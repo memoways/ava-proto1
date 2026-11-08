@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationalSessionContext } from "@/types";
-import { baseDimensionQuestions, CONVERSATIONAL_DIMENSIONS, validateConversationalQuestionnaire } from "./conversationalQuestionnaire";
+import { baseDimensionQuestions, CONVERSATIONAL_DIMENSIONS } from "./conversationalQuestionnaire";
 import {
   applyFollowUp,
-  buildProvisionalQuestionnaire,
   canRequestFollowUp,
   confirmScore,
   currentDimension,
   detectSpokenScore,
   progressLabel,
-  rawSummary,
   startFlow,
   submitAnswer,
   submitFollowUpAnswer,
@@ -111,17 +109,6 @@ describe("conversational questionnaire flow", () => {
     expect(detectSpokenScore("j’ai parlé 4 minutes avec Max")).toBeNull();
     expect(detectSpokenScore("je dirais 7")).toBeNull();
     expect(detectSpokenScore("c'était bien")).toBeNull();
-  });
-
-  it("builds a valid provisional payload with a raw summary", () => {
-    let state = startFlow(questions);
-    const scores = [4, null, 3, 5, 2] as const;
-    for (const score of scores) state = runDimension(state, "Réponse.", score);
-    const data = buildProvisionalQuestionnaire(state, context, new Date("2026-11-08T12:00:00Z"));
-    expect(validateConversationalQuestionnaire(data)).toEqual([]);
-    expect(data.summary).toEqual({ text: rawSummary(state), edited_by_user: false, validated_at: "2026-11-08T12:00:00.000Z" });
-    expect(data.summary.text).toContain("Intérêt — non évalué");
-    expect(data.session_context).toBe(context);
   });
 
   it("never turns session context into a question", () => {

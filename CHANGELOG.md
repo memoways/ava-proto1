@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel, lot 3 : validation finale, radar et admin agrégé] — 2026-11-08
+
+- Validation finale (`ConversationalReview`, `conversationalQuestionnaireReview.ts`) : synthèse par dimension
+  éditable (réponse, relance, commentaire), note modifiée seulement par un toucher explicite, `edited_by_user` vrai
+  dès qu'un texte ou une note change ; « Valider et envoyer » seul déclencheur d'enregistrement.
+- Radar 5 axes (`ConversationalRadar`) montré au participant : dimensions non évaluées listées à part, jamais à 0.
+- Consentement à la conservation de la transcription obligatoire (jamais l'audio) ; email facultatif validé ;
+  opt-ins PRD4 repris, actifs seulement avec un email.
+- Admin Questionnaires : radar des moyennes (seules notes données), comptes « non évalué », verbatims par dimension,
+  filtre appareil, détail dédié ; PRD4/legacy inchangés. Export Markdown : section questionnaire conversationnel.
+- Enregistrement provisoire du lot 2 retiré. Aucune Edge Function modifiée. Envoi réel vers Notion et recette voix
+  réelle non faits.
+
 ## [Questionnaire conversationnel, lot 2 : parcours vocal derrière un réglage admin] — 2026-11-08
 
 - Réglage `QUESTIONNAIRE_MODE` (« Questionnaire conversationnel (à la voix) », onglet Game Master), désactivé par défaut :

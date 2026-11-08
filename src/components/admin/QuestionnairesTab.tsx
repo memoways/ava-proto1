@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,6 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Trash2, Eye } from "lucide-react";
 import type { SessionRow } from "./SessionsTab";
+import { isConversationalQuestionnaire } from "@/services/conversationalQuestionnaire";
+import { conversationalRows, DEVICE_LABELS } from "@/services/conversationalQuestionnaireAggregate";
+import { ConversationalQuestionnaireDetail, ConversationalQuestionnairesPanel } from "./ConversationalQuestionnairesPanel";
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
 
@@ -29,6 +32,7 @@ export default function QuestionnairesTab({ sessions, onRefresh }: Props) {
   const [deleting, setDeleting] = useState(false);
 
   const withQ = sessions.filter((s) => s.questionnaire_responses);
+  const conversational = useMemo(() => conversationalRows(withQ), [withQ]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -80,6 +84,8 @@ export default function QuestionnairesTab({ sessions, onRefresh }: Props) {
         </div>
       </div>
 
+      {conversational.length > 0 && <ConversationalQuestionnairesPanel rows={conversational} />}
+
       <div className="overflow-x-auto border rounded-lg">
         <table className="w-full text-sm">
           <thead>
@@ -104,6 +110,7 @@ export default function QuestionnairesTab({ sessions, onRefresh }: Props) {
           <tbody>
             {withQ.map((s) => {
               const q = s.questionnaire_responses;
+              const conv = isConversationalQuestionnaire(q) ? q : null;
               return (
                 <tr key={s.id} className="border-b hover:bg-accent/30">
                   <td className="p-2">
@@ -114,12 +121,25 @@ export default function QuestionnairesTab({ sessions, onRefresh }: Props) {
                   </td>
                   <td className="p-2 font-mono text-xs">{s.name || s.id.slice(0, 8)}</td>
                   <td className="p-2 text-xs">{fmt(s.started_at)}</td>
-                  <td className="p-2 text-center">{q.experience_rating}/10</td>
-                  <td className="p-2 text-xs">{q.experience_word || "—"}</td>
-                  <td className="p-2 text-center">{q.nps}/10</td>
-                  <td className="p-2 text-center">{q.immersion_story}/5</td>
-                  <td className="p-2 text-center">{s.trust_level ?? 0}</td>
-                  <td className="p-2 text-xs max-w-[200px] truncate">{q.open_feedback || "—"}</td>
+                  {conv ? (
+                    <>
+                      <td className="p-2 text-xs" colSpan={3}>
+                        Conversationnel · {conv.session_context?.device_class ? DEVICE_LABELS[conv.session_context.device_class] : "appareil inconnu"}
+                      </td>
+                      <td className="p-2 text-center">{conv.dimensions.immersion?.score == null ? "—" : `${conv.dimensions.immersion.score}/5`}</td>
+                      <td className="p-2 text-center">{s.trust_level ?? 0}</td>
+                      <td className="p-2 text-xs max-w-[200px] truncate">{conv.summary?.text || "—"}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="p-2 text-center">{q.experience_rating}/10</td>
+                      <td className="p-2 text-xs">{q.experience_word || "—"}</td>
+                      <td className="p-2 text-center">{q.nps}/10</td>
+                      <td className="p-2 text-center">{q.immersion_story}/5</td>
+                      <td className="p-2 text-center">{s.trust_level ?? 0}</td>
+                      <td className="p-2 text-xs max-w-[200px] truncate">{q.open_feedback || "—"}</td>
+                    </>
+                  )}
                   <td className="p-2">
                     <button
                       onClick={() => setViewSession(s)}
@@ -147,7 +167,10 @@ export default function QuestionnairesTab({ sessions, onRefresh }: Props) {
               📋 Questionnaire — {viewSession?.name || viewSession?.id.slice(0, 8)}
             </DialogTitle>
           </DialogHeader>
-          {viewSession?.questionnaire_responses && (
+          {viewSession && isConversationalQuestionnaire(viewSession.questionnaire_responses) && (
+            <ConversationalQuestionnaireDetail data={viewSession.questionnaire_responses} />
+          )}
+          {viewSession?.questionnaire_responses && !isConversationalQuestionnaire(viewSession.questionnaire_responses) && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <Stat label="Note expérience" value={`${viewSession.questionnaire_responses.experience_rating}/10`} />

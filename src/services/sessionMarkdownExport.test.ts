@@ -34,6 +34,21 @@ describe("session Markdown report", () => {
     expect(md).toContain("repli GM");
     expect(md).toContain("402");
   });
+  it("adds a readable conversational questionnaire section and leaves PRD4 answers to the raw metadata", () => {
+    const data = fixture();
+    const dimension = (score: number | null) => ({ question: "Q ?", answer: "Bien.", follow_up: null, score, score_source: score === null ? null : "touch", score_comment: null });
+    data.session.questionnaire_responses = { version: "conversational-v1", summary: { text: "", edited_by_user: true, validated_at: "2026-11-08T12:00:00Z" },
+      dimensions: { fluidity: { ...dimension(4), follow_up: { question: "Pourquoi ?", answer: "Les silences." } }, interest: dimension(null), immersion: dimension(3), character_credibility: dimension(5), emotional_engagement: dimension(2) } };
+    const md = buildSessionMarkdown(data);
+    expect(md).toContain("## Questionnaire conversationnel");
+    expect(md).toContain("| Intérêt | non évalué |");
+    expect(md).toContain("| Fluidité | 4/5 |");
+    expect(md).toContain("**Relance :** Pourquoi ?");
+    expect(md).toContain("Synthèse corrigée par la personne : oui");
+    const prd4 = fixture();
+    prd4.session.questionnaire_responses = { version: "prd4", answers: {}, technical: {} };
+    expect(buildSessionMarkdown(prd4)).not.toContain("## Questionnaire conversationnel");
+  });
   it("exports all selected reports and handles empty conversations", () => {
     const empty = { session: { id: "s2", conversation_log: [] }, telemetry: {}, warnings: [] };
     const md = buildSessionsMarkdown([fixture(), empty], "2026-10-27T18:44:00Z");

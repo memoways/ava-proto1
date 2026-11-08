@@ -1456,9 +1456,17 @@ for (const followUp of ["Qu'est-ce qui accrochait, exactement ?", "fail"] as con
       await next.click();
     }
     expect(fakes.getFollowUpCallCount()).toBe(5);
-    await expect(page.getByLabel("Synthèse brute")).toContainText("Intérêt — non évalué");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Enregistrer mes réponses" }).click();
+    // Final validation: radar with « non évalué » apart, nothing saved before « Valider et envoyer ».
+    await expect(page.getByTestId("radar-not-rated")).toContainText("Intérêt");
+    await expect(page.getByTestId("radar-point-interest")).toHaveCount(0);
+    expect(fakes.getSessionUpdates().some((patch) => typeof patch === "object" && patch !== null && "questionnaire_responses" in patch)).toBe(false);
+    const send = page.getByRole("button", { name: "Valider et envoyer" });
+    await expect(send).toBeDisabled();
+    await page.getByLabel("Ta réponse — Immersion").fill("Réponse 3, corrigée à la relecture.");
+    await page.getByRole("checkbox", { name: /transcription de mes réponses/ }).check();
+    await page.getByLabel("Ton email (facultatif)").fill("lea@example.com");
+    await page.getByRole("checkbox", { name: /feedback plus détaillé/ }).check();
+    await send.click();
     await expect(page.getByRole("button", { name: /Recommencer/ })).toBeVisible();
 
     const saved = fakes.getSessionUpdates().find((patch): patch is { questionnaire_responses: Record<string, unknown> } =>
@@ -1469,7 +1477,10 @@ for (const followUp of ["Qu'est-ce qui accrochait, exactement ?", "fail"] as con
         fluidity: { answer: "Bof, ça accrochait.", score: 4, score_source: "touch",
           follow_up: followUp === "fail" ? null : { question: followUp, answer: "Les silences avant chaque réponse." } },
         interest: { score: null, score_source: null },
+        immersion: { answer: "Réponse 3, corrigée à la relecture.", score: 3 },
       },
+      summary: { edited_by_user: true },
+      consent: { transcript_storage: true, contact_email: "lea@example.com", opt_in_updates: false, opt_in_feedback: true },
       session_context: { characters_called: ["max"], turn_count: 1 },
     });
     await expect.poll(() => fakes.getSyncQuestionnaireBodies().length).toBe(1);
