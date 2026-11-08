@@ -7,6 +7,7 @@ const GAMEPLAY: GameplaySettings = {
   TRUST_THRESHOLD: 0.62,
   TIMEOUT_SECONDS: 300,
   SHOW_QUESTIONNAIRE: true,
+  QUESTIONNAIRE_MODE: "prd4",
   VOICE_INCREMENTAL_OUTPUT: false,
   VOICE_ONLY_UI: false,
   VOICE_HANDS_FREE: { enabled: false, endOfSpeechMs: 900, hesitationExtraMs: 700, bargeInEnabled: true, bargeInMinWords: 2 },

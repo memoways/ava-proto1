@@ -489,6 +489,65 @@ export function saveTTSSettings(settings: Partial<TTSSettings>): TTSSettings {
   return saveTTSSettingsLocal(settings);
 }
 
+// ===== Conversational questionnaire follow-up =====
+
+/**
+ * Editorial prompt for the single follow-up per dimension. The editorial text
+ * lives in the Notion task (Gamilab) « Questionnaire conversationnel » ; this
+ * default mirrors it and can be overridden per environment in admin_settings
+ * (key below), cached in localStorage.
+ */
+export interface QuestionnaireFollowUpSettings {
+  prompt: string;
+  /** Hard client timeout: past it the participant goes on without a follow-up. */
+  timeoutMs: number;
+  /** Empty = the conversation LLM model (LLM_MODEL). */
+  model: string;
+}
+
+const QUESTIONNAIRE_FOLLOW_UP_STORAGE_KEY = "ava_questionnaire_followup_settings";
+
+export const DEFAULT_QUESTIONNAIRE_FOLLOW_UP_PROMPT = `Tu accompagnes un court retour d'expérience après une fiction conversationnelle (« Où est Ava ? »). La personne vient de répondre à une question ouverte sur une dimension de son expérience. Tu décides s'il faut UNE relance, et laquelle.
+
+Relance seulement si la réponse est incomplète (elle ne dit pas pourquoi, ou reste vague : « bien », « bof », « ça allait ») ou contradictoire (deux affirmations qui s'opposent). Si la réponse est claire et motivée, pas de relance.
+
+La relance :
+- est une seule question courte (25 mots maximum), en tutoiement, neutre et bienveillante ;
+- reprend les mots de la personne pour lui demander de préciser ou de lever la contradiction ;
+- ne suggère aucune réponse, ne propose aucun exemple, ne complète jamais à sa place ;
+- ne cite jamais une mesure ni une donnée de session (pas de latence, de durée, de nombre, d'erreur, d'appareil mesuré) : le contexte de session sert seulement à choisir l'angle, jamais à l'affirmer ;
+- ne demande jamais ce que la session connaît déjà (film vu ou non, personnages appelés, appareil, durée).
+
+Réponds uniquement en JSON : {"follow_up": "ta question"} ou {"follow_up": null}.`;
+
+const questionnaireFollowUpDefaults: QuestionnaireFollowUpSettings = {
+  prompt: DEFAULT_QUESTIONNAIRE_FOLLOW_UP_PROMPT,
+  timeoutMs: 6000,
+  model: "",
+};
+
+function normalizeQuestionnaireFollowUpSettings(value: Partial<QuestionnaireFollowUpSettings> | null | undefined): QuestionnaireFollowUpSettings {
+  const prompt = typeof value?.prompt === "string" && value.prompt.trim() ? value.prompt : questionnaireFollowUpDefaults.prompt;
+  const timeout = Number(value?.timeoutMs);
+  return {
+    prompt,
+    timeoutMs: Number.isFinite(timeout) && timeout >= 1000 && timeout <= 20000 ? Math.round(timeout) : questionnaireFollowUpDefaults.timeoutMs,
+    model: typeof value?.model === "string" ? value.model.trim() : "",
+  };
+}
+
+export function getQuestionnaireFollowUpSettings(): QuestionnaireFollowUpSettings {
+  try {
+    const stored = readEnvironmentStorage(QUESTIONNAIRE_FOLLOW_UP_STORAGE_KEY);
+    if (stored) return normalizeQuestionnaireFollowUpSettings(JSON.parse(stored));
+  } catch { /* ignore */ }
+  return { ...questionnaireFollowUpDefaults };
+}
+
+export async function loadQuestionnaireFollowUpSettingsFromDB(): Promise<QuestionnaireFollowUpSettings> {
+  return normalizeQuestionnaireFollowUpSettings(await loadFromDB(QUESTIONNAIRE_FOLLOW_UP_STORAGE_KEY, questionnaireFollowUpDefaults));
+}
+
 // ===== Gameplay / Experience Settings =====
 
 export interface GameplaySettings {
@@ -497,6 +556,11 @@ export interface GameplaySettings {
   TIMEOUT_SECONDS: number;
   /** Affiche le questionnaire PRD4 après l'écran de fin de session. */
   SHOW_QUESTIONNAIRE: boolean;
+  /**
+   * Questionnaire shown when SHOW_QUESTIONNAIRE is on: PRD4 form (default) or the
+   * voice-first conversational questionnaire (docs/plan_questionnaire_conversationnel.md).
+   */
+  QUESTIONNAIRE_MODE: QuestionnaireMode;
   MAX_INSULT_TOLERANCE: number;
   MIN_QUESTIONS_BEFORE_GATE: number;
   RAG_TOP_K: number;
@@ -522,6 +586,13 @@ export interface GameplaySettings {
 
 const GAMEPLAY_STORAGE_KEY = "ava_gameplay_settings";
 
+export type QuestionnaireMode = "prd4" | "conversational";
+
+/** Anything but an explicit "conversational" falls back to the PRD4 form. */
+export function normalizeQuestionnaireMode(value: unknown): QuestionnaireMode {
+  return value === "conversational" ? "conversational" : "prd4";
+}
+
 /** Le défaut global reste `legacy` tant que la canary rich_v2 n'est pas validée. */
 export function normalizeMaxPromptVariant(
   value: unknown,
@@ -535,6 +606,7 @@ const gameplayDefaults: GameplaySettings = {
   TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
   SHOW_QUESTIONNAIRE: true,
+  QUESTIONNAIRE_MODE: "prd4",
   MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
   MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
   RAG_TOP_K: defaultSettings.RAG_TOP_K,
@@ -564,6 +636,7 @@ export function getGameplaySettings(): GameplaySettings {
         VOICE_HANDS_FREE: normalizeHandsFreeSettings(parsed.VOICE_HANDS_FREE),
         VOICE_INCREMENTAL_OUTPUT: parsed.VOICE_INCREMENTAL_OUTPUT === true,
         VOICE_ONLY_UI: parsed.VOICE_ONLY_UI === true,
+        QUESTIONNAIRE_MODE: normalizeQuestionnaireMode(parsed.QUESTIONNAIRE_MODE),
       };
     }
   } catch { /* ignore */ }
@@ -578,6 +651,7 @@ export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
     VOICE_HANDS_FREE: normalizeHandsFreeSettings(loaded.VOICE_HANDS_FREE),
     VOICE_INCREMENTAL_OUTPUT: loaded.VOICE_INCREMENTAL_OUTPUT === true,
     VOICE_ONLY_UI: loaded.VOICE_ONLY_UI === true,
+    QUESTIONNAIRE_MODE: normalizeQuestionnaireMode(loaded.QUESTIONNAIRE_MODE),
   };
 }
 

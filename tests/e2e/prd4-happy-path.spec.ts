@@ -52,6 +52,8 @@ interface NetworkFakeOptions {
   delayWhisperResponseMs?: number;
   handsFree?: boolean;
   skipQuestionnaire?: boolean;
+  /** Conversational questionnaire (lot 2); `followUp` = proxy-llm reply ("fail" → 503). */
+  conversationalQuestionnaire?: { followUp: string | null | "fail" };
   delayFirstSTTFinalMs?: number;
   /** Server output setting; "streaming_avatar" makes the avatar the configured mode. */
   outputMode?: "streaming_avatar";
@@ -77,6 +79,8 @@ async function installNetworkFakes(
   }
   let maxTurnCount = 0;
   let labelCallCount = 0;
+  let followUpCallCount = 0;
+  const syncQuestionnaireBodies: Array<Record<string, unknown>> = [];
   let gmPostTurnCount = 0;
   let ragCallCount = 0;
   let summaryCallCount = 0;
@@ -102,7 +106,7 @@ async function installNetworkFakes(
   let sessionRow: Record<string, unknown> = {};
   let memoryLastTurn = 0;
 
-  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, delayFirstSTTFinalMs, incrementalOutput, gradiumDropAt, p2 }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; delayFirstSTTFinalMs: number; incrementalOutput: boolean; gradiumDropAt: number; p2: boolean }) => {
+  await page.addInitScript(({ transcripts, simulateAudio, batchAudio, handsFree, skipQuestionnaire, conversational, delayFirstSTTFinalMs, incrementalOutput, gradiumDropAt, p2 }: { transcripts: string[]; simulateAudio: boolean; batchAudio: boolean; handsFree: boolean; skipQuestionnaire: boolean; conversational: boolean; delayFirstSTTFinalMs: number; incrementalOutput: boolean; gradiumDropAt: number; p2: boolean }) => {
     let websocketIndex = 0;
     let gradiumIndex = 0;
     type E2ETestWindow = Window & {
@@ -147,6 +151,7 @@ async function installNetworkFakes(
       ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
       ...(p2 ? { VOICE_ONLY_UI: true } : {}),
       ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
+      ...(conversational ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
     }));
     if (batchAudio) localStorage.setItem("ava:prod:ava_stt_settings", JSON.stringify({ activeProvider: "openai_whisper" }));
     // PostHog intentionally filters HeadlessChrome as a bot. Use a regular
@@ -350,6 +355,7 @@ async function installNetworkFakes(
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: E2EMediaRecorder });
   }, { transcripts, simulateAudio: options.ttsSuccess === true, batchAudio: options.whisperResponse !== undefined,
     handsFree: options.handsFree === true, skipQuestionnaire: options.skipQuestionnaire === true,
+    conversational: options.conversationalQuestionnaire !== undefined,
     delayFirstSTTFinalMs: options.delayFirstSTTFinalMs ?? 0,
     incrementalOutput: options.incrementalOutput === true, p2: options.p2 === true,
     gradiumDropAt: options.gradiumDropAt ?? -1,
@@ -484,6 +490,7 @@ async function installNetworkFakes(
           ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(options.p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
           ...(options.p2 ? { VOICE_ONLY_UI: true } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
+          ...(options.conversationalQuestionnaire ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
         } }]);
       }
       return json(route, []);
@@ -599,6 +606,18 @@ async function installNetworkFakes(
       const payload = request.postDataJSON() as { stream?: boolean; messages?: Array<{ role: string; content: string }> };
       const system = payload.messages?.[0]?.content ?? "";
       let content: string;
+      if (system.includes("court retour d'expérience")) {
+        followUpCallCount += 1;
+        const followUp = options.conversationalQuestionnaire?.followUp ?? null;
+        if (followUp === "fail") return json(route, { error: "simulated_follow_up_failure" }, 503);
+        // Only the first dimension gets a follow-up; the others need none.
+        const reply = followUpCallCount === 1 ? followUp : null;
+        return json(route, {
+          id: `follow-up-${followUpCallCount}`, model: "e2e-model",
+          choices: [{ message: { content: JSON.stringify({ follow_up: reply }) }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
+        });
+      }
       if (system.includes("analyste du Game Master")) {
         labelCallCount += 1;
         content = JSON.stringify(
@@ -699,6 +718,10 @@ async function installNetworkFakes(
         usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
       });
     }
+    if (functionName === "sync-questionnaire") {
+      syncQuestionnaireBodies.push(request.postDataJSON() as Record<string, unknown>);
+      return json(route, { ok: true });
+    }
     if (functionName === "summarize-session") {
       summaryCallCount += 1;
       const payload = request.postDataJSON() as { turn_count?: number };
@@ -728,6 +751,8 @@ async function installNetworkFakes(
     getVoiceEvents: () => voiceEvents,
     getGmFilmContexts: () => gmFilmContexts,
     getTtsCallCount: () => ttsCallCount,
+    getFollowUpCallCount: () => followUpCallCount,
+    getSyncQuestionnaireBodies: () => syncQuestionnaireBodies,
     getTtsText: () => ttsTexts.join(" "),
     getTtsSubmittedText: async () => options.incrementalOutput
       ? page.evaluate(() => (window as Window & { __e2eGradiumTexts?: string[] }).__e2eGradiumTexts?.join(' ') ?? '')
@@ -1393,6 +1418,64 @@ test("parcours PRD4 heureux avec trois tours de conversation", async ({ page }) 
   expect(fakes.getSessionUpdates().length).toBeGreaterThanOrEqual(1);
   await expect.poll(fakes.getPosthogRequestCount, { timeout: 10_000 }).toBeGreaterThan(0);
 });
+
+for (const followUp of ["Qu'est-ce qui accrochait, exactement ?", "fail"] as const) {
+  test(`questionnaire conversationnel au clavier : cinq dimensions, ${followUp === "fail" ? "relance en échec ignorée" : "une relance"}, aucune voix de sortie`, async ({ page }) => {
+    test.setTimeout(60_000);
+    const fakes = await installNetworkFakes(page, TRANSCRIPTS, { conversationalQuestionnaire: { followUp } });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Commencer" }).click();
+    await page.getByRole("button", { name: /Passer/ }).click();
+    await answerFilmQuestion(page);
+    await page.getByRole("button", { name: "Appeler Max" }).click();
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect(page.getByText(new RegExp(TRANSCRIPTS[0].slice(0, 24)))).toBeVisible();
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+    await expect.poll(fakes.getMaxTurnCount).toBe(1);
+    await page.getByRole("button", { name: "Terminer", exact: true }).click();
+    await page.getByRole("button", { name: "Terminer l’expérience", exact: true }).click();
+    await page.getByRole("button", { name: "Continuer", exact: true }).click();
+
+    await expect(page.getByText("1/5", { exact: true })).toBeVisible();
+    await expect(page.getByText("10 questions courtes — 2 min.")).toHaveCount(0);
+    const ttsBefore = fakes.getTtsCallCount();
+    const scores = ["4", null, "3", "5", "2"];
+    for (let i = 0; i < 5; i += 1) {
+      await expect(page.getByText(`${i + 1}/5`, { exact: true })).toBeVisible();
+      await page.getByLabel("Ta réponse").fill(i === 0 ? "Bof, ça accrochait." : `Réponse ${i + 1}, parce que c'était clair.`);
+      await page.getByRole("button", { name: "Valider ma réponse" }).click();
+      if (i === 0 && followUp !== "fail") {
+        await expect(page.getByText(followUp)).toBeVisible();
+        await page.getByLabel("Ta précision").fill("Les silences avant chaque réponse.");
+        await page.getByRole("button", { name: "Valider ma précision" }).click();
+      }
+      const next = page.getByRole("button", { name: i === 4 ? "Terminer" : "Question suivante", exact: true });
+      await expect(next).toBeDisabled();
+      if (scores[i]) await page.getByRole("button", { name: `Note ${scores[i]} sur 5` }).click();
+      else await page.getByRole("button", { name: "Je préfère ne pas noter" }).click();
+      await next.click();
+    }
+    expect(fakes.getFollowUpCallCount()).toBe(5);
+    await expect(page.getByLabel("Synthèse brute")).toContainText("Intérêt — non évalué");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Enregistrer mes réponses" }).click();
+    await expect(page.getByRole("button", { name: /Recommencer/ })).toBeVisible();
+
+    const saved = fakes.getSessionUpdates().find((patch): patch is { questionnaire_responses: Record<string, unknown> } =>
+      typeof patch === "object" && patch !== null && "questionnaire_responses" in patch);
+    expect(saved?.questionnaire_responses).toMatchObject({
+      version: "conversational-v1",
+      dimensions: {
+        fluidity: { answer: "Bof, ça accrochait.", score: 4, score_source: "touch",
+          follow_up: followUp === "fail" ? null : { question: followUp, answer: "Les silences avant chaque réponse." } },
+        interest: { score: null, score_source: null },
+      },
+      session_context: { characters_called: ["max"], turn_count: 1 },
+    });
+    await expect.poll(() => fakes.getSyncQuestionnaireBodies().length).toBe(1);
+    expect(fakes.getTtsCallCount()).toBe(ttsBefore);
+  });
+}
 
 test("une réponse vocale plus longue que le watchdog est lue jusqu'au bout", async ({ page }) => {
   const longResponse = "D'accord, je vais reprendre calmement. La tension à la maison est palpable. Emma et moi ne nous parlons presque plus, et Léo comme Ava restent profondément affectés. J'essaie de les protéger sans toujours savoir si je fais les bons choix.";

@@ -77,6 +77,7 @@ export default function GameMasterConfigTab() {
       const updated = saveGameplaySettings({
         TIMEOUT_SECONDS: gameplay.TIMEOUT_SECONDS,
         SHOW_QUESTIONNAIRE: gameplay.SHOW_QUESTIONNAIRE,
+        QUESTIONNAIRE_MODE: gameplay.QUESTIONNAIRE_MODE,
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
         VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
         VOICE_ONLY_UI: gameplay.VOICE_ONLY_UI,
@@ -107,6 +108,7 @@ export default function GameMasterConfigTab() {
 
   const globalChanged = gameplay.TIMEOUT_SECONDS !== savedGameplay.TIMEOUT_SECONDS
     || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE
+    || gameplay.QUESTIONNAIRE_MODE !== savedGameplay.QUESTIONNAIRE_MODE
     || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
     || gameplay.VOICE_ONLY_UI !== savedGameplay.VOICE_ONLY_UI
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
@@ -173,6 +175,21 @@ export default function GameMasterConfigTab() {
             checked={gameplay.SHOW_QUESTIONNAIRE}
             onCheckedChange={(checked) => setGameplay((current) => ({ ...current, SHOW_QUESTIONNAIRE: checked }))}
             aria-label="Afficher le questionnaire final"
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+          <div>
+            <p className="text-sm font-medium">Questionnaire conversationnel (à la voix)</p>
+            <p className="text-xs text-muted-foreground">
+              Activé, le questionnaire final devient un échange court : une dimension à la fois, réponse à la voix ou au clavier, une relance au plus, note confirmée. Désactivé, le formulaire PRD4 reste affiché.
+            </p>
+          </div>
+          <Switch
+            checked={gameplay.QUESTIONNAIRE_MODE === "conversational"}
+            disabled={!gameplay.SHOW_QUESTIONNAIRE}
+            onCheckedChange={(checked) => setGameplay((current) => ({ ...current, QUESTIONNAIRE_MODE: checked ? "conversational" : "prd4" }))}
+            aria-label="Questionnaire conversationnel"
           />
         </div>
       </section>

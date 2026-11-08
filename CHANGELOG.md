@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel, lot 2 : parcours vocal derrière un réglage admin] — 2026-11-08
+
+- Réglage `QUESTIONNAIRE_MODE` (« Questionnaire conversationnel (à la voix) », onglet Game Master), désactivé par défaut :
+  le formulaire PRD4 reste le repli, inchangé.
+- Écran `ConversationalQuestionnaire` : une dimension à la fois avec repère « X/5 », question affichée et jamais lue
+  (aucun TTS), réponse dictée par la façade `src/services/stt` (`useDictation`) ou tapée, texte affiché au fil de la
+  parole et corrigeable, aucune avance automatique.
+- Relance unique par dimension générée par `proxy-llm` (`conversationalFollowUp.ts`) avec un contexte de session
+  qualitatif ; filtre des mesures citées ; échec ou délai → pas de relance. Prompt éditorial dans la tâche Notion,
+  défaut dans `settingsService.ts`, surcharge admin_settings `ava_questionnaire_followup_settings`.
+- Note : pastilles 1–5 ou « je préfère ne pas noter » (`null`) ; une note dite (« je dirais 4 ») est proposée puis
+  confirmée (`voice_confirmed`) ; jamais de valeur par défaut.
+- Enregistrement provisoire `conversational-v1` avec synthèse brute et consentement à la transcription ; validation
+  finale et radar au lot 3.
+- Tests : `conversationalQuestionnaireFlow.test.ts`, `conversationalFollowUp.test.ts`,
+  `ConversationalQuestionnaire.test.tsx`, deux E2E clavier.
+
 ## [Recette iPad : cause du micro visible ; console d'invitations : mot de passe retrouvable] — 2026-11-08
 
 - iPad (sessions `9166856f`, `ace79a1c`, `780c635e`, tablette, mains libres) : le micro ne démarrait jamais (aucun

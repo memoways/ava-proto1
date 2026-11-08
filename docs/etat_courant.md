@@ -54,13 +54,15 @@ lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'
 après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres
 personnages en haut à gauche. Reste la recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
 
-**Questionnaire conversationnel (8 novembre, lot 1 livré, sans écran).** Remplacer le formulaire PRD4 par un échange
-vocal court : questions affichées sans voix de sortie, 5 dimensions, une relance max, note 1–5 confirmée ou « non évalué »,
-synthèse validée, radar, pas d'audio stocké, rien de demandé que la session connaît. Lot 1 : types, `buildSessionContext`
-(`src/services/conversationalQuestionnaire.ts`), sauvegarde `conversational-v1` qui n'écrase jamais PRD4/legacy, branche
-`sync-questionnaire` et 16 colonnes Notion « Conv ». Redéploiement de `sync-questionnaire` via Lovable requis.
-[Plan](plan_questionnaire_conversationnel.md), [prompt lot 2](prompt_reprise_questionnaire_conversationnel_lot_2.md)
-(parcours vocal derrière un réglage admin).
+**Questionnaire conversationnel (8 novembre, lot 2 : parcours vocal, désactivé par défaut).** Remplacer le formulaire
+PRD4 par un échange vocal court : 5 dimensions, une relance max, note 1–5 confirmée ou « non évalué », pas d'audio stocké,
+rien de demandé que la session connaît. Lot 1 : modèle, `buildSessionContext`, sauvegarde `conversational-v1`, branche
+`sync-questionnaire`, 16 colonnes Notion « Conv ». Lot 2 : réglage admin « Questionnaire conversationnel (à la voix) »
+(Game Master, `QUESTIONNAIRE_MODE`, défaut PRD4), écran `ConversationalQuestionnaire` (question affichée, jamais lue ;
+dictée par la façade STT ou clavier, texte corrigeable ; relance `proxy-llm` unique, filtrée, abandonnée en cas d'échec ;
+pastilles 1–5 / « je préfère ne pas noter », note dite confirmée), enregistrement provisoire avec synthèse brute.
+Recette humaine (voix réelle smartphone/desktop) non faite. [Plan](plan_questionnaire_conversationnel.md),
+[prompt lot 3](prompt_reprise_questionnaire_conversationnel_lot_3.md) (validation finale et radar).
 
 **Adaptation aux écrans, lot 3 (8 novembre, code) — dernier lot du plan.** Tablette : même écran vidéo (avatar gardé),
 avec une prop `touchFirst` calculée une fois depuis la classe (`touchFirstFor`) : cibles 44 px (Terminer, Ignorer,
