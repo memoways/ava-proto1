@@ -106,8 +106,9 @@ import TransitionScreen from "@/components/prd4/TransitionScreen";
 import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
 import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
-import { conversationLayoutFor, resolveCallOutputMode } from "@/services/callOutputMode";
+import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
 import { getDeviceClass } from "@/services/deviceClass";
+import { cn } from "@/lib/utils";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ThanksScreen from "@/components/ThanksScreen";
@@ -248,6 +249,7 @@ const IndexPRD4 = () => {
   const [voiceOnly, setVoiceOnly] = useState(false);
   // Computed once from the frozen device class: smartphones get the voice call screen.
   const [conversationLayout] = useState(() => conversationLayoutFor(getDeviceClass()));
+  const [touchFirst] = useState(() => touchFirstFor(getDeviceClass()));
   const rescueRef = useRef(new Map<RuntimeCharacter, { text: string; blob: Blob }>());
   const lastRescueRef = useRef(new Map<RuntimeCharacter, string>());
   const rescuePendingRef = useRef(new Set<RuntimeCharacter>());
@@ -3501,8 +3503,9 @@ const IndexPRD4 = () => {
           onSelect={handleSelectCharacter}
           onLockedClick={handleLockedClick}
           onReviewIntroduction={handleIntroductionReview}
+          touchFirst={touchFirst}
         />
-        {sessionIdRef.current ? <button className="fixed bottom-4 right-4 underline max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:min-h-11 max-sm:px-3" onClick={() => void finalizeAndEnd('user_end_experience')}>Terminer l’expérience</button> : null}
+        {sessionIdRef.current ? <button className={cn("fixed bottom-4 right-4 underline max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:min-h-11 max-sm:px-3", touchFirst && "min-h-11 px-3")} onClick={() => void finalizeAndEnd('user_end_experience')}>Terminer l’expérience</button> : null}
         </>
       );
       break;
@@ -3525,6 +3528,7 @@ const IndexPRD4 = () => {
               onPTTPress={handlePTTPress}
               onPTTRelease={handlePTTRelease}
               layout={conversationLayout}
+              touchFirst={touchFirst}
               handsFree={handsFreeEnabled}
               voiceOnly={voiceOnly}
               handsFreeListening={handsFreeListening}
@@ -3602,6 +3606,7 @@ const IndexPRD4 = () => {
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         active={cinematicActive}
         showSkip={teaserActive || (interludeActive && cinematic.phase === "playing")}
+        touchFirst={touchFirst}
       />
       {screen}
       {/* Lot 3b: black veil for the fades between the character and the video. */}

@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
+import { cn } from "@/lib/utils";
 import { START_BUFFER_MAX_WAIT_MS, START_BUFFER_S, bufferedAheadSeconds, resolveNativeVideoSource } from "@/services/videoPlayback";
 
 /** Idle time before the pointer hides again over a playing video. */
@@ -25,6 +26,8 @@ interface GumletVideoPlayerProps {
   active?: boolean;
   /** Show the skip button overlay. */
   showSkip?: boolean;
+  /** Touch device (tablet, smartphone): « Passer » becomes a 44 px target. Computed once by the caller. */
+  touchFirst?: boolean;
   /** Optional overlay content (e.g. HUD) rendered on top of the video. */
   children?: React.ReactNode;
 }
@@ -42,6 +45,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   onError,
   active = true,
   showSkip = true,
+  touchFirst = false,
   children,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -365,7 +369,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       {showSkip ? (
         <button
           onClick={handleSkip}
-          className="absolute bottom-8 right-8 z-30 rounded-md border border-border/20 bg-black/40 px-3 py-1.5 font-mono text-xs max-sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-sm:right-4 max-sm:min-h-11 max-sm:px-4 max-sm:text-sm text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground"
+          className={cn(
+            "absolute bottom-8 right-8 z-30 rounded-md border border-border/20 bg-black/40 px-3 py-1.5 font-mono text-xs max-sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-sm:right-4 max-sm:min-h-11 max-sm:px-4 max-sm:text-sm text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground",
+            touchFirst && "min-h-11 px-4 text-sm",
+          )}
         >
           Passer →
         </button>

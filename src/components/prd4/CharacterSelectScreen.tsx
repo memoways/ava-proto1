@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import maxImg from "@/assets/characters/max.jpg";
 import emmaImg from "@/assets/characters/emma.jpg";
@@ -16,6 +17,8 @@ interface Props {
   onSelect: (id: "max" | "emma", profile: CharacterRuntimeReadiness | null) => void;
   onLockedClick?: (id: Exclude<CharId, "max">) => void;
   onReviewIntroduction?: () => void;
+  /** Touch device (tablet, smartphone): 44 px secondary link. Computed once by the caller. */
+  touchFirst?: boolean;
 }
 
 const CHARACTER_IMAGES: Record<CharId, string> = { max: maxImg, emma: emmaImg, ava: avaImg, leo: leoImg };
@@ -29,7 +32,7 @@ function portraitAlt(name: string): string {
   return name === "Emma" || name === "Ava" ? `Portrait d’${name}` : `Portrait de ${name}`;
 }
 
-const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction }: Props) => {
+const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction, touchFirst = false }: Props) => {
   const [lockedDialog, setLockedDialog] = useState(false);
   const [emmaOn, setEmmaOn] = useState(true);
   const [runtimePortraits, setRuntimePortraits] = useState<Partial<Record<"max" | "emma", string>>>({});
@@ -135,7 +138,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction }
             variant="link"
             type="button"
             onClick={onReviewIntroduction}
-            className="h-auto whitespace-normal text-sm text-muted-foreground hover:text-foreground max-sm:min-h-11"
+            className={cn("h-auto whitespace-normal text-sm text-muted-foreground hover:text-foreground max-sm:min-h-11", touchFirst && "min-h-11")}
           >
             Revoir la vidéo d’introduction
           </Button>

@@ -18,6 +18,12 @@ interface Props {
    * the caller from the device class, never from `window` here.
    */
   layout?: "video" | "call";
+  /**
+   * Touch device (tablet; smartphone too, already covered by "call"): 44 px
+   * targets, "touche" wording and `100svh` on the video screen. Computed once by
+   * the caller from the device class; false keeps the desktop render unchanged.
+   */
+  touchFirst?: boolean;
   audioState: AudioState;
   userSubtitle: string;
   maxSubtitle: string;
@@ -58,6 +64,7 @@ const characterCapsuleClass = "flex min-h-14 w-full items-center gap-3 rounded-f
 
 const ConversationScreen = ({
   layout = "video",
+  touchFirst = false,
   audioState,
   userSubtitle,
   conversationLog,
@@ -90,6 +97,7 @@ const ConversationScreen = ({
   // Le flux vidéo en direct est celui de Max. Pour tout autre personnage (Emma),
   // on n'affiche ni le flux, ni sa dernière image figée : seulement sa photo.
   const callLayout = layout === "call";
+  const touchTargets = callLayout || touchFirst;
   // The call screen never shows the avatar stream, whatever the caller requests.
   const streamingAvatarActive = streamingAvatarRequested && activeCharacter === "max" && !callLayout;
   const handoffInputBlocked = handoffCalling || handoffInputLocked;
@@ -261,7 +269,7 @@ const ConversationScreen = ({
         <span className="min-w-0 flex-1 leading-tight">Une vidéo arrive</span>
         {onIgnoreCinematic && (
           <button type="button" onClick={onIgnoreCinematic}
-            className={cn(callLayout && "min-h-11 px-2", "shrink-0 underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary")}>
+            className={cn(touchTargets && "min-h-11 px-2", "shrink-0 underline-offset-2 hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary")}>
             Ignorer
           </button>
         )}
@@ -274,9 +282,9 @@ const ConversationScreen = ({
     <>
     {/* Status helper line */}
     <p role="status" aria-live="polite" hidden={handsFree} className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
-      {audioState === "idle" && (callLayout ? "Touche pour parler" : "Clique pour parler")}
+      {audioState === "idle" && (touchTargets ? "Touche pour parler" : "Clique pour parler")}
       {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
-      {audioState === "user_speaking" && (callLayout ? "Enregistrement — touche pour envoyer" : "Enregistrement — clique pour envoyer")}
+      {audioState === "user_speaking" && (touchTargets ? "Enregistrement — touche pour envoyer" : "Enregistrement — clique pour envoyer")}
       {audioState === "user_finalizing" && "Finalisation de tout ce qui a été dit…"}
       {audioState === "max_thinking" && `${displayName} réfléchit…`}
       {audioState === "max_speaking" && `${displayName} répond…`}
@@ -413,7 +421,10 @@ const ConversationScreen = ({
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
+    <div
+      data-touch-first={touchFirst ? "true" : undefined}
+      className={cn("relative flex flex-col overflow-hidden bg-background", touchFirst ? "min-h-[100svh]" : "min-h-screen")}
+    >
       {/* Background photo (Max plein cadre) — masquée dès qu'une image vidéo existe */}
       <div
         className={cn(
@@ -499,7 +510,10 @@ const ConversationScreen = ({
           </span>
           <button
             onClick={onHangUp}
-            className="flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-sm text-foreground/80 backdrop-blur-md transition-colors hover:bg-destructive/20 hover:text-destructive"
+            className={cn(
+              "flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-2 text-sm text-foreground/80 backdrop-blur-md transition-colors hover:bg-destructive/20 hover:text-destructive",
+              touchFirst && "min-h-11 px-4",
+            )}
           >
             <PhoneOff className="h-4 w-4" />
             Terminer

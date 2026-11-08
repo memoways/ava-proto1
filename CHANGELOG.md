@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Adaptation aux écrans, lot 3 : tablette tactile et recette multi-appareils] — 2026-11-08
+
+- Tablette (classe du lot 1, forçable par `?ecran=tablette`) : écran vidéo et avatar gardés ; prop `touchFirst`
+  calculée une fois (`touchFirstFor` dans `src/services/callOutputMode.ts`) : `100svh`, « Terminer », « Ignorer »,
+  « Passer », « Revoir la vidéo d'introduction » et « Terminer l'expérience » à 44 px, « Touche pour parler ».
+  Desktop strictement inchangé ; smartphone inchangé.
+- Playwright : projets `iphone` (WebKit, iPhone 13) et `ipad` (WebKit, iPad Pro 11) limités aux tests `@iphone` /
+  `@ipad`, exclus du projet `chromium` ; répartis dans les 4 shards existants.
+- Tests : `ConversationScreen.touchFirst.test.tsx` (même écran, même avatar et mêmes capsules que desktop ; seules
+  les différences voulues), `touchFirstFor`, lien de la grille ; E2E `@device` iPad (avatar monté, cibles, capsules)
+  et iPhone (appel vocal Max puis Emma), sans tours de parole : WebKit Linux ne lit pas l'audio simulé de façon fiable.
+- Recette humaine : `docs/recette_adaptation_ecrans.md` (iPhone Safari, Android Chrome, iPad Safari, desktop Chrome,
+  latences par appareil). Dernier lot du plan d'adaptation aux écrans.
+
 ## [Adaptation aux écrans, lot 2 bis : voix de Max sur iPhone et écrans pensés pour le pouce] — 2026-11-08
 
 - Recette iPhone d'Ulrich (session `032b7235`, Safari, smartphone) : transcription OK, mais Max muet ; chaque tour

@@ -2679,3 +2679,81 @@ test('écran téléphone : appel vocal sans avatar, passage Emma puis raccrocher
   await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
   await expect(page.getByText('Connexion vidéo…')).toHaveCount(0);
 });
+
+// Screen plan, lot 3 — device projects (`iphone`, `ipad`, WebKit) run only the
+// tests tagged @iphone / @ipad; desktop Chrome skips every @device test.
+// Linux WebKit cannot play the fake voice turns reliably (audio "ended" never
+// fires, then the page crashes): these tests check layout, avatar mounting,
+// touch targets and navigation without voice turns. Turns, handoff capsule
+// clicks and cinematics stay covered by the Chromium E2E on the same components.
+async function expectTouchTarget(page: Page, name: string) {
+  const viewport = page.viewportSize()!;
+  const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+}
+
+test('@device @ipad écran tablette : avatar demandé, vidéo montée, cibles tactiles et capsules', async ({ page }) => {
+  test.setTimeout(60_000);
+  const avatarRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/functions/v1/streaming-avatar-session')) avatarRequests.push(request.url());
+  });
+  // The avatar session never answers: the <video> stays mounted for Max.
+  await page.route('**/functions/v1/streaming-avatar-session**', () => new Promise(() => {}));
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, outputMode: 'streaming_avatar' });
+  await page.goto('/?ecran=tablette');
+  await expectTouchTarget(page, 'Commencer');
+  await page.getByRole('button', { name: 'Commencer' }).click();
+  await expectTouchTarget(page, 'Passer →');
+  await page.getByRole('button', { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  await expectTouchTarget(page, 'Revoir la vidéo d’introduction');
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Portrait d’Max' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('[data-touch-first="true"]')).toBeVisible();
+  await expect(page.locator('[data-layout="call"]')).toHaveCount(0);
+  await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(1);
+  expect(avatarRequests.length).toBeGreaterThan(0);
+  await expectTouchTarget(page, 'Terminer');
+  await expectTouchTarget(page, "Démarrer l'enregistrement");
+  await expect(page.getByText('Touche pour parler')).toBeVisible();
+  // Character capsules stack in the header column, clear of each other and of « Terminer ».
+  const current = (await page.locator('[data-character-capsule="current"]').boundingBox())!;
+  const handoff = (await page.locator('[data-character-capsule="handoff"]').boundingBox())!;
+  const hangUp = (await page.getByRole('button', { name: 'Terminer', exact: true }).boundingBox())!;
+  expect(handoff.y).toBeGreaterThanOrEqual(current.y + current.height);
+  expect(handoff.height).toBeGreaterThanOrEqual(44);
+  expect(handoff.x + handoff.width).toBeLessThanOrEqual(hangUp.x);
+  expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'streaming_avatar', device_class: 'tablet' });
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
+});
+
+test('@device @iphone écran téléphone (WebKit) : appel vocal sans avatar, Max puis Emma, raccrocher', async ({ page }) => {
+  test.setTimeout(60_000);
+  const avatarRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/functions/v1/streaming-avatar-session')) avatarRequests.push(request.url());
+  });
+  const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true, outputMode: 'streaming_avatar' });
+  await page.goto('/?ecran=telephone');
+  await expectTouchTarget(page, 'Commencer');
+  await page.getByRole('button', { name: 'Commencer' }).click();
+  await page.getByRole('button', { name: /Passer/ }).click();
+  await answerFilmQuestion(page);
+  for (const name of ['Max', 'Emma'] as const) {
+    await page.getByRole('button', { name: `Appeler ${name}`, exact: true }).click();
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-layout="call"]')).toBeVisible();
+    await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
+    await expectTouchTarget(page, 'Terminer');
+    await expectTouchTarget(page, "Démarrer l'enregistrement");
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+    await expect(page.getByRole('button', { name: `Appeler ${name}`, exact: true })).toBeVisible();
+  }
+  expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'tts', streaming_avatar_provider: null, device_class: 'smartphone' });
+  expect(avatarRequests).toEqual([]);
+});

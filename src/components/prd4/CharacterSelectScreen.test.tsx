@@ -94,3 +94,13 @@ describe("CharacterSelectScreen", () => {
     expect(screen.queryByText("Emma est dans l'appartement de Lausanne.")).not.toBeInTheDocument();
   });
 });
+
+describe("CharacterSelectScreen — touch-first (tablet)", () => {
+  it("enlarges « Revoir la vidéo d’introduction » only when touchFirst is set", () => {
+    const { rerender } = render(<CharacterSelectScreen onSelect={vi.fn()} onReviewIntroduction={vi.fn()} />);
+    const link = () => screen.getByRole("button", { name: "Revoir la vidéo d’introduction" });
+    expect(link().className.split(" ")).not.toContain("min-h-11");
+    rerender(<CharacterSelectScreen onSelect={vi.fn()} onReviewIntroduction={vi.fn()} touchFirst />);
+    expect(link().className.split(" ")).toContain("min-h-11");
+  });
+});

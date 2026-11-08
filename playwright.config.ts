@@ -58,6 +58,8 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      // Device tests run on the WebKit device projects below, not on desktop Chrome.
+      grepInvert: /@device/,
       use: {
         ...devices["Desktop Chrome"],
         permissions: ["microphone"],
@@ -77,6 +79,18 @@ export default defineConfig({
       // conversation + GM trigger and is too flaky on the shared WebKit runner.
       grep: /teaser démarre|P2 :/,
       use: { ...devices["Desktop Safari"] },
+    },
+    // Screen plan, lot 3: a small @device subset on emulated Apple devices
+    // (WebKit, touch, device viewport), spread over the existing CI shards.
+    {
+      name: "iphone",
+      grep: /@iphone/,
+      use: { ...devices["iPhone 13"] },
+    },
+    {
+      name: "ipad",
+      grep: /@ipad/,
+      use: { ...devices["iPad Pro 11"] },
     },
   ],
 });

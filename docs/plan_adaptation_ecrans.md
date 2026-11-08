@@ -162,6 +162,34 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
    écouteurs, Bluetooth), mains libres, cinématique, passage Max ↔ Emma, raccrocher, questionnaire ;
    comparaison des latences par appareil dans l'admin.
 
+### Exécution lot 3 (8 novembre 2026)
+
+- Départ vérifié : PR #172 (lot 2 bis) fusionnée (`3023e7f`) ; recette iPhone du lot 2 / 2 bis encore à faire par
+  Ulrich (reprise dans la recette ci-dessous, section iPhone).
+- Prop `touchFirst` calculée une fois dans `IndexPRD4` par `touchFirstFor(getDeviceClass())` (vrai hors desktop) et
+  passée à `ConversationScreen`, `CharacterSelectScreen` et `GumletVideoPlayer` ; aucune lecture de `window` dans
+  les composants. Sur l'écran vidéo : `min-h-[100svh]` (barre Safari iPad), « Terminer » et « Ignorer » à 44 px,
+  « Touche pour parler ». Grille : « Revoir la vidéo d'introduction » et « Terminer l'expérience » à 44 px. Lecteur :
+  « Passer » à 44 px. Faux → rendu desktop strictement inchangé. Le raccourci Espace reste un bonus clavier, jamais
+  le seul moyen (le bouton micro suffit).
+- Revue (WebKit, `?ecran=tablette`, 768×1024, 1024×768, 820×1180, 1180×820, 1024×1366, 1366×1024) : avant
+  correctif, seuls « Passer » (30 px) et « Revoir la vidéo d'introduction » (36 px) étaient sous 44 px ; après,
+  aucune cible visible sous 44 px sur accueil, teaser, film, grille, conversation. Cadrage : un flux 16:9 en
+  `object-cover` sur 3:4 ou 4:3 ne coupe que les côtés, le visage reste centré, la colonne des capsules (gauche,
+  160 px) et « Terminer » (droite) ne le recouvrent pas ; `object-position` inchangé.
+- Playwright : projets `iphone` (iPhone 13) et `ipad` (iPad Pro 11), WebKit déjà installé en CI, `grep` sur
+  `@iphone` / `@ipad` ; `chromium` exclut `@device`. Deux tests courts répartis par le sharding par test.
+  iPad : avatar demandé (session avatar sans réponse → `<video>` monté), `device_class = tablet`, cibles ≥ 44 px de
+  l'accueil à la conversation, capsules empilées sans chevauchement, raccrocher. iPhone : appel vocal du lot 2 sous
+  WebKit (Max puis Emma depuis la grille, raccrocher), sans requête avatar. Premier essai CI avec des tours de parole :
+  WebKit Linux ne termine pas la lecture audio simulée puis la page plante (fragilité déjà notée pour les cinématiques) ;
+  tours, clic de la capsule de passage et cinématiques restent couverts par les E2E Chromium sur les mêmes composants.
+  Ce sont des émulations (viewport, tactile, moteur WebKit), pas de vrais appareils.
+- Durée CI avant : run 42459423384, shards e2e 6 min 00 à 7 min 05, run 7 min 11 ; après : voir le compte rendu.
+- Recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
+- **Aucun lot ne suit dans ce plan.** Restent la recette humaine signée et la reformulation de la tâche Notion
+  (« avatar vidéo » au lieu de « aucune vidéo »).
+
 ## Livraison et documentation
 
 - Plan versionné `docs/plan_adaptation_ecrans.md` ; une PR par lot via `github-delivery-exec` et la garde
