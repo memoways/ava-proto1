@@ -17,7 +17,12 @@ Si Max reste muet sur un appareil : lire `error_detail` des tours de la session
 Date : ____ · Modèle / iOS : ____ · Session : ____
 
 - [ ] Accueil : bouton « Commencer » en bas, pleine largeur, atteignable au pouce.
-- [ ] Teaser lu avec le son ; « Passer » atteignable (44 px), en bas à droite.
+- [ ] Teaser lu avec le son, **image entière** (bandes noires en portrait, rien de coupé à gauche ni à droite) ;
+      « Passer » atteignable (44 px), en bas à droite.
+- [ ] « Plein écran ⤢ » (en bas à gauche) : lecteur iOS plein écran, la rotation en paysage montre le film en
+      grand ; sortie du plein écran → le film continue ; fin du film → retour à l'expérience.
+- [ ] Voix de Max = celle choisie dans Admin › Streaming Avatar › « Services par appareil » › Smartphone
+      (session : `audio_latencies.metadata_json.provider` / `model`).
 - [ ] Question du film : image entière en pleine largeur, deux réponses en bas.
 - [ ] Grille : Max et Emma disponibles, Ava et Léo grisés ; « Revoir la vidéo d'introduction » touchable.
 - [ ] Permission micro demandée une seule fois, acceptée ; refus puis nouvel essai : message clair.

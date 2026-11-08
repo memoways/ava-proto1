@@ -10,6 +10,26 @@ const START_BUFFER_POLL_MS = 150;
 const canControlNativeMedia = () =>
   typeof window !== "undefined" && !/jsdom/i.test(window.navigator.userAgent);
 
+type WebKitVideo = HTMLVideoElement & {
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+  webkitDisplayingFullscreen?: boolean;
+};
+type LockableOrientation = ScreenOrientation & { lock?: (orientation: string) => Promise<void> };
+
+/** Leaves any fullscreen this player opened (element fullscreen or iOS native player). */
+function leaveFullscreen(video: HTMLVideoElement | null): void {
+  if (typeof document === "undefined") return;
+  try {
+    if (document.fullscreenElement && typeof document.exitFullscreen === "function") void document.exitFullscreen().catch(() => undefined);
+  } catch { /* not in fullscreen */ }
+  try { screen.orientation?.unlock?.(); } catch { /* no orientation lock */ }
+  const webkit = video as WebKitVideo | null;
+  try {
+    if (webkit?.webkitDisplayingFullscreen) webkit.webkitExitFullscreen?.();
+  } catch { /* already inline */ }
+}
+
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
   stop: () => void;
@@ -49,6 +69,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   children,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
@@ -81,6 +102,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const completeOnce = useCallback(() => {
     if (hasCompletedRef.current) return;
     hasCompletedRef.current = true;
+    leaveFullscreen(videoRef.current);
     onCompleteRef.current();
   }, []);
 
@@ -104,6 +126,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
     const video = videoRef.current;
     if (!video) return;
+    leaveFullscreen(video);
 
     // Mute first so the sound is cut synchronously, even if the decoder takes
     // another task to acknowledge pause/detach.
@@ -301,6 +324,39 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     }, POINTER_IDLE_HIDE_MS);
   }, []);
 
+  /**
+   * Touch screens: the whole film, landscape. Element fullscreen + landscape
+   * lock where the browser allows it (Android); iPhone has no element
+   * fullscreen, so its native player opens and follows the rotation.
+   */
+  const enterFullscreen = useCallback(() => {
+    const video = videoRef.current as WebKitVideo | null;
+    const container = containerRef.current;
+    if (!video) return;
+    if (container && document.fullscreenEnabled && typeof container.requestFullscreen === "function") {
+      void container.requestFullscreen({ navigationUI: "hide" })
+        .then(() => (screen.orientation as LockableOrientation | undefined)?.lock?.("landscape"))
+        .catch(() => { /* fullscreen or lock refused: the film stays whole on screen */ });
+      return;
+    }
+    try { video.webkitEnterFullscreen?.(); } catch { /* not allowed now */ }
+  }, []);
+
+  // Leaving the iOS native player must not leave the film paused.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnd = () => {
+      if (activeRef.current && !video.ended && !hasCompletedRef.current) playWithAudioRef.current();
+    };
+    video.addEventListener("webkitendfullscreen", onEnd);
+    return () => video.removeEventListener("webkitendfullscreen", onEnd);
+  }, []);
+
+  useEffect(() => {
+    if (!active) leaveFullscreen(videoRef.current);
+  }, [active]);
+
   const handleSkip = useCallback(() => {
     stopPlayback();
     onSkip();
@@ -308,6 +364,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
   return (
     <div
+      ref={containerRef}
       className={`fixed inset-0 z-0 bg-background transition-opacity duration-200 ${active ? "opacity-100" : "pointer-events-none opacity-0"} ${active && !pointerVisible ? "cursor-none" : ""}`}
       aria-hidden={!active}
       data-pointer={active && !pointerVisible ? "hidden" : "visible"}
@@ -319,7 +376,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         aria-label="Video player"
         data-source={source.url}
         data-playback-engine={playbackEngine}
-        className="absolute inset-0 h-full w-full object-cover"
+        // Whole frame on touch screens and portrait windows (no side crop);
+        // desktop landscape keeps filling the screen.
+        className={cn("absolute inset-0 h-full w-full bg-black", touchFirst ? "object-contain" : "object-cover portrait:object-contain")}
+        data-fit={touchFirst ? "contain" : "cover"}
         controls={false}
         playsInline
         preload="auto"
@@ -365,6 +425,16 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       />
 
       {active ? children : null}
+
+      {active && touchFirst ? (
+        <button
+          type="button"
+          onClick={enterFullscreen}
+          className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-4 z-30 min-h-11 rounded-md border border-border/20 bg-black/40 px-4 py-1.5 font-mono text-sm text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground"
+        >
+          Plein écran ⤢
+        </button>
+      ) : null}
 
       {showSkip ? (
         <button

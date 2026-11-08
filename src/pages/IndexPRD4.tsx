@@ -109,6 +109,7 @@ import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
 import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
 import { getDeviceClass } from "@/services/deviceClass";
+import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
 import { cn } from "@/lib/utils";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
@@ -193,6 +194,15 @@ const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8
 /** Microphone kept open this long after a cinematic, while hands-free capture reopens it. */
 const MIC_HOLD_RELEASE_DELAY_MS = 6_000;
 
+/**
+ * Character profile with this device's speech engine and voice (admin
+ * "Services par appareil"); unchanged when the device keeps each character's voice.
+ */
+async function getCharacterRuntimeProfile(character: "max" | "emma"): Promise<CharacterRuntimeReadiness | null> {
+  const [profile, services] = await Promise.all([getCharacterRuntimeReadiness(character), deviceServicesReady()]);
+  return profile ? resolveDeviceVoice(profile, character, services[getDeviceClass()]) : null;
+}
+
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
   return value === "elevenlabs" || value === "inworld" || value === "fish" || value === "gradium" || value === "cartesia" ? value : null;
 }
@@ -256,8 +266,9 @@ const IndexPRD4 = () => {
   const confirmedTextRef = useRef("");
   const activeVoiceTelemetryRef = useRef<ReturnType<typeof createVoiceTurnV2> | null>(null);
   const [voiceOnly, setVoiceOnly] = useState(false);
-  // Computed once from the frozen device class: smartphones get the voice call screen.
-  const [conversationLayout] = useState(() => conversationLayoutFor(getDeviceClass()));
+  // From the frozen device class: smartphones get the voice call screen, unless
+  // "Services par appareil" connects the live avatar (set when the call starts).
+  const [conversationLayout, setConversationLayout] = useState(() => conversationLayoutFor(getDeviceClass()));
   const [touchFirst] = useState(() => touchFirstFor(getDeviceClass()));
   const rescueRef = useRef(new Map<RuntimeCharacter, { text: string; blob: Blob }>());
   const lastRescueRef = useRef(new Map<RuntimeCharacter, string>());
@@ -441,6 +452,7 @@ const IndexPRD4 = () => {
   useEffect(() => {
     void loadSTTSettingsFromDB();
     void loadSpeechPerformanceSettings();
+    void deviceServicesReady();
     const outputPromise = Promise.all([
       loadOutputSettingsFromDB(),
       loadStreamingAvatarSettingsFromDB(),
@@ -821,10 +833,17 @@ const IndexPRD4 = () => {
     avatarConnectStartedAtRef.current = null;
     avatarFirstFrameAtRef.current = null;
     avatarFirstSpeechAtRef.current = null;
-    const [outputSettings, avatarSettings] = await (
+    const [[outputSettings, configuredAvatarSettings], deviceServices] = await Promise.all([
       outputSettingsLoadRef.current ??
-      Promise.all([loadOutputSettingsFromDB(), loadStreamingAvatarSettingsFromDB()])
-    );
+        Promise.all([loadOutputSettingsFromDB(), loadStreamingAvatarSettingsFromDB()]),
+      deviceServicesReady(),
+    ]);
+    const deviceClass = getDeviceClass();
+    const deviceSettings = deviceServices[deviceClass];
+    // "Services par appareil" may pick another avatar provider for this screen.
+    const avatarSettings = deviceSettings.avatarProvider
+      ? { ...configuredAvatarSettings, activeProvider: deviceSettings.avatarProvider }
+      : configuredAvatarSettings;
     outputSettingsRef.current = outputSettings;
     avatarSettingsRef.current = avatarSettings;
 
@@ -845,8 +864,10 @@ const IndexPRD4 = () => {
     const { mode: outputMode, reason: outputModeReason } = resolveCallOutputMode({
       startingCharacter,
       configuredMode: outputSettings.mode,
-      deviceClass: getDeviceClass(),
+      deviceClass,
+      deviceOutput: deviceSettings.output,
     });
+    setConversationLayout(conversationLayoutFor(deviceClass, outputMode));
     callModeRef.current = { mode: outputMode === "streaming_avatar" ? "streaming_avatar" : "tts", avatarFallback: false };
     rescueLifetimeRef.current = new AbortController();
     const pinnedGameplay = getGameplaySettings();
@@ -1041,7 +1062,7 @@ const IndexPRD4 = () => {
       return;
     }
     const { configuredDurationSeconds, elapsedSeconds, remainingSeconds } = timerWindow;
-    const profile = await getCharacterRuntimeReadiness(session.active_character).catch(() => null);
+    const profile = await getCharacterRuntimeProfile(session.active_character).catch(() => null);
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {
       toast({
@@ -1093,7 +1114,7 @@ const IndexPRD4 = () => {
       reason: 'Le passage n’a pas été finalisé. Tu peux réessayer.', retryText: restoredState.openRequest.userText });
     if (restoredOffer) {
       // Display data must never delay resume or update a replaced offer.
-      void getCharacterRuntimeReadiness(restoredOffer.targetCharacter).then(targetProfile => {
+      void getCharacterRuntimeProfile(restoredOffer.targetCharacter).then(targetProfile => {
         if (endedRef.current || sessionIdRef.current !== session.id || handoffOfferRef.current !== restoredOffer) return;
         setHandoffPortraits({ [restoredOffer.targetCharacter]: targetProfile?.portraitUrl ?? null });
       }).catch(() => {});
@@ -1218,7 +1239,7 @@ const IndexPRD4 = () => {
     lastVideoTurnRef.current = -Infinity;
     pendingPostVideoContextRef.current = null;
     const startingCharacter = startingCharacterRef.current;
-    const profile = await getCharacterRuntimeReadiness(startingCharacter).catch(() => null);
+    const profile = await getCharacterRuntimeProfile(startingCharacter).catch(() => null);
     if (!isCurrent()) return;
     const characterContext = toCharacterExecutionContext(profile);
     if (!profile?.ready || !characterContext) {
@@ -1747,7 +1768,7 @@ const IndexPRD4 = () => {
           try {
             const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text, userText: handoffUserText,
               history: conversationRef.current, handoffCount: handoffCountRef.current, signal: preparationSignal,
-              current: handoffLease.current, readiness: getCharacterRuntimeReadiness,
+              current: handoffLease.current, readiness: getCharacterRuntimeProfile,
               persist: async next => {
                 const saved = await writeHandoffSnapshot(turnHandoffSnapshot!, next, undefined, conversationRef.current, preparationSignal);
                 turnHandoffSnapshot = saved; handoffSnapshotRef.current = saved;
@@ -1846,7 +1867,7 @@ const IndexPRD4 = () => {
               const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text: responseReceipt.generated,
                 userText: handoffUserText, history: conversationRef.current.filter(message => message.delivery?.turnId !== turnId),
                 handoffCount: handoffCountRef.current, signal: handoffLease.signal, current: handoffLease.current,
-                readiness: getCharacterRuntimeReadiness,
+                readiness: getCharacterRuntimeProfile,
                 persist: async next => {
                   const saved = await writeHandoffSnapshot(turnHandoffSnapshot!, next, undefined, conversationRef.current, handoffLease!.signal);
                   turnHandoffSnapshot = saved; handoffSnapshotRef.current = saved;
@@ -2306,7 +2327,7 @@ const IndexPRD4 = () => {
           }, gmExecuted && !coordinatedHandoff ? directorConfig : null, activeCharacterRef.current);
           const proposalTarget = decision.action.type === 'handoff' ? decision.action.targetCharacter : null;
           const proposalProfile = proposalTarget
-            ? await withTimeout('handoff_recommendation', getCharacterRuntimeReadiness(proposalTarget), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => null)
+            ? await withTimeout('handoff_recommendation', getCharacterRuntimeProfile(proposalTarget), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => null)
             : null;
           if (!isCurrentTurn()) return;
           const guarded = guardDirector(decision, ev, [], proposalProfile);
@@ -2996,7 +3017,7 @@ const IndexPRD4 = () => {
     let committed = false;
     try {
       const [snapshot, profile, runtime] = await withTimeout('grid_call', Promise.all([
-        readHandoffSnapshot(sid), getCharacterRuntimeReadiness(target), fetchPinnedDirectorRuntime(sid),
+        readHandoffSnapshot(sid), getCharacterRuntimeProfile(target), fetchPinnedDirectorRuntime(sid),
       ]), HANDOFF_DEPENDENCY_TIMEOUT_MS);
       if (!current()) return;
       const time = callTime(snapshot.conversation_log);

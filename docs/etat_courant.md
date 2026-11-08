@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Smartphone : film et voix (8 novembre, code).** Film d'introduction en image entière (portrait) avec « Plein
+écran ⤢ » (paysage) ; Admin › Streaming Avatar › « Services par appareil » choisit sortie, avatar, moteur et voix par
+appareil (défauts inchangés). Constat : l'iPhone jouait bien ElevenLabs `eleven_multilingual_v2` (voix Orchestration),
+l'ordinateur la voix Anam. **À faire par Ulrich** : choisir la voix smartphone dans ce panneau puis recette iPhone
+([recette](recette_adaptation_ecrans.md), section 1).
+
 **Recette iPad et invitations (8 novembre, code).** iPad : le micro ne démarrait pas en mains libres, sans erreur
 enregistrée ; le message dit désormais la cause (permission, micro occupé, navigateur) et le tour garde
 `capture_error`. Navigateur visible sur la capture : Brave, pas Safari. Console d'invitations : mot de passe
