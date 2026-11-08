@@ -209,6 +209,14 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
 - Tests : `audioAutoplayRescue.test.ts`, deux cas dans `elevenLabsStreamPlayer.test.ts`, coins vérifiés en unitaire
   et dans les E2E `@iphone` / `@ipad`.
 
+### Retour de recette iPad (8 novembre 2026)
+
+- Sessions `9166856f`, `ace79a1c`, `780c635e` (tablette, Anam, mains libres) : avatar et voix d'ouverture OK, mais
+  « Activer le micro » échoue à chaque essai, sans `capture_started` ni erreur enregistrée. La capture montre Brave
+  (WebKit) et non Safari. Pas de simulateur iOS sur le poste : cause non reproduite. Correctif de diagnostic : message
+  précis selon l'erreur (permission refusée → autoriser le micro pour le site et recharger ; micro occupé ; navigateur
+  sans accès) et `capture_error` sur le tour. Prochain essai : Safari, puis lire `capture_error` si l'échec persiste.
+
 ## Livraison et documentation
 
 - Plan versionné `docs/plan_adaptation_ecrans.md` ; une PR par lot via `github-delivery-exec` et la garde

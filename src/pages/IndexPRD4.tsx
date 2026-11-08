@@ -44,6 +44,7 @@ import type { TTSProviderId } from "@/services/tts/types";
 import { derivePerformanceIntent, isHeatedIntent, logPerformanceIntent, type PerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import { getAudioContextState, installAudioGestureUnlock, unlockAudioPlayback } from "@/services/audioPlayback";
+import { describeMicStartError } from "@/services/micStartError";
 import {
   getGameplaySettings,
   getLLMSettings,
@@ -2552,7 +2553,10 @@ const IndexPRD4 = () => {
     } catch (err) {
       void initialStream?.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
       if (err instanceof Error && err.name === "StaleCaptureError") return;
+      const micError = describeMicStartError(err);
+      inputTelemetryRef.current?.captureError({ kind: micError.kind, name: micError.name, message: micError.message });
       finishInputTelemetry("failed");
+      trackEvent("prd4_mic_start_failed", { session_id: sessionIdRef.current, mode: "push_to_talk", kind: micError.kind, error_name: micError.name });
       console.warn("[PRD4] PTT start failed:", err);
       endLatencySegment(sttLatencySegmentRef.current);
       sttLatencySegmentRef.current = null;
@@ -2560,7 +2564,7 @@ const IndexPRD4 = () => {
       incrementPttError();
       setAudioState("idle");
       resumeConversationTraceSync(true);
-      toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
+      toast({ title: micError.title, description: micError.description, variant: "destructive" });
     }
   }, [
     beginInputTelemetry,
@@ -2799,7 +2803,10 @@ const IndexPRD4 = () => {
         }
         return;
       }
+      const micError = describeMicStartError(err);
+      inputTelemetryRef.current?.captureError({ kind: micError.kind, name: micError.name, message: micError.message });
       finishInputTelemetry("failed");
+      trackEvent("prd4_mic_start_failed", { session_id: sessionIdRef.current, mode: "hands_free", kind: micError.kind, error_name: micError.name });
       console.warn("[PRD4] hands-free start failed:", err);
       handsFreeListeningRef.current = false;
       setHandsFreeListening(false);
@@ -2807,8 +2814,9 @@ const IndexPRD4 = () => {
       incrementPttError();
       setAudioState("idle");
       // Une réouverture automatique qui échoue est retentée avant d'alerter le joueur.
-      if (micRecoveryRef.current.attempts === 0) {
-        toast({ title: "Micro indisponible", description: "Réessaie dans un instant.", variant: "destructive" });
+      // A refused permission or a browser without capture will not recover by itself.
+      if (micRecoveryRef.current.attempts === 0 || micError.kind === "permission" || micError.kind === "unsupported") {
+        toast({ title: micError.title, description: micError.description, variant: "destructive" });
       } else scheduleMicRecoveryRef.current("rearm_failed");
     } finally {
       handsFreeStartingRef.current = false;

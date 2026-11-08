@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.98.0";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import {
+  decryptInvitationCode,
+  deriveInvitationCodeKey,
+  encryptInvitationCode,
   externalTestInvitationStatus,
   generateExternalTestCode,
   normalizeExternalTestCode,
@@ -14,7 +17,14 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 const ENVIRONMENT_SWITCH_EMAIL = "ulrich.fischer@memoways.com";
 
-type Action = "list" | "create" | "revoke";
+type Action = "list" | "create" | "revoke" | "reveal" | "rotate";
+const ACTIONS: Action[] = ["list", "create", "revoke", "reveal", "rotate"];
+
+/** `code_ciphertext` arrives by a Lovable migration; until then, behave as before. */
+function missingCipherColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || /code_ciphertext/.test(error.message ?? "");
+}
 
 function headersFor(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
@@ -45,7 +55,7 @@ serve(async (req) => {
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   const action = body?.action as Action | undefined;
-  if (!body || !action || !["list", "create", "revoke"].includes(action)) {
+  if (!body || !action || !ACTIONS.includes(action)) {
     return json(req, { error: "Invalid action" }, 400);
   }
 
@@ -53,6 +63,8 @@ serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return json(req, { error: "Service unavailable" }, 503);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const codeKey = await deriveInvitationCodeKey(serviceKey);
+  const linkOrigin = req.headers.get("origin") ?? "https://proto1.parle-a-ava.com";
 
   const { data: profile, error: profileError } = await admin
     .from("admin_users")
@@ -71,6 +83,14 @@ serve(async (req) => {
       .eq("created_by_user_id", auth.userId)
       .order("created_at", { ascending: false });
     if (error) return json(req, { error: "Unable to list invitations" }, 500);
+
+    const recoverable = new Set<string>();
+    const { data: ciphers, error: cipherError } = await admin
+      .from("external_test_invitations")
+      .select("id,code_ciphertext")
+      .eq("created_by_user_id", auth.userId)
+      .not("code_ciphertext", "is", null);
+    if (!cipherError) for (const row of ciphers ?? []) recoverable.add(row.id);
 
     const ids = (data ?? []).map((row) => row.id);
     const sessionCounts = new Map<string, number>();
@@ -92,6 +112,7 @@ serve(async (req) => {
         ...row,
         status: externalTestInvitationStatus(row),
         sessionCount: sessionCounts.get(row.id) ?? 0,
+        codeRecoverable: recoverable.has(row.id),
       })),
     });
   }
@@ -109,6 +130,55 @@ serve(async (req) => {
     if (error) return json(req, { error: "Unable to revoke invitation" }, 500);
     if (!data) return json(req, { error: "Invitation not found" }, 404);
     return json(req, { ok: true });
+  }
+
+  if (action === "reveal" || action === "rotate") {
+    const invitationId = typeof body.invitationId === "string" ? body.invitationId : "";
+    const { data: invitation, error } = await admin
+      .from("external_test_invitations")
+      .select("id,expires_at,revoked_at")
+      .eq("id", invitationId)
+      .eq("created_by_user_id", auth.userId)
+      .maybeSingle();
+    if (error) return json(req, { error: "Unable to read invitation" }, 500);
+    if (!invitation) return json(req, { error: "Invitation not found" }, 404);
+    const link = `${linkOrigin}/test/${invitation.id}`;
+
+    if (action === "reveal") {
+      const { data: stored, error: readError } = await admin
+        .from("external_test_invitations")
+        .select("code_ciphertext")
+        .eq("id", invitation.id)
+        .maybeSingle();
+      const code = readError ? null : await decryptInvitationCode(codeKey, invitation.id, stored?.code_ciphertext);
+      if (!code) {
+        return json(req, { error: "Mot de passe non conservé pour cette invitation : générez-en un nouveau.", link, recoverable: false }, 409);
+      }
+      return json(req, { link, code });
+    }
+
+    if (invitation.revoked_at || new Date(invitation.expires_at).getTime() <= Date.now()) {
+      return json(req, { error: "Invitation révoquée ou expirée." }, 409);
+    }
+    const code = generateExternalTestCode();
+    const codeHash = await sha256Hex(normalizeExternalTestCode(code));
+    const cipher = await encryptInvitationCode(codeKey, invitation.id, code);
+    let { error: updateError } = await admin
+      .from("external_test_invitations")
+      .update({ code_hash: codeHash, code_ciphertext: cipher })
+      .eq("id", invitation.id)
+      .eq("created_by_user_id", auth.userId);
+    let recoverable = !updateError;
+    if (missingCipherColumn(updateError)) {
+      ({ error: updateError } = await admin
+        .from("external_test_invitations")
+        .update({ code_hash: codeHash })
+        .eq("id", invitation.id)
+        .eq("created_by_user_id", auth.userId));
+      recoverable = false;
+    }
+    if (updateError) return json(req, { error: "Unable to renew the code" }, 500);
+    return json(req, { link, code, recoverable });
   }
 
   const environmentId = typeof body.environmentId === "string" ? body.environmentId : "";
@@ -143,25 +213,34 @@ serve(async (req) => {
 
   const code = generateExternalTestCode();
   const codeHash = await sha256Hex(normalizeExternalTestCode(code));
-  const { data: invitation, error } = await admin
+  const invitationId = crypto.randomUUID();
+  const row = {
+    id: invitationId,
+    environment_id: environmentId,
+    created_by_user_id: auth.userId,
+    tester_label: testerLabel,
+    code_hash: codeHash,
+    valid_from: new Date(fromMs).toISOString(),
+    expires_at: new Date(toMs).toISOString(),
+    multi_use: body.multiUse === true,
+  };
+  const columns = "id,environment_id,tester_label,created_at,valid_from,expires_at,multi_use";
+  const cipher = await encryptInvitationCode(codeKey, invitationId, code);
+  let { data: invitation, error } = await admin
     .from("external_test_invitations")
-    .insert({
-      environment_id: environmentId,
-      created_by_user_id: auth.userId,
-      tester_label: testerLabel,
-      code_hash: codeHash,
-      valid_from: new Date(fromMs).toISOString(),
-      expires_at: new Date(toMs).toISOString(),
-      multi_use: body.multiUse === true,
-    })
-    .select("id,environment_id,tester_label,created_at,valid_from,expires_at,multi_use")
+    .insert({ ...row, code_ciphertext: cipher })
+    .select(columns)
     .single();
+  let codeRecoverable = !error;
+  if (missingCipherColumn(error)) {
+    ({ data: invitation, error } = await admin.from("external_test_invitations").insert(row).select(columns).single());
+    codeRecoverable = false;
+  }
   if (error || !invitation) return json(req, { error: "Unable to create invitation" }, 500);
 
-  const origin = req.headers.get("origin") ?? "https://proto1.parle-a-ava.com";
   return json(req, {
-    invitation: { ...invitation, redeemed_at: null, revoked_at: null, status: externalTestInvitationStatus({ ...invitation, redeemed_at: null, revoked_at: null }), sessionCount: 0 },
-    link: `${origin}/test/${invitation.id}`,
+    invitation: { ...invitation, redeemed_at: null, revoked_at: null, status: externalTestInvitationStatus({ ...invitation, redeemed_at: null, revoked_at: null }), sessionCount: 0, codeRecoverable },
+    link: `${linkOrigin}/test/${invitation.id}`,
     code,
   }, 201);
 });

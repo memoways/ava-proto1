@@ -42,3 +42,63 @@ export function externalTestInvitationStatus(
   if (row.valid_from && new Date(row.valid_from).getTime() > now) return "scheduled";
   return "available";
 }
+
+// ---- Recoverable codes (admin console) ---------------------------------------
+// The redeem path still checks only `code_hash`. A copy of the code is kept,
+// encrypted (AES-GCM), so the creating admin can show it again. The key is
+// derived from a server-only secret (HKDF-SHA-256), never stored in the table:
+// a database export alone does not reveal the codes.
+
+const CIPHER_PREFIX = "v1";
+const KEY_INFO = "ava-external-test-invitation-code-v1";
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function fromBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+export async function deriveInvitationCodeKey(secret: string): Promise<CryptoKey> {
+  if (!secret) throw new Error("Missing secret for invitation codes");
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), "HKDF", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: new TextEncoder().encode(KEY_INFO), info: new TextEncoder().encode(KEY_INFO) },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/** `v1:<iv>:<ciphertext>`, bound to the invitation id (additional data). */
+export async function encryptInvitationCode(key: CryptoKey, invitationId: string, code: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: new TextEncoder().encode(invitationId) },
+    key,
+    new TextEncoder().encode(code),
+  );
+  return `${CIPHER_PREFIX}:${toBase64(iv)}:${toBase64(new Uint8Array(cipher))}`;
+}
+
+/** Null when absent, malformed, for another invitation or under another key. */
+export async function decryptInvitationCode(key: CryptoKey, invitationId: string, stored: string | null | undefined): Promise<string | null> {
+  if (!stored) return null;
+  const [prefix, iv, data] = stored.split(":");
+  if (prefix !== CIPHER_PREFIX || !iv || !data) return null;
+  try {
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: fromBase64(iv), additionalData: new TextEncoder().encode(invitationId) },
+      key,
+      fromBase64(data),
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}

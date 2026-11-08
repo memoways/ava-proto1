@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Recette iPad et invitations (8 novembre, code).** iPad : le micro ne démarrait pas en mains libres, sans erreur
+enregistrée ; le message dit désormais la cause (permission, micro occupé, navigateur) et le tour garde
+`capture_error`. Navigateur visible sur la capture : Brave, pas Safari. Console d'invitations : mot de passe
+réaffichable (invitations nouvelles) ou renouvelable (anciennes), copie chiffrée côté serveur. À faire par Lovable :
+migration `code_ciphertext` et redéploiement de `manage-test-invitations`.
+
 **Écrans, retours de recette iPhone (8 novembre, code).** Max muet en mains libres sur iPhone : iOS refusait le
 lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'AudioContext déverrouillé (démarrage
 après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres

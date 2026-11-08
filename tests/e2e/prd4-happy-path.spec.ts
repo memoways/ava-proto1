@@ -1560,6 +1560,10 @@ test("V2 conserve deux échecs micro sans transcript comme tentatives distinctes
     await expect.poll(() => fakes.getVoiceEvents().filter((event) => event.status === "failed").length).toBe(attempt);
   }
   const failures = fakes.getVoiceEvents().filter((event) => event.status === "failed");
+  // The player sees why (refused permission) and how to fix it; the turn keeps the error name.
+  await expect(page.getByText("Micro refusé", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/réglages du navigateur/).first()).toBeVisible();
+  expect(failures[0].capture_error).toMatchObject({ kind: "permission", name: "NotAllowedError" });
   expect(failures[0].turn_id).toBe(failures[1].turn_id);
   expect(failures[0].attempt_id).not.toBe(failures[1].attempt_id);
   expect(fakes.getMaxTurnCount()).toBe(0);

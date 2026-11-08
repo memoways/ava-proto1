@@ -55,7 +55,8 @@ Date : ____ · Modèle / iPadOS : ____ · Session : ____
 page ne changent pas en cours d'appel).
 
 - [ ] Accueil, teaser (son, « Passer » 44 px), question du film, grille : rien ne déborde, tout est touchable.
-- [ ] Permission micro acceptée.
+- [ ] Navigateur : **Safari** (pas Brave ni Chrome iOS). Permission micro acceptée ; « Activer le micro » fonctionne.
+      En cas d'échec, noter le titre du message (« Micro refusé », « Micro occupé »…) et la session.
 - [ ] Appel Max : **avatar vidéo connecté** (badge « Connexion vidéo… » puis visage animé) ; visage non masqué
       par les capsules ni par « Terminer ».
 - [ ] « Touche pour parler » ; bouton micro, « Terminer », « Ignorer », « Appeler Emma », « Rester avec Max »

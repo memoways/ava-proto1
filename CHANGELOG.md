@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Recette iPad : cause du micro visible ; console d'invitations : mot de passe retrouvable] — 2026-11-08
+
+- iPad (sessions `9166856f`, `ace79a1c`, `780c635e`, tablette, mains libres) : le micro ne démarrait jamais (aucun
+  `capture_started`) et seul « Micro indisponible » s'affichait, sans erreur enregistrée. `describeMicStartError`
+  (`src/services/micStartError.ts`) distingue permission refusée, micro absent, micro occupé et navigateur sans accès
+  au micro, avec un message qui dit quoi faire ; `capture_error` (type, nom, message, sans contenu) sur le tour
+  `voice_turn_finished` et `prd4_mic_start_failed` dans PostHog. Une permission refusée n'est plus retentée en boucle.
+- Console d'invitations : « Afficher le mot de passe » (lien et mot de passe) pour les invitations créées à partir de
+  maintenant ; « Nouveau mot de passe » (même lien, l'ancien ne permet plus d'activer, les navigateurs connectés
+  restent connectés) pour les plus anciennes, dont le mot de passe n'était conservé que sous forme d'empreinte.
+  Copie chiffrée AES-GCM (`code_ciphertext`), clé dérivée côté serveur de la clé de service, liée à l'invitation ;
+  seule l'Edge Function `manage-test-invitations` la lit, pour l'admin qui a créé l'invitation. Le contrôle d'accès
+  reste sur `code_hash`. Migration `20261108110000_external_test_invitation_code_ciphertext.sql` (à appliquer par
+  Lovable) ; sans elle, la création fonctionne comme avant.
+- Tests : `micStartError.test.ts`, E2E micro refusé (message et `capture_error`), chiffrement des codes,
+  `TestInvitationsTab.test.tsx`.
+
 ## [Questionnaire conversationnel, lot 1 : modèle, contexte de session et stockage] — 2026-11-08
 
 - Types `QuestionnaireConversationalData`, `DimensionAnswer`, `ConversationalSessionContext` (`src/types/index.ts`) :
