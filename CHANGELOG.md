@@ -13,7 +13,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Playwright : projets `iphone` (WebKit, iPhone 13) et `ipad` (WebKit, iPad Pro 11) limités aux tests `@iphone` /
   `@ipad`, exclus du projet `chromium` ; répartis dans les 4 shards existants.
 - Tests : `ConversationScreen.touchFirst.test.tsx` (même écran, même avatar et mêmes capsules que desktop ; seules
-  les différences voulues), `touchFirstFor`, lien de la grille ; E2E `@device` iPad et iPhone.
+  les différences voulues), `touchFirstFor`, lien de la grille ; E2E `@device` iPad (avatar monté, cibles, capsules)
+  et iPhone (appel vocal Max puis Emma), sans tours de parole : WebKit Linux ne lit pas l'audio simulé de façon fiable.
 - Recette humaine : `docs/recette_adaptation_ecrans.md` (iPhone Safari, Android Chrome, iPad Safari, desktop Chrome,
   latences par appareil). Dernier lot du plan d'adaptation aux écrans.
 

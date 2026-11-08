@@ -178,10 +178,13 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
   `object-cover` sur 3:4 ou 4:3 ne coupe que les côtés, le visage reste centré, la colonne des capsules (gauche,
   160 px) et « Terminer » (droite) ne le recouvrent pas ; `object-position` inchangé.
 - Playwright : projets `iphone` (iPhone 13) et `ipad` (iPad Pro 11), WebKit déjà installé en CI, `grep` sur
-  `@iphone` / `@ipad` ; `chromium` exclut `@device`. Deux tests (≈ 15 s chacun) répartis par le sharding par test.
-  iPad : avatar demandé (session avatar sans réponse → `<video>` monté), `device_class = tablet`, cibles ≥ 44 px,
-  capsules empilées sans chevauchement, « Appeler Emma » cliqué, raccrocher. iPhone : appel vocal du lot 2 sous
-  WebKit, sans requête avatar. Ce sont des émulations (viewport, tactile, moteur WebKit), pas de vrais appareils.
+  `@iphone` / `@ipad` ; `chromium` exclut `@device`. Deux tests courts répartis par le sharding par test.
+  iPad : avatar demandé (session avatar sans réponse → `<video>` monté), `device_class = tablet`, cibles ≥ 44 px de
+  l'accueil à la conversation, capsules empilées sans chevauchement, raccrocher. iPhone : appel vocal du lot 2 sous
+  WebKit (Max puis Emma depuis la grille, raccrocher), sans requête avatar. Premier essai CI avec des tours de parole :
+  WebKit Linux ne termine pas la lecture audio simulée puis la page plante (fragilité déjà notée pour les cinématiques) ;
+  tours, clic de la capsule de passage et cinématiques restent couverts par les E2E Chromium sur les mêmes composants.
+  Ce sont des émulations (viewport, tactile, moteur WebKit), pas de vrais appareils.
 - Durée CI avant : run 42459423384, shards e2e 6 min 00 à 7 min 05, run 7 min 11 ; après : voir le compte rendu.
 - Recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
 - **Aucun lot ne suit dans ce plan.** Restent la recette humaine signée et la reformulation de la tâche Notion
