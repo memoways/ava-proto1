@@ -14,7 +14,7 @@ import { createLocalSpeechDetector } from "@/services/localSpeechDetection";
 import { generateSpeech } from "@/services/tts";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
@@ -112,9 +112,17 @@ import { getDeviceClass } from "@/services/deviceClass";
 import { cn } from "@/lib/utils";
 import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
+import ConversationalQuestionnaire from "@/components/prd4/ConversationalQuestionnaire";
+import { baseDimensionQuestions, buildSessionContext } from "@/services/conversationalQuestionnaire";
+import { requestQuestionnaireFollowUp } from "@/services/conversationalFollowUpClient";
 import ThanksScreen from "@/components/ThanksScreen";
 import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/GumletVideoPlayer";
-import { savePRD4Questionnaire, syncPRD4QuestionnaireToNotion } from "@/services/prd4Questionnaire";
+import {
+  saveConversationalQuestionnaire,
+  savePRD4Questionnaire,
+  syncConversationalQuestionnaireToNotion,
+  syncPRD4QuestionnaireToNotion,
+} from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { countPlayedExtracts, selectEligibleVideos } from "@/services/videoEligibility";
 import { buildPostVideoContext, formatWatchedVideos, rememberWatchedVideo, watchedVideoFrom, type WatchedVideo } from "@/services/watchedVideoMemory";
@@ -124,7 +132,7 @@ import {
   videoTriggerDefaults,
   type VideoTriggerSettings,
 } from "@/services/settingsService";
-import type { QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
+import type { QuestionnaireConversationalData, QuestionnairePRD4Answers, QuestionnairePRD4Data, UserPosture } from "@/types";
 import { ensureGameAuth, isCurrentUserAdmin, isGameCaptchaEnabled, isGameSecurityEnabled } from "@/services/gameAuth";
 import {
   getPrivacyPreferences,
@@ -329,6 +337,8 @@ const IndexPRD4 = () => {
   const sessionDurationRef = useRef<number>(0);
   const configuredSessionDurationRef = useRef<number>(initialSessionDuration);
   const showQuestionnaireRef = useRef(getGameplaySettings().SHOW_QUESTIONNAIRE);
+  // PRD4 form unless the admin chose the conversational questionnaire (lot 2).
+  const questionnaireModeRef = useRef(getGameplaySettings().QUESTIONNAIRE_MODE);
   const gameplaySettingsLoadRef = useRef<Promise<GameplaySettings> | null>(null);
   const triggeredVideoIdsRef = useRef<string[]>([]);
   const lastVideoTurnRef = useRef<number>(-Infinity);
@@ -446,6 +456,7 @@ const IndexPRD4 = () => {
       const duration = normalizeSessionDurationSeconds(settings.TIMEOUT_SECONDS);
       configuredSessionDurationRef.current = duration;
       showQuestionnaireRef.current = settings.SHOW_QUESTIONNAIRE;
+      questionnaireModeRef.current = settings.QUESTIONNAIRE_MODE;
       setSessionDurationSeconds(duration);
     });
   }, []);
@@ -1159,6 +1170,7 @@ const IndexPRD4 = () => {
     const configuredDuration = normalizeSessionDurationSeconds(gameplaySettings.TIMEOUT_SECONDS);
     configuredSessionDurationRef.current = configuredDuration;
     showQuestionnaireRef.current = gameplaySettings.SHOW_QUESTIONNAIRE;
+    questionnaireModeRef.current = gameplaySettings.QUESTIONNAIRE_MODE;
     // Voice behavior was pinned with the session; admin changes affect new sessions.
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
     setSessionDurationSeconds(configuredDuration);
@@ -3377,6 +3389,61 @@ const IndexPRD4 = () => {
     ],
   );
 
+  // Conversational questionnaire: everything the session knows is collected here and never asked.
+  const conversationalContext = useMemo(() => {
+    if (state.phase !== "questionnaire" || questionnaireModeRef.current !== "conversational") return null;
+    return buildSessionContext({
+      sessionId: sessionIdRef.current,
+      film: state.hasSeenFilm,
+      teaserSeen: state.teaserSeen,
+      teaserSkipped: state.teaserSkipped,
+      startingCharacter: startingCharacterRef.current,
+      conversation: conversationRef.current,
+      watchedVideos: watchedVideosRef.current,
+      durationSeconds: sessionDurationRef.current,
+      turnLatenciesMs: turnLatenciesRef.current,
+      micErrors: state.pttErrors,
+      handsFree: handsFreeSettingsRef.current.enabled,
+      endReason: state.endReason,
+      deviceClass: getDeviceClass(),
+      callMode: callModeRef.current.mode,
+      avatarFallback: callModeRef.current.avatarFallback,
+      roleProfile: state.userRoleProfile,
+      posture: state.userPosture,
+    });
+    // Frozen when the questionnaire opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase]);
+  const conversationalQuestions = useMemo(
+    () => (conversationalContext ? baseDimensionQuestions(conversationalContext) : null),
+    [conversationalContext],
+  );
+
+  const handleConversationalSave = useCallback(
+    async (data: QuestionnaireConversationalData) => {
+      setSubmittingQuestionnaire(true);
+      try {
+        if (sessionIdRef.current) {
+          const result = await saveConversationalQuestionnaire(sessionIdRef.current, data);
+          if (result.saved) void syncConversationalQuestionnaireToNotion(sessionIdRef.current, data);
+        }
+        trackEvent("conversational_questionnaire_submitted", {
+          session_id: sessionIdRef.current,
+          rated: Object.values(data.dimensions).filter((d) => d.score !== null).length,
+          follow_ups: Object.values(data.dimensions).filter((d) => d.follow_up !== null).length,
+          device_class: data.session_context.device_class,
+          provisional: true,
+        });
+      } catch (err) {
+        console.warn("[PRD4] conversational questionnaire submit failed:", err);
+      } finally {
+        setSubmittingQuestionnaire(false);
+        setPhase("thanks");
+      }
+    },
+    [setPhase],
+  );
+
   const handleRestart = useCallback(() => {
     cleanupAudio();
     reset();
@@ -3578,7 +3645,16 @@ const IndexPRD4 = () => {
       screen = <EndSessionScreen onContinue={handleEndContinue} />;
       break;
     case "questionnaire":
-      screen = (
+      screen = conversationalContext && conversationalQuestions ? (
+        <ConversationalQuestionnaire
+          questions={conversationalQuestions}
+          sessionContext={conversationalContext}
+          requestFollowUp={requestQuestionnaireFollowUp}
+          onSave={handleConversationalSave}
+          onSkip={handleRestart}
+          submitting={submittingQuestionnaire}
+        />
+      ) : (
         <QuestionnaireScreenPRD4
           teaserSeen={state.teaserSeen}
           onSubmit={handleQuestionnaireSubmit}

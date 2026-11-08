@@ -120,5 +120,39 @@ garde ses branches legacy et PRD4 et gagne une branche `conversational-v1`.
 - **Pas de migration SQL** : le jsonb suffit. Lecture admin/export inchangée (le rendu dédié arrive au lot 3).
 - Redéploiement de `sync-questionnaire` : par Lovable après la fusion.
 
-Prompt de reprise du lot 2 : [prompt_reprise_questionnaire_conversationnel_lot_2.md](prompt_reprise_questionnaire_conversationnel_lot_2.md).
+## Exécution lot 2 (8 novembre 2026)
+
+- **Réglage** : `GameplaySettings.QUESTIONNAIRE_MODE` (`"prd4"` | `"conversational"`, défaut `"prd4"`, toute autre valeur
+  → PRD4 via `normalizeQuestionnaireMode`), interrupteur « Questionnaire conversationnel (à la voix) » dans l'onglet
+  Game Master, actif seulement si le questionnaire final est affiché. `IndexPRD4` lit le mode avec `SHOW_QUESTIONNAIRE` ;
+  `handleEndContinue` et le formulaire PRD4 sont inchangés.
+- **Parcours** : machine à états pure `src/services/conversationalQuestionnaireFlow.ts` (réponse → relance éventuelle
+  → note → dimension suivante, `review` à la fin) ; aucune étape n'avance seule. Une relance au plus par dimension
+  (`followUpRequested`). `detectSpokenScore` repère « je dirais 4 », « 3 sur 5 », « je mettrais cinq » ; la note est
+  seulement proposée, `voice_confirmed` uniquement si la personne confirme la note entendue, sinon `touch`.
+- **Écran** : `src/components/prd4/ConversationalQuestionnaire.tsx`, repère « X/5 », question affichée, réponse
+  précédente visible pendant la relance et la note. Dictée par `src/hooks/useDictation.ts` sur `createConfiguredSTT`
+  (façade seule, micro demandé dans le geste, mode manuel, « J'ai fini de parler » appelle `flush`) ; texte affiché au
+  fil de la parole, champ modifiable, validation bloquée pendant l'écoute, saisie clavier toujours possible. Aucun TTS.
+- **Relance** : `src/services/conversationalFollowUp.ts` (pur) + `conversationalFollowUpClient.ts` (`callLLM` →
+  `proxy-llm`, `feature_key: questionnaire_follow_up`, température 0,2). Le modèle reçoit la question, la réponse et un
+  contexte **qualitatif** seulement (appareil, avatar/voix seule et repli, mains libres, film vu ou non, personnages
+  entendus, passage) : aucune latence, durée ni compte. Sortie JSON `{"follow_up": …}` ; rejet si chiffre, mot de
+  mesure (« latence », « mesuré », « secondes », « erreur micro », « on a remarqué »…), plus de 220 caractères ou pas
+  une question. Échec, délai (6 s par défaut) ou rejet : pas de relance.
+- **Prompt éditorial** : texte dans la tâche Notion (section « Prompt de relance ») ; défaut identique
+  `DEFAULT_QUESTIONNAIRE_FOLLOW_UP_PROMPT` dans `settingsService.ts`, surchargeable par environnement dans
+  admin_settings, clé `ava_questionnaire_followup_settings` (`prompt`, `timeoutMs`, `model` ; vide = `LLM_MODEL`).
+  Aucune surcharge n'existait au 8 novembre (clé nouvelle).
+- **Enregistrement provisoire** : écran « Tes réponses » avec synthèse brute (`rawSummary`, non éditée,
+  `edited_by_user: false`), case de consentement à la conservation de la transcription obligatoire, puis
+  `saveConversationalQuestionnaire` et, si écrit, `syncConversationalQuestionnaireToNotion` ; évènement PostHog
+  `conversational_questionnaire_submitted` (notes données, relances, appareil). Email/opt-ins : lot 3.
+- **Tests** : unitaires (enchaînement des 5 dimensions, relance unique, null ≠ 0, aucune question sur le contexte, repli
+  PRD4, relance absente en échec, filtre des mesures, dictée par la façade) et deux E2E clavier (relance puis relance en
+  503) vérifiant l'absence d'appel TTS, la sauvegarde et l'appel `sync-questionnaire`.
+- **Non fait** : recette voix réelle smartphone/desktop ; aucune Edge Function modifiée (pas de redéploiement).
+
+Prompt de reprise du lot 3 : [prompt_reprise_questionnaire_conversationnel_lot_3.md](prompt_reprise_questionnaire_conversationnel_lot_3.md).
+Prompt du lot 2 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_2.md](prompt_reprise_questionnaire_conversationnel_lot_2.md).
 Prompt du lot 1 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_1.md](prompt_reprise_questionnaire_conversationnel_lot_1.md).
