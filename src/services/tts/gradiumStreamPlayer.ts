@@ -607,7 +607,8 @@ export function createGradiumTurnSession(opts: GradiumStreamOptions): GradiumStr
         fail(new Error("AudioContext unavailable"));
         return;
       }
-      if (ctx.state === "suspended") {
+      // "interrupted" (iOS, after the microphone starts) is as silent as "suspended".
+      if (ctx.state !== "running" && ctx.state !== "closed") {
         ctx.resume().then(
           () => {
             if (ctx.state !== "running") fail(new DOMException("AudioContext suspended (autoplay policy)", "NotAllowedError"));

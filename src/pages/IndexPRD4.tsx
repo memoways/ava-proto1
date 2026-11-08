@@ -43,7 +43,7 @@ import {
 import type { TTSProviderId } from "@/services/tts/types";
 import { derivePerformanceIntent, isHeatedIntent, logPerformanceIntent, type PerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
-import { unlockAudioPlayback } from "@/services/audioPlayback";
+import { getAudioContextState, installAudioGestureUnlock, unlockAudioPlayback } from "@/services/audioPlayback";
 import {
   getGameplaySettings,
   getLLMSettings,
@@ -418,6 +418,9 @@ const IndexPRD4 = () => {
   useEffect(() => {
     trackEvent("prd4_phase_changed", { phase: state.phase });
   }, [state.phase]);
+
+  // iOS stops Web Audio when the microphone starts; every later tap resumes it.
+  useEffect(() => installAudioGestureUnlock(), []);
 
   useEffect(() => {
     void loadSTTSettingsFromDB();
@@ -2204,6 +2207,11 @@ const IndexPRD4 = () => {
           error_type: outputResult.status === "failed"
             ? (outputAtStart?.mode === "streaming_avatar" ? "streaming_avatar" : "tts")
             : null,
+          error_detail: outputResult.status === "failed" ? {
+            name: outputResult.error?.name ?? "unknown",
+            message: (outputResult.error?.message ?? "").slice(0, 200),
+            audio_context_state: getAudioContextState(),
+          } : null,
         }));
 
         // Persist conversation (best effort, fire-and-forget)
@@ -3494,7 +3502,7 @@ const IndexPRD4 = () => {
           onLockedClick={handleLockedClick}
           onReviewIntroduction={handleIntroductionReview}
         />
-        {sessionIdRef.current ? <button className="fixed bottom-4 right-4 underline" onClick={() => void finalizeAndEnd('user_end_experience')}>Terminer l’expérience</button> : null}
+        {sessionIdRef.current ? <button className="fixed bottom-4 right-4 underline max-sm:bottom-[max(1rem,env(safe-area-inset-bottom))] max-sm:min-h-11 max-sm:px-3" onClick={() => void finalizeAndEnd('user_end_experience')}>Terminer l’expérience</button> : null}
         </>
       );
       break;

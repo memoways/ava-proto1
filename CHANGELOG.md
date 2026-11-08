@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Adaptation aux écrans, lot 2 bis : voix de Max sur iPhone et écrans pensés pour le pouce] — 2026-11-08
+
+- Recette iPhone d'Ulrich (session `032b7235`, Safari, smartphone) : transcription OK, mais Max muet ; chaque tour
+  `error_type: "tts"`, aucune lecture. Avant le lot 2, l'iPhone entendait Max par l'avatar Anam (WebRTC) ; désormais la
+  voix passe par Gradium, jouée en Web Audio. iOS met l'AudioContext partagé en état `interrupted` quand le micro
+  démarre ; le code ne relançait qu'un état `suspended` et programmait le son dans un contexte arrêté.
+- `src/services/audioPlayback.ts` : `interrupted` traité comme `suspended` ; relance automatique dès qu'iOS interrompt
+  le contexte ; `installAudioGestureUnlock` relance le contexte à chaque geste (micro, décrocher, Terminer…) tant qu'il
+  ne tourne pas, sans effet quand il tourne (desktop) ; le son de déverrouillage démarre dans le geste même.
+  `gradiumStreamPlayer` relance tout état autre que `running`/`closed`.
+- Diagnostic : `voice_turn_completed.error_detail` (nom et message de l'erreur de sortie, état de l'AudioContext) en
+  cas d'échec, sans contenu de conversation.
+- Responsive smartphone (largeur < 640 px, variante `max-sm:` ; rien ne change à partir de 640 px) : question du film
+  avec l'image entière en pleine largeur et les deux réponses en bas ; accueil et fin avec le bouton principal en bas,
+  pleine largeur ; « Passer » du teaser, « Terminer l'expérience », « Revoir la vidéo d'introduction » et
+  « Terminer l'appel » à 44 px ; marges `env(safe-area-inset-bottom)` ; textes « touche » au lieu de « clique / barre
+  Espace » sur l'écran d'appel et la sonnerie.
+- Tests : `audioContextUnlock.test.ts` (relance d'un contexte interrompu dans le geste, réveil au geste seulement s'il
+  est arrêté) ; E2E téléphone étendu (bouton « Commencer », réponses film et micro dans le tiers bas, ≥ 44 px, dans la
+  largeur ; image du film en pleine largeur au-dessus des réponses).
+
 ## [Adaptation aux écrans, lot 2 : smartphone en appel vocal sans avatar] — 2026-11-07
 
 - Smartphone (classe du lot 1, forçable par `?ecran=telephone`) : la conversation devient un appel vocal —

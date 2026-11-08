@@ -64,7 +64,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 max-sm:min-h-[100svh] max-sm:px-4 max-sm:pb-20">
       <div className="mx-auto w-full max-w-3xl space-y-8 text-center">
         <div className="space-y-4">
           <p className="text-base leading-relaxed text-foreground md:text-lg">
@@ -135,7 +135,7 @@ const CharacterSelectScreen = ({ onSelect, onLockedClick, onReviewIntroduction }
             variant="link"
             type="button"
             onClick={onReviewIntroduction}
-            className="h-auto whitespace-normal text-sm text-muted-foreground hover:text-foreground"
+            className="h-auto whitespace-normal text-sm text-muted-foreground hover:text-foreground max-sm:min-h-11"
           >
             Revoir la vidéo d’introduction
           </Button>

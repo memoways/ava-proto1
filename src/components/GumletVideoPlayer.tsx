@@ -365,7 +365,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       {showSkip ? (
         <button
           onClick={handleSkip}
-          className="absolute bottom-8 right-8 z-30 rounded-md border border-border/20 bg-black/40 px-3 py-1.5 font-mono text-xs text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground"
+          className="absolute bottom-8 right-8 z-30 rounded-md border border-border/20 bg-black/40 px-3 py-1.5 font-mono text-xs max-sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] max-sm:right-4 max-sm:min-h-11 max-sm:px-4 max-sm:text-sm text-muted-foreground/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-foreground"
         >
           Passer →
         </button>

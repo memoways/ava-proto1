@@ -19,8 +19,12 @@ Plan complet et décisions d'Ulrich : [plan_adaptation_ecrans.md](plan_adaptatio
   `src/components/prd4/ConversationScreen.tsx`, pas l'ancien `src/components/ConversationScreen.tsx`.
 - `viewport-fit=cover` volontairement absent d'`index.html` (il ferait passer accueil, grille et questionnaire sous
   l'encoche iPhone) : à reprendre seulement avec une marge de sécurité globale, vérifiée sur chaque écran.
-- À vérifier au démarrage : PR du lot 2 fusionnée sur main, synchronisation Lovable faite, recette iPhone du lot 2
-  rendue par Ulrich (si elle signale un défaut smartphone, le corriger avant la tablette).
+- Lot 2 bis (8 novembre) : voix de Max sur iPhone (AudioContext `interrupted` relancé, réveil à chaque geste via
+  `installAudioGestureUnlock`, `voice_turn_completed.error_detail`) et écrans < 640 px pensés pour le pouce (variante
+  `max-sm:` : film, accueil, fin, cibles 44 px). Non confirmé sur vrai iPhone au moment de la fusion.
+- À vérifier au démarrage : PR du lot 2 bis fusionnée sur main, synchronisation Lovable faite, recette iPhone rendue
+  par Ulrich. Si Max reste muet, lire `error_detail` des tours de la session (Lovable `query_database` sur
+  `voice_turn_events`) avant toute autre piste, et corriger avant la tablette.
 
 ## Objectif du lot 3
 
@@ -58,8 +62,9 @@ recette du lot 2).
 
 ## Recette (Ulrich, après fusion et synchronisation Lovable)
 
-1. Lot 2 si pas encore fait : iPhone Safari, appel Max en voix seule avec vignette, cinématique et teaser lus,
-   passage Emma, raccrocher ; desktop sans paramètre : avatar Anam connecté comme avant.
+1. Lot 2 / 2 bis si pas encore fait : iPhone Safari, Max audible en voix seule (mains libres et appui micro),
+   vignette, cinématique et teaser lus, question du film (image entière, réponses en bas), passage Emma, raccrocher ;
+   desktop sans paramètre : avatar Anam connecté comme avant.
 2. Lot 3 : dérouler `docs/recette_adaptation_ecrans.md` sur les quatre appareils et le signer.
 
 ## Invariants

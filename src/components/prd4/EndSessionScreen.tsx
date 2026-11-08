@@ -15,9 +15,9 @@ const EndSessionScreen = ({ onContinue, autoContinueAfterMs }: Props) => {
   }, [autoContinueAfterMs, onContinue]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
-      <div className="max-w-lg space-y-6">
-        <p className="font-serif text-xl text-foreground/90">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center max-sm:min-h-[100svh] max-sm:px-4 max-sm:pt-8 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="max-w-lg space-y-6 max-sm:flex max-sm:w-full max-sm:flex-1 max-sm:flex-col max-sm:gap-6 max-sm:space-y-0">
+        <p className="font-serif text-xl text-foreground/90 max-sm:!mt-auto">
           La communication se coupe.
         </p>
         <p className="text-sm text-muted-foreground/80">
@@ -25,7 +25,7 @@ const EndSessionScreen = ({ onContinue, autoContinueAfterMs }: Props) => {
         </p>
         <Button
           onClick={onContinue}
-          className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90"
+          className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 max-sm:!mt-auto max-sm:min-h-12 max-sm:w-full"
         >
           Continuer
         </Button>
