@@ -40,3 +40,12 @@ export type ConversationLayout = "video" | "call";
 export function conversationLayoutFor(deviceClass: DeviceClass): ConversationLayout {
   return deviceClass === "smartphone" ? "call" : "video";
 }
+
+/**
+ * Touch-first controls on the video screen (screen plan, lot 3): tablets (and
+ * smartphones, whose call screen already has them) get 44 px targets, "touche"
+ * wording and `100svh`. Desktop keeps its current render.
+ */
+export function touchFirstFor(deviceClass: DeviceClass): boolean {
+  return deviceClass !== "desktop";
+}

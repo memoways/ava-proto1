@@ -2679,3 +2679,68 @@ test('écran téléphone : appel vocal sans avatar, passage Emma puis raccrocher
   await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
   await expect(page.getByText('Connexion vidéo…')).toHaveCount(0);
 });
+
+// Screen plan, lot 3 — device projects (`iphone`, `ipad`, WebKit) run only the
+// tests tagged @iphone / @ipad; desktop Chrome skips every @device test.
+test('@device @ipad écran tablette : avatar demandé, vidéo montée, cibles tactiles et capsules cliquables', async ({ page }) => {
+  test.setTimeout(90_000);
+  const avatarRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/functions/v1/streaming-avatar-session')) avatarRequests.push(request.url());
+  });
+  // The avatar session never answers: the stream stays « connecting » with its <video> mounted.
+  await page.route('**/functions/v1/streaming-avatar-session**', () => new Promise(() => {}));
+  const turns = [...HANDOFF_TURNS, "J'aimerais parler à Emma, s'il te plaît."];
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmTarget: 'emma', gmStance: 'accept', gmHandoffAt: 4, maxResponse: "D'accord, je te la passe.", outputMode: 'streaming_avatar' });
+  await startCharacterConversation(page, 'Max', '/?ecran=tablette');
+  await expect(page.locator('[data-touch-first="true"]')).toBeVisible();
+  await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(1);
+  expect(avatarRequests.length).toBeGreaterThan(0);
+  const viewport = page.viewportSize()!;
+  const touchTarget = async (name: string) => {
+    const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  };
+  await touchTarget('Terminer');
+  await touchTarget("Démarrer l'enregistrement");
+  await expect(page.getByText('Touche pour parler')).toBeVisible();
+  expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'streaming_avatar', device_class: 'tablet' });
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  // Character capsules stack in the header column, clear of each other and of « Terminer ».
+  const current = (await page.locator('[data-character-capsule="current"]').boundingBox())!;
+  const handoff = (await page.locator('[data-character-capsule="handoff"]').boundingBox())!;
+  const hangUp = (await page.getByRole('button', { name: 'Terminer', exact: true }).boundingBox())!;
+  expect(handoff.y).toBeGreaterThanOrEqual(current.y + current.height);
+  expect(handoff.x + handoff.width).toBeLessThanOrEqual(hangUp.x);
+  await touchTarget('Appeler Emma');
+  await touchTarget('Rester avec Max');
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Portrait d’Emma' })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+});
+
+test('@device @iphone écran téléphone (WebKit) : appel vocal sans avatar jusqu’au raccrocher', async ({ page }) => {
+  test.setTimeout(90_000);
+  const avatarRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/functions/v1/streaming-avatar-session')) avatarRequests.push(request.url());
+  });
+  const turns = [...HANDOFF_TURNS, "J'aimerais parler à Emma, s'il te plaît."];
+  const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true,
+    gmTarget: 'emma', gmStance: 'accept', gmHandoffAt: 4, maxResponse: "D'accord, je te la passe.", outputMode: 'streaming_avatar' });
+  await startCharacterConversation(page, 'Max', '/?ecran=telephone');
+  await expect(page.locator('[data-layout="call"]')).toBeVisible();
+  await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
+  for (const text of turns) { await sendHandoffTurn(page, text); await page.waitForLoadState('networkidle'); }
+  await page.getByRole('button', { name: 'Appeler Emma', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Emma', exact: true })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Appeler Max', exact: true })).toBeVisible();
+  expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'tts', streaming_avatar_provider: null, device_class: 'smartphone' });
+  expect(avatarRequests).toEqual([]);
+});

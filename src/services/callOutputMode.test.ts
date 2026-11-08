@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conversationLayoutFor, resolveCallOutputMode } from "./callOutputMode";
+import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "./callOutputMode";
 
 describe("resolveCallOutputMode", () => {
   it.each(["streaming_avatar", "tts"] as const)("keeps a smartphone voice-only even when the setting is %s", (configuredMode) => {
@@ -27,5 +27,13 @@ describe("conversationLayoutFor", () => {
     expect(conversationLayoutFor("smartphone")).toBe("call");
     expect(conversationLayoutFor("tablet")).toBe("video");
     expect(conversationLayoutFor("desktop")).toBe("video");
+  });
+});
+
+describe("touchFirstFor", () => {
+  it("is on for touch devices and off for desktop", () => {
+    expect(touchFirstFor("tablet")).toBe(true);
+    expect(touchFirstFor("smartphone")).toBe(true);
+    expect(touchFirstFor("desktop")).toBe(false);
   });
 });

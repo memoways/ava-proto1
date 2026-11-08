@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 7 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 8 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -42,6 +42,13 @@ Personnel : Ulrich `377e8583-7838-4c05-9f76-8833a450f304`, sources Ava exclues.
 GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
+
+**Adaptation aux écrans, lot 3 (8 novembre, code) — dernier lot du plan.** Tablette : même écran vidéo (avatar gardé),
+avec une prop `touchFirst` calculée une fois depuis la classe (`touchFirstFor`) : cibles 44 px (Terminer, Ignorer,
+« Passer » du teaser, « Revoir la vidéo d'introduction », « Terminer l'expérience »), « Touche pour parler », `100svh`.
+Desktop inchangé. Revue 768×1024 à 1366×1024 portrait/paysage : cadrage vidéo et capsules corrects. Projets Playwright
+`iphone` / `ipad` (WebKit) sur les tests `@device`, répartis dans les 4 shards. **Aucun lot ne suit** : reste la recette
+humaine, [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md) (iPhone, Android, iPad, desktop, latences).
 
 **Adaptation aux écrans, lot 2 bis (8 novembre, code).** Sur iPhone, Max était muet en appel vocal : iOS met l'AudioContext
 en `interrupted` au démarrage du micro ; relance corrigée (`audioPlayback.ts`, réveil à chaque geste) et erreur exacte
