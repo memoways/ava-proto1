@@ -343,6 +343,9 @@ const IndexPRD4 = () => {
   const activeCharacterRef = useRef<RuntimeCharacter>("max");
   const activeCharacterContextRef = useRef<CharacterExecutionContext | null>(null);
   const startingCharacterRef = useRef<RuntimeCharacter>("max");
+  // Conversational questionnaire session context: call mode resolved at call start, and
+  // whether the avatar fell back to voice-only. Read at the end, never asked.
+  const callModeRef = useRef<{ mode: "streaming_avatar" | "tts"; avatarFallback: boolean }>({ mode: "tts", avatarFallback: false });
   const activeVoiceIdRef = useRef<string | null>(null);
   const activeTTSProviderIdRef = useRef<TTSProviderId | null>(null);
   const handoffCountRef = useRef(0);
@@ -646,6 +649,7 @@ const IndexPRD4 = () => {
     if (sessionIdRef.current) await fallback.prepare({ sessionId: sessionIdRef.current });
     if (endedRef.current || callGenerationRef.current !== generation) { await fallback.dispose(); throw new DOMException('Call closed', 'AbortError'); }
     responseOutputRef.current = fallback;
+    if (callModeRef.current.mode === "streaming_avatar") callModeRef.current = { ...callModeRef.current, avatarFallback: true };
     setStreamingAvatarState("failed");
     const sid = sessionIdRef.current;
     if (sid) {
@@ -831,6 +835,7 @@ const IndexPRD4 = () => {
       configuredMode: outputSettings.mode,
       deviceClass: getDeviceClass(),
     });
+    callModeRef.current = { mode: outputMode === "streaming_avatar" ? "streaming_avatar" : "tts", avatarFallback: false };
     rescueLifetimeRef.current = new AbortController();
     const pinnedGameplay = getGameplaySettings();
     incrementalOutputEnabledRef.current = pinnedGameplay.VOICE_INCREMENTAL_OUTPUT === true;
@@ -3391,6 +3396,7 @@ const IndexPRD4 = () => {
     handoffCountRef.current = 0;
 
     startingCharacterRef.current = "max";
+    callModeRef.current = { mode: "tts", avatarFallback: false };
     setCurrentHandoffOffer(null);
     setHandoffCalling(false);
     activeTurnControllerRef.current?.abort("experience-restart");

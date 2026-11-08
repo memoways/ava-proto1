@@ -97,4 +97,28 @@ garde ses branches legacy et PRD4 et gagne une branche `conversational-v1`.
 4. **Appareils et recette** — smartphone (une question par écran, micro en bas, 44 px, radar compact), tablette
    (`touchFirst`), desktop (question et transcript côte à côte) ; E2E `@iphone` / `@ipad` ; recette humaine.
 
-Prompt de reprise du lot 1 : [prompt_reprise_questionnaire_conversationnel_lot_1.md](prompt_reprise_questionnaire_conversationnel_lot_1.md).
+## Exécution lot 1 (8 novembre 2026)
+
+- **Source fiable des personnages et passages** : le journal `conversationRef` (celui que `endPRD4Session` écrit dans
+  `sessions.conversation_log`). Un personnage est « appelé » s'il a une réplique non vide (`role` `max`/`emma`) ; un
+  passage est un changement de locuteur entre deux répliques, `returning` si le personnage avait déjà parlé. Plus
+  fiable que `voice_turn_events` (télémétrie, absente si l'outbox échoue) et que `handoffCountRef` (compte les offres).
+- **Mode d'appel** : `callModeRef` dans `IndexPRD4` (mode résolu par `resolveCallOutputMode` au décrochage, repli
+  avatar → voix marqué par `activateTTSFallback`). Appareil : `getDeviceClass()`. Film : `state.hasSeenFilm`
+  (`rappel` = vu, comme `experienceFrame`).
+- **Code** : types dans `src/types/index.ts` ; `src/services/conversationalQuestionnaire.ts` (pur) ;
+  `saveConversationalQuestionnaire` / `syncConversationalQuestionnaireToNotion` dans `src/services/prd4Questionnaire.ts`
+  (écriture seulement si `questionnaire_responses` est vide) ; mapping Notion extrait tel quel dans
+  `supabase/functions/_shared/questionnaireNotionProps.ts` + branche `conversational-v1`.
+- **Notion** (data source `collection://31d62322-e595-8036-af64-000b1236aaf2`, ajout seul, schéma relu après écriture) :
+  `Conv Fluidité`, `Conv Intérêt`, `Conv Immersion`, `Conv Crédibilité`, `Conv Engagement` (number, vide = non évalué),
+  cinq `… verbatim` (texte : réponse, relance, commentaire de note), `Conv Synthèse`, `Conv Version`, `Conv Appareil`,
+  `Conv Mode appel` (Avatar vidéo / Voix seule / Avatar puis voix (repli)), plus `Conv Personnages appelés`
+  (multi-select) et `Conv Passages` (number), que les colonnes PRD4 ne couvraient pas. Le contexte connu va dans les
+  colonnes PRD4 techniques (film, teaser, personnage de départ, durée, tours, latences, erreurs micro, raison de fin,
+  rôle JSON, transcript) ; email et opt-ins réutilisent les canaux PRD4.
+- **Pas de migration SQL** : le jsonb suffit. Lecture admin/export inchangée (le rendu dédié arrive au lot 3).
+- Redéploiement de `sync-questionnaire` : par Lovable après la fusion.
+
+Prompt de reprise du lot 2 : [prompt_reprise_questionnaire_conversationnel_lot_2.md](prompt_reprise_questionnaire_conversationnel_lot_2.md).
+Prompt du lot 1 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_1.md](prompt_reprise_questionnaire_conversationnel_lot_1.md).
