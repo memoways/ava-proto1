@@ -50,6 +50,7 @@ describe("ConversationScreen — touch-first video screen (tablet)", () => {
     expect(screen.getByText("Clique pour parler")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Terminer" }).className).not.toContain("min-h-11");
     expect(screen.getByRole("button", { name: "Ignorer" }).className).not.toContain("min-h-11");
+    expect(screen.getByLabelText("Temps restant").parentElement!.className).not.toContain("flex-col");
   });
 
   it("tablet: 100svh, « Touche », 44 px Terminer and Ignorer", () => {
@@ -62,5 +63,7 @@ describe("ConversationScreen — touch-first video screen (tablet)", () => {
     expect(screen.getByRole("button", { name: "Terminer" }).className).toContain("min-h-11");
     expect(screen.getByRole("button", { name: "Ignorer" }).className).toContain("min-h-11");
     expect(screen.getByRole("button", { name: "Rester avec Max" }).className).toContain("min-h-11");
+    // Terminer on top, timer below; desktop keeps them side by side.
+    expect(screen.getByLabelText("Temps restant").parentElement!.className).toContain("flex-col-reverse");
   });
 });

@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Adaptation aux écrans : voix de Max sur iPhone en mains libres et coins de l'écran d'appel] — 2026-11-08
+
+- Recette iPhone d'Ulrich (session `feb8eb9b`, Safari, mains libres) : Max muet, `NotAllowedError` sur chaque tour avec
+  un AudioContext `running`. La voix ElevenLabs passait par un `<audio>` neuf à chaque réplique, refusé par iOS hors
+  geste. Un refus avant tout son rejoue désormais la réplique par l'AudioContext déverrouillé, puis les répliques
+  suivantes y vont directement (`playAudioBlobWebAudio`, `isMediaElementAutoplayBlocked`). Sur iPhone, la réplique
+  démarre après réception complète du MP3. Chemin inchangé ailleurs ; hors expérience (banc admin des voix, contexte
+  jamais déverrouillé), le refus reste affiché.
+- Écran d'appel smartphone : « Terminer » en haut à droite, minutage dessous ; autres personnages en haut à gauche.
+  Tablette : minutage sous « Terminer ». Desktop inchangé.
+- Tests : `audioAutoplayRescue.test.ts`, refus et contournement dans `elevenLabsStreamPlayer.test.ts`, coins de
+  l'écran en unitaire et E2E `@iphone` / `@ipad`.
+
 ## [Questionnaire conversationnel de fin d'expérience : plan] — 2026-11-08
 
 - Plan `docs/plan_questionnaire_conversationnel.md` : réponses à la voix (questions affichées, sans voix de sortie),

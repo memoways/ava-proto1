@@ -89,6 +89,8 @@ function setup(overrides: Partial<ElevenLabsStreamDeps> = {}, ctx: Parameters<ty
     createAudio: () => audio as unknown as HTMLAudioElement,
     playBlob: playBlob as never,
     stallTimeoutMs: 1000,
+    autoplayBlocked: () => false,
+    onAutoplayBlocked: vi.fn(),
     ...overrides,
   };
   const handle = createElevenLabsStreamingPlayback(ctx, deps);
@@ -96,6 +98,26 @@ function setup(overrides: Partial<ElevenLabsStreamDeps> = {}, ctx: Parameters<ty
 }
 
 describe("ElevenLabs progressive playback (L1.1)", () => {
+  it("plays the full MP3 when iOS refuses the <audio> element outside a gesture (hands-free)", async () => {
+    failNextAppend = false;
+    const { handle, audio, playBlob } = setup();
+    audio.play.mockImplementationOnce(() => Promise.reject(new DOMException("not allowed", "NotAllowedError")));
+    handle.open();
+    await handle.started;
+    await expect(handle.finished).resolves.toMatchObject({ playbackTotalMs: 40 });
+    expect(playBlob).toHaveBeenCalledTimes(1);
+    expect((playBlob.mock.calls[0][0] as Blob).size).toBe(600);
+  });
+
+  it("skips the <audio> stream once autoplay was refused and goes straight to the blob", async () => {
+    failNextAppend = false;
+    const { handle, audio, playBlob } = setup({ autoplayBlocked: () => true });
+    handle.open();
+    await expect(handle.finished).resolves.toMatchObject({ playbackTotalMs: 40 });
+    expect(audio.play).not.toHaveBeenCalled();
+    expect(playBlob).toHaveBeenCalledTimes(1);
+  });
+
   it("settles `finished` when the request fails after an early end (G1, E2E hang)", async () => {
     failNextAppend = false;
     let fail!: (e: unknown) => void;

@@ -18,6 +18,20 @@ export interface PlaybackResult {
 
 let audioContext: AudioContext | null = null;
 let unlocked = false;
+// Set once an <audio> element is refused outside a gesture (iOS Safari in
+// hands-free mode): later turns go straight to Web Audio.
+let mediaElementAutoplayBlocked = false;
+
+/** True once the browser refused to start an <audio> element without a gesture. */
+export function isMediaElementAutoplayBlocked(): boolean {
+  return mediaElementAutoplayBlocked;
+}
+
+/** Records an autoplay refusal of an <audio> element (see isMediaElementAutoplayBlocked). */
+export function noteMediaElementAutoplayBlocked(): void {
+  // Only the experience (shared context unlocked by a tap) switches to Web Audio.
+  if (unlocked && audioContext) mediaElementAutoplayBlocked = true;
+}
 
 function getAudioContext(): AudioContext | null {
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -98,9 +112,91 @@ export function isAudioPlaybackUnlocked(): boolean {
   return unlocked || audioContext?.state === "running";
 }
 
+function readBlobBytes(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error("Blob read failed"));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+/**
+ * Plays a blob through the shared AudioContext (decode + buffer source). iOS
+ * Safari refuses `<audio>.play()` outside a user gesture (hands-free turns)
+ * but lets an unlocked, running context start sources at any time.
+ */
+export async function playAudioBlobWebAudio(
+  blob: Blob,
+  onPlaybackStart?: (playbackStartMs: number) => void,
+  signal?: AbortSignal,
+): Promise<PlaybackResult> {
+  const t0 = performance.now();
+  const ctx = getAudioContext();
+  if (!ctx) {
+    const error = new DOMException("Web Audio unavailable", "NotSupportedError");
+    return { status: "failed", playbackTotalMs: 0, error, errorInfo: classifyPlaybackError(error) };
+  }
+  let source: AudioBufferSourceNode | null = null;
+  let abortListener: (() => void) | null = null;
+  let playbackStartMs: number | undefined;
+  try {
+    if (signal?.aborted) throw new DOMException("Audio playback aborted", "AbortError");
+    if (audioContextNeedsResume(ctx)) await ctx.resume().catch(() => undefined);
+    const bytes = await readBlobBytes(blob);
+    const buffer = await new Promise<AudioBuffer>((resolve, reject) => {
+      // Callback form: older WebKit has no promise-returning decodeAudioData.
+      const maybe = ctx.decodeAudioData(bytes, resolve, reject) as Promise<AudioBuffer> | undefined;
+      maybe?.then?.(resolve, reject);
+    });
+    if (signal?.aborted) throw new DOMException("Audio playback aborted", "AbortError");
+    await new Promise<void>((resolve, reject) => {
+      const node = ctx.createBufferSource();
+      source = node;
+      node.buffer = buffer;
+      node.connect(ctx.destination);
+      node.onended = () => resolve();
+      abortListener = () => {
+        try { node.stop(); } catch { /* already stopped */ }
+        reject(new DOMException("Audio playback aborted", "AbortError"));
+      };
+      signal?.addEventListener("abort", abortListener, { once: true });
+      node.start(0);
+      playbackStartMs = Math.round(performance.now() - t0);
+      onPlaybackStart?.(playbackStartMs);
+    });
+    return { status: "played", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0) };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { status: "failed", playbackStartMs, playbackTotalMs: Math.round(performance.now() - t0), error, errorInfo: classifyPlaybackError(err) };
+  } finally {
+    if (abortListener) signal?.removeEventListener("abort", abortListener);
+    if (source) (source as AudioBufferSourceNode).onended = null;
+  }
+}
+
 export async function playAudioBlobRobust(
   blob: Blob,
   stallTimeoutMs = AUDIO_PLAYBACK_STALL_DEADLINE_MS,
+  onPlaybackStart?: (playbackStartMs: number) => void,
+  signal?: AbortSignal,
+): Promise<PlaybackResult> {
+  if (mediaElementAutoplayBlocked) return playAudioBlobWebAudio(blob, onPlaybackStart, signal);
+  const result = await playAudioBlobElement(blob, stallTimeoutMs, onPlaybackStart, signal);
+  // Refused before any sound, while the experience has unlocked the shared
+  // context (call started by a tap): same speech through Web Audio. Elsewhere
+  // (admin speech bench) the refusal stays visible.
+  if (result.status === "failed" && result.errorInfo?.type === "not_allowed" && result.playbackStartMs === undefined && unlocked && audioContext) {
+    mediaElementAutoplayBlocked = true;
+    return playAudioBlobWebAudio(blob, onPlaybackStart, signal);
+  }
+  return result;
+}
+
+async function playAudioBlobElement(
+  blob: Blob,
+  stallTimeoutMs: number,
   onPlaybackStart?: (playbackStartMs: number) => void,
   signal?: AbortSignal,
 ): Promise<PlaybackResult> {

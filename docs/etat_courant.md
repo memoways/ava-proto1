@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Écrans, retours de recette iPhone (8 novembre, code).** Max muet en mains libres sur iPhone : iOS refusait le
+lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'AudioContext déverrouillé (démarrage
+après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres
+personnages en haut à gauche. Reste la recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
+
 **Questionnaire conversationnel (8 novembre, plan).** Remplacer le formulaire PRD4 par un échange vocal court :
 questions affichées sans voix de sortie, 5 dimensions (fluidité, intérêt, immersion, crédibilité, engagement), une
 relance max, note 1–5 confirmée ou « non évalué », synthèse validée, radar participant + admin, pas d'audio stocké,

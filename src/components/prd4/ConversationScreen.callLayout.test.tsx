@@ -73,6 +73,21 @@ describe("ConversationScreen — smartphone call layout", () => {
     expect(onIgnoreCinematic).toHaveBeenCalledTimes(1);
   });
 
+  it("puts the other characters top left and Terminer top right with the timer below", () => {
+    const { container } = render(<ConversationScreen {...baseProps} handoffOffer={{ reason: "Emma sait", targetCharacter: "emma" }} />);
+    const header = container.querySelector("header")!;
+    const characters = header.querySelector("[data-call-slot=characters]")!;
+    const hangUp = header.querySelector("[data-call-slot=hang-up]")!;
+    expect(header.firstElementChild).toBe(characters);
+    expect(header.lastElementChild).toBe(hangUp);
+    expect(characters.querySelector("[data-character-capsule=handoff]")).not.toBeNull();
+    const [first, second] = [...hangUp.children];
+    expect(first).toBe(screen.getByRole("button", { name: "Terminer" }));
+    expect(second).toBe(screen.getByLabelText("Temps restant"));
+    expect(hangUp.className).toContain("flex-col");
+    expect(hangUp.className).toContain("items-end");
+  });
+
   it("leaves the default video layout unchanged", () => {
     const { container } = render(<ConversationScreen {...baseProps} layout={undefined}
       streamingAvatarActive streamingAvatarState="ready" attachAvatarMedia={vi.fn()} />);
