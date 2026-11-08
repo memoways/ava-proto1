@@ -165,4 +165,24 @@ describe("GumletVideoPlayer", () => {
       vi.useRealTimers();
     }
   });
+
+  it("shows the whole film on touch screens and offers fullscreen; desktop keeps filling in landscape", () => {
+    const url = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
+    const { unmount } = render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} />);
+    const desktop = screen.getByLabelText("Video player");
+    expect(desktop.className).toContain("object-cover");
+    expect(desktop.className).toContain("portrait:object-contain");
+    expect(screen.queryByRole("button", { name: /Plein écran/ })).toBeNull();
+    unmount();
+
+    render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst />);
+    const touch = screen.getByLabelText("Video player") as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+    expect(touch.className).toContain("object-contain");
+    expect(touch.className).not.toContain("object-cover");
+    // iPhone: no element fullscreen, the native player opens.
+    const enter = vi.fn();
+    touch.webkitEnterFullscreen = enter;
+    fireEvent.click(screen.getByRole("button", { name: /Plein écran/ }));
+    expect(enter).toHaveBeenCalledTimes(1);
+  });
 });

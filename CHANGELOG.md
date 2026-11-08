@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Smartphone : film entier et plein écran ; services par appareil] — 2026-11-08
+
+- Constat sur les sessions iPhone du 8 novembre (`3713440c`, `6b83bfaf`, sandbox-ulrich) : Max parlait bien par
+  ElevenLabs (`eleven_multilingual_v2`, voix `VK9GO2Vntd9rcY7Tg6wl`, profil Orchestration), en MP3 complet joué par
+  Web Audio, micro ouvert (mains libres). Sur ordinateur et tablette, Max parle avec la voix de l'avatar Anam : ce
+  sont deux chaînes différentes, d'où l'écart entendu.
+- Admin › Streaming Avatar › « Services par appareil » (`ava_device_services`, par environnement) : pour
+  smartphone, tablette et desktop, sortie (appel vocal, avatar vidéo ou interrupteur global), fournisseur d'avatar,
+  moteur de voix et voix de Max et d'Emma. Défauts = comportement actuel (smartphone en appel vocal, autres sur
+  l'interrupteur, voix du personnage). Un smartphone réglé en avatar affiche l'écran vidéo ; Emma démarre toujours en
+  voix seule. Le moteur choisi s'applique à la voix seule et aux replis (`resolveDeviceVoice`).
+- Film d'introduction et cinématiques : image entière sur écrans tactiles et fenêtres en portrait (plus de
+  recadrage au centre) ; bouton « Plein écran ⤢ » sur écrans tactiles (plein écran + paysage sur Android, lecteur
+  natif iOS qui suit la rotation), sorti à la fin, à « Passer » et à l'arrêt. Desktop paysage inchangé.
+- Tests : `deviceServices.test.ts`, choix par appareil dans `callOutputMode.test.ts`, cadrage et plein écran dans
+  `GumletVideoPlayer.test.tsx` ; E2E `@iphone` / `@ipad` verts. Recette humaine iPhone à refaire (voix, film).
+
 ## [Questionnaire conversationnel, lot 3 : validation finale, radar et admin agrégé] — 2026-11-08
 
 - Validation finale (`ConversationalReview`, `conversationalQuestionnaireReview.ts`) : synthèse par dimension

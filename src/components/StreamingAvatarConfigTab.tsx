@@ -75,6 +75,7 @@ import {
 import { assignTavusFace } from "@/services/streamingAvatar/tavusFaceAdmin";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
 import TavusFaceTrainer from "@/components/TavusFaceTrainer";
+import DeviceServicesPanel from "@/components/admin/DeviceServicesPanel";
 
 
 const providerCopy: Record<StreamingAvatarProviderId, { title: string; description: string }> = {
@@ -151,6 +152,8 @@ export default function StreamingAvatarConfigTab() {
           Ava produit le texte final. Le fournisseur sélectionné ne fait que le prononcer et le rendre en vidéo temps réel.
         </p>
       </div>
+
+      <DeviceServicesPanel />
 
       <div className="grid gap-3 md:grid-cols-2">
         {(["heygen", "tavus", "anam", "lemonslice"] as const).map((provider) => {
