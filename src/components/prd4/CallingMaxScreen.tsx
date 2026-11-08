@@ -95,10 +95,10 @@ const CallingMaxScreen = ({ onAnswered, onHangUp, character, situation, portrait
   }, []);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 text-center max-sm:min-h-[100svh] max-sm:px-4">
       <div className="space-y-8">
         {onHangUp && <button type="button" onClick={onHangUp}
-          className="rounded-full border px-5 py-3 text-sm focus-visible:outline focus-visible:outline-2">Terminer l’appel</button>}
+          className="rounded-full border px-5 py-3 text-sm focus-visible:outline focus-visible:outline-2 max-sm:min-h-11">Terminer l’appel</button>}
         <div className="relative mx-auto h-44 w-44">
           <span
             className="absolute inset-0 animate-ping rounded-full border-2 border-primary/40"
@@ -140,8 +140,13 @@ const CallingMaxScreen = ({ onAnswered, onHangUp, character, situation, portrait
               {encounterFrame(situation)}
             </span>
           )}
-          Quand ce sera à toi de parler, clique sur le bouton micro
-          (ou appuie sur la barre&nbsp;Espace). Clique à nouveau pour envoyer.
+          <span className="max-sm:hidden">
+            Quand ce sera à toi de parler, clique sur le bouton micro
+            (ou appuie sur la barre&nbsp;Espace). Clique à nouveau pour envoyer.
+          </span>
+          <span className="sm:hidden">
+            Quand ce sera à toi de parler, touche le bouton micro en bas de l’écran.
+          </span>
         </p>
       </div>
     </div>

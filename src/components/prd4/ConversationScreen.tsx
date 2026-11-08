@@ -274,9 +274,9 @@ const ConversationScreen = ({
     <>
     {/* Status helper line */}
     <p role="status" aria-live="polite" hidden={handsFree} className="min-h-[1.25rem] text-xs uppercase tracking-[0.18em] text-muted-foreground/80">
-      {audioState === "idle" && "Clique pour parler"}
+      {audioState === "idle" && (callLayout ? "Touche pour parler" : "Clique pour parler")}
       {audioState === "mic_starting" && "Micro en cours d'ouverture…"}
-      {audioState === "user_speaking" && "Enregistrement — clique pour envoyer"}
+      {audioState === "user_speaking" && (callLayout ? "Enregistrement — touche pour envoyer" : "Enregistrement — clique pour envoyer")}
       {audioState === "user_finalizing" && "Finalisation de tout ce qui a été dit…"}
       {audioState === "max_thinking" && `${displayName} réfléchit…`}
       {audioState === "max_speaking" && `${displayName} répond…`}

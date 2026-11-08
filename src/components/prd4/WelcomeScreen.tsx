@@ -39,12 +39,12 @@ const WelcomeScreen = ({
   const analyticsAllowed = privacyPreferences?.analyticsAllowed === true;
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 text-center tablet:px-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 py-10 text-center tablet:px-10 max-sm:min-h-[100svh] max-sm:px-4 max-sm:pt-8 max-sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[hsl(var(--fade-overlay))]" />
-      <div className="relative z-10 w-full max-w-2xl tablet:max-w-3xl">
+      <div className="relative z-10 w-full max-w-2xl tablet:max-w-3xl max-sm:flex max-sm:flex-1 max-sm:flex-col">
 
-        <div className="space-y-8">
-          <h1 className="font-serif text-5xl font-light tracking-tight text-foreground md:text-7xl">
+        <div className="space-y-8 max-sm:flex max-sm:flex-1 max-sm:flex-col max-sm:gap-6 max-sm:space-y-0">
+          <h1 className="font-serif text-5xl font-light tracking-tight text-foreground md:text-7xl max-sm:!mt-auto">
             Où est Ava&nbsp;?
           </h1>
           <p className="text-lg text-muted-foreground md:text-xl">
@@ -115,7 +115,7 @@ const WelcomeScreen = ({
               }
             }}
             disabled={starting || resumeLoading || !videoReady || !voiceAcknowledged || Boolean(HCAPTCHA_ENABLED && !captchaToken)}
-            className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90"
+            className="mt-6 min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 max-sm:!mt-auto max-sm:min-h-12 max-sm:w-full"
           >
             {resumeLoading
               ? "Recherche d’un appel…"
@@ -136,7 +136,7 @@ const WelcomeScreen = ({
                 await onResume().finally(() => setStarting(false));
               }}
               disabled={starting || resumeLoading || !voiceAcknowledged}
-              className="min-w-[200px]"
+              className="min-w-[200px] max-sm:min-h-12 max-sm:w-full"
             >
               {resumeLoading ? "Recherche…" : "Reprendre l’appel"}
             </Button>

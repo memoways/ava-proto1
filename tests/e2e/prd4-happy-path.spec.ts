@@ -2636,8 +2636,33 @@ test('écran téléphone : appel vocal sans avatar, passage Emma puis raccrocher
   // The server setting asks for the avatar: the phone must still stay voice-only.
   const fakes = await installNetworkFakes(page, turns, { ttsSuccess: true, characterOpenings: true, characterPortraits: true,
     gmTarget: 'emma', gmStance: 'accept', gmHandoffAt: 4, maxResponse: "D'accord, je te la passe.", outputMode: 'streaming_avatar' });
-  await startCharacterConversation(page, 'Max', '/?ecran=telephone');
+  await page.route('**/__l5e/assets-v1/**', route => route.fulfill({ path: 'public/assets/max-bg.jpg', contentType: 'image/jpeg' }));
+  // Thumb reach: the main buttons sit in the bottom third, 44 px or taller, inside the 390 px width.
+  const inThumbZone = async (name: string) => {
+    const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+    expect(box.y).toBeGreaterThan(844 * 2 / 3);
+    expect(box.y + box.height).toBeLessThanOrEqual(844);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+  };
+  await page.goto('/?ecran=telephone');
+  await inThumbZone('Commencer');
+  await page.getByRole('button', { name: 'Commencer' }).click();
+  await page.getByRole('button', { name: /Passer/ }).click();
+  // Film question: the whole image across the full width, both answers below it.
+  const image = (await page.getByTestId('film-question-image').boundingBox())!;
+  expect(image.x).toBe(0);
+  expect(image.width).toBe(390);
+  expect(image.height).toBeLessThan(844 / 2);
+  const seen = (await page.getByRole('button', { name: "J'ai vu le film", exact: true }).boundingBox())!;
+  expect(seen.y).toBeGreaterThanOrEqual(image.y + image.height);
+  await inThumbZone("Je n'ai pas vu le film");
+  await answerFilmQuestion(page);
+  await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Portrait d’Max' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('[data-layout="call"]')).toBeVisible();
+  await inThumbZone("Démarrer l'enregistrement");
   await expect(page.getByTestId('call-portrait')).toHaveAttribute('src', 'https://portraits.example/max-runtime.jpg');
   await expect(page.getByRole('heading', { name: 'Max', exact: true })).toBeVisible();
   await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);

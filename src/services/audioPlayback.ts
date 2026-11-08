@@ -22,8 +22,26 @@ let unlocked = false;
 function getAudioContext(): AudioContext | null {
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioCtx) return null;
-  if (!audioContext) audioContext = new AudioCtx();
+  if (!audioContext) {
+    const ctx = new AudioCtx();
+    audioContext = ctx;
+    // iOS Safari moves the context to "interrupted" when the microphone starts
+    // (or after a phone call / Siri); try to bring it back as soon as it happens.
+    ctx.addEventListener?.("statechange", () => {
+      if ((ctx.state as string) === "interrupted") void ctx.resume().catch(() => { /* next gesture retries */ });
+    });
+  }
   return audioContext;
+}
+
+/** Current state of the shared context (`null` before it exists): "running", "suspended", "interrupted" (iOS) or "closed". */
+export function getAudioContextState(): string | null {
+  return audioContext?.state ?? null;
+}
+
+/** A context that is neither running nor closed produces no sound until it is resumed. */
+export function audioContextNeedsResume(ctx: Pick<AudioContext, "state"> | null): boolean {
+  return Boolean(ctx) && ctx!.state !== "running" && ctx!.state !== "closed";
 }
 
 /** Shared AudioContext (the one unlockAudioPlayback unlocks) for streaming playback. */
@@ -45,15 +63,35 @@ export function classifyPlaybackError(err: unknown): PlaybackErrorInfo {
 export async function unlockAudioPlayback(): Promise<boolean> {
   const ctx = getAudioContext();
   if (!ctx) return false;
-  if (ctx.state === "suspended") await ctx.resume();
-
+  // Everything below runs synchronously inside the user gesture: iOS only
+  // unlocks Web Audio when resume() and a first buffer start within it.
+  const resumed = audioContextNeedsResume(ctx) ? ctx.resume() : null;
   const buffer = ctx.createBuffer(1, 1, Math.max(8000, ctx.sampleRate));
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
   source.start(0);
   unlocked = true;
+  if (resumed) await resumed;
   return true;
+}
+
+/**
+ * Re-unlocks the shared context on every user gesture while it is not running
+ * (mic tap, answer, hang up…). Needed on iOS, where the context stops after
+ * the microphone starts and can only be resumed from a gesture. No effect while
+ * the context runs (desktop). Returns the uninstall function.
+ */
+export function installAudioGestureUnlock(target: Pick<Document, "addEventListener" | "removeEventListener"> = document): () => void {
+  const onGesture = () => {
+    if (audioContext && !audioContextNeedsResume(audioContext)) return;
+    void unlockAudioPlayback().catch(() => { /* the next gesture retries */ });
+  };
+  const events = ["pointerdown", "touchend", "click", "keydown"] as const;
+  for (const name of events) target.addEventListener(name, onGesture, { capture: true, passive: true });
+  return () => {
+    for (const name of events) target.removeEventListener(name, onGesture, { capture: true });
+  };
 }
 
 export function isAudioPlaybackUnlocked(): boolean {

@@ -136,6 +136,20 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
   inchangés (le faux réseau gagne seulement l'option `outputMode`).
 - Recette : [prompt lot 3](prompt_reprise_adaptation_ecrans_lot_3.md) reprend la recette iPhone du lot 2.
 
+### Exécution lot 2 bis (8 novembre 2026)
+
+- Recette iPhone (session `032b7235`, Safari) : Max muet, tours `error_type: "tts"`, `t_audio_playback_total_ms: 0`.
+  Cause : sur iPhone la voix ne passe plus par l'avatar (WebRTC) mais par Gradium en Web Audio ; iOS met
+  l'AudioContext en `interrupted` au démarrage du micro, état que le code ne relançait pas. Correctif dans
+  `audioPlayback.ts` (relance de `interrupted`, relance à chaque geste, déverrouillage synchrone dans le geste) et
+  `gradiumStreamPlayer.ts` ; `error_detail` ajouté à `voice_turn_completed` pour lire l'erreur exacte si un échec
+  subsiste. Non vérifiable hors d'un vrai iPhone : à confirmer en recette.
+- Responsive smartphone par `max-sm:` (< 640 px), donc tablette et desktop inchangés : question du film (image entière
+  en pleine largeur, réponses en bas), accueil et fin (bouton principal en bas, pleine largeur), cibles 44 px (Passer,
+  Terminer l'expérience, Revoir l'introduction, Terminer l'appel), marges de sécurité basses, libellés tactiles.
+  Grille, écran d'appel et questionnaire relus à 390×844 : déjà adaptés, inchangés.
+- `viewport-fit=cover` toujours absent : les marges `env()` valent 0 sans lui, d'où des `max(…)` avec un minimum fixe.
+
 ## Lot 3 — Tablette optimisée et recette multi-appareils
 
 1. Revue de `ConversationScreen`, grille, accueil et lecteur sur 768×1024, 820×1180, 1024×1366

@@ -41,6 +41,8 @@ export interface VoiceTurnTimings {
 }
 
 export interface VoiceTurnCompletedInput {
+  /** Output failure detail (error name/message and Web Audio state) — diagnostic only, no content. */
+  error_detail?: { name: string; message: string; audio_context_state: string | null } | null;
   session_id?: string | null;
   turn_id: string;
   turn_index: number;

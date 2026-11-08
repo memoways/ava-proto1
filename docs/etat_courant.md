@@ -43,12 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Adaptation aux écrans, lot 2 livré en code (7 novembre).** Sur smartphone (`?ecran=telephone` pour forcer), la
-conversation est un appel vocal sans avatar : vignette ronde, nom, état, minuterie, micro, Terminer, capsules
-inchangées ; aiguillage unique `src/services/callOutputMode.ts` (raison `output_mode_reason` dans PostHog). Tablette
-et desktop inchangés (avatar vidéo). Lot 1 (#170) : classe d'appareil sur la session, les tours, les latences et
-PostHog. Recette iPhone puis suite : [prompt lot 3](prompt_reprise_adaptation_ecrans_lot_3.md) (tablette optimisée,
-recette multi-appareils).
+**Adaptation aux écrans, lot 2 bis (8 novembre, code).** Sur iPhone, Max était muet en appel vocal : iOS met l'AudioContext
+en `interrupted` au démarrage du micro ; relance corrigée (`audioPlayback.ts`, réveil à chaque geste) et erreur exacte
+dans `voice_turn_completed.error_detail`. Écrans < 640 px pensés pour le pouce (film : image pleine largeur et réponses
+en bas ; accueil, fin : bouton en bas ; cibles 44 px). Lot 2 (#171) : appel vocal sans avatar sur smartphone, tablette et
+desktop inchangés. Recette iPhone puis suite : [prompt lot 3](prompt_reprise_adaptation_ecrans_lot_3.md).
 
 **Anam, mode « Calage initial » (7 novembre, code).** Mesures du mode navigateur : synchro stable (~−30 ms) dès la
 réplique 4, mais +1,6 s puis −0,6 s sur les deux premières (recalage lent, seulement pendant la parole). Nouveau mode
