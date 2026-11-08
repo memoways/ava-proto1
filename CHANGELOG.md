@@ -10,7 +10,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   un AudioContext `running`. La voix ElevenLabs passait par un `<audio>` neuf à chaque réplique, refusé par iOS hors
   geste. Un refus avant tout son rejoue désormais la réplique par l'AudioContext déverrouillé, puis les répliques
   suivantes y vont directement (`playAudioBlobWebAudio`, `isMediaElementAutoplayBlocked`). Sur iPhone, la réplique
-  démarre après réception complète du MP3. Chemin inchangé ailleurs.
+  démarre après réception complète du MP3. Chemin inchangé ailleurs ; hors expérience (banc admin des voix, contexte
+  jamais déverrouillé), le refus reste affiché.
 - Écran d'appel smartphone : « Terminer » en haut à droite, minutage dessous ; autres personnages en haut à gauche.
   Tablette : minutage sous « Terminer ». Desktop inchangé.
 - Tests : `audioAutoplayRescue.test.ts`, refus et contournement dans `elevenLabsStreamPlayer.test.ts`, coins de

@@ -83,6 +83,14 @@ describe("autoplay refusal of <audio> (iOS hands-free)", () => {
     expect(result.errorInfo?.type).toBe("aborted");
   });
 
+  it("keeps the refusal visible when the experience never unlocked audio (admin bench)", async () => {
+    const audio = await loadModule();
+    const result = await audio.playAudioBlobRobust(new Blob(["mp3"]), 5_000);
+    expect(result.status).toBe("failed");
+    expect(result.errorInfo?.type).toBe("not_allowed");
+    expect(audio.isMediaElementAutoplayBlocked()).toBe(false);
+  });
+
   it("does not hide a refusal when Web Audio is missing", async () => {
     vi.stubGlobal("AudioContext", undefined);
     (window as unknown as { AudioContext: unknown }).AudioContext = undefined;

@@ -29,7 +29,8 @@ export function isMediaElementAutoplayBlocked(): boolean {
 
 /** Records an autoplay refusal of an <audio> element (see isMediaElementAutoplayBlocked). */
 export function noteMediaElementAutoplayBlocked(): void {
-  mediaElementAutoplayBlocked = true;
+  // Only the experience (shared context unlocked by a tap) switches to Web Audio.
+  if (unlocked && audioContext) mediaElementAutoplayBlocked = true;
 }
 
 function getAudioContext(): AudioContext | null {
@@ -183,8 +184,10 @@ export async function playAudioBlobRobust(
 ): Promise<PlaybackResult> {
   if (mediaElementAutoplayBlocked) return playAudioBlobWebAudio(blob, onPlaybackStart, signal);
   const result = await playAudioBlobElement(blob, stallTimeoutMs, onPlaybackStart, signal);
-  // Refused before any sound: same speech through Web Audio, once.
-  if (result.status === "failed" && result.errorInfo?.type === "not_allowed" && result.playbackStartMs === undefined && getAudioContext()) {
+  // Refused before any sound, while the experience has unlocked the shared
+  // context (call started by a tap): same speech through Web Audio. Elsewhere
+  // (admin speech bench) the refusal stays visible.
+  if (result.status === "failed" && result.errorInfo?.type === "not_allowed" && result.playbackStartMs === undefined && unlocked && audioContext) {
     mediaElementAutoplayBlocked = true;
     return playAudioBlobWebAudio(blob, onPlaybackStart, signal);
   }

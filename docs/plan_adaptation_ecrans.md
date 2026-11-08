@@ -202,7 +202,8 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
   son rejoue la même réplique par l'AudioContext déjà déverrouillé (décodage + buffer source, arrêt immédiat à
   l'interruption) ; le refus est mémorisé et les répliques suivantes vont directement en Web Audio, sans tenter le
   flux `<audio>`. Coût sur iPhone : la réplique démarre une fois le MP3 complet reçu (plus de lecture progressive).
-  Desktop, Android et iPad sans refus : chemin inchangé.
+  Desktop, Android et iPad sans refus : chemin inchangé. Le secours ne joue que si l'expérience a déverrouillé le
+  contexte (appel lancé par un appui) : ailleurs (banc admin des voix), le refus reste affiché comme avant.
 - Écran d'appel smartphone : « Terminer » en haut à droite avec le minutage dessous, autres personnages (capsule de
   passage, annonce de cinématique) en haut à gauche. Tablette tactile : minutage sous « Terminer » ; desktop inchangé.
 - Tests : `audioAutoplayRescue.test.ts`, deux cas dans `elevenLabsStreamPlayer.test.ts`, coins vérifiés en unitaire
