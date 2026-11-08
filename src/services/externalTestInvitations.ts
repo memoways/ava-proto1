@@ -16,6 +16,15 @@ export interface ExternalTestInvitationSummary {
   revoked_at: string | null;
   status: ExternalTestInvitationStatus;
   sessionCount: number;
+  /** The password can be shown again from the console (invitations created after 8 Nov 2026). */
+  codeRecoverable?: boolean;
+}
+
+export interface ExternalTestInvitationSecret {
+  link: string;
+  code: string;
+  /** False when the new code could not be kept for later display (migration pending). */
+  recoverable?: boolean;
 }
 
 interface InvocationError {
@@ -60,6 +69,28 @@ export async function createExternalTestInvitation(input: {
     throw new Error(messageFrom(data, "Impossible de créer l’invitation."));
   }
   return { invitation: data.invitation, link: data.link, code: data.code };
+}
+
+/** Link and password of one of my invitations, when the password was kept. */
+export async function revealExternalTestInvitation(invitationId: string): Promise<ExternalTestInvitationSecret> {
+  const { data, error } = await supabase.functions.invoke<{ link?: string; code?: string; error?: string }>(
+    "manage-test-invitations",
+    { body: { action: "reveal", invitationId } },
+  );
+  if (error || !data?.link || !data.code) {
+    throw new Error(messageFrom(data, "Mot de passe non disponible pour cette invitation."));
+  }
+  return { link: data.link, code: data.code };
+}
+
+/** New password for the same link; the previous password stops working. */
+export async function renewExternalTestInvitationCode(invitationId: string): Promise<ExternalTestInvitationSecret> {
+  const { data, error } = await supabase.functions.invoke<{ link?: string; code?: string; recoverable?: boolean; error?: string }>(
+    "manage-test-invitations",
+    { body: { action: "rotate", invitationId } },
+  );
+  if (error || !data?.link || !data.code) throw new Error(messageFrom(data, "Impossible de générer un nouveau mot de passe."));
+  return { link: data.link, code: data.code, recoverable: data.recoverable };
 }
 
 export async function revokeExternalTestInvitation(invitationId: string): Promise<void> {

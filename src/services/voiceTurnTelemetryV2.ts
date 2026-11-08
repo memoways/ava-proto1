@@ -84,6 +84,8 @@ export interface VoiceTurnV2 {
   interruptions_capped?: boolean;
   capture_dsp?: { echoCancellation: boolean; noiseSuppression: boolean | null; autoGainControl: boolean | null; trackSampleRate: number | null; contextSampleRate: number };
   avatar_cue?: AvatarCueObservation;
+  /** Why the microphone did not start (name and message only, no audio, no content). */
+  capture_error?: { kind: string; name: string; message: string };
 }
 export type VoiceObserver = (name: VoiceMilestone, at?: number) => void;
 export function observeVoice(observer: VoiceObserver | undefined, name: VoiceMilestone, at = performance.now()): void {
@@ -146,6 +148,7 @@ export function createVoiceTurnV2(
     },
     captureDsp(dsp: NonNullable<VoiceTurnV2["capture_dsp"]>) { if (!finished) value.capture_dsp = { ...dsp }; },
     avatarCue(cue: AvatarCueObservation) { if (!finished) value.avatar_cue = { ...cue }; },
+    captureError(error: NonNullable<VoiceTurnV2["capture_error"]>) { if (!finished) value.capture_error = { ...error }; },
     setOrigin(at: number, origin: VoiceTurnV2["latency_origin"]) {
       if (finished || !Number.isFinite(at)) return;
       const shift = Math.round(originAt - at);

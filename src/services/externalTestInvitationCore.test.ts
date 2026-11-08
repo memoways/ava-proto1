@@ -35,3 +35,18 @@ describe("external test invitation core", () => {
     expect(externalTestInvitationStatus({ revoked_at: past, redeemed_at: past, expires_at: future }, now)).toBe("revoked");
   });
 });
+
+describe("recoverable invitation codes", () => {
+  it("round-trips a code for its own invitation only, and never under another key", async () => {
+    const { deriveInvitationCodeKey, encryptInvitationCode, decryptInvitationCode } = await import("../../supabase/functions/_shared/externalTestInvitationCore");
+    const key = await deriveInvitationCodeKey("service-secret");
+    const stored = await encryptInvitationCode(key, "inv-1", "AVA-ABCD-EFGH-JKLM-NPQR");
+    expect(stored).toMatch(/^v1:/);
+    expect(stored).not.toContain("ABCD");
+    expect(await decryptInvitationCode(key, "inv-1", stored)).toBe("AVA-ABCD-EFGH-JKLM-NPQR");
+    expect(await decryptInvitationCode(key, "inv-2", stored)).toBeNull();
+    expect(await decryptInvitationCode(await deriveInvitationCodeKey("other-secret"), "inv-1", stored)).toBeNull();
+    expect(await decryptInvitationCode(key, "inv-1", null)).toBeNull();
+    expect(await decryptInvitationCode(key, "inv-1", "garbage")).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { addDays, endOfDay, format, isSameDay, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
-import { CalendarIcon, Copy, KeyRound, RefreshCw, ShieldX } from "lucide-react";
+import { CalendarIcon, Copy, Eye, KeyRound, RefreshCw, RotateCcw, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 import { useAdminEnvironment } from "@/contexts/AdminEnvironmentContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { ENVIRONMENTS } from "@/services/environmentContext";
 import {
   createExternalTestInvitation,
   listExternalTestInvitations,
+  renewExternalTestInvitationCode,
+  revealExternalTestInvitation,
   revokeExternalTestInvitation,
   type ExternalTestInvitationStatus,
   type ExternalTestInvitationSummary,
@@ -40,6 +42,10 @@ const STATUS_CLASSES: Record<ExternalTestInvitationStatus, string> = {
 interface CreatedSecret {
   link: string;
   code: string;
+  testerLabel: string;
+  /** Can be shown again later from « Mes invitations ». */
+  recoverable: boolean;
+  origin: "created" | "revealed" | "renewed";
 }
 
 function formatDate(value: string): string {
@@ -95,6 +101,7 @@ export default function TestInvitationsTab() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState<string | null>(null);
   const environment = ENVIRONMENTS.find((candidate) => candidate.id === environmentId);
   const isSandbox = environment?.type === "sandbox";
   const periodValid = !!startDate && !!endDate && startOfDay(endDate) >= startOfDay(startDate);
@@ -141,14 +148,46 @@ export default function TestInvitationsTab() {
         validUntil: endOfDay(endDate).toISOString(),
         multiUse,
       });
-      setCreatedSecret({ link: result.link, code: result.code });
+      setCreatedSecret({ link: result.link, code: result.code, testerLabel: label,
+        recoverable: result.invitation.codeRecoverable === true, origin: "created" });
       setInvitations((current) => [result.invitation, ...current]);
       setTesterLabel("");
-      toast.success("Invitation créée. Copiez maintenant son mot de passe.");
+      toast.success(result.invitation.codeRecoverable
+        ? "Invitation créée. Le mot de passe reste consultable dans « Mes invitations »."
+        : "Invitation créée. Copiez maintenant son mot de passe.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible de créer l’invitation.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function reveal(invitation: ExternalTestInvitationSummary): Promise<void> {
+    setRevealing(invitation.id);
+    try {
+      const secret = await revealExternalTestInvitation(invitation.id);
+      setCreatedSecret({ ...secret, testerLabel: invitation.tester_label, recoverable: true, origin: "revealed" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Mot de passe non disponible pour cette invitation.");
+    } finally {
+      setRevealing(null);
+    }
+  }
+
+  async function renew(invitation: ExternalTestInvitationSummary): Promise<void> {
+    if (!window.confirm(`Nouveau mot de passe pour ${invitation.tester_label} ? L’ancien ne permettra plus d’activer l’accès ; `
+      + "les navigateurs déjà connectés restent connectés.")) return;
+    setRevealing(invitation.id);
+    try {
+      const secret = await renewExternalTestInvitationCode(invitation.id);
+      const recoverable = secret.recoverable !== false;
+      setCreatedSecret({ link: secret.link, code: secret.code, testerLabel: invitation.tester_label, recoverable, origin: "renewed" });
+      setInvitations((current) => current.map((item) => (item.id === invitation.id ? { ...item, codeRecoverable: recoverable } : item)));
+      toast.success("Nouveau mot de passe généré.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Impossible de générer un nouveau mot de passe.");
+    } finally {
+      setRevealing(null);
     }
   }
 
@@ -235,10 +274,13 @@ export default function TestInvitationsTab() {
 
       {createdSecret ? (
         <Card className="border-fuchsia-500/50 bg-fuchsia-500/5">
-          <CardHeader><CardTitle className="text-base">À transmettre au testeur</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">À transmettre au testeur · {createdSecret.testerLabel}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm font-medium text-fuchsia-700 dark:text-fuchsia-200">
-              Copiez le mot de passe maintenant : il ne sera plus affiché après avoir quitté cette page.
+              {createdSecret.origin === "renewed" ? "Nouveau mot de passe : l’ancien ne permet plus d’activer l’accès. " : ""}
+              {createdSecret.recoverable
+                ? "Ce mot de passe reste consultable ici, dans « Mes invitations »."
+                : "Copiez le mot de passe maintenant : il ne sera plus affiché après avoir quitté cette page."}
             </p>
             <div className="space-y-2">
               <Label>Lien d’invitation</Label>
@@ -250,7 +292,7 @@ export default function TestInvitationsTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Mot de passe unique</Label>
+              <Label>Mot de passe</Label>
               <div className="flex gap-2">
                 <Input readOnly value={createdSecret.code} className="font-mono tracking-wide" />
                 <Button variant="outline" size="icon" aria-label="Copier le mot de passe" onClick={() => void copy(createdSecret.code, "Mot de passe")}>
@@ -258,7 +300,7 @@ export default function TestInvitationsTab() {
                 </Button>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setCreatedSecret(null)}>J’ai terminé la copie</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCreatedSecret(null)}>Masquer</Button>
           </CardContent>
         </Card>
       ) : null}
@@ -308,6 +350,14 @@ export default function TestInvitationsTab() {
                         onClick={() => void copy(`${window.location.origin}/test/${invitation.id}`, "Lien")}
                       >
                         <Copy className="mr-2 h-4 w-4" /> Copier le lien
+                      </Button>
+                      {invitation.codeRecoverable ? (
+                        <Button variant="outline" size="sm" onClick={() => void reveal(invitation)} disabled={revealing === invitation.id}>
+                          <Eye className="mr-2 h-4 w-4" /> Afficher le mot de passe
+                        </Button>
+                      ) : null}
+                      <Button variant="outline" size="sm" onClick={() => void renew(invitation)} disabled={revealing === invitation.id}>
+                        <RotateCcw className="mr-2 h-4 w-4" /> Nouveau mot de passe
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => void revoke(invitation)} disabled={revoking === invitation.id}>
                         <ShieldX className="mr-2 h-4 w-4" /> {revoking === invitation.id ? "Révocation…" : "Révoquer"}
