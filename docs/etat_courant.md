@@ -48,6 +48,12 @@ lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'
 après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres
 personnages en haut à gauche. Reste la recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
 
+**Questionnaire conversationnel (8 novembre, plan).** Remplacer le formulaire PRD4 par un échange vocal court :
+questions affichées sans voix de sortie, 5 dimensions (fluidité, intérêt, immersion, crédibilité, engagement), une
+relance max, note 1–5 confirmée ou « non évalué », synthèse validée, radar participant + admin, pas d'audio stocké,
+rien de demandé que la session connaît. [Plan](plan_questionnaire_conversationnel.md),
+[prompt lot 1](prompt_reprise_questionnaire_conversationnel_lot_1.md) (modèle, contexte, stockage, colonnes Notion « Conv »).
+
 **Adaptation aux écrans, lot 3 (8 novembre, code) — dernier lot du plan.** Tablette : même écran vidéo (avatar gardé),
 avec une prop `touchFirst` calculée une fois depuis la classe (`touchFirstFor`) : cibles 44 px (Terminer, Ignorer,
 « Passer » du teaser, « Revoir la vidéo d'introduction », « Terminer l'expérience »), « Touche pour parler », `100svh`.
