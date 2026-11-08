@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages par appareil : diagnostic et plan] — 2026-11-08
+
+- Diagnostic : l'expérience joueur ne recharge pas depuis la base les réglages LLM, ElevenLabs et autres moteurs
+  TTS ; un appareil sans admin ouvert joue les défauts du code (preuve sandbox-ulrich dans le plan).
+- `docs/plan_reglages_par_appareil.md` (carte des réglages, décisions proposées, deux lots) et prompt du lot 1.
+
 ## [Smartphone : film entier et plein écran ; services par appareil] — 2026-11-08
 
 - Constat sur les sessions iPhone du 8 novembre (`3713440c`, `6b83bfaf`, sandbox-ulrich) : Max parlait bien par

@@ -43,6 +43,12 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Réglages par appareil (8 novembre, diagnostic).** L'expérience joueur ne charge pas LLM ni TTS depuis la base :
+un appareil sans admin ouvert (iPhone, testeurs) joue les défauts du code (`gemini-2.5-flash`,
+`eleven_multilingual_v2`) au lieu de sandbox-ulrich (`gpt-5.6-luna`, `eleven_v4_turbo`). [Plan](plan_reglages_par_appareil.md),
+[prompt lot 1](prompt_reprise_reglages_par_appareil_lot_1.md) (chargement complet, résumé effectif) ; lot 2 : onglet
+Expérience › Appareils.
+
 **Smartphone : film et voix (8 novembre, code).** Film d'introduction en image entière (portrait) avec « Plein
 écran ⤢ » (paysage) ; Admin › Streaming Avatar › « Services par appareil » choisit sortie, avatar, moteur et voix par
 appareil (défauts inchangés). Constat : l'iPhone jouait bien ElevenLabs `eleven_multilingual_v2` (voix Orchestration),
