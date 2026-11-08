@@ -185,10 +185,28 @@ Personnages : Max et Emma actifs ; Ava et Léo restent grisés (aucune promesse 
   WebKit Linux ne termine pas la lecture audio simulée puis la page plante (fragilité déjà notée pour les cinématiques) ;
   tours, clic de la capsule de passage et cinématiques restent couverts par les E2E Chromium sur les mêmes composants.
   Ce sont des émulations (viewport, tactile, moteur WebKit), pas de vrais appareils.
-- Durée CI avant : run 42459423384, shards e2e 6 min 00 à 7 min 05, run 7 min 11 ; après : voir le compte rendu.
+- Durée CI avant : run 42459423384, shards e2e 6 min 00 à 7 min 05, run 7 min 11 ; après : run 42461979370, shards
+  6 min 14 à 7 min 17, run 7 min 22 (~ +11 s). Livré par PR #173 (`fa18a58`).
 - Recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
 - **Aucun lot ne suit dans ce plan.** Restent la recette humaine signée et la reformulation de la tâche Notion
   (« avatar vidéo » au lieu de « aucune vidéo »).
+
+### Retours de recette iPhone (8 novembre 2026, après le lot 3)
+
+- Max muet sur iPhone Safari en mains libres (session `feb8eb9b`) : chaque tour `error_type: "tts"`,
+  `error_detail.name = NotAllowedError` alors que l'AudioContext est `running` ; `audio_latencies` montre
+  ElevenLabs (`http_stream`) refusé en 1 ms. Cause : la voix de Max passe par ElevenLabs dans un `<audio>`
+  (MediaSource) créé à chaque réplique ; iOS refuse `play()` d'un nouvel élément hors geste. Seule l'ouverture,
+  lancée par l'appui sur « Appeler », passait. Le lot 2 bis avait corrigé le chemin Web Audio (Gradium), pas celui-ci.
+- Correctif (`src/services/audioPlayback.ts`, `elevenLabsStreamPlayer.ts`) : un refus `NotAllowedError` avant tout
+  son rejoue la même réplique par l'AudioContext déjà déverrouillé (décodage + buffer source, arrêt immédiat à
+  l'interruption) ; le refus est mémorisé et les répliques suivantes vont directement en Web Audio, sans tenter le
+  flux `<audio>`. Coût sur iPhone : la réplique démarre une fois le MP3 complet reçu (plus de lecture progressive).
+  Desktop, Android et iPad sans refus : chemin inchangé.
+- Écran d'appel smartphone : « Terminer » en haut à droite avec le minutage dessous, autres personnages (capsule de
+  passage, annonce de cinématique) en haut à gauche. Tablette tactile : minutage sous « Terminer » ; desktop inchangé.
+- Tests : `audioAutoplayRescue.test.ts`, deux cas dans `elevenLabsStreamPlayer.test.ts`, coins vérifiés en unitaire
+  et dans les E2E `@iphone` / `@ipad`.
 
 ## Livraison et documentation
 

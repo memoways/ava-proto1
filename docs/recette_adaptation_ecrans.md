@@ -21,10 +21,12 @@ Date : ____ · Modèle / iOS : ____ · Session : ____
 - [ ] Question du film : image entière en pleine largeur, deux réponses en bas.
 - [ ] Grille : Max et Emma disponibles, Ava et Léo grisés ; « Revoir la vidéo d'introduction » touchable.
 - [ ] Permission micro demandée une seule fois, acceptée ; refus puis nouvel essai : message clair.
-- [ ] Appel Max : écran d'appel (vignette ronde, nom, état, minuterie), **aucune vidéo d'avatar**,
+- [ ] Appel Max : écran d'appel (vignette ronde, nom, état), **aucune vidéo d'avatar**,
       aucun « Connexion vidéo… ».
+- [ ] Coins : « Terminer » en haut à droite, minutage juste dessous ; Emma (capsule de passage) en haut à gauche.
 - [ ] **Max audible** en voix seule — appui micro (Démarrer / Arrêter).
-- [ ] **Max audible** en mains libres (si activé) ; interruption possible pendant qu'il parle.
+- [ ] **Max audible** en mains libres (si activé), à chaque réplique et pas seulement à l'ouverture ;
+      interruption possible pendant qu'il parle. (Sur iPhone, la réplique démarre un peu plus tard qu'ailleurs.)
 - [ ] Sortie audio : haut-parleur de l'iPhone ✔ · écouteurs filaires / Lightning-USB-C ✔ · Bluetooth (AirPods) ✔.
 - [ ] Cinématique : capsule « Une vidéo arrive / Ignorer », vidéo lue plein écran avec le son, retour à l'appel
       et micro rendu ; « Ignorer » touchable.

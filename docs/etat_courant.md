@@ -43,6 +43,11 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
+**Écrans, retours de recette iPhone (8 novembre, code).** Max muet en mains libres sur iPhone : iOS refusait le
+lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'AudioContext déverrouillé (démarrage
+après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres
+personnages en haut à gauche. Reste la recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
+
 **Adaptation aux écrans, lot 3 (8 novembre, code) — dernier lot du plan.** Tablette : même écran vidéo (avatar gardé),
 avec une prop `touchFirst` calculée une fois depuis la classe (`touchFirstFor`) : cibles 44 px (Terminer, Ignorer,
 « Passer » du teaser, « Revoir la vidéo d'introduction », « Terminer l'expérience »), « Touche pour parler », `100svh`.

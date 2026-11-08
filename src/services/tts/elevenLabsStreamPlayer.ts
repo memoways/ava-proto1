@@ -14,7 +14,7 @@
  */
 
 import { AUDIO_PLAYBACK_STALL_DEADLINE_MS } from "@/config/experienceRuntime";
-import { playAudioBlobRobust } from "@/services/audioPlayback";
+import { isMediaElementAutoplayBlocked, noteMediaElementAutoplayBlocked, playAudioBlobRobust } from "@/services/audioPlayback";
 import { debugLogger } from "@/services/debugLogger";
 import { observeVoice } from "@/services/voiceTurnTelemetryV2";
 import type {
@@ -51,6 +51,9 @@ export interface ElevenLabsStreamDeps {
   createAudio?: () => HTMLAudioElement;
   playBlob?: typeof playAudioBlobRobust;
   stallTimeoutMs?: number;
+  /** Shared autoplay-refusal state (defaults to the audioPlayback module). */
+  autoplayBlocked?: () => boolean;
+  onAutoplayBlocked?: () => void;
 }
 
 function abortError(reason?: unknown): Error {
@@ -79,7 +82,9 @@ export function createElevenLabsStreamingPlayback(
   const stallTimeoutMs = deps.stallTimeoutMs ?? AUDIO_PLAYBACK_STALL_DEADLINE_MS;
   const MS = deps.mediaSource === undefined ? resolveMp3MediaSource() : deps.mediaSource;
 
-  let mode: "mse" | "fallback" = MS ? "mse" : "fallback";
+  // Once iOS refused an <audio> element outside a gesture, streaming through
+  // one would be refused again: the blob goes through Web Audio instead.
+  let mode: "mse" | "fallback" = MS && !(deps.autoplayBlocked ?? isMediaElementAutoplayBlocked)() ? "mse" : "fallback";
   let openRequested = false;
   let openedAt = 0;
   let cancelled = false;
@@ -350,7 +355,7 @@ export function createElevenLabsStreamingPlayback(
   else ctx?.signal?.addEventListener("abort", onParentAbort, { once: true });
   finishedP.finally(() => ctx?.signal?.removeEventListener("abort", onParentAbort)).catch(() => {});
 
-  setupMse();
+  if (mode === "mse") setupMse();
   void generate();
 
   const handle: TTSStreamPlaybackHandle = {
@@ -361,9 +366,10 @@ export function createElevenLabsStreamingPlayback(
       if (mode === "fallback") { launchBlobPlayback(); return; }
       armStall();
       audio?.play().catch((err) => {
-        // Autoplay refusal would refuse the blob too; anything else gets the blob.
-        if (err instanceof DOMException && err.name === "NotAllowedError") failAll(err);
-        else if (!isAbort(err)) mseFailed(err);
+        // Autoplay refusal (iOS hands-free): the blob plays through Web Audio,
+        // which an unlocked context allows without a gesture.
+        if (err instanceof DOMException && err.name === "NotAllowedError") (deps.onAutoplayBlocked ?? noteMediaElementAutoplayBlocked)();
+        if (!isAbort(err)) mseFailed(err);
       });
     },
     started: startedP,

@@ -370,20 +370,26 @@ const ConversationScreen = ({
           paddingRight: "env(safe-area-inset-right)",
         }}
       >
-        <header className="relative z-10 flex items-center justify-between gap-3 px-4 pt-4">
-          <span
-            aria-label="Temps restant"
-            className="rounded-full border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground/70"
-          >
-            {sessionTimeRemaining}
-          </span>
-          <button
-            onClick={onHangUp}
-            className="flex min-h-11 items-center gap-2 rounded-full border border-border/40 bg-background/60 px-4 py-2 text-sm text-foreground/80 transition-colors hover:bg-destructive/20 hover:text-destructive"
-          >
-            <PhoneOff className="h-4 w-4" />
-            Terminer
-          </button>
+        {/* Top left: other characters (handoff, cinematic); top right: Terminer, timer below. */}
+        <header className="relative z-10 flex items-start justify-between gap-3 px-4 pt-4">
+          <div data-call-slot="characters" className="flex w-44 min-w-0 max-w-[60%] flex-col items-stretch gap-2">
+            {handoffControls}
+          </div>
+          <div data-call-slot="hang-up" className="flex shrink-0 flex-col items-end gap-2">
+            <button
+              onClick={onHangUp}
+              className="flex min-h-11 items-center gap-2 rounded-full border border-border/40 bg-background/60 px-4 py-2 text-sm text-foreground/80 transition-colors hover:bg-destructive/20 hover:text-destructive"
+            >
+              <PhoneOff className="h-4 w-4" />
+              Terminer
+            </button>
+            <span
+              aria-label="Temps restant"
+              className="rounded-full border border-border/40 bg-background/60 px-3 py-1.5 font-mono text-xs text-foreground/70"
+            >
+              {sessionTimeRemaining}
+            </span>
+          </div>
         </header>
 
         <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center">
@@ -406,10 +412,6 @@ const ConversationScreen = ({
             </p>
           )}
         </main>
-
-        <div className="relative z-10 mx-auto flex w-full max-w-sm flex-col items-stretch gap-2 px-4">
-          {handoffControls}
-        </div>
 
         <section className="relative z-10 px-4 pb-6 pt-4">
           <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3">
@@ -501,7 +503,8 @@ const ConversationScreen = ({
             Mode voix
           </div>
         )}
-        <div className="flex items-center gap-2">
+        {/* Touch screens: Terminer on top, timer below (DOM order kept for desktop). */}
+        <div className={cn("flex items-center gap-2", touchFirst && "flex-col-reverse items-end")}>
           <span
             aria-label="Temps restant"
             className="rounded-full border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground/70 backdrop-blur-md"

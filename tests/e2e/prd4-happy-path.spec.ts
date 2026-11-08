@@ -2695,6 +2695,21 @@ async function expectTouchTarget(page: Page, name: string) {
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
 }
 
+/** Other characters top left; Terminer top right with the timer just below it. */
+async function expectCallCorners(page: Page) {
+  const viewport = page.viewportSize()!;
+  const handoff = (await page.locator('[data-character-capsule="handoff"]').boundingBox())!;
+  const hangUp = (await page.getByRole('button', { name: 'Terminer', exact: true }).boundingBox())!;
+  const timer = (await page.getByLabel('Temps restant').boundingBox())!;
+  expect(handoff.x).toBeLessThan(viewport.width / 2);
+  expect(handoff.y).toBeLessThan(viewport.height / 4);
+  expect(hangUp.x + hangUp.width).toBeGreaterThan(viewport.width * 0.8);
+  expect(hangUp.y).toBeLessThan(viewport.height / 8);
+  expect(timer.y).toBeGreaterThanOrEqual(hangUp.y + hangUp.height);
+  expect(Math.abs(timer.x + timer.width - (hangUp.x + hangUp.width))).toBeLessThanOrEqual(1);
+  expect(handoff.x + handoff.width).toBeLessThanOrEqual(Math.min(hangUp.x, timer.x));
+}
+
 test('@device @ipad écran tablette : avatar demandé, vidéo montée, cibles tactiles et capsules', async ({ page }) => {
   test.setTimeout(60_000);
   const avatarRequests: string[] = [];
@@ -2727,6 +2742,7 @@ test('@device @ipad écran tablette : avatar demandé, vidéo montée, cibles ta
   expect(handoff.y).toBeGreaterThanOrEqual(current.y + current.height);
   expect(handoff.height).toBeGreaterThanOrEqual(44);
   expect(handoff.x + handoff.width).toBeLessThanOrEqual(hangUp.x);
+  await expectCallCorners(page);
   expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'streaming_avatar', device_class: 'tablet' });
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Appeler Emma', exact: true })).toBeVisible();
@@ -2751,6 +2767,7 @@ test('@device @iphone écran téléphone (WebKit) : appel vocal sans avatar, Max
     await expect(page.locator('video[aria-label^="Flux vidéo"]')).toHaveCount(0);
     await expectTouchTarget(page, 'Terminer');
     await expectTouchTarget(page, "Démarrer l'enregistrement");
+    await expectCallCorners(page);
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
     await expect(page.getByRole('button', { name: `Appeler ${name}`, exact: true })).toBeVisible();
   }
