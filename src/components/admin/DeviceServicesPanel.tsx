@@ -22,6 +22,7 @@ import {
   SELECTABLE_STREAMING_AVATAR_PROVIDERS,
   type SelectableStreamingAvatarProvider,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
+import { EffectiveVoiceBlock, useVoiceProfiles } from "@/components/admin/EffectiveVoiceSummary";
 
 const OUTPUT_LABELS: Record<DeviceOutputChoice, string> = {
   settings: "Suivre l'interrupteur Voix TTS / Avatar vidéo",
@@ -47,6 +48,7 @@ export default function DeviceServicesPanel() {
   const [saved, setSaved] = useState(value);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { profiles } = useVoiceProfiles();
 
   useEffect(() => {
     void loadDeviceServicesFromDB()
@@ -156,6 +158,9 @@ export default function DeviceServicesPanel() {
                     />
                   </div>
                 ))}
+              </div>
+              <div className="md:col-span-2">
+                <EffectiveVoiceBlock devices={[device]} profiles={profiles} overrides={() => ({ deviceServices: settings })} />
               </div>
             </fieldset>
           );

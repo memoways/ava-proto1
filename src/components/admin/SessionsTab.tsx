@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { readSessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 import { supabase } from "@/integrations/supabase/client";
 import type { AvatarCueObservation } from "@/services/voiceTurnTelemetryV2";
 import type { AvatarAvSyncRecord } from "@/services/voiceTelemetry";
@@ -55,6 +56,8 @@ export interface SessionRow {
   started_by_user_id: string | null;
   /** Absent or null on sessions recorded before the device class existed. */
   device_class?: string | null;
+  /** Device snapshot; since the per-device settings lot 1 it carries `effective_settings`. */
+  device_info?: unknown;
   account_display_name?: string;
 }
 
@@ -189,6 +192,38 @@ function providerLabel(rows: Array<{ cue: AvatarCueObservation | null }>): strin
 }
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleString("fr-CH") : "—";
+
+const SETTINGS_SOURCE_LABELS: Record<string, string> = {
+  database: "base (admin_settings)",
+  fallback: "repli : copie locale ou défauts du code",
+};
+
+/** What really ran for this call, recorded at session creation (per-device settings lot 1). */
+function EffectiveSettingsSummary({ deviceInfo }: { deviceInfo: unknown }) {
+  const record = readSessionEffectiveSettings(deviceInfo);
+  if (!record) {
+    return <p className="mb-4 text-xs text-muted-foreground" data-testid="session-effective-settings-missing">Réglages effectifs : non enregistrés (session antérieure au 8 novembre 2026).</p>;
+  }
+  const source = SETTINGS_SOURCE_LABELS[record.settings_source] ?? record.settings_source;
+  return (
+    <div className="mb-4 rounded border p-3 text-sm" data-testid="session-effective-settings">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">Réglages effectifs au début de l’appel</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Modèle Max" value={record.max_model} />
+        <Stat label="Modèle MJ" value={record.gm_model} />
+        <Stat label="Sortie" value={record.output_mode === "streaming_avatar" ? `Avatar ${record.avatar_provider ?? ""}`.trim() : "Voix seule"} />
+        <Stat label="Moteur TTS" value={[record.tts_provider, record.tts_model].filter(Boolean).join(" · ")} />
+        <Stat label="Voix" value={record.voice_id ? `${record.voice_id} (${record.voice_source})` : record.voice_source} />
+        <Stat label="Réglages" value={`${source}${record.settings_fallback_reason ? ` (${record.settings_fallback_reason})` : ""} · ${record.settings_environment} · ${fmt(record.settings_updated_at)}`} />
+      </div>
+      <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+        <p><span className="font-medium text-foreground">Max :</span> {record.characters.max.summary}</p>
+        <p><span className="font-medium text-foreground">Emma :</span> {record.characters.emma.summary}</p>
+        {record.settings_inherited_from_prod.length ? <p>Hérités de la production : {record.settings_inherited_from_prod.join(", ")}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -811,6 +846,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Testeur" value={selected.tester_label || "—"} />
               <Stat label="Invitation" value={selected.test_invitation_id?.slice(0, 8) || "—"} />
             </div>
+
+            <EffectiveSettingsSummary deviceInfo={selected.device_info} />
 
             {selected.triggers_activated?.length ? (
               <div className="mb-3">

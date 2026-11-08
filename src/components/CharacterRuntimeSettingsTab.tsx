@@ -13,6 +13,8 @@ import { getActiveEnvironment } from '@/services/environmentContext';
 import { adminTabPath } from '@/services/adminNavigation';
 import { characterVoice, loadCharacterVoicesFromDB, seedFromProfiles, type CharacterVoiceCatalogue } from '@/services/tts/characterVoices';
 import type { TTSProviderId } from '@/services/tts/types';
+import { EffectiveVoiceBlock, useVoiceProfiles } from '@/components/admin/EffectiveVoiceSummary';
+import { DEVICE_CLASSES } from '@/services/deviceClass';
 import {
   fetchCharacterAutoReadiness,
   listCharacterRuntimeProfiles,
@@ -84,6 +86,8 @@ function readiness(
 }
 
 export default function CharacterRuntimeSettingsTab() {
+  // Loads the experience settings (read-only) so the "Joué" summaries read the database values.
+  useVoiceProfiles();
   const [profiles, setProfiles] = useState<CharacterRuntimeProfile[]>([]);
   const [autoReadiness, setAutoReadiness] = useState<Record<string, CharacterAutoReadiness>>({});
   const [loading, setLoading] = useState(true);
@@ -262,6 +266,13 @@ export default function CharacterRuntimeSettingsTab() {
                   if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; sauvegarder le profil applique l’ID de la configuration TTS.</p>;
                   return null;
                 })()}
+                {profile.character_key === "max" || profile.character_key === "emma" ? (
+                  <EffectiveVoiceBlock
+                    devices={DEVICE_CLASSES}
+                    characters={[profile.character_key]}
+                    profiles={{ max: null, emma: null, [profile.character_key]: { ttsProvider: profile.tts_provider, ttsVoiceId: profile.tts_voice_id } }}
+                  />
+                ) : null}
                  <p className="text-xs text-muted-foreground">
                   Le Voice ID est repris de <a className="underline" href={adminTabPath("voice")}>Technique → Configuration TTS</a> selon le provider choisi : aucune copie à la main. Les réglages fins Gradium se règlent aussi dans TTS Config.
                 </p>

@@ -4,6 +4,28 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages par appareil, lot 1 : les bons réglages partout et le résumé effectif] — 2026-11-08
+
+- Le joueur charge désormais depuis la base tout ce qui pilote un appel : `hydrateExperienceSettings()`
+  (`src/services/experienceSettings.ts`) lit en une seule requête, lecture seule, les 20 clés `admin_settings`
+  (LLM, ElevenLabs, moteur TTS actif, Gradium, Fish, Inworld, Cartesia, catalogue de voix, contrôle du prompt de Max,
+  anti-hallucination, questionnaire, gameplay, cinématiques, parole, sortie, Streaming Avatar, services par appareil,
+  STT, dictionnaire) pour l'environnement actif, recopie dans le cache local (une clé absente en base efface la copie
+  locale périmée) et rafraîchit les caches mémoire. Lancé au montage de l'expérience ; `prepareCall` et la reprise de
+  session l'attendent au plus 2,5 s, puis repli explicite (copie locale ou défauts) avec console et événement
+  `prd4_settings_fallback`. Passage à Emma, questionnaire conversationnel et `proxy-llm` (modèle envoyé par le client)
+  lisent ces mêmes valeurs.
+- Résumé effectif partagé : `describeEffectiveVoice()` (pur, `src/services/effectiveVoice.ts`) donne moteur, modèle,
+  2–3 curseurs, voix et sa source (appareil, catalogue, profil, défaut du moteur) ou la voix de l'avatar
+  (Anam, HeyGen et son moteur, source Tavus ; Tavus « voix Ava » et LemonSlice rejouent la voix d'Ava). Ligne
+  « Joué : … » dans Services par appareil, Réglages personnages, Streaming Avatar et TTS Config.
+- Chaque session enregistre ses réglages effectifs dans `sessions.device_info.effective_settings` (colonne existante,
+  écrite à l'insertion, pas de migration) : `max_model`, `gm_model`, moteur et modèle TTS, voix et source, sortie,
+  avatar, source et date des réglages. Affichés dans le détail de session admin.
+- Tests : `experienceSettings.test.ts` (navigateur vierge → LLM et ElevenLabs de la base, repli, délai borné),
+  `effectiveVoice.test.ts` (dont accord avec `resolveDeviceVoice` / `resolveCallOutputMode`),
+  `sessionEffectiveSettings.test.ts`, E2E « navigateur vierge » (modèles envoyés à `proxy-llm` et `proxy-tts`).
+
 ## [Réglages par appareil : diagnostic et plan] — 2026-11-08
 
 - Diagnostic : l'expérience joueur ne recharge pas depuis la base les réglages LLM, ElevenLabs et autres moteurs

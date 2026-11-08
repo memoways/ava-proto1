@@ -9,6 +9,8 @@ import { writeEnvironmentStorage } from "@/services/environmentContext";
 import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
+import { EffectiveVoiceBlock, useVoiceProfiles } from "@/components/admin/EffectiveVoiceSummary";
+import { DEVICE_CLASSES } from "@/services/deviceClass";
 import {
   getActiveProviderId,
   loadActiveProviderFromDB,
@@ -91,6 +93,7 @@ const FALLBACK_GRADIUM_CHARACTERS: GradiumCharacterOption[] = [
 
 export default function TTSConfigTab() {
   const [activeProvider, setActiveProviderState] = useState<TTSProviderId>(getActiveProviderId());
+  const { profiles: voiceProfiles } = useVoiceProfiles();
 
   // ElevenLabs settings
   const [elSettings, setElSettings] = useState<TTSSettings>(getTTSSettings());
@@ -313,6 +316,13 @@ export default function TTSConfigTab() {
             Les essais temporaires sont disponibles dans l’atelier de parole.
           </p>
         )}
+        <div className="mt-3">
+          <EffectiveVoiceBlock
+            title="Voix réellement jouée (réglages sauvegardés : profil personnage, services par appareil, moteurs)"
+            devices={DEVICE_CLASSES}
+            profiles={voiceProfiles}
+          />
+        </div>
       </section>
 
       <CharacterVoicesPanel />

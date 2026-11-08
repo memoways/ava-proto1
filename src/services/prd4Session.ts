@@ -12,6 +12,7 @@ import { ensureGameAuth } from "@/services/gameAuth";
 import { trackEvent } from "@/services/posthogService";
 import { getRuntimeContext } from "@/services/environmentContext";
 import { getDeviceSnapshot } from "@/services/deviceClass";
+import type { SessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 
 type SessionInsert = Database["public"]["Tables"]["sessions"]["Insert"];
 
@@ -24,15 +25,17 @@ function trackPersistence(operation: string, success: boolean, sessionId?: strin
 }
 
 /** Device class frozen for the page and its technical snapshot (no identifying field). */
-function deviceColumns(): Pick<SessionInsert, "device_class" | "device_info"> {
+function deviceColumns(effectiveSettings?: SessionEffectiveSettings): Pick<SessionInsert, "device_class" | "device_info"> {
   const { device_class, ...device_info } = getDeviceSnapshot();
-  return { device_class, device_info: device_info as unknown as Json };
+  const info = effectiveSettings ? { ...device_info, effective_settings: effectiveSettings } : device_info;
+  return { device_class, device_info: JSON.parse(JSON.stringify(info)) as Json };
 }
 
 export async function createPRD4Session(
   userRole: UserRoleProfile | null,
   character: RuntimeCharacter,
   extra?: SessionInsert,
+  options: { effectiveSettings?: SessionEffectiveSettings } = {},
 ): Promise<string> {
   await ensureGameAuth();
   const runtime = getRuntimeContext();
@@ -51,7 +54,7 @@ export async function createPRD4Session(
     tester_label: runtime.testerLabel,
     test_invitation_id: runtime.testInvitationId,
     started_by_user_id: runtime.startedByUserId,
-    ...deviceColumns(),
+    ...deviceColumns(options.effectiveSettings),
   };
   const { data, error } = await supabase
     .from("sessions")
