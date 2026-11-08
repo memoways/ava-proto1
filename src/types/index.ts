@@ -542,3 +542,65 @@ export interface QuestionnairePRD4Data {
   answers: QuestionnairePRD4Answers;
   technical: QuestionnairePRD4Technical;
 }
+
+// ============================================================================
+// Questionnaire conversationnel de fin d'expérience (plan du 8 novembre 2026)
+// ============================================================================
+
+export type ConversationalDimensionKey =
+  | "fluidity"
+  | "interest"
+  | "immersion"
+  | "character_credibility"
+  | "emotional_engagement";
+
+/** 1–5 confirmed by the participant; `null` = not rated, never a default value. */
+export type ConversationalScore = 1 | 2 | 3 | 4 | 5 | null;
+
+export interface DimensionAnswer {
+  /** Question text as displayed. */
+  question: string;
+  /** Validated transcript of the answer. */
+  answer: string;
+  follow_up: { question: string; answer: string } | null;
+  score: ConversationalScore;
+  score_source: "touch" | "voice_confirmed" | null;
+  score_comment: string | null;
+}
+
+/** Facts known from the session itself: never asked as questions. */
+export interface ConversationalSessionContext {
+  session_id: string | null;
+  film: FilmAnswer | null;
+  teaser: { seen: boolean; skipped: boolean };
+  starting_character: "max" | "emma";
+  /** Characters who actually spoke during the session, in first-reply order. */
+  characters_called: Array<"max" | "emma">;
+  /** Every change of speaking character (Max ↔ Emma), in order. */
+  handoffs: Array<{ from: "max" | "emma"; to: "max" | "emma"; returning: boolean }>;
+  /** Cinematics triggered by the director; `partial` when skipped during playback. */
+  cinematics: Array<{ id: string; partial: boolean }>;
+  duration_seconds: number;
+  turn_count: number;
+  avg_latency_ms: number | null;
+  max_latency_ms: number | null;
+  mic_errors: number;
+  hands_free: boolean;
+  end_reason: string | null;
+  device_class: "smartphone" | "tablet" | "desktop";
+  call_mode: "streaming_avatar" | "tts";
+  /** Avatar video fell back to voice-only during the session. */
+  avatar_fallback: boolean;
+  role_profile: UserRoleProfile | null;
+  posture: UserPosture | null;
+  transcript_available: boolean;
+}
+
+export interface QuestionnaireConversationalData {
+  version: "conversational-v1";
+  submitted_at: string;
+  dimensions: Record<ConversationalDimensionKey, DimensionAnswer>;
+  summary: { text: string; edited_by_user: boolean; validated_at: string };
+  consent: { transcript_storage: true; contact_email?: string; opt_in_updates: boolean; opt_in_feedback: boolean };
+  session_context: ConversationalSessionContext;
+}
