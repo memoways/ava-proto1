@@ -3432,7 +3432,8 @@ const IndexPRD4 = () => {
           rated: Object.values(data.dimensions).filter((d) => d.score !== null).length,
           follow_ups: Object.values(data.dimensions).filter((d) => d.follow_up !== null).length,
           device_class: data.session_context.device_class,
-          provisional: true,
+          edited_by_user: data.summary.edited_by_user,
+          contact_email_given: !!data.consent.contact_email,
         });
       } catch (err) {
         console.warn("[PRD4] conversational questionnaire submit failed:", err);

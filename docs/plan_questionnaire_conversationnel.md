@@ -153,6 +153,41 @@ garde ses branches legacy et PRD4 et gagne une branche `conversational-v1`.
   503) vérifiant l'absence d'appel TTS, la sauvegarde et l'appel `sync-questionnaire`.
 - **Non fait** : recette voix réelle smartphone/desktop ; aucune Edge Function modifiée (pas de redéploiement).
 
-Prompt de reprise du lot 3 : [prompt_reprise_questionnaire_conversationnel_lot_3.md](prompt_reprise_questionnaire_conversationnel_lot_3.md).
+## Exécution lot 3 (8 novembre 2026)
+
+- **Validation finale** : `src/services/conversationalQuestionnaireReview.ts` (pur) et
+  `src/components/prd4/ConversationalReview.tsx` remplacent l'étape « Tes réponses ». Par dimension : question,
+  réponse, relance (si posée) et commentaire de note éditables ; la note ne change qu'après « Modifier la note » et
+  un toucher de pastille (`touch`), « Ne pas noter » = `null` ; retaper la note d'origine garde sa source
+  (`voice_confirmed` conservé). `edited_by_user` vrai dès qu'un texte (hors espaces) ou une note diffère de la
+  conversation. Synthèse validée (`validatedSummary`) recalculée depuis les textes corrigés.
+- **Radar participant** : `src/components/questionnaire/ConversationalRadar.tsx`, SVG 5 axes 1–5, une seule série en
+  `--primary`, textes en encre neutre, grille `--border`. Dimension non évaluée : axe pointillé, aucun point, listée
+  sous le radar ; le polygone n'est rempli que si les 5 axes sont notés, sinon segments entre axes voisins notés.
+  Info-bulle par point. Libellés courts lisibles à 375 px (capture vérifiée).
+- **Consentement et contact** : case de conservation de la transcription obligatoire (l'audio n'est jamais
+  enregistré) ; email facultatif, refusé s'il est mal formé ; opt-ins PRD4 (actualités, feedback détaillé) actifs
+  seulement avec un email valide, sinon `false`. « Valider et envoyer » est le seul déclencheur ; rien n'est écrit
+  avant (vérifié en E2E). L'enregistrement provisoire du lot 2 (`buildProvisionalQuestionnaire`, `rawSummary`) est
+  retiré.
+- **Admin Questionnaires** : `conversationalQuestionnaireAggregate.ts` (pur) et
+  `ConversationalQuestionnairesPanel.tsx`. Radar des moyennes (seules notes données), tableau moyenne / notes /
+  non évalué, verbatims par dimension (réponse, relance, commentaire, appareil, note), filtre Tous / Smartphone /
+  Tablette / Desktop sur `session_context.device_class`. Ligne de tableau « Conversationnel · appareil » et détail
+  dédié (radar, réponses, mode d'appel, contact). Rendu PRD4/legacy inchangé.
+- **Export Markdown** : section « Questionnaire conversationnel » (notes, non évalué, questions, relances,
+  commentaires) ; PRD4/legacy restent dans les métadonnées brutes comme avant.
+- PostHog `conversational_questionnaire_submitted` : `provisional` remplacé par `edited_by_user` et
+  `contact_email_given`.
+- **Notion** : aucune ligne de « Questionnaire AVA » n'a de « Conv Version » au 8 novembre (requête du data source).
+  Le premier envoi réel de la branche `conversational-v1` reste **à faire** en recette (réglage conversationnel actif,
+  `sync-questionnaire` redéployée par Lovable depuis le lot 1). Aucune Edge Function modifiée dans ce lot.
+- Tests : `conversationalQuestionnaireReview.test.ts` (édition, note explicite, consentement, email/opt-ins, radar
+  sans 0, agrégat, filtre appareil, PRD4/legacy écartés), `QuestionnairesTab.test.tsx`, export Markdown, test de
+  composant et deux E2E clavier jusqu'à « Valider et envoyer ».
+- **Non fait** : recette voix réelle smartphone/desktop (lots 2 et 3) ; envoi réel vers Notion.
+
+Prompt de reprise du lot 4 : [prompt_reprise_questionnaire_conversationnel_lot_4.md](prompt_reprise_questionnaire_conversationnel_lot_4.md).
+Prompt du lot 3 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_3.md](prompt_reprise_questionnaire_conversationnel_lot_3.md).
 Prompt du lot 2 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_2.md](prompt_reprise_questionnaire_conversationnel_lot_2.md).
 Prompt du lot 1 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_1.md](prompt_reprise_questionnaire_conversationnel_lot_1.md).

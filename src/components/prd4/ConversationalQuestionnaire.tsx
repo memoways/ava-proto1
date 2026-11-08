@@ -1,5 +1,6 @@
 /**
- * Conversational end-of-experience questionnaire — voice path (lot 2).
+ * Conversational end-of-experience questionnaire — voice path (lot 2) and
+ * final validation (lot 3, `ConversationalReview`).
  *
  * Plan: docs/plan_questionnaire_conversationnel.md. One dimension at a time
  * with a « X/5 » marker. Questions and follow-ups are DISPLAYED, never read
@@ -8,7 +9,7 @@
  * its own. A score is a tapped 1–5 pastille, a confirmed spoken score, or
  * « je préfère ne pas noter » (null) — never a default value.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Square } from "lucide-react";
 import type {
   ConversationalDimensionKey,
@@ -19,12 +20,10 @@ import type {
 import { CONVERSATIONAL_DIMENSIONS } from "@/services/conversationalQuestionnaire";
 import {
   applyFollowUp,
-  buildProvisionalQuestionnaire,
   confirmScore,
   currentDimension,
   DIMENSION_LABELS,
   progressLabel,
-  rawSummary,
   startFlow,
   submitAnswer,
   submitFollowUpAnswer,
@@ -32,6 +31,7 @@ import {
 } from "@/services/conversationalQuestionnaireFlow";
 import type { FollowUpRequest } from "@/services/conversationalFollowUp";
 import { useDictation } from "@/hooks/useDictation";
+import ConversationalReview from "./ConversationalReview";
 
 interface Props {
   questions: Record<ConversationalDimensionKey, string>;
@@ -201,7 +201,6 @@ function ScoreStep({
 const ConversationalQuestionnaire = ({ questions, sessionContext, requestFollowUp, onSave, onSkip, submitting }: Props) => {
   const [state, setState] = useState<FlowState>(() => startFlow(questions));
   const [draft, setDraft] = useState("");
-  const [consent, setConsent] = useState(false);
   const [dictating, setDictating] = useState(false);
   const requestRef = useRef(requestFollowUp);
   requestRef.current = requestFollowUp;
@@ -220,8 +219,6 @@ const ConversationalQuestionnaire = ({ questions, sessionContext, requestFollowU
     // Runs once per pending request; the dimension texts are frozen at that point.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.step, state.index]);
-
-  const summary = useMemo(() => (state.step === "review" ? rawSummary(state) : ""), [state]);
 
   return (
     <div className="min-h-screen bg-background px-4 py-8 tablet:px-10">
@@ -305,29 +302,7 @@ const ConversationalQuestionnaire = ({ questions, sessionContext, requestFollowU
         )}
 
         {state.step === "review" && (
-          <section className="space-y-5 rounded-lg border border-border bg-secondary/30 p-5">
-            <h2 className="font-serif text-xl text-foreground">Tes réponses</h2>
-            <pre className="whitespace-pre-wrap font-sans text-sm text-foreground" aria-label="Synthèse brute">{summary}</pre>
-            <label className="flex items-start gap-3 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-1 h-5 w-5 accent-primary"
-              />
-              J'accepte que la transcription de mes réponses soit conservée. L'audio n'est jamais enregistré.
-            </label>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className={primaryButton}
-                disabled={!consent || submitting}
-                onClick={() => void onSave(buildProvisionalQuestionnaire(state, sessionContext))}
-              >
-                {submitting ? "Envoi…" : "Enregistrer mes réponses"}
-              </button>
-            </div>
-          </section>
+          <ConversationalReview dimensions={state.dimensions} sessionContext={sessionContext} onSave={onSave} submitting={submitting} />
         )}
 
         {onSkip && (

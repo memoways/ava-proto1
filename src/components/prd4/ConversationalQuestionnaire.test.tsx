@@ -24,7 +24,7 @@ function answer(text: string) {
 }
 
 describe("ConversationalQuestionnaire", () => {
-  it("runs five dimensions by keyboard, skips a failed follow-up and saves a provisional payload", async () => {
+  it("runs five dimensions by keyboard, skips a failed follow-up and validates and sends the edited summary", async () => {
     const requestFollowUp = vi.fn().mockRejectedValue(new Error("proxy-llm down"));
     const onSave = vi.fn<(data: QuestionnaireConversationalData) => void>();
     render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={requestFollowUp} onSave={onSave} />);
@@ -42,14 +42,39 @@ describe("ConversationalQuestionnaire", () => {
     }
     expect(requestFollowUp).toHaveBeenCalledTimes(5);
 
-    const save = screen.getByRole("button", { name: "Enregistrer mes réponses" });
+    // Final validation: radar with the not-rated dimension apart, nothing sent yet.
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId("radar-not-rated")).toHaveTextContent("Intérêt");
+    expect(screen.queryByTestId("radar-point-interest")).not.toBeInTheDocument();
+    expect(screen.getByTestId("radar-point-fluidity")).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Valider et envoyer" });
     expect(save).toBeDisabled();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /transcription de mes réponses/ }));
+    expect(save).toBeEnabled();
+
+    // Opt-ins need an email; an invalid email blocks the send.
+    const updates = screen.getByRole("checkbox", { name: /tenu·e au courant/ });
+    expect(updates).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Ton email (facultatif)"), { target: { value: "pas-un-email" } });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Ton email (facultatif)"), { target: { value: "lea@example.com" } });
+    expect(updates).toBeEnabled();
+    fireEvent.click(updates);
+
+    // Edit a text, change a score by an explicit tap.
+    fireEvent.change(screen.getByLabelText("Ta réponse — Immersion"), { target: { value: "Réponse 3 corrigée" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Modifier la note" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Intérêt : 2 sur 5" }));
+    expect(screen.getByTestId("review-score-interest")).toHaveTextContent("2/5");
+
     fireEvent.click(save);
     const data = onSave.mock.calls[0][0];
     expect(data.dimensions.fluidity).toMatchObject({ answer: "Réponse 1", follow_up: null, score: 4, score_source: "touch" });
-    expect(data.dimensions.interest).toMatchObject({ score: null, score_source: null });
-    expect(data.summary.edited_by_user).toBe(false);
+    expect(data.dimensions.interest).toMatchObject({ score: 2, score_source: "touch" });
+    expect(data.dimensions.immersion.answer).toBe("Réponse 3 corrigée");
+    expect(data.summary.edited_by_user).toBe(true);
+    expect(data.summary.text).toContain("Immersion — 3/5 · Réponse 3 corrigée");
+    expect(data.consent).toEqual({ transcript_storage: true, contact_email: "lea@example.com", opt_in_updates: true, opt_in_feedback: false });
     expect(stt.create).not.toHaveBeenCalled();
   });
 

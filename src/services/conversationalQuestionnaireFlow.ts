@@ -9,13 +9,10 @@
 import type {
   ConversationalDimensionKey,
   ConversationalScore,
-  ConversationalSessionContext,
   DimensionAnswer,
-  QuestionnaireConversationalData,
 } from "@/types";
 import {
   CONVERSATIONAL_DIMENSIONS,
-  CONVERSATIONAL_VERSION,
   emptyDimensionAnswer,
   normalizeScore,
 } from "./conversationalQuestionnaire";
@@ -155,35 +152,6 @@ export function detectSpokenScore(text: string): ConversationalScore {
   return null;
 }
 
-/** Raw (unedited) summary for the provisional save; the edited, validated summary is lot 3. */
-export function rawSummary(state: FlowState): string {
-  return CONVERSATIONAL_DIMENSIONS.map((key) => {
-    const dimension = state.dimensions[key];
-    const parts = [`${DIMENSION_LABELS[key]} — ${dimension.score === null ? "non évalué" : `${dimension.score}/5`}`];
-    if (dimension.answer) parts.push(dimension.answer);
-    if (dimension.follow_up?.answer) parts.push(dimension.follow_up.answer);
-    if (dimension.score_comment) parts.push(dimension.score_comment);
-    return parts.join(" · ");
-  }).join("\n");
-}
-
 export function isFlowComplete(state: FlowState): boolean {
   return state.step === "review";
-}
-
-/** Payload for the provisional save at the end of lot 2 (summary not edited). */
-export function buildProvisionalQuestionnaire(
-  state: FlowState,
-  context: ConversationalSessionContext,
-  now: Date = new Date(),
-): QuestionnaireConversationalData {
-  const timestamp = now.toISOString();
-  return {
-    version: CONVERSATIONAL_VERSION,
-    submitted_at: timestamp,
-    dimensions: state.dimensions,
-    summary: { text: rawSummary(state), edited_by_user: false, validated_at: timestamp },
-    consent: { transcript_storage: true, opt_in_updates: false, opt_in_feedback: false },
-    session_context: context,
-  };
 }

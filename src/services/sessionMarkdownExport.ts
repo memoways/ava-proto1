@@ -1,6 +1,8 @@
 import type { ConversationPipelineTimings } from "@/types";
 import { displayNameForCharacter } from "./characterRegistry";
 import { messageCharacter } from "./sessionCharacters";
+import { CONVERSATIONAL_DIMENSIONS, isConversationalQuestionnaire } from "./conversationalQuestionnaire";
+import { DIMENSION_LABELS } from "./conversationalQuestionnaireFlow";
 import { getPipelineServiceLatency, LATENCY_SEGMENT_LABELS, percentile, type LatencySegmentKey } from "./latencySegments";
 
 export type ExportRecord = Record<string, unknown>;
@@ -88,6 +90,24 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
   const gm = Array.isArray(session.gm_post_turn_log) ? session.gm_post_turn_log.map(record) : [];
   for (const entry of gm) if (entry.execution_status && entry.execution_status !== "executed") incident(`GM post-tour ${text(entry.turn_index)}`, entry);
   if (!incidents) lines.push("Aucun incident identifié dans les données disponibles. Cela ne garantit pas l’absence de problème non enregistré.");
+  const questionnaire = session.questionnaire_responses;
+  if (isConversationalQuestionnaire(questionnaire)) {
+    lines.push("", "## Questionnaire conversationnel", "",
+      `- Version : ${questionnaire.version}`, `- Validé le : ${text(questionnaire.summary?.validated_at)}`,
+      `- Synthèse corrigée par la personne : ${questionnaire.summary?.edited_by_user ? "oui" : "non"}`, "",
+      "| Dimension | Note |", "| --- | ---: |");
+    for (const key of CONVERSATIONAL_DIMENSIONS) {
+      const score = questionnaire.dimensions?.[key]?.score;
+      lines.push(`| ${DIMENSION_LABELS[key]} | ${score == null ? "non évalué" : `${score}/5`} |`);
+    }
+    for (const key of CONVERSATIONAL_DIMENSIONS) {
+      const d = questionnaire.dimensions?.[key];
+      if (!d) continue;
+      lines.push("", `### ${DIMENSION_LABELS[key]}`, "", `**Question :** ${d.question}`, "", d.answer || "—");
+      if (d.follow_up) lines.push("", `**Relance :** ${d.follow_up.question}`, "", d.follow_up.answer || "—");
+      if (d.score_comment) lines.push("", `**Commentaire sur la note :** ${d.score_comment}`);
+    }
+  }
   lines.push("", "## Conversation", "");
   turn = 0;
   for (const m of messages) {
