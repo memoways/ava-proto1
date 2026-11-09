@@ -3,6 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import { parseSpeechStates } from "../_shared/speechStates.ts";
 import {
+  ACTIVE_SITUATION_SUMMARY_PROMPT_VERSION,
+  buildSituationSummaryPrompt,
+  situationSummaryRequest,
+} from "../_shared/situationSummaryPrompt.ts";
+import {
   getRagEmbeddingProfile,
   isRagEmbeddingProfileId,
   LEGACY_OPENAI_PROFILE_ID,
@@ -525,49 +530,20 @@ serve(async (req) => {
       pageContent: string,
       promptFields: Record<string, string>,
     ): Promise<string> {
-      const timeline = (promptFields.timeline || '').trim();
-      const identity = (promptFields.identite_fondamentale || '').trim();
-      const storyTail = pageContent.trim().slice(-4500);
-      if (!OPENROUTER_API_KEY || (!timeline && !storyTail)) return '';
-      const prompt = `Tu rédiges la SITUATION ACTUELLE du personnage "${name}", au moment exact où commence l'expérience (l'utilisateur va lui parler au téléphone maintenant).
-
-RÈGLES STRICTES D'ORDRE (impératives) :
-1. Commence par le PRÉSENT IMMÉDIAT : où il/elle se trouve maintenant, ce qu'il/elle est en train de faire, dans quel état.
-2. Puis les FAITS RÉCENTS : ce qui s'est passé aujourd'hui, puis hier, puis les jours précédents (du plus récent au plus ancien).
-3. Puis ce qui le/la PRÉOCCUPE et ce qu'il/elle cherche ou attend maintenant.
-4. EN DERNIER SEULEMENT, une seule phrase d'identité (âge, métier, proches), reprise littéralement de l'IDENTITÉ ci-dessous.
-
-INTERDITS :
-- Ne JAMAIS ouvrir par une phrase biographique du type "X est un ... de N ans" ou "X, journaliste, ...".
-- Pas d'interprétation psychologique, pas de style littéraire, pas de spéculation.
-- Aucun fait absent des sources ci-dessous.
-- Ne jamais inventer ni approximer un âge, un métier, un nombre d'enfants ou un prénom : ces éléments viennent uniquement de l'IDENTITÉ.
-
-OBLIGATION DE COUVERTURE : si les sources les mentionnent, aucun de ces éléments ne peut être omis — le lieu du présent, le retour de la montagne, l'arme pointée puis le désarmement, chaque enfant nommé (y compris un enfant absent ou retenu ailleurs, par exemple dans un camp), et l'attente d'une autorité qui ne répond pas.
-
-FORME : 90-130 mots, français, 3e personne, présent de l'indicatif pour le présent immédiat, faits denses et vérifiables. Priorise la TIMELINE et la FIN DU RÉCIT : l'ouverture du document décrit le passé, pas le présent.
-
-IDENTITÉ (source unique pour l'âge, le métier et les proches) :
-${identity || '(absente)'}
-
-TIMELINE STRUCTURÉE (source prioritaire du présent) :
-${timeline || '(absente)'}
-
-FIN DU RÉCIT :
-${storyTail || '(absente)'}
-
-Situation actuelle (présent d'abord, identité en dernier, 90-130 mots) :`;
+      const version = ACTIVE_SITUATION_SUMMARY_PROMPT_VERSION;
+      const prompt = buildSituationSummaryPrompt({
+        name,
+        pageContent,
+        timeline: promptFields.timeline || '',
+        identity: promptFields.identite_fondamentale || '',
+      }, version);
+      if (!OPENROUTER_API_KEY || !prompt) return '';
 
       try {
         const r = await fetch(`${OPENROUTER_API_URL}/chat/completions`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.3,
-            max_tokens: 260,
-          }),
+          body: JSON.stringify(situationSummaryRequest(prompt, version)),
         });
         if (!r.ok) {
           console.error('[sync-notion] situation_summary error:', r.status, await r.text());

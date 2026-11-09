@@ -122,10 +122,38 @@ async function main(): Promise<void> {
     existing = await store.fetchEvalResults(data.id);
   } else {
     const live = pipeline.snapshotLiveSettings();
+    const readSnapshot = (value: string | undefined) => {
+      if (!value?.startsWith("@")) return value ?? "";
+      const file = path.resolve(process.cwd(), value.slice(1));
+      if (!existsSync(file)) fail(`Instantané introuvable : ${file}`);
+      return readFileSync(file, "utf8");
+    };
+    let candidateJson = readSnapshot(options.candidateJson);
+    if (options.candidatePresent) {
+      // Lot P: candidate PRÉSENT generated once per character, in memory, before any turn is paid.
+      const { generateCandidatePresents, candidatePresentSnapshot } = await import("@/services/evalSituationSummaryCandidate");
+      const characters = characterFilter === "all" ? ["max", "emma"] as const : [characterFilter] as const;
+      log(`• Génération du PRÉSENT candidat (${options.candidatePresent}) pour ${characters.join(", ")}…`);
+      const presents = await generateCandidatePresents([...characters], options.candidatePresent);
+      for (const present of presents) {
+        log(`\n── ${present.name} — PRÉSENT stocké\n${present.stored}\n── ${present.name} — PRÉSENT candidat (${options.candidatePresent})\n${present.candidate}\n`);
+      }
+      let base: Record<string, unknown> = {};
+      if (candidateJson.trim()) {
+        try { base = JSON.parse(candidateJson) as Record<string, unknown>; } catch { fail("--candidate-json illisible"); }
+      }
+      const snapshot = { ...base, ...candidatePresentSnapshot(presents, options.candidatePresent) };
+      candidateJson = JSON.stringify(snapshot);
+      const outDir = path.resolve(process.cwd(), options.outDir!);
+      mkdirSync(outDir, { recursive: true });
+      const file = path.join(outDir, `present-${options.candidatePresent}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+      writeFileSync(file, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+      log(`✓ Instantané rejouable : --candidate-json @${path.relative(process.cwd(), file)}`);
+    }
     const compare = runner.buildCompareConfigs(
       live,
-      { variant: options.reference ?? live.promptVariant, snapshotJson: options.referenceJson },
-      { variant: options.candidate!, snapshotJson: options.candidateJson },
+      { variant: options.reference ?? live.promptVariant, snapshotJson: readSnapshot(options.referenceJson) },
+      { variant: options.candidate!, snapshotJson: candidateJson },
     );
     if (compare.errors.length) fail(`Instantané invalide : ${compare.errors.join(" ; ")}`);
     configs = compare.configs;
@@ -203,6 +231,7 @@ async function main(): Promise<void> {
       costGuard,
       readActualCostUsd: async () => (await readActualCostUsd()).usd,
       onProgress: ({ label, completed, total }) => log(`  [${completed + 1}/${total}] ${label}`),
+      onRateLimited: ({ attempt, waitMs }) => log(`  ⏳ Limite de débit (429), tentative ${attempt} : attente ${Math.round(waitMs / 1000)} s puis rejeu du tour`),
     },
   });
 

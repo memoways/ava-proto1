@@ -117,6 +117,25 @@ export function formatEvalReportMarkdown(input: EvalReportInput): string {
     lines.push(`| ${cell(row.question)} | ${cell(row.character)} | ${plain(row.reference)} | ${plain(row.candidate)} | ${signed(row.delta)} | ${moving || "—"} |`);
   }
   lines.push("");
+  lines.push(...formatCandidatePresents(input.configs));
   lines.push(`Détail des réponses et des notes : Admin › Qualité › LLM as judge, run \`${input.run.id}\`.`);
   return `${lines.join("\n")}\n`;
+}
+
+/** Lot P: the in-memory PRÉSENT each side was played with, so the run can be read and replayed. */
+export function formatCandidatePresents(configs: EvalReportInput["configs"]): string[] {
+  const lines: string[] = [];
+  for (const config of configs) {
+    const summaries = config.situationSummaries;
+    if (!summaries || !Object.keys(summaries).length) continue;
+    lines.push(`## PRÉSENT joué en mémoire — ${config.factor === "baseline" ? "référence" : "candidat"} (${config.situationSummarySource ?? "instantané"})`);
+    lines.push("");
+    for (const [character, text] of Object.entries(summaries)) {
+      lines.push(`**${character === "emma" ? "Emma" : "Max"}**`);
+      lines.push("");
+      lines.push(...String(text).split(/\r?\n/).map((line) => `> ${line}`));
+      lines.push("");
+    }
+  }
+  return lines;
 }

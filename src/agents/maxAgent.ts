@@ -1,6 +1,6 @@
 import { WATCHED_VIDEOS_SECTION_TITLE } from "@/services/watchedVideoMemory";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
-import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent } from "@/services/responseIntentStream";
+import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
@@ -289,6 +289,10 @@ export async function simulateMaxResponse(
     llmOverrides?: MaxLlmOverrides;
     /** Evaluation-only prompt compiler, applied in memory for this call. */
     promptVariant?: MaxPromptVariant;
+    /** Evaluation-only PRÉSENT replacing the stored situation_summary for this call. */
+    situationSummaryOverride?: string;
+    /** Evaluation-only output contract wording for this call. */
+    streamContract?: ResponseStreamContractVariant;
     onSpeechToken?: (text: string) => void;
     finishSpeech?: (normalCompletion?: boolean) => string;
     recoverySpeechOnly?: boolean;
@@ -296,7 +300,9 @@ export async function simulateMaxResponse(
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterContext?.displayName || opts?.characterName || "Max";
   const promptBuildStartedAt = performance.now();
-  const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext, opts?.promptVariant);
+  const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext, opts?.promptVariant, {
+    situationSummary: opts?.situationSummaryOverride,
+  });
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
   const llm = getLLMSettings();
   const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
@@ -304,7 +310,7 @@ export async function simulateMaxResponse(
     ? formatPrivateDeliveryContext(input.conversationMemory?.deliveryByCharacter?.[opts.characterContext.characterKey]) : '';
   const privateProtocol = !opts?.recoverySpeechOnly && (Boolean(opts?.onSpeechToken) || (input.speechStateHistory !== undefined && Boolean(opts?.characterContext)));
   const systemPrompt = promptTrace.finalSystemPrompt + (privateContext ? `\n# CONTINUITÉ PRIVÉE\n${privateContext}` : '')
-    + (privateProtocol ? buildResponseStreamContract(maxTokens) : '');
+    + (privateProtocol ? buildResponseStreamContract(maxTokens, opts?.streamContract) : '');
   promptTrace.finalSystemPrompt = systemPrompt;
   const messages: TraceMessage[] = [
     { role: "system", content: systemPrompt },
@@ -531,15 +537,19 @@ export async function buildMaxSystemPrompt(
   characterName: string = "Max",
   characterContext?: CharacterExecutionContext,
   variantOverride?: MaxPromptVariant,
+  evaluation?: { situationSummary?: string },
 ): Promise<MaxPromptAssemblyTrace> {
   const variant = variantOverride ?? (() => {
     try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
   })();
   if (characterContext) assertCharacterExecutionContext(characterContext);
-  const characterFields = characterContext
+  const storedFields = characterContext
     ? await loadCharacterPrompt(characterContext.characterId)
     : await loadCharacterPromptByName(characterName);
-  if (!characterFields) throw new Error(`Fiche personnage absente pour ${characterName} : génération interdite`);
+  if (!storedFields) throw new Error(`Fiche personnage absente pour ${characterName} : génération interdite`);
+  // Judge reference/candidate runs may try a candidate PRÉSENT in memory; the cached sheet is never mutated.
+  const presentOverride = evaluation?.situationSummary?.trim();
+  const characterFields = presentOverride ? { ...storedFields, situation_summary: presentOverride } : storedFields;
   const canonicalName = characterFields.name?.trim() || characterName.trim();
   const requiredFields = [
     characterFields.situation_summary,

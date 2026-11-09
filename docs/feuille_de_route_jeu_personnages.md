@@ -45,11 +45,11 @@ D'abord un instrument de mesure, ensuite les améliorations. Chaque changement d
    - **Base corpus** : ajouter Emma au champ Personnage. C'est une base technique, distincte de la base Caractères, qui reste en lecture seule.
    - **Premier usage** : mesurer C1, puis décider du sort du générateur PRÉSENT.
 2. **J2 — exécution sans navigateur.** Livré en code le 9 novembre ([plan](plan_llm_as_judge.md#lot-j2--lancer-le-juge-sans-navigateur-implémenté-9-novembre-2026)) : `npm run eval:judge` sur sandbox, ou le workflow manuel « LLM judge (manual) », avec plafond de coût. Il ne bloque pas la CI. Prompt d'origine : [prompt_reprise_llm_juge_lot_j2.md](prompt_reprise_llm_juge_lot_j2.md).
-3. **P — parole, guidée par J1.** Prompt : [prompt_reprise_parole_lot_p.md](prompt_reprise_parole_lot_p.md).
+3. **P — parole, guidée par J1.** Livré en code le 9 novembre ([plan](plan_parole_lot_p.md), [rapport](rapport_parole_lot_p_sandbox_20261109.md)) : contrat `lived_v2` adopté (+0,33), PRÉSENT v2 non retenu (−0,27, faits perdus) ; écoute AP5 à faire. Prompt d'origine : [prompt_reprise_parole_lot_p.md](prompt_reprise_parole_lot_p.md).
    - Générateur PRÉSENT à la 2e personne, sans obligation de tout couvrir.
    - Reformuler la consigne « livre d'abord ton contenu ».
    - Puis écoute (AP5).
-4. **J3 — juge sur plusieurs tours.** Rejeu de 3 à 5 tours avec historique et mémoire, sur le corpus v0 mis à jour après les arbitrages de Romed. Il mesure la rumination, la continuité et le Game Master. C'est le cœur de la spec v2 de la tâche « Batterie LLM juge ».
+4. **J3 — juge sur plusieurs tours.** Prompt : [prompt_reprise_llm_juge_lot_j3.md](prompt_reprise_llm_juge_lot_j3.md). Rejeu de 3 à 5 tours avec historique et mémoire, sur le corpus v0 mis à jour après les arbitrages de Romed. Il mesure la rumination, la continuité et le Game Master. C'est le cœur de la spec v2 de la tâche « Batterie LLM juge ».
 5. **R — rumination et sous-texte.** Décision prise **à partir des mesures de J3** : complément de fiche ou consigne au Game Master. Rien n'est ajouté avant d'avoir mesuré.
 6. **S — storyworld spatial.** Réponses de Romed au questionnaire, enrichissement des souvenirs, puis vérification par le sous-corpus du carnage.
 7. **GM.** D'abord le raccrochage sur décision du Game Master, après avoir tranché la contradiction avec l'interdit « raccrocher ». Puis les déclencheurs et le rythme.

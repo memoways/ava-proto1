@@ -1,6 +1,7 @@
 import {
   buildReferenceCandidateConfigs,
   evalCharacterKey,
+  isRateLimitError,
   listEvalWorkItems,
   parseSnapshotOverrides,
   resultWorkKey,
@@ -105,6 +106,9 @@ export interface EvalRunDeps {
 
 export interface EvalRunHooks {
   signal?: AbortSignal;
+  /** Rate-limited calls (429) are replayed after a wait instead of failing the run. */
+  rateLimitRetry?: { attempts: number; waitMs: number; sleep?: (ms: number, signal: AbortSignal) => Promise<void> };
+  onRateLimited?: (info: { attempt: number; waitMs: number; error: string }) => void;
   /** Checked before each turn; true pauses the run cleanly. */
   shouldPause?: () => boolean;
   costGuard?: EvalCostGuard;
@@ -125,6 +129,33 @@ export const EVAL_COST_CAP_MESSAGE = "Plafond de coût atteint";
 
 function isAbort(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
+}
+
+export const DEFAULT_RATE_LIMIT_RETRY = { attempts: 3, waitMs: 65_000 };
+
+function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const timer = globalThis.setTimeout(resolve, ms);
+    signal.addEventListener("abort", () => {
+      globalThis.clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }, { once: true });
+  });
+}
+
+/** proxy-llm allows 60 calls per minute per account: a 429 waits for the next window, then replays. */
+export async function withRateLimitRetry<T>(call: () => Promise<T>, signal: AbortSignal, hooks: EvalRunHooks): Promise<T> {
+  const { attempts, waitMs, sleep = abortableSleep }: NonNullable<EvalRunHooks["rateLimitRetry"]> = hooks.rateLimitRetry ?? DEFAULT_RATE_LIMIT_RETRY;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await call();
+    } catch (error) {
+      if (!isRateLimitError(error) || attempt > attempts) throw error;
+      hooks.onRateLimited?.({ attempt, waitMs, error: error instanceof Error ? error.message : String(error) });
+      await sleep(waitMs, signal);
+    }
+  }
 }
 
 export async function executeEvalRun(input: {
@@ -168,9 +199,9 @@ export async function executeEvalRun(input: {
         completed,
         total,
       });
-      const turn = await deps.runTurn(work.item, work.config, signal);
+      const turn = await withRateLimitRetry(() => deps.runTurn(work.item, work.config, signal), signal, hooks);
       const judge = turn.maxResponse
-        ? await deps.judge(work.item, turn.maxResponse, run.judge_model, signal, turn.canonReference)
+        ? await withRateLimitRetry(() => deps.judge(work.item, turn.maxResponse, run.judge_model, signal, turn.canonReference), signal, hooks)
         : null;
       const saved = await deps.saveResult({
         runId: run.id,

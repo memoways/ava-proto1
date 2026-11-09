@@ -11,6 +11,8 @@ vi.mock('@/services/experienceOrchestration', () => ({
   profile('max', 'Max', 'gradium', 'max-gradium'), profile('emma', 'Emma', 'gradium', 'emma-old'), profile('leo', 'Léo', 'fish', null),
  ]),
  fetchCharacterAutoReadiness: vi.fn(async () => ({})),
+ // Read by the effective voice summary mounted in the tab; absent, it rejected after the test (flaky CI).
+ getCharacterRuntimeReadiness: vi.fn(async () => null),
  updateCharacterRuntimeProfile: vi.fn(async () => undefined),
  uploadCharacterPortrait: vi.fn(),
 }));

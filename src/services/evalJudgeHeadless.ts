@@ -1,6 +1,11 @@
 import { EVAL_DEFAULT_JUDGE_MODEL, EVAL_PROMPT_VARIANTS, EVAL_REPEATS, type EvalCostEstimate, type EvalPromptVariant } from "@/services/evalJudgePipeline";
 import type { EvalCharacterFilter } from "@/services/evalJudgeRunner";
 import { ENVIRONMENT_IDS, canSwitchEnvironments, type AdminUserProfile, type EnvironmentId } from "@/services/environmentContext";
+import {
+  SITUATION_SUMMARY_PROMPT_VERSIONS,
+  isSituationSummaryPromptVersion,
+  type SituationSummaryPromptVersion,
+} from "../../supabase/functions/_shared/situationSummaryPrompt";
 
 /**
  * Pure helpers of the headless judge (`npm run eval:judge`). The entry script
@@ -19,6 +24,8 @@ export interface HeadlessEvalOptions {
   candidate: EvalPromptVariant;
   referenceJson: string;
   candidateJson: string;
+  /** Generate a candidate PRÉSENT with this generator version at run start (lot P). */
+  candidatePresent: SituationSummaryPromptVersion | null;
   character: EvalCharacterFilter;
   repeats: number;
   judgeModel: string;
@@ -31,8 +38,10 @@ export interface HeadlessEvalOptions {
 export const HEADLESS_EVAL_USAGE = `Usage : npm run eval:judge -- [options]
   --reference VARIANTE        variante de prompt de référence (défaut : celle réglée dans l'environnement)
   --candidate VARIANTE        variante candidate (obligatoire sauf --resume) : ${EVAL_PROMPT_VARIANTS.join(", ")}
-  --reference-json JSON       instantané JSON appliqué à la référence (en mémoire)
-  --candidate-json JSON       instantané JSON appliqué au candidat (en mémoire)
+  --reference-json JSON       instantané JSON appliqué à la référence (en mémoire) ; @fichier.json pour le lire
+  --candidate-json JSON       instantané JSON appliqué au candidat (en mémoire) ; @fichier.json pour le lire
+  --candidate-present VERSION génère le PRÉSENT candidat au départ (${SITUATION_SUMMARY_PROMPT_VERSIONS.join(", ")}),
+                              en mémoire, visible avec --dry-run avant toute dépense
   --character all|max|emma    filtre personnage (défaut all)
   --repeats N                 passages par question et configuration (1-${MAX_EVAL_REPEATS}, défaut ${EVAL_REPEATS})
   --judge-model ID            modèle juge (défaut ${EVAL_DEFAULT_JUDGE_MODEL})
@@ -78,7 +87,7 @@ export function parseHeadlessEvalArgs(argv: string[]): { options: Partial<Headle
     raw.set(key, value.trim());
   }
 
-  const known = new Set(["reference", "candidate", "reference-json", "candidate-json", "character", "repeats", "judge-model", "max-cost-usd", "env", "resume", "out"]);
+  const known = new Set(["reference", "candidate", "reference-json", "candidate-json", "candidate-present", "character", "repeats", "judge-model", "max-cost-usd", "env", "resume", "out"]);
   for (const key of raw.keys()) if (!known.has(key)) errors.push(`option inconnue : --${key}`);
 
   const options: Partial<HeadlessEvalOptions> & { referenceGiven: boolean } = { referenceGiven: false, dryRun: flags.has("dry-run") };
@@ -101,6 +110,10 @@ export function parseHeadlessEvalArgs(argv: string[]): { options: Partial<Headle
   }
   options.referenceJson = get("reference-json") ?? "";
   options.candidateJson = get("candidate-json") ?? "";
+  const present = get("candidate-present");
+  if (present === undefined) options.candidatePresent = null;
+  else if (isSituationSummaryPromptVersion(present)) options.candidatePresent = present;
+  else errors.push(`--candidate-present inconnu : ${present} (${SITUATION_SUMMARY_PROMPT_VERSIONS.join(", ")})`);
 
   const character = get("character") ?? "all";
   if (character === "all" || character === "max" || character === "emma") options.character = character;

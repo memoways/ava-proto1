@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 9 novembre 2026 (J2). Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 9 novembre 2026 (lot P). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -16,8 +16,18 @@ Aucune publication production par CT1 ; main fusionné ne vaut pas publication.
 
 Lot C1 : vécu Notion protégé avant les faits et souvenirs présentés comme vécu
 (`optimized_v3`). [État des lieux et suite](analyse_parole_sous_le_choc.md). Base
-Caractères en lecture seule. Reste : écoute sandbox, puis la décision sur le générateur PRÉSENT.
+Caractères en lecture seule. Générateur PRÉSENT mesuré par le lot P (non changé) ; reste l'écoute sandbox.
 Suite ordonnée (mesure d'abord, LLM juge J1 → J3) : [feuille de route](feuille_de_route_jeu_personnages.md).
+
+## Lot P — parole guidée par le juge (9 novembre, code)
+
+Deux leviers mesurés par J2 sur sandbox-ulrich contre `optimized_v3`. **Contrat de flux `lived_v2` adopté en jeu**
+(+0,33/10, `lived_impact` +0,32, aucun recul ; run `837feca1`) ; Max énumère encore, plus court. **PRÉSENT
+`v2_second_person` non retenu** (−0,27 ; corrige la date de Peter mais perd des faits) : la synchro garde la consigne
+`v1`, désormais partagée (`_shared/situationSummaryPrompt.ts`), comportement identique. Le juge rejoue un tour refusé
+(429) au lieu de noter une réplique de secours. **À faire par Ulrich** : écoute AP5 en sandbox (Max surtout).
+[Plan](plan_parole_lot_p.md), [rapport](rapport_parole_lot_p_sandbox_20261109.md). Prochain lot :
+[J3, juge multi-tours](prompt_reprise_llm_juge_lot_j3.md).
 
 ## LLM juge J1 (9 novembre, code)
 
@@ -33,7 +43,7 @@ les morts et date mal la mort de Peter (erreur du résumé PRÉSENT) — base de
 rapport Markdown dans `output/eval-judge/`), ou workflow manuel « LLM judge (manual) » (secrets
 `AVA_EVAL_EMAIL` / `AVA_EVAL_PASSWORD` à créer). Run réel `b12b2d34` : 5,02 → 4,96 (Δ −0,06, bruit ± 0,57), 2,13 $,
 dans le bruit de J1. [Plan J2](plan_llm_as_judge.md#lot-j2--lancer-le-juge-sans-navigateur-implémenté-9-novembre-2026).
-Prochain lot : [P, parole guidée par le juge](prompt_reprise_parole_lot_p.md).
+Lot P livré ensuite (section ci-dessus).
 
 ## CT1 — contexte et livraison
 
