@@ -1,4 +1,4 @@
-import { ResponseIntentParser, type ResponseIntent } from "./responseIntentStream";
+import { ResponseIntentParser, type ResponseIntent, type ResponseStreamContractVariant } from "./responseIntentStream";
 import { projectDeliveredConversation, type ResponseDeliveryReceipt } from "./responseDelivery";
 import type { OpenHandoffRequest } from './characterHandoffState';
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation, type ProcessSpan } from "./voiceTurnTelemetryV2";
@@ -123,6 +123,10 @@ export interface PRD4TurnInput {
     featureKey?: string;
     /** In-memory prompt compiler for reference/candidate runs; never persisted. */
     promptVariant?: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
+    /** In-memory candidate PRÉSENT replacing the stored situation_summary; never persisted. */
+    situationSummary?: string;
+    /** In-memory output contract wording for reference/candidate runs; never persisted. */
+    streamContract?: ResponseStreamContractVariant;
     ragTopK?: number;
     ragThreshold?: number;
     ragRetrieveK?: number;
@@ -140,6 +144,8 @@ export interface PRD4TurnInput {
 
 export interface PRD4TurnResult {
   maxResponse: string;
+  /** Character LLM failure message when `maxResponse` is the fallback line; null otherwise. */
+  characterError?: string | null;
   /** The original candidate must stay withheld; consumers render only maxResponse. */
   handoffPreparationBlocked: boolean;
   speechPerformanceContext?: { state: string | null; rugosite: number; states: string[] };
@@ -420,6 +426,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           recoverySpeechOnly: retry,
           llmOverrides: evaluationOverrides?.llm,
           promptVariant: evaluationOverrides?.promptVariant,
+          situationSummaryOverride: evaluationOverrides?.situationSummary,
+          streamContract: evaluationOverrides?.streamContract,
           onSpeechToken: retry || !input.streamControl ? undefined : text => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
             input.streamControl!.onToken(text);
@@ -794,6 +802,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
 
   return {
     maxResponse,
+    /** Set when the character LLM failed and `maxResponse` is the fallback line (read by the judge replay). */
+    characterError: maxError,
     handoffPreparationBlocked,
     speechPerformanceContext: { state: maxResult && !identityGuard.blocked && !handoffPreparationBlocked ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates) : null, rugosite, states: speechStates.map(state => state.name) },
     timings: {

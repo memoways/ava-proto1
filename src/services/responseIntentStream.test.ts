@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ResponseIntentParser, SPEECH_BOUNDARY, buildResponseStreamContract } from './responseIntentStream';
+import { ResponseIntentParser, SPEECH_BOUNDARY, ACTIVE_RESPONSE_STREAM_CONTRACT, buildResponseStreamContract, isResponseStreamContractVariant } from './responseIntentStream';
 const context = { characterKey: 'max' as const, displayName: 'Max Lorenzo', characterId: '11111111-1111-4111-8111-111111111111', notionPageId: '30362322e5958011ad7bffb1ed6772bc', environmentId: 'sandbox-ulrich', promptUpdatedAt: '2026-10-13T00:00:00Z' };
 const header = JSON.stringify({ goal: 'Rassurer sans divulguer', points: ['Écouter'] }) + SPEECH_BOUNDARY;
 function parser() { const spoken: string[] = []; const intents: unknown[] = []; return { spoken, intents, p: new ResponseIntentParser(context, i => intents.push(i), s => spoken.push(s)) }; }
@@ -95,11 +95,27 @@ describe('lot 3 — terminal closing residue', () => {
     expect(contract).toContain('goal : 8 mots maximum');
   });
   it('R1 — livre le contenu avant de rester ouvert et finit sur une accroche, pas une question réflexe', () => {
-    const contract = buildResponseStreamContract(360);
+    const contract = buildResponseStreamContract(360, 'v1');
     expect(contract.indexOf("Livre d'abord le contenu")).toBeLessThan(contract.indexOf('pensée peut rester ouverte'));
     expect(contract).toContain('Termine sur une accroche (un fil de ton drame laissé ouvert, une réaction), jamais sur un détail du décor ni sur une question réflexe');
     expect(contract).toContain('Vise deux à trois phrases parlées');
     expect(contract).not.toContain('sans explication ni conclusion ajoutée pour achever la pensée');
+  });
+  it('lot P — lived_v2, joué par défaut, remplace seulement la consigne de livraison de v1', () => {
+    expect(ACTIVE_RESPONSE_STREAM_CONTRACT).toBe('lived_v2');
+    const v1 = buildResponseStreamContract(360, 'v1');
+    const lived = buildResponseStreamContract(360);
+    expect(buildResponseStreamContract(360, 'lived_v2')).toBe(lived);
+    expect(lived).not.toContain("Livre d'abord le contenu");
+    expect(lived).not.toContain("Choisis l'essentiel");
+    expect(lived).toContain("depuis ce que tu as vécu");
+    expect(lived).toContain("tu n'énumères jamais plusieurs faits à la suite");
+    expect(lived.indexOf('depuis ce que tu as vécu')).toBeLessThan(lived.indexOf('pensée peut rester ouverte'));
+    // Everything else in the contract is identical.
+    const strip = (text: string) => text.replace(/Choisis l'essentiel[^]*?boucler\./, '').replace(/Si la demande est large[^]*?boucler\./, '');
+    expect(strip(lived)).toBe(strip(v1));
+    expect(isResponseStreamContractVariant('lived_v2')).toBe(true);
+    expect(isResponseStreamContractVariant('v3')).toBe(false);
   });
   it('R1 — garde la limite de mots sous le budget et ne vise pas trois phrases en petit budget', () => {
     expect(buildResponseStreamContract(480)).toContain('70 mots maximum');

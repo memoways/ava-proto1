@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Parole, lot P : PRÉSENT et contrat de flux mesurés par le juge] — 2026-11-09
+
+- Générateur PRÉSENT partagé et versionné (`supabase/functions/_shared/situationSummaryPrompt.ts`), utilisé par
+  `sync-notion` et par le juge. `v1_coverage` reproduit mot pour mot la consigne précédente et **reste active** :
+  la synchro ne change pas de comportement. `v2_second_person` (candidate) : 2e personne, sans obligation de
+  couverture, chronologie des derniers jours rangée par jour (`recentTimelineDays`), règles de datation des morts
+  et des croyances démenties.
+- Juge J2 : PRÉSENT candidat et contrat de flux applicables **en mémoire** à un côté de la comparaison
+  (`evaluationOverrides.situationSummary`, `streamContract` ; instantané `situationSummaries` / `streamContract`).
+  `npm run eval:judge -- --candidate-present v2_second_person` génère le PRÉSENT candidat (même modèle que la
+  synchro, relisible avec `--dry-run`), `--candidate-json @fichier` rejoue un instantané figé ; le rapport imprime
+  le PRÉSENT joué. Rien n'est écrit dans `character_prompts` ni `admin_settings`.
+- **Contrat de flux `lived_v2` joué par défaut** (`ACTIVE_RESPONSE_STREAM_CONTRACT`) : « réponds depuis ce que tu
+  as vécu ; un fait n'entre que par ce qu'il t'a fait ; jamais plusieurs faits à la suite ; si la demande est large,
+  une seule chose ». Mesuré avant adoption : +0,33/10, `lived_impact` +0,32, aucun critère en recul (run
+  `837feca1`). Le juge garde `v1` en option pour comparer. Écoute AP5 à faire en sandbox ; aucune publication.
+- PRÉSENT `v2_second_person` mesuré et **non retenu** (run `b38e4266`, −0,27, canon −0,42) : corrige la date de la
+  mort de Peter chez Max mais perd des faits porteurs sans obligation de couverture.
+- Test instable corrigé : le mock de `CharacterRuntimeSettingsTab.test.tsx` fournit `getCharacterRuntimeReadiness`
+  (rejet non géré selon le timing).
+- Rejeu fiabilisé : une réplique de secours due à une limite de débit (429, 60 appels/min par compte sur
+  `proxy-llm`) n'est plus jamais notée ; le tour attend 65 s puis est rejoué (3 fois au plus). Un autre repli du
+  personnage est marqué « Personnage en repli ». `PRD4TurnResult.characterError` expose l'échec au rejeu.
+- Mesures sur sandbox-ulrich : [rapport](docs/rapport_parole_lot_p_sandbox_20261109.md),
+  [plan](docs/plan_parole_lot_p.md). Prochain lot : [J3](docs/prompt_reprise_llm_juge_lot_j3.md).
+
 ## [LLM juge, lot J2 : lancer le juge sans navigateur] — 2026-11-09
 
 - `npm run eval:judge -- --candidate rich_v2 [--reference optimized_v3] [--character all|max|emma] [--repeats 3]` :

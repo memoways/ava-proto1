@@ -7,6 +7,7 @@ import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration
 import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import type { RuntimeCharacter } from "@/types";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
+import { isResponseStreamContractVariant, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -52,7 +53,19 @@ export interface EvalLiveSnapshot {
   promptVariant: EvalPromptVariant;
 }
 
-export interface EvalTurnConfig extends EvalLiveSnapshot {
+/**
+ * Lot P levers, applied in memory to one side of a comparison only. Absent
+ * means "as stored / as played": the synced PRÉSENT and the `v1` contract.
+ */
+export interface EvalTurnExtras {
+  /** Candidate PRÉSENT per character key, replacing the stored situation_summary. */
+  situationSummaries?: Partial<Record<"max" | "emma", string>>;
+  /** Short provenance of the candidate PRÉSENT (generator version), shown in labels and reports. */
+  situationSummarySource?: string;
+  streamContract?: ResponseStreamContractVariant;
+}
+
+export interface EvalTurnConfig extends EvalLiveSnapshot, EvalTurnExtras {
   label: string;
   factor: EvalFactor;
 }
@@ -126,7 +139,11 @@ export function snapshotLiveSettings(): EvalLiveSnapshot {
 
 /** Fields a reference or candidate snapshot may override; anything else stays live. */
 export type EvalSnapshotOverrides = Partial<Pick<EvalLiveSnapshot,
-  "model" | "temperature" | "topP" | "maxTokens" | "ragTopK" | "ragRetrieveK" | "ragRerank" | "ragThreshold" | "promptVariant">>;
+  "model" | "temperature" | "topP" | "maxTokens" | "ragTopK" | "ragRetrieveK" | "ragRerank" | "ragThreshold" | "promptVariant">>
+  & EvalTurnExtras;
+
+/** A candidate PRÉSENT stays in the size range of the generated one (the optimized_v3 core is bounded). */
+export const EVAL_SITUATION_SUMMARY_MAX_CHARS = 2_000;
 
 const SNAPSHOT_NUMBER_KEYS = ["temperature", "topP", "maxTokens", "ragTopK", "ragRetrieveK", "ragThreshold"] as const;
 
@@ -162,6 +179,28 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
     if (typeof value.ragRerank === "boolean") overrides.ragRerank = value.ragRerank;
     else errors.push("ragRerank doit être true ou false");
   }
+  if ("streamContract" in value) {
+    if (isResponseStreamContractVariant(value.streamContract)) overrides.streamContract = value.streamContract;
+    else errors.push(`streamContract inconnu : ${String(value.streamContract)}`);
+  }
+  if ("situationSummarySource" in value && typeof value.situationSummarySource === "string" && value.situationSummarySource.trim()) {
+    overrides.situationSummarySource = value.situationSummarySource.trim().slice(0, 80);
+  }
+  if ("situationSummaries" in value) {
+    const raw = value.situationSummaries;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      errors.push("situationSummaries doit être un objet { max, emma }");
+    } else {
+      const summaries: Partial<Record<"max" | "emma", string>> = {};
+      for (const [key, text] of Object.entries(raw as Record<string, unknown>)) {
+        if (key !== "max" && key !== "emma") errors.push(`situationSummaries : personnage inconnu ${key}`);
+        else if (typeof text !== "string" || !text.trim()) errors.push(`situationSummaries.${key} doit être un texte`);
+        else if (text.trim().length > EVAL_SITUATION_SUMMARY_MAX_CHARS) errors.push(`situationSummaries.${key} dépasse ${EVAL_SITUATION_SUMMARY_MAX_CHARS} caractères`);
+        else summaries[key] = text.trim();
+      }
+      if (Object.keys(summaries).length) overrides.situationSummaries = summaries;
+    }
+  }
   for (const key of SNAPSHOT_NUMBER_KEYS) {
     if (!(key in value)) continue;
     const n = value[key];
@@ -171,10 +210,17 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
   return { overrides, errors };
 }
 
-function describeOverrides(live: EvalLiveSnapshot, snapshot: EvalLiveSnapshot): string {
-  const changed = (Object.keys(snapshot) as Array<keyof EvalLiveSnapshot>)
-    .filter((key) => key !== "promptVariant" && snapshot[key] !== live[key])
+type EvalSnapshotWithExtras = EvalLiveSnapshot & EvalTurnExtras;
+
+function describeOverrides(live: EvalSnapshotWithExtras, snapshot: EvalSnapshotWithExtras): string {
+  const changed = (Object.keys(snapshot) as Array<keyof EvalSnapshotWithExtras>)
+    .filter((key) => key !== "promptVariant" && key !== "situationSummaries" && key !== "situationSummarySource"
+      && snapshot[key] !== live[key])
     .map((key) => `${key}=${String(snapshot[key])}`);
+  const present = snapshot.situationSummaries && Object.keys(snapshot.situationSummaries).length;
+  if (present && JSON.stringify(snapshot.situationSummaries) !== JSON.stringify(live.situationSummaries)) {
+    changed.push(`PRÉSENT ${snapshot.situationSummarySource ?? "candidat"}`);
+  }
   return changed.length ? ` + ${changed.join(", ")}` : "";
 }
 
@@ -187,8 +233,8 @@ export function buildReferenceCandidateConfigs(
   reference: EvalSnapshotOverrides,
   candidate: EvalSnapshotOverrides,
 ): EvalTurnConfig[] {
-  const ref: EvalLiveSnapshot = { ...live, ...reference };
-  const cand: EvalLiveSnapshot = { ...ref, ...candidate };
+  const ref: EvalSnapshotWithExtras = { ...live, ...reference };
+  const cand: EvalSnapshotWithExtras = { ...ref, ...candidate };
   ref.ragRetrieveK = Math.max(ref.ragRetrieveK, ref.ragTopK);
   cand.ragRetrieveK = Math.max(cand.ragRetrieveK, cand.ragTopK);
   const refLabel = `référence (${ref.promptVariant}${describeOverrides(live, ref)})`;
@@ -567,6 +613,19 @@ export function resultWorkKey(row: Pick<EvalResult, "config_label" | "item_id" |
   return `${row.config_label}::${row.item_id}::${row.repeat_index}`;
 }
 
+/** Proxy (`Rate limit exceeded`) or upstream (OpenRouter 429) refusal: transient, worth a delayed replay. */
+export function isRateLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /\b429\b|rate[ -]?limit/i.test(message);
+}
+
+export class EvalRateLimitError extends Error {
+  constructor(detail: string) {
+    super(`Rate limit (429) : ${detail.slice(0, 200)}`);
+    this.name = "EvalRateLimitError";
+  }
+}
+
 export interface IsolatedEvalTurnTrace {
   maxResponse: string;
   ragMatches: unknown;
@@ -609,6 +668,8 @@ export async function runIsolatedEvalTurn(
     evaluationOverrides: {
       featureKey: EVAL_FEATURE_KEY,
       promptVariant,
+      situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
+      streamContract: config.streamContract,
       ragTopK,
       ragThreshold: config.ragThreshold,
       ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
@@ -623,8 +684,16 @@ export async function runIsolatedEvalTurn(
       },
     },
   });
+  if (turn.characterError && isRateLimitError(turn.characterError)) {
+    // Never judge a fallback line produced by a rate limit: the runner waits and replays the turn.
+    throw new EvalRateLimitError(turn.characterError);
+  }
   const gm = await turn.postTurnPromise;
   const canonFields = await loadCharacterPrompt(characterContext.characterId).catch(() => null);
+  const errors = [
+    turn.characterError ? `Personnage en repli : ${turn.characterError}` : null,
+    gm.execution_status && gm.execution_status !== "executed" ? `GM ${gm.execution_status}` : null,
+  ].filter(Boolean);
 
   return {
     maxResponse: turn.maxResponse,
@@ -639,9 +708,7 @@ export async function runIsolatedEvalTurn(
       total_ms: turn.timings.total_ms,
     },
     tokens: {},
-    error: gm.execution_status && gm.execution_status !== "executed"
-      ? `GM ${gm.execution_status}`
-      : undefined,
+    error: errors.length ? errors.join(" · ") : undefined,
     canonReference: buildJudgeCanonReference(canonFields),
   };
 }

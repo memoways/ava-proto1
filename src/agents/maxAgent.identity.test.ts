@@ -281,3 +281,32 @@ describe("evaluation prompt variant override (J1)", () => {
     expect(getGameplaySettings().MAX_PROMPT_VARIANT).toBe("legacy");
   });
 });
+
+describe("lot P — candidate PRÉSENT in memory (judge only)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each(variants)("replaces the stored PRÉSENT for this call only in %s", async (variant) => {
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: variant } as never);
+    const stored = sheet("max");
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(stored as never);
+    const candidate = "Tu es dans le salon. Hier, Peter a été tué par Agotha devant le chalet.";
+
+    const trace = await buildMaxSystemPrompt(input, "Max Lorenzo", contexts.max, variant, { situationSummary: candidate });
+    if (variant !== "legacy") {
+      expect(trace.finalSystemPrompt).toContain(candidate);
+      expect(trace.finalSystemPrompt).not.toContain("Max Lorenzo est à Lausanne aujourd'hui.");
+    }
+    // The cached sheet object is never mutated.
+    expect(stored.situation_summary).toBe("Max Lorenzo est à Lausanne aujourd'hui.");
+
+    const plain = await buildMaxSystemPrompt(input, "Max Lorenzo", contexts.max, variant);
+    expect(plain.finalSystemPrompt).not.toContain(candidate);
+  });
+
+  it("ignores a blank override", async () => {
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: "optimized_v3" } as never);
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet("max") as never);
+    const trace = await buildMaxSystemPrompt(input, "Max Lorenzo", contexts.max, "optimized_v3", { situationSummary: "  " });
+    expect(trace.finalSystemPrompt).toContain("Max Lorenzo est à Lausanne aujourd'hui.");
+  });
+});
