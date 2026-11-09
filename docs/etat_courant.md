@@ -17,6 +17,8 @@ Aucune publication production par CT1 ; main fusionné ne vaut pas publication.
 Lot C1 : vécu Notion protégé avant les faits et souvenirs présentés comme vécu
 (`optimized_v3`). [État des lieux et suite](analyse_parole_sous_le_choc.md). Base
 Caractères en lecture seule. Reste : écoute sandbox, puis la décision sur le générateur PRÉSENT.
+Suite ordonnée (mesure d'abord, LLM juge J1 → J3) : [feuille de route](feuille_de_route_jeu_personnages.md),
+prochain lot [J1](prompt_reprise_llm_juge_lot_j1.md).
 
 ## CT1 — contexte et livraison
 
