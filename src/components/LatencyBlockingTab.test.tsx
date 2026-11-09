@@ -105,7 +105,8 @@ describe("LatencyBlockingTab session scope", () => {
     mocks.rows = [row];
     openTab();
     await screen.findByRole("button", { name: /Video session/ });
-    expect(screen.getAllByText(/future-video/).length).toBeGreaterThan(0);
+    // The comparison renders after the session list: wait for it (flaky on slow CI runners).
+    expect((await screen.findAllByText(/future-video/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/actual-avatar/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1.25 s").length).toBeGreaterThan(0);
     expect(screen.getByText(/Évolution temporelle par service/)).toBeInTheDocument();
