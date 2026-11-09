@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Parole sous le choc, lot C1 : le vécu avant les faits] — 2026-11-09
+
+- État des lieux de la tâche Notion « Ava : parole sous le choc » : [analyse](docs/analyse_parole_sous_le_choc.md).
+  Cause principale côté app : en `optimized_v3`, le présent généré (inventaire de faits à la 3e personne) passait en
+  tête, tandis que le vécu écrit dans Notion était découpé par mots-clés.
+- `optimized_v3` seulement : le paragraphe Notion « Ce que tu cherches dans cet appel » (repli : « Ce que tu vis
+  aujourd'hui ») devient la section protégée **CE QUE ÇA TE FAIT**, placée avant les faits ; PRÉSENT devient
+  « REPÈRES — CE QUE TU SAIS (jamais une liste à réciter) », contenu inchangé.
+- Souvenirs RAG : en-tête d'archive « Personnage | Archétype | Partie » retiré ; une ligne d'usage les présente comme
+  du vécu, jamais seule.
+- Budgets : noyau 5 500 → 7 000, contexte 11 000 → 12 500 caractères. Au pire cas, sur les fiches sandbox réelles,
+  rien d'autre ne perd de place par rapport à main.
+- Aucune modification Notion, aucune resynchro, aucun réglage. Écoute en sandbox à faire.
+
 ## [Questionnaire conversationnel, lot 4 : écrans par appareil, fin de dictée, recette] — 2026-11-09
 
 - Mise en page selon l'appareil de la session : téléphone avec micro et validation fixés en bas, radar compact et
