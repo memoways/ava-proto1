@@ -156,6 +156,9 @@ Chaque appel émet un jeton d’une heure limité au seul dépôt Ava.
   `~/CodeProjects/_shared/scripts/github-delivery-exec gh …` ou
   `… github-delivery-exec node .github/scripts/ship-pr.mjs --pr N --head SHA --merge`.
   Ne jamais lancer `gh` nu : il lirait le jeton personnel rangé dans le Trousseau.
+- **Fichiers `.github/workflows/` :** l'App a déjà la permission Workflows ; le jeton
+  n'en demande le droit que sur demande. Pousser avec `GIT_SHIP_WORKFLOWS_WRITE=1 git push …`
+  (refus « without `workflows` permission » sinon). Ne rien demander à Ulrich pour ça.
 - **Lectures publiques :** peuvent rester anonymes (`git -c credential.helper=`).
 
 Secours seulement si la voie directe échoue (clé absente, refus distant) : une
