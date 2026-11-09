@@ -453,6 +453,7 @@ export function buildJudgePrompt(
   item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes" | "character_name">,
   response: string,
   canonReference = "",
+  priorExchanges = "",
 ): string {
   const characterName = item.character_name?.trim() || "le personnage attribué";
   const key = evalCharacterKey(characterName);
@@ -487,7 +488,12 @@ ${item.judge_notes || "(aucune)"}
 ## REPÈRES CANON DE ${characterName.toLocaleUpperCase("fr")} (lecture seule)
 ${canonReference || "(fiche non fournie : juge canon_timeline avec MUST NOT et les notes)"}
 
-## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
+${priorExchanges.trim() ? `## ÉCHANGES PRÉCÉDENTS DE LA CONVERSATION (contexte, ne pas noter)
+${priorExchanges.trim()}
+
+Note la réponse ci-dessous dans cette conversation : une reprise de ce qui a été dit est attendue ; une contradiction avec un tour précédent compte en canon_timeline.
+
+` : ""}## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
 ${response}
 
 ## JEU DU PERSONNAGE — QUATRE CRITÈRES (0 à 5)
@@ -638,24 +644,55 @@ export interface IsolatedEvalTurnTrace {
   canonReference?: string;
 }
 
+/** Exact attributed character context of an evaluation turn (Max or Emma). */
+export async function resolveEvalCharacterContext(characterName: string | null | undefined) {
+  const name = characterName?.trim();
+  if (!name) {
+    throw new Error("No character is attributed to this evaluation item");
+  }
+  const characterKey = evalCharacterKey(name);
+  const runtime = characterKey ? await getCharacterRuntimeReadiness(characterKey) : null;
+  const characterContext = toCharacterExecutionContext(runtime);
+  if (!runtime?.ready || !characterContext) {
+    throw new Error(`No exact attributed character context for isolated evaluation: ${name}`);
+  }
+  return { characterKey, characterContext };
+}
+
+/**
+ * In-memory overrides of one evaluation turn, shared by the isolated replay
+ * (J1/J2) and the sequence replay (J3). Never persisted.
+ */
+export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: RuntimeCharacter | null) {
+  const promptVariant = normalizeMaxPromptVariant(config.promptVariant, "legacy");
+  // Mirror the live turn: optimized_v3 widens the RAG pool before deduplication.
+  const ragTopK = characterRagTopKForVariant(promptVariant, config.ragTopK);
+  return {
+    featureKey: EVAL_FEATURE_KEY,
+    promptVariant,
+    situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
+    streamContract: config.streamContract,
+    ragTopK,
+    ragThreshold: config.ragThreshold,
+    ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
+    ragRerank: config.ragRerank,
+    ragRerankModel: config.ragRerankModel,
+    ragRerankTruncation: config.ragRerankTruncation,
+    llm: {
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      topP: config.topP,
+    },
+  };
+}
+
 export async function runIsolatedEvalTurn(
   item: EvalItem,
   config: EvalTurnConfig,
   opts?: { signal?: AbortSignal },
 ): Promise<IsolatedEvalTurnTrace> {
-  const characterName = item.character_name?.trim();
-  if (!characterName) {
-    throw new Error("No character is attributed to this evaluation item");
-  }
-  const characterKey = evalCharacterKey(characterName);
-  const promptVariant = normalizeMaxPromptVariant(config.promptVariant, "legacy");
-  // Mirror the live turn: optimized_v3 widens the RAG pool before deduplication.
-  const ragTopK = characterRagTopKForVariant(promptVariant, config.ragTopK);
-  const runtime = characterKey ? await getCharacterRuntimeReadiness(characterKey) : null;
-  const characterContext = toCharacterExecutionContext(runtime);
-  if (!runtime?.ready || !characterContext) {
-    throw new Error(`No exact attributed character context for isolated evaluation: ${characterName}`);
-  }
+  const { characterKey, characterContext } = await resolveEvalCharacterContext(item.character_name);
   const turn = await processPRD4Turn({
     sessionId: null,
     conversationHistory: [],
@@ -665,24 +702,7 @@ export async function runIsolatedEvalTurn(
     characterContext,
     signal: opts?.signal,
     turnIndex: 1,
-    evaluationOverrides: {
-      featureKey: EVAL_FEATURE_KEY,
-      promptVariant,
-      situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
-      streamContract: config.streamContract,
-      ragTopK,
-      ragThreshold: config.ragThreshold,
-      ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
-      ragRerank: config.ragRerank,
-      ragRerankModel: config.ragRerankModel,
-      ragRerankTruncation: config.ragRerankTruncation,
-      llm: {
-        model: config.model,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        topP: config.topP,
-      },
-    },
+    evaluationOverrides: buildEvalTurnOverrides(config, characterKey),
   });
   if (turn.characterError && isRateLimitError(turn.characterError)) {
     // Never judge a fallback line produced by a rate limit: the runner waits and replays the turn.
@@ -717,10 +737,10 @@ export async function judgeIsolatedEvalTurn(
   item: EvalItem,
   maxResponse: string,
   judgeModel: string,
-  opts?: { signal?: AbortSignal; canonReference?: string },
+  opts?: { signal?: AbortSignal; canonReference?: string; priorExchanges?: string },
 ): Promise<EvalJudgeScore> {
   const result = await callLLMWithUsage(
-    [{ role: "system", content: buildJudgePrompt(item, maxResponse, opts?.canonReference ?? "") }],
+    [{ role: "system", content: buildJudgePrompt(item, maxResponse, opts?.canonReference ?? "", opts?.priorExchanges ?? "") }],
     {
       model: judgeModel,
       temperature: 0,
