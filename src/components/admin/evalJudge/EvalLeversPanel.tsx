@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { EvalCostEstimate, EvalLiveSnapshot } from "@/services/evalJudgePipeline";
+import type { EvalCharacterFilter } from "@/services/evalJudgeRunner";
 
 export type EvalRunMode = "compare" | "ofat";
-export type EvalCharacterFilter = "all" | "max" | "emma";
+export type { EvalCharacterFilter };
 
 export interface LeverToggles {
   tempZero: boolean;

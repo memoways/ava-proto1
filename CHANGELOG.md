@@ -4,6 +4,33 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [LLM juge, lot J2 : lancer le juge sans navigateur] — 2026-11-09
+
+- `npm run eval:judge -- --candidate rich_v2 [--reference optimized_v3] [--character all|max|emma] [--repeats 3]` :
+  la comparaison référence/candidat de l'admin, lancée depuis un terminal sur une sandbox. Même sélection du corpus,
+  mêmes configurations, même rejeu isolé, même juge, mêmes lignes `eval_runs` / `eval_results` (le run apparaît
+  dans Admin › Qualité). Rapport Markdown des Δ (verdict, critères, personnages, questions, coûts) dans
+  `output/eval-judge/`. Reprise d'un run en pause : `--resume RUN_ID` ; `--dry-run` pour l'estimation seule.
+- Boucle de run commune (`src/services/evalJudgeRunner.ts`) : l'onglet admin et le script exécutent la même séquence
+  (pause, reprise, échec) ; rien n'est dupliqué.
+- Connexion par la voie admin existante de Lovable Cloud (e-mail et mot de passe Supabase Auth, compte présent dans
+  `admin_users`), identifiants dans l'environnement ou `.env.eval.local` (ignoré par git). `prod` refusé ; seul le
+  compte autorisé choisit son environnement, comme dans l'admin. Aucune migration ni Edge Function.
+- `admin_settings` intouchable : réglages hydratés en lecture seule et toute écriture refusée au niveau des requêtes
+  (comptée dans le rapport). Les variantes restent appliquées en mémoire.
+- Plafond de coût `--max-cost-usd` (3 $ par défaut) : refus au départ si l'estimation le dépasse, puis arrêt propre
+  avant le tour qui le franchirait (coût engagé = max de l'estimation calibrée et du coût réel `llm_usage`) ; le run
+  reste en pause, reprenable.
+- Workflow GitHub « LLM judge (manual) », `workflow_dispatch` seulement (candidat, référence, personnage, passages,
+  plafond, sandbox) : jamais lancé par une PR ou un push, la CI est inchangée. Secrets `AVA_EVAL_EMAIL` et
+  `AVA_EVAL_PASSWORD` à créer avant le premier lancement.
+- Coûts LLM : la relève du prix OpenRouter (`fetchGenerationCost`) utilisait `window.setTimeout` et échouait hors
+  navigateur ; `globalThis.setTimeout` (sans effet dans l'app). Le rapport compte un coût à 0 comme « en attente »
+  et attend les prix avant de conclure ; avertissement quand un seul passage rend le verdict indicatif.
+- Run réel sur sandbox-ulrich, mêmes corpus et variantes que J1 (`b12b2d34`, 126 tours, 21 min, 2,13 $) :
+  `optimized_v3` 5,02, `rich_v2` 4,96 (Δ −0,06, bruit ± 0,57), dans le bruit du run J1 (Δ −0,15).
+  [Rapport](docs/rapport_llm_juge_j2_sandbox_20261109.md). Prochain lot : [P](docs/prompt_reprise_parole_lot_p.md).
+
 ## [LLM juge, lot J1 : mesurer le jeu de Max et Emma] — 2026-11-09
 
 - Grille : quatre critères notés 0-5 dans le prompt du juge, le parseur et les poids par défaut — `not_meta`,

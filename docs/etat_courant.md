@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 9 novembre 2026 (J1). Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 9 novembre 2026 (J2). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -28,7 +28,12 @@ personnage. Option Emma ajoutée à la base corpus. [Plan](plan_llm_as_judge.md#
 [Corpus v1](corpus_llm_juge_v1.md) validé par Ulrich et saisi dans la base corpus (20 lignes).
 Premier run réel (sandbox, 126 tours, 2,10 $) : `rich_v2` ne bat pas `optimized_v3` (Δ −0,15) ; Max énumère encore
 les morts et date mal la mort de Peter (erreur du résumé PRÉSENT) — base de mesure pour le lot P.
-Prochain lot : [J2, sans navigateur](prompt_reprise_llm_juge_lot_j2.md).
+**J2 (9 novembre, code)** : même comparaison sans navigateur, `npm run eval:judge -- --candidate rich_v2`
+(identifiants admin dans `.env.eval.local`, ignoré par git ; `prod` refusé ; plafond `--max-cost-usd`, 3 $ par défaut ;
+rapport Markdown dans `output/eval-judge/`), ou workflow manuel « LLM judge (manual) » (secrets
+`AVA_EVAL_EMAIL` / `AVA_EVAL_PASSWORD` à créer). Run réel `b12b2d34` : 5,02 → 4,96 (Δ −0,06, bruit ± 0,57), 2,13 $,
+dans le bruit de J1. [Plan J2](plan_llm_as_judge.md#lot-j2--lancer-le-juge-sans-navigateur-implémenté-9-novembre-2026).
+Prochain lot : [P, parole guidée par le juge](prompt_reprise_parole_lot_p.md).
 
 ## CT1 — contexte et livraison
 
