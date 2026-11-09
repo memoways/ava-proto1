@@ -7,14 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { writeEnvironmentStorage } from "@/services/environmentContext";
 import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
-import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
-import { EffectiveVoiceBlock, useVoiceProfiles } from "@/components/admin/EffectiveVoiceSummary";
-import { DEVICE_CLASSES } from "@/services/deviceClass";
 import {
-  getActiveProviderId,
-  loadActiveProviderFromDB,
-  setActiveProvider,
   getInworldSettings,
   loadInworldSettingsFromDB,
   saveInworldSettingsToDB,
@@ -92,8 +86,6 @@ const FALLBACK_GRADIUM_CHARACTERS: GradiumCharacterOption[] = [
 ];
 
 export default function TTSConfigTab() {
-  const [activeProvider, setActiveProviderState] = useState<TTSProviderId>(getActiveProviderId());
-  const { profiles: voiceProfiles } = useVoiceProfiles();
 
   // ElevenLabs settings
   const [elSettings, setElSettings] = useState<TTSSettings>(getTTSSettings());
@@ -123,7 +115,6 @@ export default function TTSConfigTab() {
   const [savingCa, setSavingCa] = useState(false);
 
   useEffect(() => {
-    loadActiveProviderFromDB().then(setActiveProviderState);
     loadTTSSettingsFromDB().then((s) => { setElSettings(s); setElSaved(s); });
     loadInworldSettingsFromDB().then((s) => { setIwSettings(s); setIwSaved(s); });
     loadFishSettingsFromDB().then((s) => { setFishSettings(s); setFishSaved(s); });
@@ -150,12 +141,6 @@ export default function TTSConfigTab() {
   const fishHasChanges = JSON.stringify(fishSettings) !== JSON.stringify(fishSaved);
   const grHasChanges = JSON.stringify(grSettings) !== JSON.stringify(grSaved);
   const caHasChanges = JSON.stringify(caSettings) !== JSON.stringify(caSaved);
-
-  async function handleActivate(id: TTSProviderId) {
-    setActiveProviderState(id);
-    await setActiveProvider(id);
-    toast.success(`Provider actif : ${TTS_PROVIDER_LIST.find((p) => p.id === id)?.label}`);
-  }
 
   // ElevenLabs helpers
   function updateEl(patch: Partial<TTSSettings>) {
@@ -282,48 +267,16 @@ export default function TTSConfigTab() {
           Configure les fournisseurs, modèles et paramètres utilisés dans le jeu. Les auditions se font dans Expérience → Atelier de parole.
         </p>
         <p className="text-sm text-muted-foreground">
-          Les <strong>Voice ID</strong> de chaque personnage, pour chaque fournisseur, se saisissent une seule fois ci-dessous. Gradium a des réglages fins distincts par personnage plus bas.
+          Les <strong>Voice ID</strong> de chaque personnage, pour chaque fournisseur, se saisissent une seule fois dans le catalogue ci-dessous. Gradium a des réglages fins distincts par personnage plus bas.
         </p>
       </div>
 
-      {/* ===== Active provider selector ===== */}
-      <section className="border rounded-lg p-4">
-        <h3 className="font-semibold text-sm mb-3">🎯 Provider actif (utilisé en jeu)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {TTS_PROVIDER_LIST.map((p) => {
-            const isActive = activeProvider === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => handleActivate(p.id)}
-                className={`text-left p-3 border rounded-lg transition-colors ${
-                  isActive ? "bg-primary/10 border-primary" : "hover:bg-accent/50"
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-sm">{p.label}</span>
-                  {isActive && <CheckCircle2 className="w-4 h-4 text-primary" />}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{p.description}</p>
-              </button>
-            );
-          })}
-        </div>
-        {PROVIDER_ACTING_SUPPORT[activeProvider].usability !== "audible" && (
-          <p className="text-xs text-amber-300/90 mt-3">
-            En jeu, {TTS_PROVIDER_LIST.find((p) => p.id === activeProvider)?.label} est actif :
-            l'intention y est {PROVIDER_ACTING_SUPPORT[activeProvider].labelFr.toLowerCase()}.
-            Les essais temporaires sont disponibles dans l’atelier de parole.
-          </p>
-        )}
-        <div className="mt-3">
-          <EffectiveVoiceBlock
-            title="Voix réellement jouée (réglages sauvegardés : profil personnage, services par appareil, moteurs)"
-            devices={DEVICE_CLASSES}
-            profiles={voiceProfiles}
-          />
-        </div>
-      </section>
+      {/* Engine choice per device and character: Expérience › Appareils (per-device settings plan, decision 3). */}
+      <p className="rounded-md border bg-muted/30 p-3 text-sm" data-testid="tts-devices-link">
+        Le moteur joué par chaque personnage sur chaque appareil, le moteur de repli et la ligne « Joué : … » se règlent
+        dans <a className="underline" href={adminTabPath("devices")}>Expérience › Appareils</a>. Ici : le catalogue des
+        voix et les réglages fins de chaque moteur.
+      </p>
 
       <CharacterVoicesPanel />
 

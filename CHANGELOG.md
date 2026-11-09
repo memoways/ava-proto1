@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages par appareil, lot 2 : onglet Expérience › Appareils] — 2026-11-09
+
+- Décisions 2 et 3 du plan validées par Ulrich le 9 novembre. Nouvel onglet **Expérience › Appareils**
+  (`src/components/admin/DevicesTab.tsx`, `/admin/experience/appareils`) : pour smartphone, tablette et ordinateur,
+  sortie, fournisseur d'avatar et transcription (affichée, réglée dans STT Config), puis le moteur de voix **de Max et
+  d'Emma séparément**. La voix vient du catalogue de TTS Config (`ava_tts_character_voices`) ; plus de saisie libre
+  d'ID. Ligne « Joué : … » sous chaque personnage (même fonction que l'expérience, catalogue chargé par l'onglet).
+  Le moteur de repli (ancien « Provider actif ») est réglé ici.
+- Nouveau format de `ava_device_services` (`version: 2`, `characters.max|emma.ttsProvider`). Ancien format lu sans
+  perte : le moteur commun de l'appareil s'applique à Max et à Emma, un ID saisi est gardé (`legacyVoiceId`), toujours
+  joué et signalé s'il diffère du catalogue (bouton « Utiliser le catalogue ») ; un ID égal au catalogue est retiré à la
+  sauvegarde. Sauvegarde relue et comparée. Règle unique `deviceVoiceChoice()` pour `resolveDeviceVoice` (joueur) et
+  `describeEffectiveVoice` (admin) : ID gardé, sinon catalogue, sinon voix du personnage si même moteur, sinon voix
+  par défaut du moteur.
+- « Services par appareil » quitte Streaming Avatar (un lien y reste). TTS Config ne garde que le catalogue et les
+  réglages fins des moteurs (lien vers Appareils).
+- Tests : `deviceServices.test.ts` (migration sans perte, conflits catalogue), `effectiveVoice.test.ts` (accord avec
+  le joueur, catalogues compris), `DevicesTab.test.tsx`, E2E « navigateur vierge » ancien et nouveau format (voix
+  envoyée à `proxy-tts`, `effective_settings`). Ligne réelle sandbox-ulrich (ancien format, aucun moteur choisi) :
+  lue à l'identique.
+
 ## [Réglages par appareil, lot 1 : les bons réglages partout et le résumé effectif] — 2026-11-08
 
 - Le joueur charge désormais depuis la base tout ce qui pilote un appel : `hydrateExperienceSettings()`

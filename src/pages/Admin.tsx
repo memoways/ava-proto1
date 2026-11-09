@@ -40,6 +40,7 @@ import AlertsTab from "@/components/admin/AlertsTab";
 import SandboxGuideTab from "@/components/admin/SandboxGuideTab";
 import TestInvitationsTab from "@/components/admin/TestInvitationsTab";
 import ExperienceArchitectureTab from "@/components/ExperienceArchitectureTab";
+import DevicesTab from "@/components/admin/DevicesTab";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -636,6 +637,10 @@ export default function Admin() {
 
           <TabsContent value="character-runtime">
             <CharacterRuntimeSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="devices">
+            {activeTab === "devices" && <DevicesTab />}
           </TabsContent>
 
           <TabsContent value="video-triggers">

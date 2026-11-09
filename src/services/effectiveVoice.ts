@@ -10,7 +10,7 @@
  */
 import { resolveCallOutputMode, type OutputModeReason } from "./callOutputMode";
 import type { DeviceClass } from "./deviceClass";
-import type { DeviceServiceSettings } from "./deviceServices";
+import { deviceVoiceChoice, type DeviceServiceSettings } from "./deviceServices";
 import type { TTSProviderId } from "./tts/types";
 import type { CharacterVoiceCatalogue } from "./tts/characterVoices";
 import type { CartesiaSettings, FishSettings, GradiumSettings, InworldSettings } from "./tts/providerSettings";
@@ -21,7 +21,7 @@ export type VoiceCharacter = "max" | "emma";
 
 /** Where the played voice comes from. */
 export type EffectiveVoiceSource =
-  /** Voice chosen for this device (Services par appareil). */
+  /** Voice ID kept from the former free field of Services par appareil (flagged in Appareils). */
   | "device"
   /** Character profile voice, as chosen in the TTS Config catalogue. */
   | "catalogue"
@@ -45,7 +45,7 @@ export interface EffectiveVoiceInput {
   character: VoiceCharacter;
   /** Character runtime profile (engine and voice), `null` when unavailable. */
   profile: { ttsProvider: string | null; ttsVoiceId: string | null } | null;
-  /** This device's services (Services par appareil). */
+  /** This device's services (Expérience › Appareils). */
   deviceServices: DeviceServiceSettings;
   /** Global switch "Voix TTS / Avatar vidéo". */
   configuredOutput: OutputMode;
@@ -96,7 +96,7 @@ export const AVATAR_LABELS: Record<StreamingAvatarProviderId, string> = {
 };
 
 const VOICE_SOURCE_LABELS: Record<EffectiveVoiceSource, string> = {
-  device: "appareil",
+  device: "ancien ID appareil",
   catalogue: "catalogue",
   profile: "profil",
   engine_default: "défaut du moteur",
@@ -181,7 +181,7 @@ function engineDetails(
   }
 }
 
-/** Ava's speech engine and voice for a character on a device (same rule as `resolveDeviceVoice`). */
+/** Ava's speech engine and voice for a character on a device (same rule as `resolveDeviceVoice`: `deviceVoiceChoice`). */
 function avaSpeech(input: EffectiveVoiceInput): {
   engine: TTSProviderId;
   voiceId: string | null;
@@ -190,24 +190,15 @@ function avaSpeech(input: EffectiveVoiceInput): {
   settings: EffectiveVoiceSetting[];
 } {
   const { profile, deviceServices, character, catalogue } = input;
-  const deviceEngine = deviceServices.ttsProvider;
   const profileEngine = asProvider(profile?.ttsProvider);
+  const choice = deviceVoiceChoice(profile, character, deviceServices, catalogue);
   let engine: TTSProviderId;
   let voiceId: string | null;
   let voiceSource: EffectiveVoiceSource;
-  if (deviceEngine) {
-    engine = deviceEngine;
-    const own = deviceServices.voiceIds[character]?.trim() || "";
-    if (own) {
-      voiceId = own;
-      voiceSource = "device";
-    } else if (profileEngine === deviceEngine && profile?.ttsVoiceId) {
-      voiceId = profile.ttsVoiceId;
-      voiceSource = "profile";
-    } else {
-      voiceId = null;
-      voiceSource = "engine_default";
-    }
+  if (choice.engine) {
+    engine = choice.engine;
+    voiceId = choice.voiceId;
+    voiceSource = choice.source === "legacy" ? "device" : choice.source ?? "engine_default";
   } else {
     // The experience passes the profile engine (else the TTS Config active engine) and the profile voice.
     engine = profileEngine ?? input.activeProvider;

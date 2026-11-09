@@ -36,6 +36,7 @@ describe("Admin navigation invariants", () => {
       "gamemaster",
       "gm-settings",
       "character-runtime",
+      "devices",
       "video-triggers",
       "architecture",
     ]);

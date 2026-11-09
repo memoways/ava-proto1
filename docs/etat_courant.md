@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 8 novembre 2026 (soir). Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 9 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -43,15 +43,14 @@ GitHub natif Unknown tool au dernier test ; repli git/gh autorisé avec Ulrfis.
 
 ## Suite préparée
 
-**Réglages par appareil (8 novembre, lot 1 livré en code).** Le joueur charge désormais tous les réglages d'appel
-depuis la base (`hydrateExperienceSettings`, délai borné 2,5 s, repli signalé `prd4_settings_fallback`) ; résumé
-« Joué : … » (`describeEffectiveVoice`) à côté de chaque choix de moteur ; réglages effectifs de chaque session dans
-`device_info.effective_settings` et dans le détail admin. Vérifier après livraison une nouvelle session smartphone
-(`max_model`, `tts_model`). Suite : [prompt lot 2](prompt_reprise_reglages_par_appareil_lot_2.md) (onglet
-Expérience › Appareils) ; [plan](plan_reglages_par_appareil.md). Recette iPhone (voix de Max) : humaine, à faire.
+**Réglages par appareil (9 novembre, lot 2 livré en code — plan terminé).** Expérience › Appareils : par appareil
+sortie, avatar, STT affiché, puis moteur de Max et d'Emma ; voix du catalogue TTS Config ; ligne « Joué : … ».
+`ava_device_services` v2, ancien format lu sans perte (ID saisi gardé et signalé). TTS Config : catalogue et réglages
+fins ; Streaming Avatar : lien. **À faire par Ulrich** : dans sandbox-ulrich, ouvrir Expérience › Appareils, choisir le
+moteur de Max sur smartphone et sauvegarder ; puis recette iPhone (voix de Max) et iPad. [Plan](plan_reglages_par_appareil.md).
 
 **Smartphone : film et voix (8 novembre, code).** Film d'introduction en image entière (portrait) avec « Plein
-écran ⤢ » (paysage) ; Admin › Streaming Avatar › « Services par appareil » choisit sortie, avatar, moteur et voix par
+écran ⤢ » (paysage) ; Admin › Expérience › Appareils choisit sortie, avatar, moteur et voix par
 appareil (défauts inchangés). Constat : l'iPhone jouait bien ElevenLabs `eleven_multilingual_v2` (voix Orchestration),
 l'ordinateur la voix Anam. **À faire par Ulrich** : choisir la voix smartphone dans ce panneau puis recette iPhone
 ([recette](recette_adaptation_ecrans.md), section 1).

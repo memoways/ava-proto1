@@ -7,7 +7,16 @@ import { getCartesiaSettings, getFishSettings, getGradiumSettings, getInworldSet
 import { streamingAvatarDefaults } from "./streamingAvatar/settings";
 import { DEVICE_CLASSES } from "./deviceClass";
 
-const followSwitch: DeviceServiceSettings = { output: "settings", avatarProvider: null, ttsProvider: null, voiceIds: { max: "", emma: "" } };
+const followSwitch: DeviceServiceSettings = {
+  output: "settings",
+  avatarProvider: null,
+  characters: { max: { ttsProvider: null, legacyVoiceId: "" }, emma: { ttsProvider: null, legacyVoiceId: "" } },
+};
+
+/** Same engine for Max (with an optional kept voice ID) on this device. */
+function maxEngine(engine: DeviceServiceSettings["characters"]["max"]["ttsProvider"], legacyVoiceId = ""): DeviceServiceSettings["characters"] {
+  return { ...followSwitch.characters, max: { ttsProvider: engine, legacyVoiceId } };
+}
 
 function input(patch: Partial<EffectiveVoiceInput> = {}): EffectiveVoiceInput {
   return {
@@ -46,17 +55,36 @@ describe("describeEffectiveVoice", () => {
     expect(voice.summary).toContain("(profil)");
   });
 
-  it("device engine and voice win over the character profile", () => {
+  it("device engine takes the catalogue voice of the character for that engine", () => {
     const voice = describeEffectiveVoice(input({
-      deviceServices: { ...followSwitch, output: "voice", ttsProvider: "gradium", voiceIds: { max: "g-dev", emma: "" } },
+      deviceServices: { ...followSwitch, output: "voice", characters: maxEngine("gradium") },
+      catalogue: { max: { gradium: "g-cat", elevenlabs: "VK9GO2Vntd9rcY7Tg6wl" } },
     }));
-    expect(voice).toMatchObject({ engine: "gradium", voiceId: "g-dev", voiceSource: "device", model: null });
+    expect(voice).toMatchObject({ engine: "gradium", voiceId: "g-cat", voiceSource: "catalogue", model: null });
     expect(voice.summary.startsWith("Gradium · température")).toBe(true);
+  });
+
+  it("a voice ID kept from the former format wins and is named", () => {
+    const voice = describeEffectiveVoice(input({
+      deviceServices: { ...followSwitch, output: "voice", characters: maxEngine("gradium", "g-dev") },
+      catalogue: { max: { gradium: "g-cat" } },
+    }));
+    expect(voice).toMatchObject({ engine: "gradium", voiceId: "g-dev", voiceSource: "device" });
+    expect(voice.summary).toContain("(ancien ID appareil)");
+  });
+
+  it("Emma keeps her own voice when only Max has a device engine", () => {
+    const voice = describeEffectiveVoice(input({
+      character: "emma",
+      profile: { ttsProvider: "gradium", ttsVoiceId: "g-emma" },
+      deviceServices: { ...followSwitch, output: "voice", characters: maxEngine("cartesia") },
+    }));
+    expect(voice).toMatchObject({ engine: "gradium", voiceId: "g-emma", voiceSource: "profile" });
   });
 
   it("device engine without a voice falls back to the engine's own voice", () => {
     const voice = describeEffectiveVoice(input({
-      deviceServices: { ...followSwitch, output: "voice", ttsProvider: "cartesia" },
+      deviceServices: { ...followSwitch, output: "voice", characters: maxEngine("cartesia") },
     }));
     expect(voice).toMatchObject({ engine: "cartesia", voiceSource: "engine_default", voiceId: getCartesiaSettings().voiceId });
   });
@@ -127,12 +155,14 @@ describe("describeEffectiveVoice", () => {
     const profiles = [null, { ttsProvider: "gradium", ttsVoiceId: "g-max" }, { ttsProvider: "elevenlabs", ttsVoiceId: null }];
     const services: DeviceServiceSettings[] = [
       followSwitch,
-      { ...followSwitch, output: "voice", ttsProvider: "elevenlabs", voiceIds: { max: "e-max", emma: "" } },
-      { ...followSwitch, output: "voice", ttsProvider: "gradium" },
+      { ...followSwitch, output: "voice", characters: maxEngine("elevenlabs", "e-max") },
+      { ...followSwitch, output: "voice", characters: maxEngine("gradium") },
+      { ...followSwitch, output: "voice", characters: maxEngine("fish") },
     ];
-    for (const device of DEVICE_CLASSES) for (const profile of profiles) for (const deviceServices of services) {
-      const voice = describeEffectiveVoice(input({ device, profile, deviceServices, catalogue: {} }));
-      const played = resolveDeviceVoice(profile ?? { ttsProvider: null, ttsVoiceId: null }, "max", deviceServices);
+    const catalogues = [{}, { max: { gradium: "g-cat", fish: "f-cat" } }];
+    for (const device of DEVICE_CLASSES) for (const profile of profiles) for (const deviceServices of services) for (const catalogue of catalogues) {
+      const voice = describeEffectiveVoice(input({ device, profile, deviceServices, catalogue }));
+      const played = resolveDeviceVoice(profile ?? { ttsProvider: null, ttsVoiceId: null }, "max", deviceServices, catalogue);
       const mode = resolveCallOutputMode({ startingCharacter: "max", configuredMode: "tts", deviceClass: device, deviceOutput: deviceServices.output });
       expect(voice.output).toBe(mode.mode);
       expect(voice.engine).toBe(played.ttsProvider ?? "elevenlabs");

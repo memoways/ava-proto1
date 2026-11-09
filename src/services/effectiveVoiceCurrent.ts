@@ -15,7 +15,7 @@ import {
   getGradiumSettings,
   getInworldSettings,
 } from "./tts/providerSettings";
-import { getCharacterVoices } from "./tts/characterVoices";
+import { getCharacterVoices, type CharacterVoiceCatalogue } from "./tts/characterVoices";
 import { getOutputSettings, getStreamingAvatarSettings } from "./streamingAvatar/settings";
 import type { OutputMode, StreamingAvatarSettings } from "./streamingAvatar/types";
 
@@ -23,6 +23,8 @@ export interface EffectiveVoiceOverrides {
   deviceServices?: DeviceServiceSettings;
   configuredOutput?: OutputMode;
   avatar?: StreamingAvatarSettings;
+  /** Catalogue just loaded by an editor (else the local copy). */
+  catalogue?: CharacterVoiceCatalogue;
 }
 
 export function currentEffectiveVoiceInput(
@@ -39,7 +41,7 @@ export function currentEffectiveVoiceInput(
     configuredOutput: overrides.configuredOutput ?? getOutputSettings().mode,
     avatar: overrides.avatar ?? getStreamingAvatarSettings(),
     activeProvider: getActiveProviderId(),
-    catalogue: getCharacterVoices(),
+    catalogue: overrides.catalogue ?? getCharacterVoices(),
     engines: {
       elevenlabs: getTTSSettings(),
       gradium: getGradiumSettings(),

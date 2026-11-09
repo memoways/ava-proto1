@@ -61,6 +61,8 @@ interface NetworkFakeOptions {
   llmSettings?: Record<string, unknown>;
   /** `admin_settings.ava_tts_settings` (ElevenLabs) served by the fake database. */
   elevenLabsSettings?: Record<string, unknown>;
+  /** Other `admin_settings` rows served by the fake database (key → value). */
+  extraSettings?: Record<string, unknown>;
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -94,6 +96,7 @@ async function installNetworkFakes(
   let ttsCallCount = 0;
   const ttsTexts: string[] = [];
   const ttsModels: string[] = [];
+  const ttsVoices: string[] = [];
   const characterModels: string[] = [];
   const llmModels: string[] = [];
   let posthogRequestCount = 0;
@@ -499,6 +502,7 @@ async function installNetworkFakes(
         ...(options.outputMode ? { ava_output_settings: { mode: options.outputMode } } : {}),
         ...(options.llmSettings ? { ava_llm_settings: options.llmSettings } : {}),
         ...(options.elevenLabsSettings ? { ava_tts_settings: options.elevenLabsSettings } : {}),
+        ...(options.extraSettings ?? {}),
       };
       // Single-key loads (`key=eq.X`) and the experience settings load (`key=in.(X,Y)`).
       const filter = url.searchParams.get("key") ?? "";
@@ -600,6 +604,7 @@ async function installNetworkFakes(
     if (functionName === "proxy-tts") {
       ttsTexts.push((request.postDataJSON() as { text: string }).text);
       ttsModels.push(String((request.postDataJSON() as { modelId?: string }).modelId ?? ""));
+      ttsVoices.push(String((request.postDataJSON() as { voiceId?: string }).voiceId ?? ""));
       ttsCallCount += 1;
       if (options.ttsBusyOnce && ttsCallCount === 1) {
         return json(route, {
@@ -771,6 +776,7 @@ async function installNetworkFakes(
     getSyncQuestionnaireBodies: () => syncQuestionnaireBodies,
     getTtsText: () => ttsTexts.join(" "),
     getTtsModels: () => ttsModels,
+    getTtsVoices: () => ttsVoices,
     getLlmModels: () => llmModels,
     getCharacterModels: () => characterModels,
     getTtsSubmittedText: async () => options.incrementalOutput
@@ -877,6 +883,33 @@ test('réglages par appareil lot 1 : un navigateur vierge joue le LLM et ElevenL
     output_mode: "tts",
   });
 });
+
+for (const [label, extraSettings, expectedVoice] of [
+  ["ancien format lu sans perte", {
+    ava_device_services: { desktop: { output: "voice", avatarProvider: null, ttsProvider: "elevenlabs", voiceIds: { max: "legacy-max-voice", emma: "" } } },
+    ava_tts_character_voices: { max: { elevenlabs: "catalogue-max-voice" } },
+  }, "legacy-max-voice"],
+  ["nouveau format, voix du catalogue", {
+    ava_device_services: { version: 2, desktop: { output: "voice", avatarProvider: null, characters: { max: { ttsProvider: "elevenlabs", legacyVoiceId: "" }, emma: { ttsProvider: null, legacyVoiceId: "" } } } },
+    ava_tts_character_voices: { max: { elevenlabs: "catalogue-max-voice" } },
+  }, "catalogue-max-voice"],
+] as const) {
+  test(`réglages par appareil lot 2 : ${label} (navigateur vierge)`, async ({ page }) => {
+    const fakes = await installNetworkFakes(page, HANDOFF_TURNS, {
+      ttsSuccess: true,
+      characterOpenings: true,
+      elevenLabsSettings: { modelId: "eleven_v4_turbo" },
+      extraSettings,
+    });
+    await startCharacterConversation(page, 'Max');
+    await sendHandoffTurn(page, HANDOFF_TURNS[0]);
+    await expect.poll(() => fakes.getTtsVoices().length).toBeGreaterThan(0);
+    expect(new Set(fakes.getTtsVoices())).toEqual(new Set([expectedVoice]));
+    const effective = () => (fakes.getSessionRow().device_info as { effective_settings?: Record<string, unknown> })?.effective_settings;
+    await expect.poll(effective).toBeTruthy();
+    expect(effective()).toMatchObject({ tts_provider: "elevenlabs", voice_id: expectedVoice });
+  });
+}
 
 test('A4 : une fiche initiale arrivée après raccrochage ne prononce aucun accueil', async ({ page }) => {
   const fakes = await installNetworkFakes(page, TRANSCRIPTS, { ttsSuccess: true, characterOpenings: true });
