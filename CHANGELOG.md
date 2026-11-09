@@ -4,6 +4,27 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [LLM juge, lot J3 : juge sur plusieurs tours] — 2026-11-09
+
+- `npm run eval:judge:sequences -- --candidate optimized_v3 [--reference-json …] [--candidate-json @fichier] [--repeats 2]` :
+  référence contre candidat sur des **séquences de 3 à 5 tours**, sur sandbox, mêmes garde-fous que J2 (compte admin,
+  `prod` refusé, `admin_settings` intouchable, plafond de coût par séquence entière). Questions fixées par le corpus,
+  réponses générées par la même chaîne `processPRD4Turn` ; entre deux tours, historique livré, mémoire structurée
+  fusionnée depuis `memory_delta` et conseil `next_turn_guidance` du post-tour précédent, comme en partie.
+  **Aucune session ni ligne `eval_runs`** : rapport Markdown et JSON dans `output/eval-judge/`.
+- `evaluationOverrides.conversationMemory` : mémoire rejouée en mémoire, lue seulement sans session (jamais en jeu).
+  `buildEvalTurnOverrides` / `resolveEvalCharacterContext` partagés par le rejeu isolé et le rejeu de séquence.
+- Grille : par tour, la grille J1 **inchangée** (les échanges précédents sont donnés au juge comme contexte ; prompt
+  d'un tour isolé identique) ; par séquence, cinq critères (`continuity`, `timeline_consistency`, `thread_resumption`,
+  `rumination`, `relational_trajectory`), note /10 séparée, jamais fusionnée. Rapport : Δ par séquence, par tour, par
+  critère, boucle GM (exécutions, conseils transmis, mémoire), motif des post-tours non exécutés, coût par séquence.
+- Corpus J3 proposé, non saisi dans Notion : `docs/eval/sequences_j3_v1.json` (Max A et B recalés sur les fiches du
+  25 octobre, Emma vu / pas vu le film) ; [document et arbitrages de Romed](docs/corpus_llm_juge_sequences_j3.md).
+- Mesures sandbox (7,87 $, [rapport](docs/rapport_llm_juge_j3_sandbox_20261109.md)) : deux témoins fixent le bruit
+  (par tour < 0,3, par séquence < 1,0) ; `lived_v2` contre `v1` sur plusieurs tours : +0,16 par tour, +0,86 par séquence
+  (bruit), longueur +1,02, aucun recul. Rumination en formules répétées, prémisses fausses acceptées, GM post-tour
+  illisible dans ~17 % des tours. Prochain lot : [R](docs/prompt_reprise_rumination_sous_texte_lot_r.md).
+
 ## [Parole, lot P : PRÉSENT et contrat de flux mesurés par le juge] — 2026-11-09
 
 - Générateur PRÉSENT partagé et versionné (`supabase/functions/_shared/situationSummaryPrompt.ts`), utilisé par

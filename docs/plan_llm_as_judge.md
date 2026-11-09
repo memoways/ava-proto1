@@ -238,3 +238,60 @@ Claude Sonnet 5.5). 126/126 tours en 21 min, 1 tour en erreur (timeout du person
 
 Hors périmètre J2 : plusieurs tours (J3), changement de grille, fiches et prompts, STT/TTS, production.
 Suite : [prompt du lot P](prompt_reprise_parole_lot_p.md) (feuille de route : P, puis J3).
+
+## Lot J3 — juge sur plusieurs tours (9 novembre 2026)
+
+Prompt : [prompt_reprise_llm_juge_lot_j3.md](prompt_reprise_llm_juge_lot_j3.md). Question visée : référence contre
+candidat sur 3 à 5 tours enchaînés, avec historique, mémoire de session et boucle GM → personnage, sur Max et Emma,
+pour décider du lot R (rumination et sous-texte) sur des mesures.
+
+### Plan court
+
+1. **Corpus** : spec v2 et corpus v0 relus dans Notion (lecture seule) ; six arbitrages de Romed (A à F) toujours
+   ouverts, tous sur les séquences C et D ou sur la fiche Max. Proposition J3 : [corpus_llm_juge_sequences_j3.md](corpus_llm_juge_sequences_j3.md),
+   fichier rejoué [`docs/eval/sequences_j3_v1.json`](eval/sequences_j3_v1.json) : `max-A`, `max-B` (v0 recalé sur les
+   fiches du 25 octobre), `emma-A` (vu le film), `emma-B` (pas vu), 18 tours. **Saisie dans la base corpus après
+   validation d'Ulrich seulement** ; le rejeu lit le fichier versionné en attendant.
+2. **Rejeu de séquence** (`src/services/evalJudgeSequence.ts`, pur ; `evalJudgeSequenceLive.ts`, réseau) : questions
+   fixées par le corpus, réponses générées par la même chaîne `processPRD4Turn` que le jeu et que J1/J2
+   (`buildEvalTurnOverrides`, partagé avec `runIsolatedEvalTurn`). Entre deux tours, l'état est reconstruit comme
+   dans `IndexPRD4` : historique livré, `next_turn_guidance` et `next_speech_state` du post-tour précédent (gardés
+   seulement s'il s'est exécuté), sujets couverts cumulés (24 au plus), mémoire structurée fusionnée depuis
+   `memory_delta` (`mergeConversationMemory`, comme `persistPostTurnMemory`). La mémoire passe par
+   `evaluationOverrides.conversationMemory`, lue **seulement sans session** ; aucune session n'est créée. Le post-tour
+   est attendu jusqu'à son état terminal, borné à 60 s (harnais seulement, le jeu reste non bloquant). Temps écoulé :
+   45 s par tour ; parcours film transmis (`hasSeenFilm`). Une limite de débit (429) rejoue l'appel (même règle que J2).
+3. **Grille** : par tour, la **grille J1 inchangée** (mêmes critères, mêmes poids) ; le juge reçoit en plus les
+   échanges précédents comme contexte (section absente pour un tour isolé : prompt J1/J2 identique octet pour octet).
+   Par séquence, un juge lit la transcription entière : `continuity` (3), `timeline_consistency` (3),
+   `thread_resumption` (2), `rumination` (2), `relational_trajectory` (2), note /10 pondérée. **Les deux notes ne sont
+   jamais fusionnées** (décision du v0). Compatibilité : aucun ancien run n'est relu ni modifié ; les runs J3 n'écrivent
+   ni `eval_runs` ni `eval_results` (pas d'`eval_items` pour des tours de séquence) : rapport Markdown et JSON complets.
+4. **Rapport** (`evalJudgeSequenceReport.ts`) : verdict, Δ par séquence, par tour, par critère de séquence et par
+   critère J1, bruit entre passages, boucle GM (exécutions, conseils transmis, mémoire absorbée), coût mesuré par
+   séquence (`llm_usage`), plafond.
+5. **Exécution** : `npm run eval:judge:sequences -- --reference optimized_v3 --candidate optimized_v3 --repeats 2
+   --max-cost-usd 3` (options J2 : `--reference-json`, `--candidate-json @fichier`, `--character`, `--env`, `--dry-run` ;
+   plus `--corpus`, `--sequences`). Plafond par séquence entière : on ne commence pas une séquence qui ferait dépasser.
+   Coût estimé : J1 par tour × 1,25 (historique) + 0,03 $ par jugement de séquence.
+6. **Runs** : témoin `optimized_v3` contre lui-même (bruit multi-tours), puis le levier retenu par le lot P, le contrat
+   `lived_v2`, désormais joué par défaut : référence `optimized_v3` + `streamContract: v1` contre `optimized_v3`.
+
+### Résultats (sandbox-ulrich, 9 novembre 2026)
+
+[Rapport complet](rapport_llm_juge_j3_sandbox_20261109.md) ; cinq runs, 7,87 $ mesurés, chacun sous son plafond.
+
+- **Bruit multi-tours** (deux témoins, `lived_v2`/`lived_v2` et `v1`/`v1`) : note par tour Δ +0,27 et −0,13 (bruit
+  ± 0,2–0,3) ; note de séquence Δ +1,02 et +0,25 (bruit ± 0,7). Seuils : par tour < 0,3, par séquence < 1,0, tour
+  isolé < 1,2.
+- **Levier du lot P** (`v1` → `lived_v2`, 3 passages) : par tour +0,16, séquence +0,86 (dans le bruit), longueur
+  **+1,02**, aucun recul, `rumination` 0. `lived_v2` reste joué.
+- **Pour R** : la rumination existe mais tourne en formules répétées (`rumination` ≈ 3,3/5, `thread_resumption`
+  le plus bas) ; Max accepte des prémisses fausses du joueur (thermos « le même soir », « Emma a contaminé Ava ») ;
+  Emma « pas vu le film » ne présente pas ce qu'elle nomme. Le GM post-tour rend un JSON illisible dans ~17 % des
+  tours : conseil et mémoire du tour perdus, en jeu comme en rejeu.
+- **Limites** : repère canon du juge sans les premiers jours (pénalise le premier soir de `max-A`, des deux côtés) ;
+  corpus non validé ; séquences C et D en attente des arbitrages de Romed.
+
+Hors périmètre J3 : fiches Notion, grille J1 par tour, STT/TTS, production, publication Lovable.
+Suite : [prompt du lot R](prompt_reprise_rumination_sous_texte_lot_r.md).

@@ -499,6 +499,42 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       .toMatchObject({ ...structuredMemory, version: 4 });
   });
 
+  it("J3 : sans session, la mémoire rejouée en mémoire nourrit le personnage et le GM, sans lecture ni écriture de session", async () => {
+    const replayed = (await vi.importActual<typeof import("@/services/conversationMemoryV1")>("@/services/conversationMemoryV1"))
+      .mergeConversationMemory(null, { interlocutor: { name: "Claire" }, topics: ["chevreuil"] }, 2, "max");
+    const result = await processPRD4Turn({
+      sessionId: null,
+      conversationHistory: makeConversation(2),
+      userMessage: "question-3",
+      userRole: null,
+      timeElapsedSeconds: 90,
+      turnIndex: 3,
+      gmGuidance: "Reprends le chevreuil.",
+      evaluationOverrides: { featureKey: "llm_as_judge", conversationMemory: replayed },
+    });
+    expect(fetchConversationMemory).not.toHaveBeenCalled();
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].conversationMemory?.interlocutor.name).toBe("Claire");
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].gmGuidance?.guidance).toBe("Reprends le chevreuil.");
+    await result.postTurnPromise;
+    const gmInput = vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0];
+    expect(gmInput.sessionId).toBeNull();
+    expect(gmInput.conversationMemoryBefore?.interlocutor.name).toBe("Claire");
+  });
+
+  it("J3 : avec une session, la mémoire de la session prime sur une mémoire rejouée", async () => {
+    const result = await processPRD4Turn({
+      sessionId: "session-soak",
+      conversationHistory: makeConversation(2),
+      userMessage: "question-3",
+      userRole: null,
+      timeElapsedSeconds: 90,
+      evaluationOverrides: { conversationMemory: { interlocutor: { name: "Claire" } } as never },
+    });
+    expect(fetchConversationMemory).toHaveBeenCalledWith("session-soak");
+    expect(vi.mocked(simulateMaxResponse).mock.calls[0][0].conversationMemory?.interlocutor.name).toBeNull();
+    await result.postTurnPromise;
+  });
+
   it("transmet le contexte temporel et la guidance GM à Max", async () => {
     const result = await processPRD4Turn({
       sessionId: "session-soak",

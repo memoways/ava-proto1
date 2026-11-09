@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:rls": "vitest run src/integration/sessionsRls.integration.test.ts",
     "eval:judge": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/run.ts --",
+    "eval:judge:sequences": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/sequences.ts --",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test",
     "test:e2e:install": "playwright install chromium firefox webkit"

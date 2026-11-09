@@ -61,6 +61,7 @@ import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/e
 import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
+import type { ConversationMemoryV1 } from "@/types/conversationMemory";
 
 export interface PRD4TurnInput {
   /** Internal shared execution seam; batch callers omit it. */
@@ -127,6 +128,11 @@ export interface PRD4TurnInput {
     situationSummary?: string;
     /** In-memory output contract wording for reference/candidate runs; never persisted. */
     streamContract?: ResponseStreamContractVariant;
+    /**
+     * Sequence replay (judge J3): structured memory rebuilt in memory from the
+     * previous GM deltas. Read only when there is no session; never persisted.
+     */
+    conversationMemory?: ConversationMemoryV1 | null;
     ragTopK?: number;
     ragThreshold?: number;
     ragRetrieveK?: number;
@@ -226,7 +232,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         fetchConversationMemory(input.sessionId),
         SUMMARY_FETCH_DEADLINE_MS,
       ).catch(() => null)
-    : Promise.resolve(null);
+    : Promise.resolve(evaluationOverrides?.conversationMemory ?? null);
   // Démarre avec la mémoire et le RAG. simulateMaxResponse relira la même fiche
   // depuis le cache : aucune requête supplémentaire n'est ajoutée en série.
   const characterPromptPromise = loadCharacterPrompt(input.characterContext.characterId);
