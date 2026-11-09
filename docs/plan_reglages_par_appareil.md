@@ -44,7 +44,7 @@ réglages **par personnage**, avec à chaque choix de moteur un résumé de ce q
 Note : le 8 novembre à 16 h 42, `ava_device_services` sandbox-ulrich a été sauvegardé avec smartphone =
 « Suivre l'interrupteur » : le smartphone suit désormais l'interrupteur global (avatar si « Avatar vidéo »).
 
-## Décisions proposées (à valider par Ulrich au début du lot 2)
+## Décisions (1, 4 et 5 appliquées au lot 1 ; 2 et 3 validées par Ulrich le 9 novembre 2026, telles quelles)
 
 1. **Les réglages viennent toujours de la base pour le joueur.** Au démarrage de l'expérience, chargement en lecture
    seule de tous les réglages qui pilotent un appel, pour l'environnement actif, avant le premier appel. Le
@@ -100,3 +100,20 @@ Prompt du lot 2 : [prompt_reprise_reglages_par_appareil_lot_2.md](prompt_reprise
   règles de l'expérience), E2E « navigateur vierge » (modèles réellement envoyés à `proxy-llm` / `proxy-tts`, ligne
   de session), `@iphone` / `@ipad`. Après livraison : lecture base d'une nouvelle session smartphone. Recette iPhone
   (voix de Max) : humaine, distincte, non faite.
+
+## Exécution lot 2 (9 novembre 2026)
+
+- **Décisions** — 2 et 3 validées telles quelles par Ulrich au début du lot (une question à la fois).
+- **Format** — `ava_device_services` v2 : par appareil `output`, `avatarProvider`, `characters.{max,emma}` =
+  `{ ttsProvider, legacyVoiceId }`. Lecture tolérante de l'ancien format (moteur commun → Max et Emma, ID saisi →
+  `legacyVoiceId`), écriture du seul nouveau format, relecture comparée. `deviceVoiceChoice()` est la règle unique du
+  joueur (`resolveDeviceVoice`, avec le catalogue) et du résumé (`describeEffectiveVoice`). Seul changement de
+  comportement voulu : un moteur d'appareil sans ID gardé prend désormais la voix du catalogue avant celle du profil.
+- **Admin** — Expérience › Appareils (`DevicesTab`) : sortie, avatar, STT affiché, moteur par personnage, voix du
+  catalogue (manque signalé avec lien), ID gardé signalé avec « Utiliser le catalogue », moteur de repli, ligne
+  « Joué : … ». Streaming Avatar : lien. TTS Config : catalogue et réglages fins seulement.
+- **Validations** — `test:quality`, `test:delivery`, E2E `@iphone` / `@ipad`, « navigateur vierge » lot 1 et lot 2
+  (ancien et nouveau format), atelier de parole. Lecture base (Lovable) avant livraison : ligne sandbox-ulrich à
+  l'ancien format sans moteur choisi, lue sans changement. **À faire après publication** : sauvegarder Appareils dans
+  sandbox-ulrich puis relire la ligne (format v2) ; nouvelle session par appareil (`effective_settings`). Recettes
+  humaines iPhone (voix de Max) et iPad : distinctes, non faites.

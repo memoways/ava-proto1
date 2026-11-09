@@ -78,7 +78,7 @@ import {
 import { assignTavusFace } from "@/services/streamingAvatar/tavusFaceAdmin";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
 import TavusFaceTrainer from "@/components/TavusFaceTrainer";
-import DeviceServicesPanel from "@/components/admin/DeviceServicesPanel";
+import { adminTabPath } from "@/services/adminNavigation";
 
 
 const providerCopy: Record<StreamingAvatarProviderId, { title: string; description: string }> = {
@@ -157,7 +157,10 @@ export default function StreamingAvatarConfigTab() {
         </p>
       </div>
 
-      <DeviceServicesPanel />
+      <p className="rounded-md border bg-muted/30 p-3 text-sm" data-testid="device-services-link">
+        Sortie, avatar et voix de chaque appareil (smartphone, tablette, ordinateur) :{" "}
+        <a className="underline" href={adminTabPath("devices")}>Expérience › Appareils</a>.
+      </p>
 
       <div className="grid gap-3 md:grid-cols-2">
         {(["heygen", "tavus", "anam", "lemonslice"] as const).map((provider) => {

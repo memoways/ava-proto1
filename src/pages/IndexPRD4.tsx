@@ -108,6 +108,7 @@ import ConversationScreen from "@/components/prd4/ConversationScreen";
 import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
 import { getDeviceClass } from "@/services/deviceClass";
 import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
+import { getCharacterVoices } from "@/services/tts/characterVoices";
 import { ensureExperienceSettings, startExperienceSettingsLoad } from "@/services/experienceSettings";
 import { describeCurrentEffectiveVoice } from "@/services/effectiveVoiceCurrent";
 import { buildSessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
@@ -197,11 +198,12 @@ const MIC_HOLD_RELEASE_DELAY_MS = 6_000;
 
 /**
  * Character profile with this device's speech engine and voice (admin
- * "Services par appareil"); unchanged when the device keeps each character's voice.
+ * Expérience › Appareils, voice from the TTS Config catalogue); unchanged when
+ * the device keeps the character's voice.
  */
 async function getCharacterRuntimeProfile(character: "max" | "emma"): Promise<CharacterRuntimeReadiness | null> {
   const [profile, services] = await Promise.all([getCharacterRuntimeReadiness(character), deviceServicesReady()]);
-  return profile ? resolveDeviceVoice(profile, character, services[getDeviceClass()]) : null;
+  return profile ? resolveDeviceVoice(profile, character, services[getDeviceClass()], getCharacterVoices()) : null;
 }
 
 function asTTSProviderId(value: string | null | undefined): TTSProviderId | null {
