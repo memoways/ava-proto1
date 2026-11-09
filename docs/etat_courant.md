@@ -12,6 +12,12 @@ Voix et mains libres acceptées préservées ; la recette F4 demeure humaine et
 distincte : [prompt F4](prompt_reprise_present_canonique_lot_f4_recette.md).
 Aucune publication production par CT1 ; main fusionné ne vaut pas publication.
 
+## Parole sous le choc (9 novembre)
+
+Lot C1 : vécu Notion protégé avant les faits et souvenirs présentés comme vécu
+(`optimized_v3`). [État des lieux et suite](analyse_parole_sous_le_choc.md). Base
+Caractères en lecture seule. Reste : écoute sandbox, puis la décision sur le générateur PRÉSENT.
+
 ## CT1 — contexte et livraison
 
 Les trois décisions ont été approuvées. [Plan et validations](plan_audit_contexte_travail.md),

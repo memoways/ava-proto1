@@ -333,6 +333,8 @@ function compactText(text: string, maxChars: number): string {
 
 function cleanMaxMemoryContent(content: string): string {
   return content
+    // Chunk header from sync-notion: archive metadata, not something the character remembers.
+    .replace(/^\s*Personnage\s*:[^|\n]*(?:\|\s*Archétype\s*:[^|\n]*)?(?:\|\s*Partie\s+\d+\s*\/\s*\d+\s*)?/gim, "")
     .replace(/\bPartie\s+\d+\s*\/\s*\d+\b\s*[:—-]?/gi, "")
     .replace(/^\s*\[[^\]]+\]\s*/gm, "")
     .replace(/\s+/g, " ")

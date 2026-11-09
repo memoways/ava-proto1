@@ -8,7 +8,12 @@ import { MAX_MAX_RAG_CONTEXT_CHARS, MAX_MAX_RAG_ITEM_CHARS, MAX_MAX_RAG_ITEMS } 
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
-import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
+import {
+  characterEmbodiment,
+  characterLivedImpact,
+  withoutCharacterEmbodiment,
+  withoutCharacterLivedImpact,
+} from '@/services/characterEmbodiment';
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 import {
   POST_VIDEO_SECTION_MAX_CHARS,
@@ -17,9 +22,9 @@ import {
 } from "@/services/watchedVideoMemory";
 
 export const OPTIMIZED_V3_LIMITS = {
-  generatedContextChars: 11_000,
-  normalTotalMessageChars: 12_000,
-  staticChars: 5_500,
+  generatedContextChars: 12_500, // +1 500 with the lived paragraph: nothing else loses room
+  normalTotalMessageChars: 13_500,
+  staticChars: 7_000, // 5 500 + the protected lived paragraph (« Ce que ça te fait »)
   runtimeChars: 800,
   memoryChars: 1_200,
   ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
@@ -94,6 +99,12 @@ export interface OptimizedPromptInput {
   identityInvariant?: string;
 }
 
+/** The generated present is a dense list of facts: it anchors coherence but
+ * must not become the content of the reply. */
+export const PRESENT_TITLE = "REPÈRES — CE QUE TU SAIS (jamais une liste à réciter)";
+export const LIVED_IMPACT_TITLE = "CE QUE ÇA TE FAIT";
+export const RAG_USAGE_LINE = "Ce sont tes souvenirs, pas un dossier : au téléphone, ce qui en remonte, c'est ce que ça te fait maintenant, jamais leur contenu récité.";
+
 const FIELD_SPECS: Array<{
   key: keyof Pick<CharacterPrompt,
     "situation_summary" | "identite_fondamentale" | "qui_tu_es" | "dynamique_conversation" |
@@ -104,7 +115,7 @@ const FIELD_SPECS: Array<{
   group: "core" | "canon";
   required?: boolean;
 }> = [
-  { key: "situation_summary", title: "PRÉSENT", baseScore: 1_000, group: "core", required: true },
+  { key: "situation_summary", title: PRESENT_TITLE, baseScore: 1_000, group: "core", required: true },
   { key: "identite_fondamentale", title: "IDENTITÉ ET CONTRADICTION", baseScore: 900, group: "core", required: true },
   { key: "qui_tu_es", title: "VOIX ET POSTURE", baseScore: 820, group: "core", required: true },
   { key: "maniere_de_parler", title: "MANIÈRE DE PARLER", baseScore: 850, group: "core" },
@@ -254,6 +265,8 @@ function capAtBoundary(value: string, maxChars: number): string {
 
 function cleanRagContent(value: string): string {
   return value
+    // Chunk header from sync-notion: archive metadata, not something the character remembers.
+    .replace(/^\s*Personnage\s*:[^|\n]*(?:\|\s*Archétype\s*:[^|\n]*)?(?:\|\s*Partie\s+\d+\s*\/\s*\d+\s*)?/gim, "")
     .replace(/\bPartie\s+\d+\s*\/\s*\d+\b\s*[:—-]?/gi, "")
     .replace(/^\s*\[[^\]]+\]\s*/gm, "")
     .replace(/\s+/g, " ")
@@ -270,8 +283,10 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
 
 function protectedCharacterSections(character: CharacterPrompt) {
   const present = character.situation_summary.trim();
+  const lived = characterLivedImpact(character);
   return [
-    ...(present ? [{ key: 'situation_summary', title: 'PRÉSENT', content: present }] : []),
+    ...(present ? [{ key: 'situation_summary', title: PRESENT_TITLE, content: present }] : []),
+    ...(lived ? [{ key: 'vecu', title: LIVED_IMPACT_TITLE, content: lived.content }] : []),
     ...characterEmbodiment(character),
   ];
 }
@@ -279,7 +294,7 @@ function protectedCharacterSections(character: CharacterPrompt) {
 function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
-  const selectable = withoutCharacterEmbodiment(character);
+  const selectable = withoutCharacterLivedImpact(withoutCharacterEmbodiment(character));
   FIELD_SPECS.forEach((spec, fieldIndex) => {
     // The current scene is one atomic editorial unit, never a relevance candidate.
     if (spec.key === 'situation_summary') return;
@@ -382,6 +397,8 @@ function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", ch
   if (group === 'core') {
     const motive = units.find(unit => unit.sourceKey === 'moteur_intime');
     if (motive) blocks.push(`## ${motive.title}\n${motive.text}`);
+    const lived = units.find(unit => unit.sourceKey === 'vecu');
+    if (lived) blocks.push(`## ${lived.title}\n${lived.text}`);
   }
   for (const spec of FIELD_SPECS.filter((item) => item.group === group)) {
     const parts = units.filter((unit) => unit.sourceKey === spec.key).map((unit) => unit.text);
@@ -469,8 +486,10 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     if (key === 'character_core' && content.length > remaining) {
       throw new Error('Présent canonique et parole éditoriale hors budget de contexte : génération interdite');
     }
+    const trimmedRag = key === "rag_context" ? trimRagContextToWholeSouvenirs(content, Math.max(0, remaining)) : "";
     const bounded = key === 'character_core' ? content : key === "rag_context"
-      ? trimRagContextToWholeSouvenirs(content, Math.max(0, remaining))
+      // The usage line alone, without any souvenir, is not worth a section.
+      ? (/\bSouvenir \d+\n/.test(trimmedRag) ? trimmedRag : "")
       : capAtBoundary(content, Math.max(0, remaining));
     if (!bounded) {
       unitDecisions.push({ id, source, sourceKey: key, title, text: content, score: 0, status: "budget", originalChars: original.length, removedChars: novelty.removedChars, reason: "budget" });
@@ -505,7 +524,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("character_canon", "CANON PERTINENT", canon, OPTIMIZED_V3_LIMITS.staticChars, "static");
 
   const ragSelected: CandidateUnit[] = [];
-  let ragUsed = 0;
+  let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
   const ragBlocks: string[] = [];
   for (const candidate of input.ragCandidates ?? []) {
     const clean = cleanRagContent(candidate.content);
@@ -562,7 +581,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   // qui cèdent la place quand le contexte est plein (jamais l'inverse).
   append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, OPTIMIZED_V3_LIMITS.postVideoChars, "runtime");
   append("watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos, OPTIMIZED_V3_LIMITS.watchedVideosChars, "runtime");
-  append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.join("\n\n"), OPTIMIZED_V3_LIMITS.ragChars, "rag");
+  append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.length ? [RAG_USAGE_LINE, ...ragBlocks].join("\n\n") : "", OPTIMIZED_V3_LIMITS.ragChars, "rag");
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
   if (protectedCharacterSections(input.character).some(section => !deliveredCore.includes(section.content))) {
