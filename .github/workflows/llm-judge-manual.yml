@@ -1,0 +1,84 @@
+name: LLM judge (manual)
+
+# Reference vs candidate on a sandbox, without a browser (docs/plan_llm_as_judge.md, "Lot J2").
+# Manual only: never triggered by a PR or a push, so it can neither block nor
+# slow the `Core experience quality` CI. Each launch spends real LLM credits,
+# bounded by `max_cost_usd`. Needs the repository secrets AVA_EVAL_EMAIL and
+# AVA_EVAL_PASSWORD (a Lovable Cloud admin account; a dedicated one is preferred).
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: "Candidate prompt variant"
+        required: true
+        type: choice
+        options: [rich_v2, optimized_v3, compact_v1, legacy]
+      reference:
+        description: "Reference prompt variant (blank = the one set in the environment)"
+        required: false
+        default: ""
+        type: string
+      character:
+        description: "Character filter"
+        required: true
+        default: all
+        type: choice
+        options: [all, max, emma]
+      repeats:
+        description: "Repeats per question and configuration (1-5)"
+        required: true
+        default: "3"
+        type: string
+      max_cost_usd:
+        description: "Cost cap in USD (clean stop when reached)"
+        required: true
+        default: "3"
+        type: string
+      environment:
+        description: "Settings environment (never prod)"
+        required: true
+        default: sandbox-ulrich
+        type: choice
+        options: [sandbox-ulrich, sandbox-romed, sandbox-benoit, sandbox-julien]
+
+permissions:
+  contents: read
+
+# A paid run is never cancelled by a newer launch: the next one waits.
+concurrency:
+  group: llm-judge-manual
+  cancel-in-progress: false
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-node22-v1
+      - run: npm ci
+      - name: Reference vs candidate
+        env:
+          AVA_EVAL_EMAIL: ${{ secrets.AVA_EVAL_EMAIL }}
+          AVA_EVAL_PASSWORD: ${{ secrets.AVA_EVAL_PASSWORD }}
+          INPUT_REFERENCE: ${{ inputs.reference }}
+          INPUT_CANDIDATE: ${{ inputs.candidate }}
+          INPUT_CHARACTER: ${{ inputs.character }}
+          INPUT_REPEATS: ${{ inputs.repeats }}
+          INPUT_MAX_COST: ${{ inputs.max_cost_usd }}
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        # The Markdown report is appended to the job summary by the script.
+        run: >-
+          npm run eval:judge --
+          --reference "$INPUT_REFERENCE"
+          --candidate "$INPUT_CANDIDATE"
+          --character "$INPUT_CHARACTER"
+          --repeats "$INPUT_REPEATS"
+          --max-cost-usd "$INPUT_MAX_COST"
+          --env "$INPUT_ENVIRONMENT"

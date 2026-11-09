@@ -172,7 +172,8 @@ export async function fetchGenerationCost(
 } | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), COST_FETCH_TIMEOUT_MS);
+    // globalThis, not window: the headless judge (Node) records costs through this path too.
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), COST_FETCH_TIMEOUT_MS);
     const res = await authenticatedFunctionFetch(`${SUPABASE_URL}/functions/v1/proxy-llm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -8,20 +8,15 @@ import {
   EVAL_DEFAULT_JUDGE_MODEL,
   EVAL_REPEATS,
   buildOfatConfigs,
-  buildReferenceCandidateConfigs,
   defaultOfatSelection,
   evalCharacterKey,
-  parseSnapshotOverrides,
   estimateEvalRun,
   judgeIsolatedEvalTurn,
   listEvalJudgeModels,
   listEvalMaxModels,
-  listEvalWorkItems,
-  resultWorkKey,
   runIsolatedEvalTurn,
   snapshotLiveSettings,
   type EvalItem,
-  type EvalLiveSnapshot,
   type EvalPromptVariant,
   type EvalResult,
   type EvalRun,
@@ -48,6 +43,7 @@ import {
   saveEvalNotionDatabaseId,
   syncEvalItemsFromNotion,
 } from "@/services/evalJudgeStore";
+import { buildCompareConfigs, executeEvalRun, selectRunnableEvalItems } from "@/services/evalJudgeRunner";
 import EvalCorpusPanel from "./evalJudge/EvalCorpusPanel";
 import EvalLeversPanel, { type EvalCharacterFilter, type EvalRunMode, type LeverToggles } from "./evalJudge/EvalLeversPanel";
 import EvalCompareSetup, { type CompareSideState } from "./evalJudge/EvalCompareSetup";
@@ -63,19 +59,6 @@ interface StoredRunConfig {
 
 function defaultCandidateVariant(live: EvalPromptVariant): EvalPromptVariant {
   return live === "rich_v2" ? "optimized_v3" : "rich_v2";
-}
-
-function buildCompareConfigs(live: EvalLiveSnapshot, reference: CompareSideState, candidate: CompareSideState) {
-  const ref = parseSnapshotOverrides(reference.snapshotJson);
-  const cand = parseSnapshotOverrides(candidate.snapshotJson);
-  return {
-    configs: buildReferenceCandidateConfigs(
-      live,
-      { promptVariant: reference.variant, ...ref.overrides },
-      { promptVariant: candidate.variant, ...cand.overrides },
-    ),
-    errors: [...ref.errors.map((error) => `référence : ${error}`), ...cand.errors.map((error) => `candidat : ${error}`)],
-  };
 }
 
 export default function EvalJudgeTab() {
@@ -146,13 +129,10 @@ export default function EvalJudgeTab() {
     [characterFilter, items],
   );
   const audit = useMemo(() => auditEvalCorpus(filteredItems), [filteredItems]);
-  const usableItemsFor = useCallback((filter: EvalCharacterFilter) => {
-    const usable = new Set(
-      auditEvalCorpus(items).issues.filter((issue) => issue.level !== "error").map((issue) => issue.itemId),
-    );
-    return items.filter((item) => item.active && usable.has(item.id)
-      && (filter === "all" || evalCharacterKey(item.character_name) === filter));
-  }, [items]);
+  const usableItemsFor = useCallback(
+    (filter: EvalCharacterFilter) => selectRunnableEvalItems(items, filter),
+    [items],
+  );
   const activeItems = useMemo(() => usableItemsFor(characterFilter), [characterFilter, usableItemsFor]);
   const compareBlocked = mode === "compare" && compare.errors.length > 0;
   const estimate = useMemo(
@@ -260,60 +240,39 @@ export default function EvalJudgeTab() {
     abortRef.current = controller;
     pauseRef.current = false;
     setRunning(true);
-    await patchEvalRun(run.id, { status: "running", started_at: run.started_at ?? new Date().toISOString() });
-    const done = new Set(existing.map(resultWorkKey));
-    const queue = listEvalWorkItems(nextConfigs, runItems, run.repeats, done);
-    let completed = existing.length;
-    const acc = [...existing];
     try {
-      for (const work of queue) {
-        if (pauseRef.current) {
-          await patchEvalRun(run.id, { status: "paused", current_index: completed });
-          setActiveRun({ ...run, status: "paused", current_index: completed });
-          toast.message("Test en pause");
-          return;
-        }
-        if (controller.signal.aborted) return;
-        setProgressLabel(`${work.config.label} · ${work.item.question.slice(0, 60)} · passage ${work.repeatIndex}`);
-        const turn = await runIsolatedEvalTurn(work.item, work.config, { signal: controller.signal });
-        const judge = turn.maxResponse
-          ? await judgeIsolatedEvalTurn(work.item, turn.maxResponse, run.judge_model, {
-            signal: controller.signal,
-            canonReference: turn.canonReference,
-          })
-          : null;
-        const saved = await insertEvalResult({
-          runId: run.id,
-          item: work.item,
-          config: work.config,
-          repeatIndex: work.repeatIndex,
-          turn,
-          judge,
-        });
-        acc.push(saved);
-        completed += 1;
-        setResults([...acc]);
-        await patchEvalRun(run.id, { current_index: completed, status: "running" });
-      }
-      await patchEvalRun(run.id, {
-        status: "done",
-        current_index: completed,
-        finished_at: new Date().toISOString(),
+      const outcome = await executeEvalRun({
+        run,
+        configs: nextConfigs,
+        items: runItems,
+        existing,
+        deps: {
+          runTurn: (item, config, signal) => runIsolatedEvalTurn(item, config, { signal }),
+          judge: (item, maxResponse, model, signal, canonReference) => judgeIsolatedEvalTurn(item, maxResponse, model, {
+            signal,
+            canonReference,
+          }),
+          saveResult: insertEvalResult,
+          patchRun: patchEvalRun,
+        },
+        hooks: {
+          signal: controller.signal,
+          shouldPause: () => pauseRef.current,
+          onProgress: ({ label }) => setProgressLabel(label),
+          onResult: (_row, all) => setResults(all),
+        },
       });
-      setActiveRun({ ...run, status: "done", current_index: completed });
-      toast.success("Test terminé");
-      await reload();
-    } catch (error) {
-      if (pauseRef.current || (error instanceof DOMException && error.name === "AbortError")) {
-        await patchEvalRun(run.id, { status: "paused", current_index: completed });
-        setActiveRun({ ...run, status: "paused", current_index: completed });
+      if (outcome.status === "done") {
+        setActiveRun({ ...run, status: "done", current_index: outcome.completed });
+        toast.success("Test terminé");
+        await reload();
+      } else if (outcome.status === "failed") {
+        setActiveRun({ ...run, status: "failed", error_message: outcome.error });
+        toast.error(outcome.error);
+      } else {
+        setActiveRun({ ...run, status: "paused", current_index: outcome.completed });
         toast.message("Test en pause");
-        return;
       }
-      const message = error instanceof Error ? error.message : String(error);
-      await patchEvalRun(run.id, { status: "failed", error_message: message, current_index: completed });
-      setActiveRun({ ...run, status: "failed", error_message: message });
-      toast.error(message);
     } finally {
       setRunning(false);
       abortRef.current = null;

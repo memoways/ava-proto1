@@ -1,6 +1,6 @@
 # Plan — LLM as judge, tours isolés (lot 1)
 
-> Statut : lots 1, 2 et J1 implémentés — base Notion créée, option Emma ajoutée
+> Statut : lots 1, 2, J1 et J2 implémentés — base Notion créée, option Emma ajoutée, juge lançable sans navigateur
 > Objectif : banc d’essai texte (sans STT/TTS) dans Qualité, pour classer
 > l’effet du **modèle Max**, de l’**échantillonnage** et du **RAG** sur la
 > qualité d’une réponse, jugée par un LLM contre une cible Notion
@@ -142,3 +142,99 @@ température 1,4, 360 tokens). 21 questions (corpus v1 + ligne d'exemple) × 2 �
 Hors périmètre J1 : plusieurs tours (J3), exécution sans navigateur (J2), fiches et prompts, STT/TTS.
 Suite : [prompt J2](prompt_reprise_llm_juge_lot_j2.md).
 
+## Lot J2 — lancer le juge sans navigateur (implémenté, 9 novembre 2026)
+
+Question visée : mesurer référence contre candidat avant chaque lot P et J3, à la main, sur une sandbox,
+sans ouvrir l'admin. Même grille, même pipeline, mêmes tables que l'onglet Qualité.
+
+### Dépendances navigateur relevées
+
+- `evalJudgePipeline.ts` ne touche le navigateur qu'à travers ses imports : réglages (`settingsService` →
+  `localStorage` par environnement, hydratés depuis `admin_settings`), `processPRD4Turn` (Edge Functions avec le
+  JWT de session), `callLLMWithUsage` (`proxy-llm`, même JWT), `performance.now`.
+- `evalJudgeStore.ts` : client Supabase (`import.meta.env.VITE_SUPABASE_*`, stockage de session
+  `localStorage`), `getCachedSession` pour `created_by`, `authenticatedFunctionFetch`.
+- Constat : chargé par `vite-node` (mêmes alias et `import.meta.env` que Vite, `.env` public du dépôt), le module
+  se charge dans Node 22+ avec un simple `localStorage` en mémoire. Aucune duplication nécessaire.
+
+### Authentification : voie existante, rien à créer côté serveur
+
+La voie admin existe déjà : connexion Supabase Auth de Lovable Cloud par e-mail et mot de passe (page `/auth`),
+appartenance vérifiée par `admin_users`, RLS « Admins manage eval items/runs/results », Edge Functions appelées
+avec le JWT court de la session. Le script fait exactement la même chose :
+
+- identifiants lus dans l'environnement du processus (`AVA_EVAL_EMAIL`, `AVA_EVAL_PASSWORD`), localement depuis
+  `.env.eval.local` (ignoré par `*.local`), dans GitHub depuis deux secrets du dépôt ; jamais dans le dépôt ;
+- refus si le compte n'est pas dans `admin_users` ; environnement = celui demandé si le compte peut changer
+  d'environnement (même règle que l'admin), sinon son environnement par défaut ; **`prod` toujours refusé** ;
+- session en mémoire (aucun fichier de session écrit), déconnexion locale en fin de run.
+
+Aucune migration, aucune Edge Function nouvelle, aucun Supabase direct : la clé publique et l'URL Lovable Cloud
+du `.env` versionné suffisent, comme pour le site. Recommandation : un compte admin dédié à l'évaluation, défaut
+`sandbox-ulrich`, plutôt que le compte personnel dans les secrets GitHub.
+
+### Garde-fous
+
+- **Overrides en mémoire** : le script installe un filtre `fetch` qui refuse toute écriture
+  (`POST/PATCH/PUT/DELETE`) vers `admin_settings` ; les tentatives sont comptées et listées dans le rapport.
+  Les réglages sont hydratés en lecture seule (`hydrateAllSettings({ readOnly: true })`).
+- **Plafond de coût** (`--max-cost-usd`, défaut 3 $) : refus au départ si l'estimation dépasse le plafond ;
+  pendant le run, coût engagé = max(estimation calibrée J1 par tour, coût réel `llm_usage` relu tous les 10 tours) ;
+  arrêt propre avant le tour qui ferait dépasser, run marqué `paused` avec la raison, reprenable (`--resume RUN_ID`).
+- Rejeu identique à l'admin : boucle commune `executeEvalRun` (`src/services/evalJudgeRunner.ts`), utilisée par
+  l'onglet et par le script ; sélection du corpus commune (`selectRunnableEvalItems`), configurations communes
+  (`buildCompareConfigs`).
+
+### Exécution
+
+- Local : `npm run eval:judge -- --reference optimized_v3 --candidate rich_v2 --character all --repeats 3`
+  (options : `--env`, `--judge-model`, `--max-cost-usd`, `--reference-json`, `--candidate-json`, `--out`,
+  `--resume`, `--dry-run`). Sortie : rapport Markdown des Δ (verdict, critères, personnages, questions, coût
+  estimé et réel, lien du run), écrit dans `output/eval-judge/` et sur la sortie standard.
+- Identifiants locaux : `.env.eval.local` dans le dossier de lancement ou à la racine du checkout canonique
+  (cherché aussi depuis un worktree), deux lignes `AVA_EVAL_EMAIL=` / `AVA_EVAL_PASSWORD=`.
+- GitHub : workflow `LLM judge (manual)` (`.github/workflows/llm-judge-manual.yml`), `workflow_dispatch` seulement
+  (candidat, référence, filtre personnage, passages, plafond, sandbox) ; aucun déclencheur PR/push, la CI
+  `Core experience quality` est inchangée. Un run payant n'est jamais annulé par un lancement suivant (file
+  d'attente). Rapport dans le résumé du job ; pas d'artefact. Secrets requis : `AVA_EVAL_EMAIL`, `AVA_EVAL_PASSWORD`.
+
+### Lancement réel sans navigateur (sandbox-ulrich, 9 novembre 2026)
+
+Run `b12b2d34-5d57-44bf-aaab-e6798aeb0fcd`, `npm run eval:judge -- --reference optimized_v3 --candidate rich_v2
+--character all --repeats 3`, compte admin d'Ulrich. Même corpus (21 questions actives : 12 Max, 9 Emma, vérifiées
+dans la base corpus), mêmes variantes et réglages que le run J1 (`openai/gpt-5.6-luna`, T 1,4, 360 tokens, juge
+Claude Sonnet 5.5). 126/126 tours en 21 min, 1 tour en erreur (timeout du personnage, réponse de repli).
+[Rapport complet](rapport_llm_juge_j2_sandbox_20261109.md).
+
+| | J1 (admin, run `690eaf20`) | J2 (Node, run `b12b2d34`) |
+|---|---:|---:|
+| Référence `optimized_v3` /10 | 5,10 | 5,02 |
+| Candidat `rich_v2` /10 | 4,95 | 4,96 |
+| Δ | −0,15 | −0,06 |
+| Bruit entre passages | ± 0,56 | ± 0,57 |
+| Canon et timeline Δ (/5) | −0,62 | −0,65 |
+| Coût réel | 2,10 $ | 2,13 $ |
+
+- **Écart dans le bruit** : notes à ±0,1 de J1 pour un bruit de ±0,57 ; même lecture (rich_v2 ne bat pas
+  optimized_v3, recul net sur le canon et la timeline). Les mêmes questions faibles côté Max (« Et Peter… »,
+  « … à la montagne ? », accueil de la cellule) restent sous 3/10 en référence. La longueur reste le critère le
+  plus faible (0,56/5).
+- **Coût** : 2,13 $ mesurés (juge 1,73 $, GM 0,33 $, personnages 0,07 $), estimation 2,10 $.
+- **Défaut trouvé et corrigé pendant le lot** : la relève des prix OpenRouter (`fetchGenerationCost`) appelait
+  `window.setTimeout`, absent de Node ; les 381 lignes `llm_usage` du run restaient à 0 $ et le rapport affichait
+  « 0.00 $ mesurés ». Correctif : `globalThis.setTimeout` (aucun effet dans le navigateur) ; un coût à 0 est
+  désormais compté « en attente » jusqu'à ce que la relève abandonne, et le script attend les prix (jusqu'à
+  2 min 30) avant d'écrire le rapport. Les prix du run ont été récupérés depuis OpenRouter
+  (`retryCostForRow`, l'action de l'admin) ; 5 appels personnage en timeout n'ont pas de génération facturée.
+  Effet de bord : ~1 000 lignes de diagnostic « window is not defined » dans le journal des erreurs de coût
+  (sandbox, 9 novembre 19 h 09 – 19 h 35 UTC).
+- **Vérifications après correctif** : run court `7418d466-5cd7-4486-871a-3a3d60f322f4` (Emma, 1 passage, 18 tours,
+  3 min) : 0,30 $ mesurés pendant le run pour 0,30 $ estimés, sortie standard réduite au rapport. Plafond : la
+  même commande avec `--max-cost-usd 0.15` est refusée au départ (sortie 2, aucun run créé).
+- **Limites connues** : OpenRouter limite le débit de la relève des prix (429 observés lors du rattrapage) ;
+  la relève réessaie à 15, 30 et 60 s, puis le rapport signale les appels « sans prix disponible ». Avec un seul
+  passage, le bruit n'est pas mesuré : le rapport le signale et le verdict reste indicatif.
+- Workflow GitHub : livré, non lancé (secrets `AVA_EVAL_EMAIL` / `AVA_EVAL_PASSWORD` à créer par Ulrich).
+
+Hors périmètre J2 : plusieurs tours (J3), changement de grille, fiches et prompts, STT/TTS, production.
+Suite : [prompt du lot P](prompt_reprise_parole_lot_p.md) (feuille de route : P, puis J3).

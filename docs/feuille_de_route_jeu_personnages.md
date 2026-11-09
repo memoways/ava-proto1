@@ -44,8 +44,8 @@ D'abord un instrument de mesure, ensuite les améliorations. Chaque changement d
      - les régressions RAG du carnage (Peter, Mona, contamination d'Ava).
    - **Base corpus** : ajouter Emma au champ Personnage. C'est une base technique, distincte de la base Caractères, qui reste en lecture seule.
    - **Premier usage** : mesurer C1, puis décider du sort du générateur PRÉSENT.
-2. **J2 — exécution sans navigateur.** Prompt : [prompt_reprise_llm_juge_lot_j2.md](prompt_reprise_llm_juge_lot_j2.md). Script Node sur sandbox, lancé à la main par `workflow_dispatch`. Il ne bloque pas la CI, pour maîtriser le coût.
-3. **P — parole, guidée par J1.**
+2. **J2 — exécution sans navigateur.** Livré en code le 9 novembre ([plan](plan_llm_as_judge.md#lot-j2--lancer-le-juge-sans-navigateur-implémenté-9-novembre-2026)) : `npm run eval:judge` sur sandbox, ou le workflow manuel « LLM judge (manual) », avec plafond de coût. Il ne bloque pas la CI. Prompt d'origine : [prompt_reprise_llm_juge_lot_j2.md](prompt_reprise_llm_juge_lot_j2.md).
+3. **P — parole, guidée par J1.** Prompt : [prompt_reprise_parole_lot_p.md](prompt_reprise_parole_lot_p.md).
    - Générateur PRÉSENT à la 2e personne, sans obligation de tout couvrir.
    - Reformuler la consigne « livre d'abord ton contenu ».
    - Puis écoute (AP5).
