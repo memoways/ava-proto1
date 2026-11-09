@@ -27,6 +27,8 @@ interface Props {
   describe?: (key: ConversationalDimensionKey, value: number) => string;
   notRatedLabel?: string;
   className?: string;
+  /** Phone: smaller chart so the review starts above the fold. */
+  compact?: boolean;
 }
 
 const SIZE = 300;
@@ -45,7 +47,7 @@ function point(index: number, value: number) {
 const valid = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= MAX;
 
-export default function ConversationalRadar({ values, title, describe, notRatedLabel = "Non évalué", className }: Props) {
+export default function ConversationalRadar({ values, title, describe, notRatedLabel = "Non évalué", className, compact = false }: Props) {
   const titleId = useId();
   const keys = CONVERSATIONAL_DIMENSIONS;
   const rated = keys.map((key) => (valid(values[key]) ? (values[key] as number) : null));
@@ -65,7 +67,7 @@ export default function ConversationalRadar({ values, title, describe, notRatedL
 
   return (
     <figure className={className} aria-label={title}>
-      <svg viewBox={`${-PAD_X} 0 ${SIZE + 2 * PAD_X} ${SIZE}`} className="mx-auto block h-auto w-full max-w-[360px]" role="img" aria-labelledby={titleId}>
+      <svg viewBox={`${-PAD_X} 0 ${SIZE + 2 * PAD_X} ${SIZE}`} className={`mx-auto block h-auto w-full ${compact ? "max-w-[280px]" : "max-w-[360px]"}`} role="img" aria-labelledby={titleId}>
         <title id={titleId}>{title}</title>
         {[1, 2, 3, 4, 5].map((ring) => (
           <polygon

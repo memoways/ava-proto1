@@ -6,6 +6,9 @@
  * scores (not-rated dimensions listed apart, never at 0). Consent to keep the
  * transcript (never the audio) is required; email and opt-ins are optional.
  * « Valider et envoyer » is the only trigger of the definitive save.
+ *
+ * Phone (lot 4): compact radar, dimension cards folded to a summary line (one
+ * tap opens the editor), « Valider et envoyer » docked at the bottom.
  */
 import { useMemo, useState } from "react";
 import type {
@@ -27,12 +30,16 @@ import {
   type ReviewState,
 } from "@/services/conversationalQuestionnaireReview";
 import ConversationalRadar from "@/components/questionnaire/ConversationalRadar";
+import type { QuestionnaireLayout } from "@/services/conversationalQuestionnaireLayout";
+import { cn } from "@/lib/utils";
+import QuestionnaireActionBar from "./QuestionnaireActionBar";
 
 interface Props {
   dimensions: Record<ConversationalDimensionKey, DimensionAnswer>;
   sessionContext: ConversationalSessionContext;
   onSave: (data: QuestionnaireConversationalData) => void | Promise<void>;
   submitting?: boolean;
+  layout?: QuestionnaireLayout;
 }
 
 const textareaClass =
@@ -95,14 +102,39 @@ function DimensionCard({
   dimension,
   onEdit,
   onScore,
+  folded = false,
 }: {
   dimensionKey: ConversationalDimensionKey;
   dimension: DimensionAnswer;
   onEdit: (field: "answer" | "follow_up" | "score_comment", text: string) => void;
   onScore: (score: ConversationalScore) => void;
+  /** Phone: start as a summary line; one tap opens the editor. */
+  folded?: boolean;
 }) {
   const [showComment, setShowComment] = useState(!!dimension.score_comment);
+  const [open, setOpen] = useState(!folded);
   const label = DIMENSION_LABELS[dimensionKey];
+  if (!open) {
+    return (
+      <article className="rounded-md border border-border bg-background/40" data-testid={`review-${dimensionKey}`}>
+        <button
+          type="button"
+          className="flex min-h-11 w-full flex-col items-start gap-1 p-4 text-left"
+          aria-expanded={false}
+          onClick={() => setOpen(true)}
+        >
+          <span className="flex w-full items-center justify-between gap-3">
+            <span className="text-base font-medium text-foreground">{label}</span>
+            <span className="text-sm text-foreground" data-testid={`review-score-${dimensionKey}`}>
+              {dimension.score === null ? "non évalué" : `${dimension.score}/5`}
+            </span>
+          </span>
+          <span className="line-clamp-2 text-sm text-muted-foreground">{dimension.answer || "—"}</span>
+          <span className="text-sm text-primary">Relire ou corriger — {label}</span>
+        </button>
+      </article>
+    );
+  }
   return (
     <article className="space-y-3 rounded-md border border-border bg-background/40 p-4" data-testid={`review-${dimensionKey}`}>
       <h3 className="text-base font-medium text-foreground">{label}</h3>
@@ -146,7 +178,9 @@ function DimensionCard({
   );
 }
 
-export default function ConversationalReview({ dimensions, sessionContext, onSave, submitting }: Props) {
+export default function ConversationalReview({ dimensions, sessionContext, onSave, submitting, layout = "desktop" }: Props) {
+  const phone = layout === "phone";
+  const touchLabel = layout !== "desktop" ? "min-h-11" : "";
   const [review, setReview] = useState<ReviewState>(() => startReview(dimensions));
   const blockers = reviewBlockers(review);
   const emailInvalid = blockers.includes("email");
@@ -171,7 +205,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
         </p>
       </header>
 
-      <ConversationalRadar values={radarValues} title="Tes notes par dimension" />
+      <ConversationalRadar values={radarValues} title="Tes notes par dimension" compact={phone} />
 
       <div className="space-y-4">
         {CONVERSATIONAL_DIMENSIONS.map((key) => (
@@ -181,12 +215,13 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
             dimension={review.dimensions[key]}
             onEdit={(field, text) => setReview((current) => editDimensionText(current, key, field, text))}
             onScore={(score) => setReview((current) => changeScore(current, key, score))}
+            folded={phone}
           />
         ))}
       </div>
 
       <div className="space-y-3 border-t border-border pt-4">
-        <label className="flex items-start gap-3 text-sm text-foreground">
+        <label className={cn("flex items-start gap-3 text-sm text-foreground", touchLabel)}>
           <input
             type="checkbox"
             checked={review.consent}
@@ -213,7 +248,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
             onChange={(e) => setReview((current) => ({ ...current, email: e.target.value }))}
           />
           {emailInvalid && <p role="alert" className="text-xs text-destructive">Cet email ne semble pas valide.</p>}
-          <label className={`flex items-start gap-3 text-sm ${hasEmail ? "text-foreground" : "text-muted-foreground"}`}>
+          <label className={cn("flex items-start gap-3 text-sm", hasEmail ? "text-foreground" : "text-muted-foreground", touchLabel)}>
             <input
               type="checkbox"
               disabled={!hasEmail}
@@ -223,7 +258,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
             />
             Je souhaite être tenu·e au courant du projet.
           </label>
-          <label className={`flex items-start gap-3 text-sm ${hasEmail ? "text-foreground" : "text-muted-foreground"}`}>
+          <label className={cn("flex items-start gap-3 text-sm", hasEmail ? "text-foreground" : "text-muted-foreground", touchLabel)}>
             <input
               type="checkbox"
               disabled={!hasEmail}
@@ -236,7 +271,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <QuestionnaireActionBar docked={phone}>
         <button
           type="button"
           className="min-h-11 w-full rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -245,7 +280,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
         >
           {submitting ? "Envoi…" : "Valider et envoyer"}
         </button>
-      </div>
+      </QuestionnaireActionBar>
     </section>
   );
 }

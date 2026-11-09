@@ -2958,3 +2958,83 @@ test('@device @iphone écran téléphone (WebKit) : appel vocal sans avatar, Max
   expect(fakes.getSessionRow()).toMatchObject({ output_mode: 'tts', streaming_avatar_provider: null, device_class: 'smartphone' });
   expect(avatarRequests).toEqual([]);
 });
+
+// Conversational questionnaire, lot 4 — same keyboard path on emulated Apple
+// devices (no voice turn: WebKit cannot play the fake turns). Phone: microphone
+// and validation docked at the bottom, review folded; tablet: 44 px targets.
+/** Same check as `expectTouchTarget`, after scrolling the button into view. */
+async function scrolledTouchTarget(page: Page, name: string) {
+  await page.getByRole('button', { name, exact: true }).scrollIntoViewIfNeeded();
+  await expectTouchTarget(page, name);
+}
+
+for (const device of [
+  { tag: '@iphone', query: 'telephone', layout: 'phone' },
+  { tag: '@ipad', query: 'tablette', layout: 'tablet' },
+] as const) {
+  test(`@device ${device.tag} questionnaire conversationnel au toucher jusqu'à « Valider et envoyer »`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.route('**/functions/v1/streaming-avatar-session**', () => new Promise(() => {}));
+    const fakes = await installNetworkFakes(page, TRANSCRIPTS, {
+      ttsSuccess: true, characterOpenings: true, outputMode: 'streaming_avatar',
+      conversationalQuestionnaire: { followUp: "Qu'est-ce qui accrochait, exactement ?" },
+    });
+    await page.goto(`/?ecran=${device.query}`);
+    await page.getByRole('button', { name: 'Commencer' }).click();
+    await page.getByRole('button', { name: /Passer/ }).click();
+    await answerFilmQuestion(page);
+    await page.getByRole('button', { name: 'Appeler Max', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Terminer', exact: true })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+    await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+
+    await expect(page.locator(`[data-questionnaire-layout="${device.layout}"]`)).toBeVisible();
+    await expect(page.getByText('1/5', { exact: true })).toBeVisible();
+    await scrolledTouchTarget(page, 'Répondre à la voix');
+    await scrolledTouchTarget(page, 'Valider ma réponse');
+    await scrolledTouchTarget(page, 'Passer le questionnaire');
+    if (device.layout === 'phone') {
+      const viewport = page.viewportSize()!;
+      const bar = (await page.locator('[data-docked="true"]').boundingBox())!;
+      expect(bar.y + bar.height).toBeGreaterThan(viewport.height - 2);
+      await expect(page.locator('[data-docked="true"]').getByRole('button', { name: 'Valider ma réponse' })).toBeVisible();
+    } else {
+      await expect(page.locator('[data-docked="true"]')).toHaveCount(0);
+    }
+
+    for (let i = 0; i < 5; i += 1) {
+      await expect(page.getByText(`${i + 1}/5`, { exact: true })).toBeVisible();
+      await page.getByLabel('Ta réponse').fill(i === 0 ? 'Bof, ça accrochait.' : `Réponse ${i + 1}, parce que c'était clair.`);
+      await page.getByRole('button', { name: 'Valider ma réponse' }).click();
+      if (i === 0) {
+        await expect(page.getByText("Qu'est-ce qui accrochait, exactement ?")).toBeVisible();
+        await page.getByLabel('Ta précision').fill('Les silences.');
+        await page.getByRole('button', { name: 'Valider ma précision' }).click();
+      }
+      const next = page.getByRole('button', { name: i === 4 ? 'Terminer' : 'Question suivante', exact: true });
+      await page.getByRole('button', { name: `Note ${(i % 5) + 1} sur 5` }).click();
+      await scrolledTouchTarget(page, i === 4 ? 'Terminer' : 'Question suivante');
+      await next.click();
+    }
+
+    await expect(page.getByTestId('radar-not-rated')).toHaveCount(0);
+    if (device.layout === 'phone') {
+      await page.getByRole('button', { name: /Relire ou corriger — Immersion/ }).click();
+    }
+    await page.getByLabel('Ta réponse — Immersion').fill('Réponse 3, corrigée sur l’écran tactile.');
+    await page.getByRole('checkbox', { name: /transcription de mes réponses/ }).check();
+    await scrolledTouchTarget(page, 'Valider et envoyer');
+    await page.getByRole('button', { name: 'Valider et envoyer' }).click();
+    await expect(page.getByRole('button', { name: /Recommencer/ })).toBeVisible();
+
+    const saved = fakes.getSessionUpdates().find((patch): patch is { questionnaire_responses: Record<string, unknown> } =>
+      typeof patch === 'object' && patch !== null && 'questionnaire_responses' in patch);
+    expect(saved?.questionnaire_responses).toMatchObject({
+      version: 'conversational-v1',
+      dimensions: { immersion: { answer: 'Réponse 3, corrigée sur l’écran tactile.', score: 3 } },
+      summary: { edited_by_user: true },
+      session_context: { device_class: device.layout === 'phone' ? 'smartphone' : 'tablet' },
+    });
+  });
+}

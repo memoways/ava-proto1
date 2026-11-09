@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ConversationalSessionContext, QuestionnaireConversationalData } from "@/types";
 import { baseDimensionQuestions } from "@/services/conversationalQuestionnaire";
@@ -118,5 +118,65 @@ describe("ConversationalQuestionnaire", () => {
     expect(session.setManualMode).toHaveBeenCalledWith(true);
     fireEvent.change(screen.getByLabelText("Ta réponse"), { target: { value: "Ça a très bien marché" } });
     expect(screen.getByRole("button", { name: "Valider ma réponse" })).toBeEnabled();
+  });
+
+  it("keeps the words already shown when the provider returns no final text", async () => {
+    let emit: (text: string, final: boolean) => void = () => {};
+    const session = {
+      isActive: true,
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      setManualMode: vi.fn(),
+      flush: vi.fn(async () => { /* no final text */ }),
+    };
+    stt.create.mockImplementation(async (cb: typeof emit) => { emit = cb; return session; });
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [] }) } });
+    render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={vi.fn().mockResolvedValue(null)} onSave={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText("Ta réponse"), { target: { value: "Début." } });
+    fireEvent.click(screen.getByRole("button", { name: "Répondre à la voix" }));
+    await screen.findByRole("button", { name: "J'ai fini de parler" });
+    act(() => emit("J'étais un peu perdu", false));
+    fireEvent.click(screen.getByRole("button", { name: "J'ai fini de parler" }));
+    await waitFor(() => expect(screen.getByLabelText("Ta réponse")).toHaveValue("Début. J'étais un peu perdu"));
+    expect(screen.getByRole("button", { name: "Valider ma réponse" })).toBeEnabled();
+  });
+
+  it("docks the microphone and validation at the bottom on a phone and folds the review", async () => {
+    const phone = { ...context, device_class: "smartphone" as const };
+    const onSave = vi.fn<(data: QuestionnaireConversationalData) => void>();
+    const { container } = render(<ConversationalQuestionnaire questions={questions} sessionContext={phone} requestFollowUp={vi.fn().mockResolvedValue(null)} onSave={onSave} />);
+    expect(container.querySelector('[data-questionnaire-layout="phone"]')).not.toBeNull();
+    const bar = container.querySelector('[data-docked="true"]')!;
+    expect(bar).not.toBeNull();
+    expect(within(bar as HTMLElement).getByRole("button", { name: "Répondre à la voix" })).toBeInTheDocument();
+    expect(within(bar as HTMLElement).getByRole("button", { name: "Valider ma réponse" })).toBeInTheDocument();
+
+    for (let i = 0; i < 5; i += 1) {
+      answer(`Réponse ${i + 1}`);
+      fireEvent.click(await screen.findByRole("button", { name: `Note ${(i % 5) + 1} sur 5` }));
+      const next = screen.getByRole("button", { name: i === 4 ? "Terminer" : "Question suivante" });
+      expect(next.closest('[data-docked="true"]')).not.toBeNull();
+      fireEvent.click(next);
+    }
+    // Folded cards: a summary line, the editor opens on demand.
+    expect(screen.queryByLabelText("Ta réponse — Immersion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("review-score-immersion")).toHaveTextContent("3/5");
+    fireEvent.click(screen.getByRole("button", { name: /Relire ou corriger — Immersion/ }));
+    expect(screen.getByLabelText("Ta réponse — Immersion")).toHaveValue("Réponse 3");
+    const send = screen.getByRole("button", { name: "Valider et envoyer" });
+    expect(send.closest('[data-docked="true"]')).not.toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: /transcription de mes réponses/ }));
+    fireEvent.click(send);
+    expect(onSave.mock.calls[0][0].summary.edited_by_user).toBe(false);
+  });
+
+  it("puts the question and the transcript side by side on desktop", () => {
+    const { container } = render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={vi.fn().mockResolvedValue(null)} onSave={vi.fn()} />);
+    expect(container.querySelector('[data-questionnaire-layout="desktop"]')).not.toBeNull();
+    expect(screen.getByTestId("questionnaire-step").className).toContain("grid-cols-2");
+    expect(container.querySelector('[data-docked="true"]')).toBeNull();
   });
 });

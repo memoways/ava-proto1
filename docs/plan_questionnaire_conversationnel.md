@@ -187,7 +187,29 @@ garde ses branches legacy et PRD4 et gagne une branche `conversational-v1`.
   composant et deux E2E clavier jusqu'à « Valider et envoyer ».
 - **Non fait** : recette voix réelle smartphone/desktop (lots 2 et 3) ; envoi réel vers Notion.
 
-Prompt de reprise du lot 4 : [prompt_reprise_questionnaire_conversationnel_lot_4.md](prompt_reprise_questionnaire_conversationnel_lot_4.md).
+## Exécution lot 4 (9 novembre 2026) — dernier lot
+
+- **Premier envoi réel** (8 novembre, iPhone, avatar vidéo, session `a3586dec`) : colonnes « Conv » remplies dans
+  « Questionnaire AVA » et visibles sur la page Données Questionnaire. Les lots 1 à 3 sont validés de bout en bout.
+- **Mise en page par appareil** depuis `session_context.device_class` (`conversationalQuestionnaireLayout.ts`) :
+  téléphone = micro et validation fixés en bas (`QuestionnaireActionBar`, zone sûre, fond opaque), micro sur sa
+  propre ligne quand il y a deux actions (relance), radar compact, cartes de synthèse repliées (« Relire ou
+  corriger » ouvre la carte), « Valider et envoyer » en bas ; tablette = cibles de 44 px (« Passer le questionnaire »,
+  cases à cocher) ; desktop = question et transcript côte à côte. Chaque étape repart en haut de l'écran. Captures
+  375 × 812, iPad Pro 11 et 1280 × 720 regardées.
+- **Fin de dictée** : la précision d'engagement de `a3586dec` s'arrête sur « J'étais un peu ». Lecture du code :
+  Deepgram (fournisseur par défaut) attend l'accusé de `Finalize` jusqu'à 1,5 s ; la cause n'est pas établie.
+  Correction défensive dans `useDictation` : si aucun texte final n'arrive à l'arrêt, le texte déjà affiché est gardé
+  au lieu d'être effacé. Évènement PostHog `conversational_dictation_finished` (longueurs seulement : affiché à
+  l'arrêt, final, gardé ; échec du flush) pour diagnostiquer en recette.
+- **Tests** : unitaires (mise en page, texte gardé sans final, barre fixée et cartes repliées sur téléphone, deux
+  colonnes sur desktop) ; E2E `@device @iphone` et `@device @ipad` (WebKit) au toucher jusqu'à « Valider et
+  envoyer », cibles ≥ 44 px, barre fixée dans l'écran sur téléphone.
+- **Fiche de recette** : [recette_questionnaire_conversationnel.md](recette_questionnaire_conversationnel.md).
+- **Aucun lot ne suit.** Restent la recette humaine (voix réelle Android, iPad, desktop ; fin de dictée) et la
+  décision d'Ulrich d'activer le mode conversationnel par défaut. Aucune Edge Function modifiée.
+
+Prompt du lot 4 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_4.md](prompt_reprise_questionnaire_conversationnel_lot_4.md).
 Prompt du lot 3 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_3.md](prompt_reprise_questionnaire_conversationnel_lot_3.md).
 Prompt du lot 2 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_2.md](prompt_reprise_questionnaire_conversationnel_lot_2.md).
 Prompt du lot 1 (historique) : [prompt_reprise_questionnaire_conversationnel_lot_1.md](prompt_reprise_questionnaire_conversationnel_lot_1.md).
