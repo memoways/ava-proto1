@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { EvalCostEstimate, EvalLiveSnapshot } from "@/services/evalJudgePipeline";
 
+export type EvalRunMode = "compare" | "ofat";
+export type EvalCharacterFilter = "all" | "max" | "emma";
+
 export interface LeverToggles {
   tempZero: boolean;
   tempHigh: boolean;
@@ -15,6 +19,11 @@ export interface LeverToggles {
 }
 
 interface Props {
+  mode: EvalRunMode;
+  onModeChange: (mode: EvalRunMode) => void;
+  compareSetup: ReactNode;
+  characterFilter: EvalCharacterFilter;
+  onCharacterFilterChange: (filter: EvalCharacterFilter) => void;
   live: EvalLiveSnapshot;
   liveModelLabel: string;
   catalog: Array<{ id: string; label: string }>;
@@ -38,7 +47,7 @@ interface Props {
 }
 
 const SETTINGS_MAP: Array<{ label: string; value: (live: EvalLiveSnapshot) => string; where: string }> = [
-  { label: "Modèle de Max", value: (live) => live.model, where: "Technique → LLM Config" },
+  { label: "Modèle du personnage", value: (live) => live.model, where: "Technique → LLM Config" },
   { label: "Température", value: (live) => String(live.temperature), where: "Technique → LLM Config" },
   { label: "Top-p", value: (live) => String(live.topP), where: "Technique → LLM Config" },
   { label: "Tokens max", value: (live) => String(live.maxTokens), where: "Technique → LLM Config" },
@@ -53,6 +62,11 @@ const SETTINGS_MAP: Array<{ label: string; value: (live: EvalLiveSnapshot) => st
 ];
 
 export default function EvalLeversPanel({
+  mode,
+  onModeChange,
+  compareSetup,
+  characterFilter,
+  onCharacterFilterChange,
   live,
   liveModelLabel,
   catalog,
@@ -81,11 +95,36 @@ export default function EvalLeversPanel({
       <CardHeader>
         <CardTitle className="text-base">Étape 2 — Ce qui est testé, et ce qu'on compare</CardTitle>
         <CardDescription>
-          Le test rejoue le vrai pipeline texte (recherche RAG → Game Master → Max → validateur), sans voix. La
-          référence est toujours ta configuration actuelle ; on ne change qu'un paramètre à la fois.
+          Le test rejoue le vrai pipeline texte (recherche RAG → personnage → Game Master), sans voix, pour le
+          personnage de chaque question (Max ou Emma). Deux façons de comparer : référence contre candidat (une
+          variante de prompt ou un instantané de réglages), ou un levier à la fois.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="eval-mode">Comparaison</Label>
+            <Select value={mode} onValueChange={(value) => onModeChange(value as EvalRunMode)}>
+              <SelectTrigger id="eval-mode"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="compare">Référence contre candidat</SelectItem>
+                <SelectItem value="ofat">Un levier à la fois (modèle, sampling, RAG)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="eval-characters">Personnages testés</Label>
+            <Select value={characterFilter} onValueChange={(value) => onCharacterFilterChange(value as EvalCharacterFilter)}>
+              <SelectTrigger id="eval-characters"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Max et Emma</SelectItem>
+                <SelectItem value="max">Max seulement</SelectItem>
+                <SelectItem value="emma">Emma seulement</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div>
           <p className="mb-2 text-sm font-medium">Réglages utilisés par le test (ceux de ta sandbox)</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -99,8 +138,11 @@ export default function EvalLeversPanel({
           </div>
         </div>
 
+        {mode === "compare" ? compareSetup : null}
+
+        {mode === "ofat" ? (<>
         <div className="space-y-2">
-          <Label>Modèles de Max à comparer</Label>
+          <Label>Modèles du personnage à comparer</Label>
           <p className="text-xs text-muted-foreground">
             Même catalogue que Technique → LLM Config. Ta configuration actuelle est toujours dans le test.
           </p>
@@ -159,7 +201,7 @@ export default function EvalLeversPanel({
             />
             <span>
               Température 0.8
-              <span className="block text-xs text-muted-foreground">Vérifie si plus de liberté rend la voix de Max plus juste.</span>
+              <span className="block text-xs text-muted-foreground">Vérifie si plus de liberté rend la voix du personnage plus juste.</span>
             </span>
           </label>
           <label className="flex items-start gap-2 text-sm">
@@ -185,6 +227,7 @@ export default function EvalLeversPanel({
             </span>
           </label>
         </div>
+        </>) : null}
 
         <div>
           <Label>Modèle juge (température 0)</Label>
@@ -197,7 +240,7 @@ export default function EvalLeversPanel({
             </SelectContent>
           </Select>
           <p className="mt-1 text-xs text-muted-foreground">
-            Le juge ne joue pas Max : il note la réponse produite contre la cible Notion.
+            Le juge ne joue pas le personnage : il note la réponse produite contre la cible Notion et la fiche.
           </p>
         </div>
 

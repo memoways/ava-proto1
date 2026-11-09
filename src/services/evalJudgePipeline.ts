@@ -1,6 +1,8 @@
 import type { Database } from "@/integrations/supabase/types";
 import { callLLMWithUsage } from "@/services/openRouterLLM";
-import { getGameplaySettings, getLLMSettings, listLlmConfigModels } from "@/services/settingsService";
+import { getGameplaySettings, getLLMSettings, listLlmConfigModels, normalizeMaxPromptVariant, type GameplaySettings } from "@/services/settingsService";
+import { characterRagTopKForVariant } from "@/services/characterRagTopK";
+import { loadCharacterPrompt } from "@/services/characterPromptService";
 import { getCharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import type { RuntimeCharacter } from "@/types";
@@ -9,7 +11,11 @@ import { processPRD4Turn } from "@/services/prd4Orchestrator";
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
 export const EVAL_NOTION_SETTING_KEY = "ava_eval_notion_database_id";
-export const EVAL_DEFAULT_JUDGE_MODEL = "anthropic/claude-sonnet-4";
+/** claude-sonnet-4 is no longer served by OpenRouter (checked 9 November 2026). */
+export const EVAL_DEFAULT_JUDGE_MODEL = "anthropic/claude-sonnet-5.5";
+const EVAL_JUDGE_EXTRA_MODELS = [
+  { id: EVAL_DEFAULT_JUDGE_MODEL, label: "Claude Sonnet 5.5 (juge conseillé)" },
+];
 
 export const EVAL_NOTION_COLUMNS = [
   { name: "Question", type: "Title", note: "Réplique joueur" },
@@ -28,7 +34,9 @@ export const EVAL_NOTION_COLUMNS = [
 export type EvalItem = Database["public"]["Tables"]["eval_items"]["Row"];
 export type EvalRun = Database["public"]["Tables"]["eval_runs"]["Row"];
 export type EvalResult = Database["public"]["Tables"]["eval_results"]["Row"];
-export type EvalFactor = "baseline" | "model" | "sampling" | "rag";
+export type EvalFactor = "baseline" | "model" | "sampling" | "rag" | "candidate";
+export type EvalPromptVariant = GameplaySettings["MAX_PROMPT_VARIANT"];
+export const EVAL_PROMPT_VARIANTS: EvalPromptVariant[] = ["optimized_v3", "rich_v2", "compact_v1", "legacy"];
 
 export interface EvalLiveSnapshot {
   model: string;
@@ -41,7 +49,7 @@ export interface EvalLiveSnapshot {
   ragThreshold: number;
   ragRerankModel: "rerank-3" | "rerank-3-lite" | "rerank-2.5" | "rerank-2.5-lite";
   ragRerankTruncation: boolean;
-  promptVariant: string;
+  promptVariant: EvalPromptVariant;
 }
 
 export interface EvalTurnConfig extends EvalLiveSnapshot {
@@ -55,8 +63,17 @@ export interface OfatSelection {
   ragVariants: Array<{ key: "conservative" | "generous"; topK: number; rerank: boolean }>;
 }
 
+export const SPEECH_QUALITY_KEYS = ["sounds_spoken", "no_therapeutic_language", "non_caricatural", "facts_understandable", "hope_without_cure"] as const;
+/** J1 play criteria, 0 to 5 each. Absent from results stored before J1. */
+export const PLAY_CRITERIA_KEYS = ["not_meta", "lived_impact", "canon_timeline", "distinct_voice"] as const;
+export type PlayCriterionKey = typeof PLAY_CRITERIA_KEYS[number];
+
 export interface EvalJudgeScore {
   speech_quality?: { sounds_spoken: number; no_therapeutic_language: number; non_caricatural: number; facts_understandable: number; hope_without_cure: number };
+  not_meta?: number;
+  lived_impact?: number;
+  canon_timeline?: number;
+  distinct_voice?: number;
   gold_fidelity: number;
   must_include: number;
   must_not: number;
@@ -88,8 +105,6 @@ export interface EvalCostEstimate {
 }
 
 const LLM_CALLS_PER_TURN = 3;
-const TOKENS_IN_PER_CALL = 1_800;
-const TOKENS_OUT_PER_CALL = 180;
 
 export function snapshotLiveSettings(): EvalLiveSnapshot {
   const llm = getLLMSettings();
@@ -105,8 +120,90 @@ export function snapshotLiveSettings(): EvalLiveSnapshot {
     ragThreshold: gameplay.RAG_MATCH_THRESHOLD,
     ragRerankModel: gameplay.RAG_RERANK_MODEL,
     ragRerankTruncation: gameplay.RAG_RERANK_TRUNCATION,
-    promptVariant: gameplay.MAX_PROMPT_VARIANT,
+    promptVariant: normalizeMaxPromptVariant(gameplay.MAX_PROMPT_VARIANT, "legacy"),
   };
+}
+
+/** Fields a reference or candidate snapshot may override; anything else stays live. */
+export type EvalSnapshotOverrides = Partial<Pick<EvalLiveSnapshot,
+  "model" | "temperature" | "topP" | "maxTokens" | "ragTopK" | "ragRetrieveK" | "ragRerank" | "ragThreshold" | "promptVariant">>;
+
+const SNAPSHOT_NUMBER_KEYS = ["temperature", "topP", "maxTokens", "ragTopK", "ragRetrieveK", "ragThreshold"] as const;
+
+/**
+ * Reads a pasted settings snapshot (JSON). Unknown keys are ignored; invalid
+ * values are reported instead of silently replaced. Nothing is persisted.
+ */
+export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOverrides; errors: string[] } {
+  const text = raw.trim();
+  if (!text) return { overrides: {}, errors: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { overrides: {}, errors: ["JSON illisible"] };
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { overrides: {}, errors: ["Un objet JSON est attendu"] };
+  }
+  const value = parsed as Record<string, unknown>;
+  const overrides: EvalSnapshotOverrides = {};
+  const errors: string[] = [];
+  if ("model" in value) {
+    if (typeof value.model === "string" && value.model.trim()) overrides.model = value.model.trim();
+    else errors.push("model doit être un identifiant de modèle");
+  }
+  if ("promptVariant" in value) {
+    const variant = normalizeMaxPromptVariant(value.promptVariant, "legacy");
+    if (variant === value.promptVariant) overrides.promptVariant = variant;
+    else errors.push(`promptVariant inconnu : ${String(value.promptVariant)}`);
+  }
+  if ("ragRerank" in value) {
+    if (typeof value.ragRerank === "boolean") overrides.ragRerank = value.ragRerank;
+    else errors.push("ragRerank doit être true ou false");
+  }
+  for (const key of SNAPSHOT_NUMBER_KEYS) {
+    if (!(key in value)) continue;
+    const n = value[key];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0) overrides[key] = n;
+    else errors.push(`${key} doit être un nombre positif`);
+  }
+  return { overrides, errors };
+}
+
+function describeOverrides(live: EvalLiveSnapshot, snapshot: EvalLiveSnapshot): string {
+  const changed = (Object.keys(snapshot) as Array<keyof EvalLiveSnapshot>)
+    .filter((key) => key !== "promptVariant" && snapshot[key] !== live[key])
+    .map((key) => `${key}=${String(snapshot[key])}`);
+  return changed.length ? ` + ${changed.join(", ")}` : "";
+}
+
+/**
+ * Reference vs candidate: exactly two configurations built from the live
+ * snapshot, each applied in memory for the evaluation turn only.
+ */
+export function buildReferenceCandidateConfigs(
+  live: EvalLiveSnapshot,
+  reference: EvalSnapshotOverrides,
+  candidate: EvalSnapshotOverrides,
+): EvalTurnConfig[] {
+  const ref: EvalLiveSnapshot = { ...live, ...reference };
+  const cand: EvalLiveSnapshot = { ...ref, ...candidate };
+  ref.ragRetrieveK = Math.max(ref.ragRetrieveK, ref.ragTopK);
+  cand.ragRetrieveK = Math.max(cand.ragRetrieveK, cand.ragTopK);
+  const refLabel = `référence (${ref.promptVariant}${describeOverrides(live, ref)})`;
+  let candLabel = `candidat (${cand.promptVariant}${describeOverrides(ref, cand)})`;
+  if (candLabel.slice("candidat".length) === refLabel.slice("référence".length)) candLabel = `${candLabel} · témoin`;
+  return [
+    { ...ref, label: refLabel, factor: "baseline" },
+    { ...cand, label: candLabel, factor: "candidate" },
+  ];
+}
+
+/** Judge choices: the recommended judge first, then the LLM Config catalog. */
+export function listEvalJudgeModels(): Array<{ id: string; label: string }> {
+  const catalog = listLlmConfigModels().map((model) => ({ id: model.id, label: model.label }));
+  return [...EVAL_JUDGE_EXTRA_MODELS, ...catalog.filter((model) => !EVAL_JUDGE_EXTRA_MODELS.some((extra) => extra.id === model.id))];
 }
 
 export function listEvalMaxModels(liveModel: string) {
@@ -171,28 +268,44 @@ export function parseUsdPerMillion(raw: string): number {
   return match ? Number(match[1]) : 1;
 }
 
+/**
+ * Cost model measured on the J1 sandbox run of 9 November 2026 (126 turns,
+ * llm_usage): character ~4 200 / 110 tokens, GM post-turn ~8 000 / 580 tokens
+ * (Gemini Flash), judge ~2 900 / 180 tokens. The recommended judge billed
+ * $0.0136 per call, above its list price: use the measured value.
+ */
+const CHARACTER_TOKENS_IN = 4_200;
+const CHARACTER_TOKENS_OUT = 110;
+const GM_COST_PER_TURN_USD = 0.0026;
+const JUDGE_TOKENS_IN = 2_900;
+const JUDGE_TOKENS_OUT = 180;
+const MEASURED_JUDGE_COST_PER_CALL_USD: Record<string, number> = {
+  "anthropic/claude-sonnet-5.5": 0.0136,
+};
+
+function catalogCallCost(modelId: string, tokensIn: number, tokensOut: number, fallbackIn = "$1", fallbackOut = "$3"): number {
+  const catalog = listLlmConfigModels().find((model) => model.id === modelId);
+  const inUsd = parseUsdPerMillion(catalog?.costInput ?? fallbackIn);
+  const outUsd = parseUsdPerMillion(catalog?.costOutput ?? fallbackOut);
+  return (tokensIn * inUsd + tokensOut * outUsd) / 1_000_000;
+}
+
 export function estimateEvalRun(
   itemCount: number,
   configs: EvalTurnConfig[],
   repeats = EVAL_REPEATS,
+  judgeModel = EVAL_DEFAULT_JUDGE_MODEL,
 ): EvalCostEstimate {
   const turns = itemCount * configs.length * repeats;
   const llmCalls = turns * LLM_CALLS_PER_TURN;
-  const byModel = new Map<string, number>();
-  for (const config of configs) {
-    byModel.set(config.model, (byModel.get(config.model) ?? 0) + itemCount * repeats * 2);
-  }
+  const judgePerCall = MEASURED_JUDGE_COST_PER_CALL_USD[judgeModel]
+    ?? catalogCallCost(judgeModel, JUDGE_TOKENS_IN, JUDGE_TOKENS_OUT, "$3", "$15");
   let estimatedCostUsd = 0;
-  for (const [modelId, callCount] of byModel) {
-    const catalog = listLlmConfigModels().find((model) => model.id === modelId);
-    const inUsd = parseUsdPerMillion(catalog?.costInput ?? "$1");
-    const outUsd = parseUsdPerMillion(catalog?.costOutput ?? "$3");
-    estimatedCostUsd += (callCount * TOKENS_IN_PER_CALL * inUsd) / 1_000_000;
-    estimatedCostUsd += (callCount * TOKENS_OUT_PER_CALL * outUsd) / 1_000_000;
+  for (const config of configs) {
+    const configTurns = itemCount * repeats;
+    estimatedCostUsd += configTurns * catalogCallCost(config.model, CHARACTER_TOKENS_IN, CHARACTER_TOKENS_OUT);
+    estimatedCostUsd += configTurns * (GM_COST_PER_TURN_USD + judgePerCall);
   }
-  const remainingCalls = Math.max(0, llmCalls - [...byModel.values()].reduce((sum, n) => sum + n, 0));
-  estimatedCostUsd += (remainingCalls * TOKENS_IN_PER_CALL * 0.3) / 1_000_000;
-  estimatedCostUsd += (remainingCalls * TOKENS_OUT_PER_CALL * 2.5) / 1_000_000;
   return {
     configs: configs.length,
     items: itemCount,
@@ -219,11 +332,16 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
       parsed = {};
     }
   }
+  const play: Partial<Record<PlayCriterionKey, number>> = {};
+  for (const key of PLAY_CRITERIA_KEYS) {
+    if (parsed[key] !== undefined && parsed[key] !== null) play[key] = clampScore(parsed[key], 0, 5);
+  }
   return {
     gold_fidelity: clampScore(parsed.gold_fidelity, 0, 5),
     ...(parsed.speech_quality && typeof parsed.speech_quality === "object" ? {
-      speech_quality: Object.fromEntries(["sounds_spoken", "no_therapeutic_language", "non_caricatural", "facts_understandable", "hope_without_cure"].map(key => [key, clampScore((parsed.speech_quality as Record<string, unknown>)[key], 0, 5)])) as NonNullable<EvalJudgeScore["speech_quality"]>,
+      speech_quality: Object.fromEntries(SPEECH_QUALITY_KEYS.map(key => [key, clampScore((parsed.speech_quality as Record<string, unknown>)[key], 0, 5)])) as NonNullable<EvalJudgeScore["speech_quality"]>,
     } : {}),
+    ...play,
     must_include: clampScore(parsed.must_include, 0, 5),
     must_not: clampScore(parsed.must_not, 0, 5),
     tone: clampScore(parsed.tone, 0, 5),
@@ -235,8 +353,65 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
   };
 }
 
-export function buildJudgePrompt(item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes" | "character_name">, response: string): string {
+/** Max or Emma from the item's Personnage field; null when unknown. */
+export function evalCharacterKey(characterName: string | null | undefined): RuntimeCharacter | null {
+  const name = characterName?.trim() ?? "";
+  if (/^emma(?:\s|$)/i.test(name)) return "emma";
+  if (/^max(?:\s|$)/i.test(name)) return "max";
+  return null;
+}
+
+const CANON_FIELD_CHARS = 1_800;
+
+function clip(text: string | undefined, limit: number): string {
+  const value = (text ?? "").trim();
+  return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
+const TIMELINE_TAIL_CHARS = 4_400;
+const TIMELINE_EARLIER_CHARS = 1_200;
+
+/**
+ * The timeline runs from oldest to today; the carnage and the present sit at
+ * its end. Keep the recent tail whole, plus earlier period headings and the
+ * lines about Mona (camp regression), within a bounded budget.
+ */
+export function judgeTimelineExcerpt(timeline: string | undefined): string {
+  const text = (timeline ?? "").trim();
+  if (text.length <= TIMELINE_TAIL_CHARS + TIMELINE_EARLIER_CHARS) return text;
+  const cut = text.indexOf("\n", text.length - TIMELINE_TAIL_CHARS);
+  const tail = text.slice(cut < 0 ? text.length - TIMELINE_TAIL_CHARS : cut + 1);
+  const earlier = text.slice(0, text.length - tail.length).split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^(Il y a|Permanent|Hier|Aujourd)/i.test(line) || /\bMona\b/.test(line));
+  let kept = "";
+  for (const line of earlier) {
+    if (kept.length + line.length + 1 > TIMELINE_EARLIER_CHARS) break;
+    kept += `${line}\n`;
+  }
+  return `${kept}…\n${tail}`;
+}
+
+/** Read-only canon excerpt from the synced character sheet, for the judge only. */
+export function buildJudgeCanonReference(fields: { situation_summary?: string; timeline?: string; maniere_de_parler?: string } | null): string {
+  if (!fields) return "";
+  const parts = [
+    fields.situation_summary?.trim() ? `### Situation présente\n${clip(fields.situation_summary, CANON_FIELD_CHARS)}` : "",
+    fields.timeline?.trim() ? `### Timeline (périodes, Mona, puis les derniers jours en entier)\n${judgeTimelineExcerpt(fields.timeline)}` : "",
+    fields.maniere_de_parler?.trim() ? `### Manière de parler\n${clip(fields.maniere_de_parler, 900)}` : "",
+  ].filter(Boolean);
+  return parts.join("\n\n");
+}
+
+export function buildJudgePrompt(
+  item: Pick<EvalItem, "question" | "gold_answer" | "must_include" | "must_not" | "tone" | "max_length" | "judge_notes" | "character_name">,
+  response: string,
+  canonReference = "",
+): string {
   const characterName = item.character_name?.trim() || "le personnage attribué";
+  const key = evalCharacterKey(characterName);
+  const firstName = characterName.split(/\s+/)[0];
+  const otherName = key === "max" ? "Emma" : key === "emma" ? "Max" : "l'autre personnage";
   return `Tu es un juge strict pour l'expérience narrative « Où est Ava ? ».
 Évalue la réponse de ${characterName} au regard de la cible de ce personnage.
 Ne récompense PAS le copier-coller du texte d'or : la grille prime.
@@ -263,8 +438,18 @@ ${item.max_length != null ? `${item.max_length} phrase(s)` : "1-2 phrases orales
 ## NOTES
 ${item.judge_notes || "(aucune)"}
 
+## REPÈRES CANON DE ${characterName.toLocaleUpperCase("fr")} (lecture seule)
+${canonReference || "(fiche non fournie : juge canon_timeline avec MUST NOT et les notes)"}
+
 ## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
 ${response}
+
+## JEU DU PERSONNAGE — QUATRE CRITÈRES (0 à 5)
+- not_meta : ${firstName} vit la situation de l'intérieur ; il n'explique pas l'histoire, le dispositif ni son propre rôle comme un narrateur. 0 = résumé de situation ou commentaire sur la fiction.
+- lived_impact : les faits passent par ce qu'ils font à sa vie, à son corps, à sa famille ; une énumération de faits sans leur effet vécu vaut au plus 2.
+- canon_timeline : rien ne contredit la fiche, la timeline ni le présent ; un souvenir (ex. J−2 à l'hôtel) n'est jamais raconté comme le présent (l'appartement). 0 = contradiction nette.
+- distinct_voice : on reconnaît ${firstName}, pas ${otherName} ni un assistant ; vocabulaire, rythme et rapport aux autres lui sont propres.
+Le défaut principal à détecter : un personnage trop méta qui énumère des faits sans leur impact.
 
 ## PAROLE INCARNÉE — CINQ CRITÈRES (0 à 5)
 - sounds_spoken : sonne parlé, pas rédigé ; une suspension ou une réponse incomplète pertinente est recevable.
@@ -283,6 +468,10 @@ Retourne UNIQUEMENT un JSON :
   "length_ok": true/false,
   "character_voice": 0-5,
   "speech_quality": {"sounds_spoken": 0-5, "no_therapeutic_language": 0-5, "non_caricatural": 0-5, "facts_understandable": 0-5, "hope_without_cure": 0-5},
+  "not_meta": 0-5,
+  "lived_impact": 0-5,
+  "canon_timeline": 0-5,
+  "distinct_voice": 0-5,
   "overall": 0-10,
   "rationale": "2 phrases max"
 }`;
@@ -386,6 +575,8 @@ export interface IsolatedEvalTurnTrace {
   latencies: { rag_ms: number; gm_ms: number; max_ms: number; validator_ms: number; total_ms: number };
   tokens: { rag?: unknown; gm?: unknown; max?: unknown; validator?: unknown };
   error?: string;
+  /** Read-only canon excerpt handed to the judge; not stored in eval_results. */
+  canonReference?: string;
 }
 
 export async function runIsolatedEvalTurn(
@@ -397,11 +588,10 @@ export async function runIsolatedEvalTurn(
   if (!characterName) {
     throw new Error("No character is attributed to this evaluation item");
   }
-  const characterKey: RuntimeCharacter | null = /^emma(?:\s|$)/i.test(characterName)
-    ? "emma"
-    : /^max(?:\s|$)/i.test(characterName)
-      ? "max"
-      : null;
+  const characterKey = evalCharacterKey(characterName);
+  const promptVariant = normalizeMaxPromptVariant(config.promptVariant, "legacy");
+  // Mirror the live turn: optimized_v3 widens the RAG pool before deduplication.
+  const ragTopK = characterRagTopKForVariant(promptVariant, config.ragTopK);
   const runtime = characterKey ? await getCharacterRuntimeReadiness(characterKey) : null;
   const characterContext = toCharacterExecutionContext(runtime);
   if (!runtime?.ready || !characterContext) {
@@ -418,9 +608,10 @@ export async function runIsolatedEvalTurn(
     turnIndex: 1,
     evaluationOverrides: {
       featureKey: EVAL_FEATURE_KEY,
-      ragTopK: config.ragTopK,
+      promptVariant,
+      ragTopK,
       ragThreshold: config.ragThreshold,
-      ragRetrieveK: Math.max(config.ragRetrieveK, config.ragTopK),
+      ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
       ragRerank: config.ragRerank,
       ragRerankModel: config.ragRerankModel,
       ragRerankTruncation: config.ragRerankTruncation,
@@ -433,6 +624,7 @@ export async function runIsolatedEvalTurn(
     },
   });
   const gm = await turn.postTurnPromise;
+  const canonFields = await loadCharacterPrompt(characterContext.characterId).catch(() => null);
 
   return {
     maxResponse: turn.maxResponse,
@@ -450,6 +642,7 @@ export async function runIsolatedEvalTurn(
     error: gm.execution_status && gm.execution_status !== "executed"
       ? `GM ${gm.execution_status}`
       : undefined,
+    canonReference: buildJudgeCanonReference(canonFields),
   };
 }
 
@@ -457,14 +650,14 @@ export async function judgeIsolatedEvalTurn(
   item: EvalItem,
   maxResponse: string,
   judgeModel: string,
-  opts?: { signal?: AbortSignal },
+  opts?: { signal?: AbortSignal; canonReference?: string },
 ): Promise<EvalJudgeScore> {
   const result = await callLLMWithUsage(
-    [{ role: "system", content: buildJudgePrompt(item, maxResponse) }],
+    [{ role: "system", content: buildJudgePrompt(item, maxResponse, opts?.canonReference ?? "") }],
     {
       model: judgeModel,
       temperature: 0,
-      max_tokens: 400,
+      max_tokens: 500,
       feature_key: EVAL_FEATURE_KEY,
       signal: opts?.signal,
       timeoutMs: 25_000,

@@ -5,17 +5,19 @@ import { Slider } from "@/components/ui/slider";
 import {
   DEFAULT_SCORE_WEIGHTS,
   EVAL_SCORE_CRITERIA,
+  describeCriterion,
   type EvalScoreWeights,
 } from "@/services/evalJudgeScoring";
 
 interface Props {
+  characterName?: string | null;
   weights: EvalScoreWeights;
   onChange: (weights: EvalScoreWeights) => void;
   onSave: () => void;
   saving: boolean;
 }
 
-export default function EvalScoringPanel({ weights, onChange, onSave, saving }: Props) {
+export default function EvalScoringPanel({ characterName, weights, onChange, onSave, saving }: Props) {
   const total = EVAL_SCORE_CRITERIA.reduce((sum, criterion) => sum + (weights[criterion.key] ?? 0), 0);
 
   return (
@@ -23,9 +25,10 @@ export default function EvalScoringPanel({ weights, onChange, onSave, saving }: 
       <CardHeader>
         <CardTitle className="text-base">Étape 3 — Régler la grille de notation</CardTitle>
         <CardDescription>
-          Le juge note six critères de 0 à 5. La note finale sur 10 est la moyenne de ces six notes, pondérée par les
-          curseurs ci-dessous. Changer un poids recalcule immédiatement tous les classements, sans relancer un seul
-          test et sans coût.
+          Le juge note onze critères de 0 à 5, dont quatre sur le jeu du personnage (pas méta, impact vécu, canon,
+          voix distincte). La note finale sur 10 est la moyenne pondérée par les curseurs ci-dessous. Un test lancé
+          avant ces critères garde sa note sur ceux qu'il contient. Changer un poids recalcule immédiatement tous les
+          classements, sans relancer un seul test et sans coût.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -38,7 +41,7 @@ export default function EvalScoringPanel({ weights, onChange, onSave, saving }: 
                 <span className="text-sm font-medium">{criterion.label}</span>
                 <span className="text-xs text-muted-foreground">poids {value.toFixed(1)} · {share} % de la note</span>
               </div>
-              <p className="text-xs text-muted-foreground">{criterion.description}</p>
+              <p className="text-xs text-muted-foreground">{describeCriterion(criterion.description, characterName)}</p>
               <Slider
                 value={[value]}
                 min={0}

@@ -68,6 +68,8 @@ export async function fetchEvalResults(runId: string): Promise<EvalResult[]> {
 export async function createEvalRun(input: {
   baseline: EvalLiveSnapshot;
   configs: EvalTurnConfig[];
+  mode?: "compare" | "ofat";
+  characterFilter?: "all" | "max" | "emma";
   judgeModel: string;
   repeats: number;
   estimatedTurns: number;
@@ -80,7 +82,11 @@ export async function createEvalRun(input: {
       status: "queued",
       created_by: session?.user?.id ?? null,
       baseline: input.baseline as unknown as Json,
-      ofat_config: { configs: input.configs } as unknown as Json,
+      ofat_config: {
+        configs: input.configs,
+        mode: input.mode ?? "ofat",
+        characterFilter: input.characterFilter ?? "all",
+      } as unknown as Json,
       judge_model: input.judgeModel,
       repeats: input.repeats,
       estimated_turns: input.estimatedTurns,

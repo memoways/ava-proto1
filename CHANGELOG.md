@@ -4,6 +4,30 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [LLM juge, lot J1 : mesurer le jeu de Max et Emma] — 2026-11-09
+
+- Grille : quatre critères notés 0-5 dans le prompt du juge, le parseur et les poids par défaut — `not_meta`,
+  `lived_impact`, `canon_timeline`, `distinct_voice` — et `speech_quality` (moyenne des cinq sous-critères) compte
+  dans la note pondérée. Le juge reçoit un extrait en lecture seule de la fiche (situation, timeline, manière de
+  parler, derniers jours de la timeline en entier) pour juger le canon. Plus de « On entend Max » codé en dur : nom
+  du personnage de la question. Juge par défaut : Claude Sonnet 5.5 (`claude-sonnet-4` n'est plus servi).
+- Compatibilité : un résultat stocké avant J1 garde sa note sur les critères qu'il contient (les absents sortent du
+  calcul, sans zéro) ; des poids enregistrés avant J1 sont complétés par les nouveaux défauts.
+- Personnage : les questions portent Max ou Emma, le rejeu cible ce personnage ; une ligne sans personnage connu est
+  signalée inutilisable. Filtre « Max et Emma / Max / Emma » au lancement. Option Emma ajoutée au champ Personnage
+  de la base corpus (base technique ; base Caractères intacte).
+- Mode « Référence contre candidat » (par défaut) : deux valeurs de `MAX_PROMPT_VARIANT` et, au besoin, deux
+  instantanés de réglages en JSON, appliqués en mémoire pour le test seulement (`evaluationOverrides.promptVariant`
+  jusqu'au compilateur), jamais dans `admin_settings`. Résultats : verdict, Δ global, par personnage, par critère et
+  par question. L'ancien mode « un levier à la fois » reste disponible. Le rejeu applique désormais le plancher RAG
+  d'`optimized_v3` (6 souvenirs) comme le tour réel, au lieu du `RAG_TOP_K` réglé.
+- Estimation de coût recalée sur un run réel (juge compris) ; bruit mesuré entre passages d'une même question.
+- Premier run réel sandbox (126 tours, 2,10 $) : `rich_v2` ne bat pas `optimized_v3` (Δ −0,15) ; le juge relève
+  l'énumération des morts et « Peter tué il y a deux jours » côté Max. Détail dans le
+  [plan](docs/plan_llm_as_judge.md#premier-lancement-réel-sandbox-ulrich-9-novembre-2026).
+- [Corpus v1](docs/corpus_llm_juge_v1.md) : 20 lignes Max et Emma (M1–M4, E1–E4, recette, régressions du
+  carnage), validé par Ulrich et saisi dans la base corpus.
+
 ## [Feuille de route : jeu des personnages et LLM juge] — 2026-11-09
 
 - Lecture de seize tâches Notion (jeu, mémoire, rumination, RAG, Game Master, tests). Résultat dans la

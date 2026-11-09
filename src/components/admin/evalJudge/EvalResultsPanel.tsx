@@ -34,8 +34,8 @@ export default function EvalResultsPanel({
           <div>
             <CardTitle className="text-base">Étape 4 — Résultats et recommandations</CardTitle>
             <CardDescription>
-              Chaque configuration est comparée à ta configuration actuelle. Δ positif = la variante fait mieux.
-              Une variante instable entre les 3 passages est marquée non concluante.
+              Chaque configuration est comparée à la référence. Δ positif = la variante fait mieux.
+              Une variante dont les 3 passages d'une même question varient trop est marquée non concluante.
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={onExport} disabled={!canExport}>
@@ -174,7 +174,9 @@ export default function EvalResultsPanel({
               const judge = row.judge_json as { rationale?: string } | null;
               return (
                 <div key={row.id} className="border-b pb-3 text-sm">
-                  <p className="font-medium">{item?.question ?? row.item_id} · passage {row.repeat_index}</p>
+                  <p className="font-medium">
+                    {item?.question ?? row.item_id} · {item?.character_name || "?"} · passage {row.repeat_index}
+                  </p>
                   <p className="mt-1 whitespace-pre-wrap">{row.max_response || "—"}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {judge?.rationale || row.error_message || ""}

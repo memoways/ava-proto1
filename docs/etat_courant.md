@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 9 novembre 2026. Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 9 novembre 2026 (J1). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -17,8 +17,18 @@ Aucune publication production par CT1 ; main fusionné ne vaut pas publication.
 Lot C1 : vécu Notion protégé avant les faits et souvenirs présentés comme vécu
 (`optimized_v3`). [État des lieux et suite](analyse_parole_sous_le_choc.md). Base
 Caractères en lecture seule. Reste : écoute sandbox, puis la décision sur le générateur PRÉSENT.
-Suite ordonnée (mesure d'abord, LLM juge J1 → J3) : [feuille de route](feuille_de_route_jeu_personnages.md),
-prochain lot [J1](prompt_reprise_llm_juge_lot_j1.md).
+Suite ordonnée (mesure d'abord, LLM juge J1 → J3) : [feuille de route](feuille_de_route_jeu_personnages.md).
+
+## LLM juge J1 (9 novembre, code)
+
+Admin › Qualité › LLM as judge : mode « Référence contre candidat » par défaut (deux variantes de prompt ou deux
+instantanés JSON, en mémoire seulement), questions Max et Emma, quatre critères de jeu (`not_meta`,
+`lived_impact`, `canon_timeline`, `distinct_voice`) et `speech_quality` pondéré ; Δ par critère, question et
+personnage. Option Emma ajoutée à la base corpus. [Plan](plan_llm_as_judge.md#lot-j1--mesurer-le-jeu-de-max-et-emma-implémenté-9-novembre-2026).
+[Corpus v1](corpus_llm_juge_v1.md) validé par Ulrich et saisi dans la base corpus (20 lignes).
+Premier run réel (sandbox, 126 tours, 2,10 $) : `rich_v2` ne bat pas `optimized_v3` (Δ −0,15) ; Max énumère encore
+les morts et date mal la mort de Peter (erreur du résumé PRÉSENT) — base de mesure pour le lot P.
+Prochain lot : [J2, sans navigateur](prompt_reprise_llm_juge_lot_j2.md).
 
 ## CT1 — contexte et livraison
 

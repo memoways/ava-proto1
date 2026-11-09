@@ -136,7 +136,7 @@ export default function EvalCorpusPanel({
                 <li><strong>Must include</strong> : ne nie pas ; reste dans le doute ; une phrase courte</li>
                 <li><strong>Must not</strong> : ne nomme personne ; ne raconte pas la dispute ; ne pose pas deux questions</li>
                 <li><strong>Ton</strong> : retenu — <strong>Longueur max</strong> : 2 — <strong>Categorie</strong> : emotion</li>
-                <li><strong>Actif</strong> : coché — <strong>Personnage</strong> : Max — <strong>Ordre</strong> : 3</li>
+                <li><strong>Actif</strong> : coché — <strong>Personnage</strong> : Max ou Emma — <strong>Ordre</strong> : 3</li>
               </ul>
               <p>
                 « Must include » et « Reponse visee » sont indispensables : sans eux, la note du juge n'a aucun point de
@@ -152,6 +152,7 @@ export default function EvalCorpusPanel({
               <TableRow>
                 <TableHead className="w-16">Ordre</TableHead>
                 <TableHead>Question</TableHead>
+                <TableHead className="w-24">Personnage</TableHead>
                 <TableHead className="w-28">Catégorie</TableHead>
                 <TableHead className="w-24">État</TableHead>
                 <TableHead>Ce qui manque</TableHead>
@@ -165,6 +166,7 @@ export default function EvalCorpusPanel({
                   <TableRow key={item.id}>
                     <TableCell>{item.sort_order}</TableCell>
                     <TableCell className="max-w-sm truncate">{item.question}</TableCell>
+                    <TableCell>{item.character_name || "—"}</TableCell>
                     <TableCell>{item.category || "—"}</TableCell>
                     <TableCell>
                       {level === "off" ? (

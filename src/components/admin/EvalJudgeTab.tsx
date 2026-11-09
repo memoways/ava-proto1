@@ -8,15 +8,21 @@ import {
   EVAL_DEFAULT_JUDGE_MODEL,
   EVAL_REPEATS,
   buildOfatConfigs,
+  buildReferenceCandidateConfigs,
   defaultOfatSelection,
+  evalCharacterKey,
+  parseSnapshotOverrides,
   estimateEvalRun,
   judgeIsolatedEvalTurn,
+  listEvalJudgeModels,
   listEvalMaxModels,
   listEvalWorkItems,
   resultWorkKey,
   runIsolatedEvalTurn,
   snapshotLiveSettings,
   type EvalItem,
+  type EvalLiveSnapshot,
+  type EvalPromptVariant,
   type EvalResult,
   type EvalRun,
   type EvalTurnConfig,
@@ -26,6 +32,7 @@ import {
   DEFAULT_SCORE_WEIGHTS,
   analyseEvalResults,
   auditEvalCorpus,
+  compareReferenceCandidate,
   loadScoreWeights,
   saveScoreWeights,
   type EvalScoreWeights,
@@ -42,9 +49,34 @@ import {
   syncEvalItemsFromNotion,
 } from "@/services/evalJudgeStore";
 import EvalCorpusPanel from "./evalJudge/EvalCorpusPanel";
-import EvalLeversPanel, { type LeverToggles } from "./evalJudge/EvalLeversPanel";
+import EvalLeversPanel, { type EvalCharacterFilter, type EvalRunMode, type LeverToggles } from "./evalJudge/EvalLeversPanel";
+import EvalCompareSetup, { type CompareSideState } from "./evalJudge/EvalCompareSetup";
+import EvalComparisonPanel from "./evalJudge/EvalComparisonPanel";
 import EvalResultsPanel from "./evalJudge/EvalResultsPanel";
 import EvalScoringPanel from "./evalJudge/EvalScoringPanel";
+
+interface StoredRunConfig {
+  configs?: EvalTurnConfig[];
+  mode?: EvalRunMode;
+  characterFilter?: EvalCharacterFilter;
+}
+
+function defaultCandidateVariant(live: EvalPromptVariant): EvalPromptVariant {
+  return live === "rich_v2" ? "optimized_v3" : "rich_v2";
+}
+
+function buildCompareConfigs(live: EvalLiveSnapshot, reference: CompareSideState, candidate: CompareSideState) {
+  const ref = parseSnapshotOverrides(reference.snapshotJson);
+  const cand = parseSnapshotOverrides(candidate.snapshotJson);
+  return {
+    configs: buildReferenceCandidateConfigs(
+      live,
+      { promptVariant: reference.variant, ...ref.overrides },
+      { promptVariant: candidate.variant, ...cand.overrides },
+    ),
+    errors: [...ref.errors.map((error) => `référence : ${error}`), ...cand.errors.map((error) => `candidat : ${error}`)],
+  };
+}
 
 export default function EvalJudgeTab() {
   const [notionId, setNotionId] = useState("");
@@ -68,14 +100,23 @@ export default function EvalJudgeTab() {
     ragGenerous: true,
   });
   const [drillLabel, setDrillLabel] = useState<string | null>(null);
+  const [mode, setMode] = useState<EvalRunMode>("compare");
+  const [characterFilter, setCharacterFilter] = useState<EvalCharacterFilter>("all");
   const abortRef = useRef<AbortController | null>(null);
   const pauseRef = useRef(false);
 
   const live = useMemo(() => snapshotLiveSettings(), []);
   const catalog = useMemo(() => listLlmConfigModels(), []);
+  const judgeModels = useMemo(() => listEvalJudgeModels(), []);
   const evalMaxModels = useMemo(() => listEvalMaxModels(live.model), [live.model]);
   const liveCatalogModel = catalog.find((model) => model.id === live.model);
   const ofatDefaults = useMemo(() => defaultOfatSelection(live), [live]);
+  const [reference, setReference] = useState<CompareSideState>({ variant: live.promptVariant, snapshotJson: "" });
+  const [candidate, setCandidate] = useState<CompareSideState>({
+    variant: defaultCandidateVariant(live.promptVariant),
+    snapshotJson: "",
+  });
+  const compare = useMemo(() => buildCompareConfigs(live, reference, candidate), [candidate, live, reference]);
 
   useEffect(() => {
     if (extraModelsReady.current) return;
@@ -96,28 +137,39 @@ export default function EvalJudgeTab() {
     ],
   }), [extraModels, ofatDefaults.ragVariants, toggles]);
 
-  const configs = useMemo(() => buildOfatConfigs(live, selection), [live, selection]);
-  const audit = useMemo(() => auditEvalCorpus(items), [items]);
-  const activeItems = useMemo(
-    () => {
-      const usable = new Set(
-        audit.issues.filter((issue) => issue.level !== "error").map((issue) => issue.itemId),
-      );
-      return items.filter((item) => item.active && usable.has(item.id));
-    },
-    [audit.issues, items],
+  const configs = useMemo(
+    () => (mode === "compare" ? compare.configs : buildOfatConfigs(live, selection)),
+    [compare.configs, live, mode, selection],
   );
+  const filteredItems = useMemo(
+    () => items.filter((item) => characterFilter === "all" || evalCharacterKey(item.character_name) === characterFilter),
+    [characterFilter, items],
+  );
+  const audit = useMemo(() => auditEvalCorpus(filteredItems), [filteredItems]);
+  const usableItemsFor = useCallback((filter: EvalCharacterFilter) => {
+    const usable = new Set(
+      auditEvalCorpus(items).issues.filter((issue) => issue.level !== "error").map((issue) => issue.itemId),
+    );
+    return items.filter((item) => item.active && usable.has(item.id)
+      && (filter === "all" || evalCharacterKey(item.character_name) === filter));
+  }, [items]);
+  const activeItems = useMemo(() => usableItemsFor(characterFilter), [characterFilter, usableItemsFor]);
+  const compareBlocked = mode === "compare" && compare.errors.length > 0;
   const estimate = useMemo(
-    () => estimateEvalRun(activeItems.length, configs, EVAL_REPEATS),
-    [activeItems.length, configs],
+    () => estimateEvalRun(activeItems.length, configs, EVAL_REPEATS, judgeModel),
+    [activeItems.length, configs, judgeModel],
   );
   const runConfigs = useMemo(() => {
-    const stored = (activeRun?.ofat_config as { configs?: EvalTurnConfig[] } | null)?.configs;
+    const stored = (activeRun?.ofat_config as StoredRunConfig | null)?.configs;
     return stored?.length ? stored : configs;
   }, [activeRun, configs]);
   const analysis = useMemo(
     () => analyseEvalResults({ results, items, configs: runConfigs, weights }),
     [items, results, runConfigs, weights],
+  );
+  const comparison = useMemo(
+    () => compareReferenceCandidate({ results, items, weights }),
+    [items, results, weights],
   );
   const lastSyncAt = useMemo(
     () => items.reduce<string | null>((latest, item) => (
@@ -198,14 +250,19 @@ export default function EvalJudgeTab() {
     }
   }
 
-  async function executeRun(run: EvalRun, nextConfigs: EvalTurnConfig[], existing: EvalResult[]) {
+  async function executeRun(
+    run: EvalRun,
+    nextConfigs: EvalTurnConfig[],
+    existing: EvalResult[],
+    runItems: EvalItem[],
+  ) {
     const controller = new AbortController();
     abortRef.current = controller;
     pauseRef.current = false;
     setRunning(true);
     await patchEvalRun(run.id, { status: "running", started_at: run.started_at ?? new Date().toISOString() });
     const done = new Set(existing.map(resultWorkKey));
-    const queue = listEvalWorkItems(nextConfigs, activeItems, run.repeats, done);
+    const queue = listEvalWorkItems(nextConfigs, runItems, run.repeats, done);
     let completed = existing.length;
     const acc = [...existing];
     try {
@@ -220,7 +277,10 @@ export default function EvalJudgeTab() {
         setProgressLabel(`${work.config.label} · ${work.item.question.slice(0, 60)} · passage ${work.repeatIndex}`);
         const turn = await runIsolatedEvalTurn(work.item, work.config, { signal: controller.signal });
         const judge = turn.maxResponse
-          ? await judgeIsolatedEvalTurn(work.item, turn.maxResponse, run.judge_model, { signal: controller.signal })
+          ? await judgeIsolatedEvalTurn(work.item, turn.maxResponse, run.judge_model, {
+            signal: controller.signal,
+            canonReference: turn.canonReference,
+          })
           : null;
         const saved = await insertEvalResult({
           runId: run.id,
@@ -266,9 +326,15 @@ export default function EvalJudgeTab() {
       toast.error(audit.blockers[0] ?? "Corpus insuffisant");
       return;
     }
+    if (compareBlocked) {
+      toast.error(compare.errors[0]);
+      return;
+    }
     const currentLive = snapshotLiveSettings();
-    const currentConfigs = buildOfatConfigs(currentLive, selection);
-    const currentEstimate = estimateEvalRun(activeItems.length, currentConfigs, EVAL_REPEATS);
+    const currentConfigs = mode === "compare"
+      ? buildCompareConfigs(currentLive, reference, candidate).configs
+      : buildOfatConfigs(currentLive, selection);
+    const currentEstimate = estimateEvalRun(activeItems.length, currentConfigs, EVAL_REPEATS, judgeModel);
     if (!window.confirm(`Lancer ${currentEstimate.turns} tours (~${currentEstimate.llmCalls} appels LLM, ~$${currentEstimate.estimatedCostUsd.toFixed(3)}) ?`)) {
       return;
     }
@@ -276,6 +342,8 @@ export default function EvalJudgeTab() {
       const run = await createEvalRun({
         baseline: { ...currentLive, scoreWeights: weights } as typeof currentLive,
         configs: currentConfigs,
+        mode,
+        characterFilter,
         judgeModel,
         repeats: EVAL_REPEATS,
         estimatedTurns: currentEstimate.turns,
@@ -283,19 +351,19 @@ export default function EvalJudgeTab() {
       });
       setActiveRun(run);
       setResults([]);
-      await executeRun(run, currentConfigs, []);
+      await executeRun(run, currentConfigs, [], activeItems);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
   }
 
   async function handleResume(run: EvalRun) {
-    const stored = (run.ofat_config as { configs?: EvalTurnConfig[] } | null)?.configs;
-    const nextConfigs = stored?.length ? stored : configs;
+    const stored = run.ofat_config as StoredRunConfig | null;
+    const nextConfigs = stored?.configs?.length ? stored.configs : configs;
     const existing = await fetchEvalResults(run.id);
     setResults(existing);
     setActiveRun(run);
-    await executeRun(run, nextConfigs, existing);
+    await executeRun(run, nextConfigs, existing, usableItemsFor(stored?.characterFilter ?? "all"));
   }
 
   function handlePause() {
@@ -304,7 +372,7 @@ export default function EvalJudgeTab() {
   }
 
   function exportRun() {
-    const blob = new Blob([JSON.stringify({ run: activeRun, weights, results, analysis }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ run: activeRun, weights, results, analysis, comparison }, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -323,10 +391,11 @@ export default function EvalJudgeTab() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">LLM as judge — banc d’essai des réponses de Max</h2>
+          <h2 className="text-lg font-semibold">LLM as judge — banc d’essai des réponses de Max et Emma</h2>
           <p className="max-w-3xl text-sm text-muted-foreground">
             Quatre étapes : vérifier le corpus Notion, choisir ce qu’on compare, régler la grille de notation, lire les
-            résultats et les recommandations. Chaque question est jouée trois fois, sans mémoire entre les questions.
+            résultats. Question type : le prompt candidat fait-il mieux jouer Max et Emma que la référence ? Chaque
+            question est jouée trois fois, sans mémoire entre les questions.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void reload()} disabled={loading}>
@@ -346,9 +415,23 @@ export default function EvalJudgeTab() {
       />
 
       <EvalLeversPanel
+        mode={mode}
+        onModeChange={setMode}
+        compareSetup={(
+          <EvalCompareSetup
+            liveVariant={live.promptVariant}
+            reference={reference}
+            candidate={candidate}
+            onReferenceChange={setReference}
+            onCandidateChange={setCandidate}
+            errors={compare.errors}
+          />
+        )}
+        characterFilter={characterFilter}
+        onCharacterFilterChange={setCharacterFilter}
         live={live}
         liveModelLabel={liveCatalogModel?.label ?? live.model}
-        catalog={catalog}
+        catalog={judgeModels}
         evalModels={evalMaxModels}
         extraModels={extraModels}
         onExtraModelsChange={setExtraModels}
@@ -362,13 +445,16 @@ export default function EvalJudgeTab() {
         onResume={() => activeRun && void handleResume(activeRun)}
         running={running}
         canResume={Boolean(activeRun && (activeRun.status === "paused" || activeRun.status === "failed"))}
-        blocked={!audit.readyToRun}
-        blockedReason={audit.blockers[0] ?? null}
+        blocked={!audit.readyToRun || compareBlocked}
+        blockedReason={audit.blockers[0] ?? (compareBlocked ? compare.errors[0] : null)}
         progress={progress}
         progressLabel={progressLabel || `${results.length}/${activeRun?.total_turns ?? 0}`}
       />
 
+      {comparison ? <EvalComparisonPanel comparison={comparison} /> : null}
+
       <EvalScoringPanel
+        characterName={characterFilter === "all" ? null : characterFilter === "max" ? "Max" : "Emma"}
         weights={weights}
         onChange={setWeights}
         onSave={() => void handleSaveWeights()}
