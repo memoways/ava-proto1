@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Feuille de route : jeu des personnages et LLM juge] — 2026-11-09
+
+- Lecture de seize tâches Notion (jeu, mémoire, rumination, RAG, Game Master, tests). Résultat dans la
+  [feuille de route](docs/feuille_de_route_jeu_personnages.md) : la mesure passe d'abord (LLM juge J1 à J3), puis la
+  parole, la rumination, le storyworld spatial, le Game Master et les tests humains. Le document indique aussi les
+  regroupements de tâches retenus.
+- [Prompt de reprise du lot J1](docs/prompt_reprise_llm_juge_lot_j1.md), qui ajoute au juge les critères méta,
+  impact vécu, canon et voix distincte, plus le mode « référence vs candidat » et un corpus Max et Emma.
+- Documentation seulement. Aucun code ni réglage modifié.
+
 ## [Parole sous le choc, lot C1 : le vécu avant les faits] — 2026-11-09
 
 - État des lieux de la tâche Notion « Ava : parole sous le choc » : [analyse](docs/analyse_parole_sous_le_choc.md).
