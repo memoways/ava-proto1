@@ -35,7 +35,7 @@ D'abord un instrument de mesure, ensuite les améliorations. Chaque changement d
 
 ## Ordre des prochains lots
 
-1. **J1 — juge utile, lancé à la demande.** Prompt de reprise : [prompt_reprise_llm_juge_lot_j1.md](prompt_reprise_llm_juge_lot_j1.md).
+1. **J1 — juge utile, lancé à la demande.** Livré en code le 9 novembre ([plan](plan_llm_as_judge.md), [corpus v1 à valider](corpus_llm_juge_v1.md)). Prompt d'origine : [prompt_reprise_llm_juge_lot_j1.md](prompt_reprise_llm_juge_lot_j1.md).
    - **Grille** : ajouter quatre critères (`not_meta`, `lived_impact`, `canon_timeline`, `distinct_voice`), rendre le nom du personnage dynamique et pondérer `speech_quality`.
    - **Mode « référence vs candidat »** : comparer deux variantes de prompt ou deux instantanés de réglages.
    - **Corpus v1**, environ 20 lignes :
@@ -44,7 +44,7 @@ D'abord un instrument de mesure, ensuite les améliorations. Chaque changement d
      - les régressions RAG du carnage (Peter, Mona, contamination d'Ava).
    - **Base corpus** : ajouter Emma au champ Personnage. C'est une base technique, distincte de la base Caractères, qui reste en lecture seule.
    - **Premier usage** : mesurer C1, puis décider du sort du générateur PRÉSENT.
-2. **J2 — exécution sans navigateur.** Script Node sur sandbox, lancé à la main par `workflow_dispatch`. Il ne bloque pas la CI, pour maîtriser le coût.
+2. **J2 — exécution sans navigateur.** Prompt : [prompt_reprise_llm_juge_lot_j2.md](prompt_reprise_llm_juge_lot_j2.md). Script Node sur sandbox, lancé à la main par `workflow_dispatch`. Il ne bloque pas la CI, pour maîtriser le coût.
 3. **P — parole, guidée par J1.**
    - Générateur PRÉSENT à la 2e personne, sans obligation de tout couvrir.
    - Reformuler la consigne « livre d'abord ton contenu ».

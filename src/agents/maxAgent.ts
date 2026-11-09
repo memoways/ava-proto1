@@ -272,6 +272,8 @@ export type MaxLlmOverrides = {
   topP?: number;
 };
 
+type MaxPromptVariant = ReturnType<typeof getGameplaySettings>["MAX_PROMPT_VARIANT"];
+
 export async function simulateMaxResponse(
   input: MaxAgentInput,
   opts?: {
@@ -285,6 +287,8 @@ export async function simulateMaxResponse(
     signal?: AbortSignal;
     diagnosticTrace?: boolean;
     llmOverrides?: MaxLlmOverrides;
+    /** Evaluation-only prompt compiler, applied in memory for this call. */
+    promptVariant?: MaxPromptVariant;
     onSpeechToken?: (text: string) => void;
     finishSpeech?: (normalCompletion?: boolean) => string;
     recoverySpeechOnly?: boolean;
@@ -292,7 +296,7 @@ export async function simulateMaxResponse(
 ): Promise<SimulateMaxResult> {
   const characterName = opts?.characterContext?.displayName || opts?.characterName || "Max";
   const promptBuildStartedAt = performance.now();
-  const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext);
+  const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext, opts?.promptVariant);
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
   const llm = getLLMSettings();
   const maxTokens = opts?.llmOverrides?.maxTokens ?? llm.LLM_MAX_TOKENS;
@@ -526,8 +530,9 @@ export async function buildMaxSystemPrompt(
   input: MaxAgentInput,
   characterName: string = "Max",
   characterContext?: CharacterExecutionContext,
+  variantOverride?: MaxPromptVariant,
 ): Promise<MaxPromptAssemblyTrace> {
-  const variant = (() => {
+  const variant = variantOverride ?? (() => {
     try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
   })();
   if (characterContext) assertCharacterExecutionContext(characterContext);

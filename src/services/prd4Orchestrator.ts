@@ -28,6 +28,7 @@ import {
   type CharacterResponseGuardResult,
 } from "@/services/characterIdentityGuard";
 import { getGameplaySettings, getLLMSettings, isReasoningEnabledForModel } from "@/services/settingsService";
+import { characterRagTopKForVariant } from "@/services/characterRagTopK";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { selectOptimizedConversation, selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
@@ -120,6 +121,8 @@ export interface PRD4TurnInput {
   /** Test-only values; the public PRD4 execution graph remains unchanged. */
   evaluationOverrides?: {
     featureKey?: string;
+    /** In-memory prompt compiler for reference/candidate runs; never persisted. */
+    promptVariant?: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
     ragTopK?: number;
     ragThreshold?: number;
     ragRetrieveK?: number;
@@ -194,6 +197,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     try { return getGameplaySettings(); } catch { return null; }
   })();
   const evaluationOverrides = input.evaluationOverrides;
+  const promptVariant = evaluationOverrides?.promptVariant ?? gameplay?.MAX_PROMPT_VARIANT;
   const recentConversation = selectRecentConversation(input.conversationHistory);
   const sessionDurationSeconds = normalizeSessionDurationSeconds(gameplay?.TIMEOUT_SECONDS);
   const minimumClosureSeconds = getSessionMinimumClosureSeconds(sessionDurationSeconds);
@@ -260,9 +264,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       queryRAGDetailed(
         input.userMessage,
         recent,
-        evaluationOverrides?.ragTopK ?? (gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
-          ? Math.max(6, gameplay?.RAG_TOP_K ?? 3)
-          : gameplay?.RAG_TOP_K ?? 5),
+        evaluationOverrides?.ragTopK ?? characterRagTopKForVariant(promptVariant, gameplay?.RAG_TOP_K),
         evaluationOverrides?.ragThreshold ?? gameplay?.RAG_MATCH_THRESHOLD,
         {
           characterId: input.characterContext.characterId,
@@ -286,7 +288,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ragErrorKind = "rerank_failed";
     }
     matchesCount = matches.length;
-    ragContext = formatMaxRAGContext(matches, maxRagFormatOptionsForVariant(gameplay?.MAX_PROMPT_VARIANT));
+    ragContext = formatMaxRAGContext(matches, maxRagFormatOptionsForVariant(promptVariant));
     knowledgeContext = buildKnowledgeContextFromRAG(matches);
   } catch (err) {
     // An aborted parent means this turn is obsolete, not that RAG merely
@@ -331,7 +333,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   });
   const sliceUserTurns = input.conversationHistory.filter((message) => message.role === "user").length;
   const memoryLastTurn = structuredMemory?.lastTurn ?? 0;
-  const maxConversationHistory = gameplay?.MAX_PROMPT_VARIANT === "optimized_v3"
+  const maxConversationHistory = promptVariant === "optimized_v3"
     ? selectOptimizedConversation(
         input.conversationHistory,
         activeCharacter === "max" && memoryLastTurn < sliceUserTurns ? memoryLastTurn : 0,
@@ -417,6 +419,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           diagnosticTrace: diagnosticTraceEnabled,
           recoverySpeechOnly: retry,
           llmOverrides: evaluationOverrides?.llm,
+          promptVariant: evaluationOverrides?.promptVariant,
           onSpeechToken: retry || !input.streamControl ? undefined : text => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
             input.streamControl!.onToken(text);

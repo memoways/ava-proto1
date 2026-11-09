@@ -66,4 +66,13 @@ describe("EvalJudgeTab", () => {
     expect(button).toHaveProperty("disabled", true);
     expect(screen.getAllByText(/Aucune question active/).length).toBeGreaterThan(0);
   });
+
+  it("opens on reference vs candidate with the live variant as reference", async () => {
+    render(<EvalJudgeTab />);
+    expect(await screen.findByText("Référence")).toBeTruthy();
+    expect(screen.getByText("Candidat")).toBeTruthy();
+    expect(screen.getByLabelText(/Instantané de réglages/, { selector: "#eval-cand-snapshot" })).toBeTruthy();
+    expect(screen.getByText(/Max et Emma/, { selector: "span" })).toBeTruthy();
+    expect(screen.getAllByText(/legacy \(actuelle\)/).length).toBeGreaterThan(0);
+  });
 });

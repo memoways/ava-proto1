@@ -263,3 +263,21 @@ describe('P1 format within the selected output budget', () => {
   });
 
 });
+
+describe("evaluation prompt variant override (J1)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("compiles the in-memory variant instead of the saved setting, without touching settings", async () => {
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet("emma") as never);
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: "optimized_v3" } as never);
+    const saved = await buildMaxSystemPrompt(input, "Emma Munz", contexts.emma);
+
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: "legacy" } as never);
+    const overridden = await buildMaxSystemPrompt(input, "Emma Munz", contexts.emma, "optimized_v3");
+    const legacy = await buildMaxSystemPrompt(input, "Emma Munz", contexts.emma);
+
+    expect(overridden.finalSystemPrompt).toBe(saved.finalSystemPrompt);
+    expect(legacy.finalSystemPrompt).not.toBe(saved.finalSystemPrompt);
+    expect(getGameplaySettings().MAX_PROMPT_VARIANT).toBe("legacy");
+  });
+});
