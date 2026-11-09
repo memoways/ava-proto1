@@ -122,3 +122,15 @@ describe("admin aggregate", () => {
     expect(aggregateConversational(filterByDevice(rows, "smartphone")).dimensions.emotional_engagement.mean).toBe(2);
   });
 });
+
+describe("questionnaire layout per device", () => {
+  it("maps the session device class to a layout, desktop when unknown", async () => {
+    const { questionnaireLayoutFor, isTouchLayout } = await import("./conversationalQuestionnaireLayout");
+    expect(questionnaireLayoutFor("smartphone")).toBe("phone");
+    expect(questionnaireLayoutFor("tablet")).toBe("tablet");
+    expect(questionnaireLayoutFor("desktop")).toBe("desktop");
+    expect(questionnaireLayoutFor(undefined)).toBe("desktop");
+    expect(isTouchLayout("tablet")).toBe(true);
+    expect(isTouchLayout("desktop")).toBe(false);
+  });
+});

@@ -66,14 +66,13 @@ lecteur `<audio>` d'ElevenLabs hors geste ; la réplique passe désormais par l'
 après réception complète du MP3 sur iPhone). Appel smartphone : « Terminer » et minutage en haut à droite, autres
 personnages en haut à gauche. Reste la recette humaine : [docs/recette_adaptation_ecrans.md](recette_adaptation_ecrans.md).
 
-**Questionnaire conversationnel (8 novembre, lot 3 : validation finale et radar, désactivé par défaut).** Échange
-vocal court en 5 dimensions (une relance max, note 1–5 confirmée ou « non évalué », pas d'audio stocké, rien de demandé
-que la session connaît), derrière le réglage admin « Questionnaire conversationnel (à la voix) » (défaut PRD4). Lot 3 :
-synthèse par dimension éditable, note changée seulement par un toucher, radar participant (non évalué à part, jamais
-à 0), consentement transcription obligatoire, email/opt-ins facultatifs, « Valider et envoyer » seul déclencheur ;
-admin : radar des moyennes, verbatims, filtre appareil ; export Markdown. **Non fait** : premier envoi réel vers les
-colonnes Notion « Conv » (aucune ligne au 8 novembre) et recette voix réelle. [Plan](plan_questionnaire_conversationnel.md),
-[prompt lot 4](prompt_reprise_questionnaire_conversationnel_lot_4.md) (appareils et recette, dernier lot).
+**Questionnaire conversationnel (9 novembre, lot 4 : dernier lot, désactivé par défaut).** Parcours complet derrière
+le réglage « Questionnaire conversationnel (à la voix) » (🧭 Expérience → Orchestration, défaut PRD4) : 5 dimensions,
+une relance max, note confirmée ou « non évalué », synthèse éditable, radar, « Valider et envoyer » ; admin agrégé.
+Premier envoi réel vérifié dans Notion (iPhone, session `a3586dec`). Lot 4 : mise en page téléphone / tablette /
+desktop, texte de dictée gardé à l'arrêt, E2E iPhone/iPad. **Aucun lot ne suit** : reste la recette humaine,
+[docs/recette_questionnaire_conversationnel.md](recette_questionnaire_conversationnel.md), puis la décision d'activer
+le mode par défaut. [Plan](plan_questionnaire_conversationnel.md).
 
 **Adaptation aux écrans, lot 3 (8 novembre, code) — dernier lot du plan.** Tablette : même écran vidéo (avatar gardé),
 avec une prop `touchFirst` calculée une fois depuis la classe (`touchFirstFor`) : cibles 44 px (Terminer, Ignorer,

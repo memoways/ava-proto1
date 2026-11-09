@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel, lot 4 : écrans par appareil, fin de dictée, recette] — 2026-11-09
+
+- Mise en page selon l'appareil de la session : téléphone avec micro et validation fixés en bas, radar compact et
+  synthèse repliée ; tablette avec cibles de 44 px ; desktop avec question et transcript côte à côte.
+- Dictée : le texte affiché n'est plus effacé si le fournisseur ne renvoie pas de texte final à l'arrêt ; évènement
+  `conversational_dictation_finished` (longueurs, sans contenu).
+- E2E `@iphone` / `@ipad` jusqu'à « Valider et envoyer » ; fiche `docs/recette_questionnaire_conversationnel.md`.
+- Premier envoi réel vérifié dans Notion (session `a3586dec`). Dernier lot du plan ; reste la recette humaine et la
+  décision d'activer le mode par défaut.
+
 ## [Réglages par appareil, lot 2 : onglet Expérience › Appareils] — 2026-11-09
 
 - Décisions 2 et 3 du plan validées par Ulrich le 9 novembre. Nouvel onglet **Expérience › Appareils**
