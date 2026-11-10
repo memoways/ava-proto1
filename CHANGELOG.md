@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Pause : bilan et devoirs avant le lot R] — 2026-11-10
+
+- [Bilan de la pause](docs/bilan_pause_juge_parole_rumination_20261110.md) : ce que les lots C1, J1–J3, P et GM ont
+  changé, ce qui a été produit par des agents sans relecture (corpus v1 et J3, grille et poids du juge, définition de
+  la rumination, repère canon), le juge jamais comparé à un jugement humain, un défaut d'instrument (une réponse de
+  juge illisible compte 0/10), les devoirs d'Ulrich et de Romed et cinq scénarios à écouter en sandbox.
+- Lot R bloqué jusqu'au calibrage du juge, à une définition éditoriale de la rumination et à la relecture des
+  corpus ; prompt R, feuille de route, état courant et statut du corpus J3 mis à jour. Aucun code modifié.
+
 ## [GM post-tour : JSON lisible à chaque tour] — 2026-11-10
 
 - Diagnostic sur sandbox (juge J3) : les post-tours illisibles (17/72) étaient **tous tronqués** par le plafond de

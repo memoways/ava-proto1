@@ -28,6 +28,13 @@ Deux leviers mesurés par J2 sur sandbox-ulrich contre `optimized_v3`. **Contrat
 (429) au lieu de noter une réplique de secours. **À faire par Ulrich** : écoute AP5 en sandbox (Max surtout).
 [Plan](plan_parole_lot_p.md), [rapport](rapport_parole_lot_p_sandbox_20261109.md).
 
+## Pause du 10 novembre — reprendre la main avant R
+
+Ulrich arrête l'enchaînement des lots : le juge, ses corpus et sa grille ont été produits par des agents et n'ont
+jamais été comparés à un jugement humain ; `lived_v2` et le conseil GM touchent le jeu sans écoute. **Lot R bloqué**
+jusqu'au calibrage du juge (Ulrich), à une définition éditoriale de la rumination (Romed, Ulrich) et à la relecture
+des corpus. Devoirs, scénarios sandbox et ordre : [bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md).
+
 ## GM post-tour lisible (10 novembre, code)
 
 Les post-tours illisibles relevés par J3 étaient tous tronqués à 950 tokens (objet indenté, mémoire antérieure
@@ -35,7 +42,7 @@ recopiée). Contrat GM compact, mémoire antérieure en chaînes « id — texte
 d'illisibles sur sandbox, conseil GM transmis à chaque tour (56/56), notes du juge sans recul au-delà du bruit.
 Reste hors lot : un refus de la relation par le moteur annule le `memory_delta` du tour (9/72).
 [Plan](plan_gm_post_tour_json_fiable.md), [rapport](rapport_gm_post_tour_json_sandbox_20261110.md).
-Prochain lot inchangé : [R](prompt_reprise_rumination_sous_texte_lot_r.md).
+Prochain lot : [R](prompt_reprise_rumination_sous_texte_lot_r.md), bloqué par la pause ci-dessus.
 
 ## LLM juge J3 — plusieurs tours (9 novembre, code)
 

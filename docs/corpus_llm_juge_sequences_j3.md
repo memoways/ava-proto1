@@ -1,7 +1,9 @@
 # Corpus multi-tours du LLM juge (J3) — proposition à valider
 
 Date : 9 novembre 2026. Lot J3 ([feuille de route](feuille_de_route_jeu_personnages.md), lot 4 ;
-[plan du juge](plan_llm_as_judge.md)). **Statut : proposition, rien n'est saisi dans la base corpus Notion.**
+[plan du juge](plan_llm_as_judge.md)). **Statut : saisi dans la base corpus Notion le 10 novembre (Actif décoché) après un accord global ; relecture
+ligne à ligne par Ulrich et Romed à faire** ([bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md)) :
+Emma A et B sont entièrement écrites par un agent.
 Fichier lu par le rejeu : [`docs/eval/sequences_j3_v1.json`](eval/sequences_j3_v1.json).
 
 ## Sources lues (lecture seule, 9 novembre)
