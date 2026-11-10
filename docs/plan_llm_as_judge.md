@@ -289,7 +289,8 @@ pour décider du lot R (rumination et sous-texte) sur des mesures.
 - **Pour R** : la rumination existe mais tourne en formules répétées (`rumination` ≈ 3,3/5, `thread_resumption`
   le plus bas) ; Max accepte des prémisses fausses du joueur (thermos « le même soir », « Emma a contaminé Ava ») ;
   Emma « pas vu le film » ne présente pas ce qu'elle nomme. Le GM post-tour rend un JSON illisible dans ~17 % des
-  tours : conseil et mémoire du tour perdus, en jeu comme en rejeu.
+  tours : conseil et mémoire du tour perdus, en jeu comme en rejeu. Corrigé le 10 novembre (troncatures à 950 tokens ;
+  0/72 ensuite) : [plan](plan_gm_post_tour_json_fiable.md).
 - **Limites** : repère canon du juge sans les premiers jours (pénalise le premier soir de `max-A`, des deux côtés) ;
   corpus non validé ; séquences C et D en attente des arbitrages de Romed.
 

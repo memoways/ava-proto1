@@ -47,7 +47,7 @@ describe("GM optional structured handoff compatibility", () => {
     expect(messages[0].content).toContain('sans rotation obligatoire');
     expect(messages[0].content).not.toContain('Jamais un état inventé ni trois fois');
     expect(messages[1].content).toContain('déclencheurs');
-    expect(options).toMatchObject({ max_tokens: 950, model: 'existing-gm' });
+    expect(options).toMatchObject({ max_tokens: 1600, model: 'existing-gm' });
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
   });
   it("accepts a historical JSON without next_speech_state under the actual published v7 prompt", async () => {
@@ -82,7 +82,7 @@ describe("GM optional structured handoff compatibility", () => {
     expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
     expect(vi.mocked(callLLMWithUsage).mock.calls[0][0][0].content).toBe(`${EXPERIENCE_DIRECTOR_SYSTEM_PROMPT}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}`);
-    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 1600, timeoutMs: 12000 });
     expect(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT).not.toContain("handoff_assessment");
     expect(buildExperienceDirectorPrompt(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, DEFAULT_DIRECTOR_CONFIG)).not.toContain("handoff_assessment");
   });
@@ -162,9 +162,9 @@ describe('live same-call handoff context', () => {
     expect(messages[0].content).toContain('Pour player_request, si aucune source admissible');
     expect(messages[0].content).toContain('Pour gm_proposal, origin reprend les identifiants courants');
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
-    expect(options).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    expect(options).toMatchObject({ max_tokens: 1600, timeoutMs: 12000 });
   });
-  it('adds exact ownership, open request and delivered evidence while retaining one 950-token call', async () => {
+  it('adds exact ownership, open request and delivered evidence while retaining one 1600-token call', async () => {
     const fixture = validInput();
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: JSON.stringify({ ...historicalJson,
       handoff_assessment: validAssessment() }), ...llmMetadata });
@@ -176,7 +176,7 @@ describe('live same-call handoff context', () => {
     expect(last[0][1].content).toContain('"turnId":"session:11"');
     expect(last[0][1].content).toContain('"orchestrationVersionId":"v6"');
     expect(last[0][1].content).toContain(JSON.stringify(fixture.delivery!.delivered));
-    expect(last[1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    expect(last[1]).toMatchObject({ max_tokens: 1600, timeoutMs: 12000 });
     expect(validateCharacterHandoff({ ...fixture, evaluation: result }).authorized).toBe(true);
   });
 });
@@ -257,7 +257,7 @@ describe("live handoff prompt contract over historical schemas", () => {
       expect(extension).toMatch(/prioritaire sur le schéma historique/);
       expect(extension).toMatch(/accord effectivement délivré/);
       expect(callLLMWithUsage).toHaveBeenCalledOnce();
-      expect(options).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+      expect(options).toMatchObject({ max_tokens: 1600, timeoutMs: 12000 });
     },
   );
 });
@@ -367,7 +367,7 @@ describe('lot 3 — historical references and GM lifetime', () => {
     expect(system).toContain('JAMAIS des consentRef');
     expect(validateCharacterHandoff({ ...fixture, delivery, evaluation: result }).authorized).toBe(false);
     expect(callLLMWithUsage).toHaveBeenCalledOnce();
-    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 950, timeoutMs: 12000 });
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ max_tokens: 1600, timeoutMs: 12000 });
   });
   it.each([['max', 'emma'], ['emma', 'max']] as const)('evaluates delivered T12 evidence through v7 %s → %s', async (source, target) => {
     const fixture = validInput();

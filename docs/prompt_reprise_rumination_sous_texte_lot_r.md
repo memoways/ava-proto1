@@ -24,8 +24,10 @@ Tu exécutes et livres **uniquement le lot R** dans
   le plus bas (2,4–3,1/5). Max **accepte des prémisses fausses** du joueur (thermos « le même soir », « Emma a
   contaminé Ava »). Emma « pas vu le film » nomme Mona, Léo, la contamination sans les présenter. Le prénom et le
   registre de l'interlocuteur sont peu repris alors que la mémoire structurée les contient.
-- Le GM post-tour rend un JSON illisible dans ~17 % des tours (`invalid_json · json_unreadable`) : conseil et mémoire
-  du tour perdus, en jeu comme en rejeu.
+- GM post-tour : les ~17 % de JSON illisibles mesurés par J3 étaient des troncatures ; corrigé le 10 novembre
+  (0/72 illisible, conseil transmis à chaque tour, [rapport](rapport_gm_post_tour_json_sandbox_20261110.md)). Un
+  refus de la relation par le moteur annule encore le `memory_delta` du tour (9/72) : lire la colonne « Mémoire »
+  du rapport J3 en conséquence.
 - Limite connue : le repère canon du juge ne contient que les derniers jours de la timeline en entier ; le juge de
   séquence a pénalisé la scène canon du premier soir (`max-A`).
 - Corpus J3 : proposition [`docs/eval/sequences_j3_v1.json`](eval/sequences_j3_v1.json), à valider par Ulrich
@@ -53,8 +55,9 @@ fiche** (texte candidat en mémoire, jamais écrit dans la base Caractères) et 
 3. **Mesure** : `npm run eval:judge:sequences` à 3 passages, plafond explicite (3,50 $ par run), un run par levier ;
    lire `rumination`, `thread_resumption`, `continuity` et la note par tour (aucun recul de `canon_timeline` ni de
    `must_not`). Adoption seulement au-delà des seuils de bruit ci-dessus.
-4. **GM illisible** : mesurer le taux `invalid_json` sur les mêmes runs ; s'il gêne la lecture du levier (a),
-   proposer un lot séparé de fiabilisation plutôt que de le traiter ici.
+4. **Boucle GM** : vérifier sur les mêmes runs que les post-tours restent lisibles (colonne motif du rapport,
+   `output_shape` en cas d'échec) et que les conseils sont transmis ; un recul de la note de séquence d'environ
+   −0,35 a été vu sur quatre runs après la correction du GM (sous le bruit) : le surveiller.
 
 ## Hors périmètre
 

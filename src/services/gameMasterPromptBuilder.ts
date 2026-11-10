@@ -1,6 +1,6 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "./characterConversation";
-import { GM_JSON_EXAMPLE } from "./gameMasterContract";
+import { GM_JSON_EXAMPLE, GM_MIN_MAX_TOKENS } from "./gameMasterContract";
 
 /** Added to the same GM call only when the runtime supplies exact handoff context. */
 export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `CONTRAT RUNTIME DE PASSAGE — prioritaire sur le schéma historique et sa règle de suggestion au tour suivant.
@@ -23,7 +23,7 @@ Analyse la réplique complète : accept|object|defer. stance=accept seulement po
 refusal=true dès qu'un refus de transfert contredit l'accord dans la réplique complète, même si un extrait semble affirmatif. Ne classe jamais accept un refus avec ou sans ne, « Je vais l'appeler… enfin non » ou un oui hors contexte. Une inquiétude générale sur les sentiments de Max ne vaut pas refus de transfert. Le moteur garde ses vetos et vérifie le reçu entendu, la fraîcheur, version, source et cible.
 Une demande ouverte doit être reconfirmée defer au tour courant ; null, refus ou retrait la ferme. Ne ressuscite pas une ancienne demande. Pour object/defer, action peut rester none. Préserve seuil, quota, pause, disponibilité, version et clic du joueur ; aucun transfert automatique ni partage des mémoires privées.
 Procédure de passage à rappeler dans proposalGuidance sans la réciter au joueur : ${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}
-Budget de sortie 950 tokens conservé : émettre handoff_assessment avant memory_delta ; fermer l'objet entier. notes : 40 caractères maximum ; next_turn_guidance et proposalGuidance : 100 caractères chacune. Pas de commentaire ni répétition de preuves.
+Budget de sortie ${GM_MIN_MAX_TOKENS} tokens conservé : émettre handoff_assessment avant memory_delta ; fermer l'objet entier. notes : 40 caractères maximum ; next_turn_guidance et proposalGuidance : 100 caractères chacune. Pas de commentaire ni répétition de preuves.
 memory_delta : uniquement les nouveautés du dernier échange, jamais une copie de la mémoire. null si rien de nouveau ; sinon seulement les champs utiles, deux faits courts par liste et lastExchange en 20 mots maximum. N'invente ni n'efface de fait pour raccourcir. Une proposition relationship n'est utile que si elle change l'état, avec métadonnées et preuves exactes ; sinon l'omettre.`;
 
 const TONE_LABELS: Record<ExperienceDirectorEditorConfig["tone"], string> = {

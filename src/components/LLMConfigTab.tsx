@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { toast } from "sonner";
 import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles, Brain } from "lucide-react";
 import {
@@ -371,9 +372,9 @@ export default function LLMConfigTab() {
           <Slider
             value={[settings.LLM_MAX_TOKENS_GM]}
             onValueChange={([v]) => updateLocal({ LLM_MAX_TOKENS_GM: v })}
-            min={950} max={2000} step={50}
+            min={GM_MIN_MAX_TOKENS} max={3000} step={50}
           />
-          <p className="mt-1 text-xs text-muted-foreground">Plancher P3 : 950 tokens pour conserver le JSON complet (le réglage historique 180 est refusé).</p>
+          <p className="mt-1 text-xs text-muted-foreground">Plancher : {GM_MIN_MAX_TOKENS} tokens pour conserver le JSON complet (les réglages historiques 180 et 950 sont relevés).</p>
         </div>
       </section>
 
