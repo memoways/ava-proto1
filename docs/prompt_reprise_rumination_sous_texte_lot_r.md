@@ -4,6 +4,15 @@ Tu exécutes et livres **uniquement le lot R** dans
 `/Users/ulrich/CodeProjects/memoways/ava-proto1` (remote
 `https://github.com/memoways/ava-proto1`).
 
+> **Bloqué depuis le 10 novembre 2026 — préalables humains.** Ne commence pas ce lot tant que ces trois
+> conditions ne sont pas remplies et datées dans la tâche Notion « Évaluer le besoin d'un complément rumination » :
+> (1) Ulrich a calibré le juge sur la fiche des 10 réponses notées à l'aveugle, et l'écart avec le juge est acceptable
+> ou la grille a été revue ; (2) Romed et Ulrich ont validé une **définition éditoriale de la rumination** (sujets,
+> déclencheurs, formes, ratés, expérience du joueur, exemples) ; (3) les corpus v1 et J3 ont été relus ligne à ligne.
+> Sinon, arrête-toi et renvoie au [bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md).
+> Une fois débloqué, la définition validée **remplace** la description agent du critère `rumination` du juge et sert
+> de cahier des charges aux deux leviers ci-dessous.
+
 **Avant de commencer**
 - Lis AGENTS.md, `docs/etat_courant.md`, la [feuille de route](feuille_de_route_jeu_personnages.md) (lot 5, « R »),
   le [plan du juge](plan_llm_as_judge.md) (section « Lot J3 ») et le [rapport J3](rapport_llm_juge_j3_sandbox_20261109.md).
