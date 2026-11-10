@@ -466,7 +466,11 @@ export function describeGmIssue(gm: PRD4PostTurnEvaluation | null): string | nul
   if (!gm) return "sans état terminal";
   if (gm.execution_status === "executed" || !gm.execution_status) return null;
   const codes = (gm.validation_issues ?? []).map((issue) => issue.missing_fields?.length
-    ? `${issue.code}(${issue.missing_fields.join(",")})` : issue.code);
+    ? `${issue.code}(${issue.missing_fields.join(",")})`
+    : issue.output_shape
+      ? `${issue.code}(${[issue.output_shape, issue.finish_reason ? `fin ${issue.finish_reason}` : null,
+        issue.completion_tokens != null ? `${issue.completion_tokens} tokens` : null].filter(Boolean).join(", ")})`
+      : issue.code);
   return [gm.execution_reason ?? gm.execution_status, ...codes].join(" · ");
 }
 

@@ -1,6 +1,6 @@
 # Ava — état courant
 
-Mise à jour : 9 novembre 2026 (lot J3). Entrée courte de reprise, historique dans CHANGELOG.
+Mise à jour : 10 novembre 2026 (GM post-tour lisible). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
 
@@ -28,13 +28,22 @@ Deux leviers mesurés par J2 sur sandbox-ulrich contre `optimized_v3`. **Contrat
 (429) au lieu de noter une réplique de secours. **À faire par Ulrich** : écoute AP5 en sandbox (Max surtout).
 [Plan](plan_parole_lot_p.md), [rapport](rapport_parole_lot_p_sandbox_20261109.md).
 
+## GM post-tour lisible (10 novembre, code)
+
+Les post-tours illisibles relevés par J3 étaient tous tronqués à 950 tokens (objet indenté, mémoire antérieure
+recopiée). Contrat GM compact, mémoire antérieure en chaînes « id — texte », plancher 1600 : **23,6 % → 0 %**
+d'illisibles sur sandbox, conseil GM transmis à chaque tour (56/56), notes du juge sans recul au-delà du bruit.
+Reste hors lot : un refus de la relation par le moteur annule le `memory_delta` du tour (9/72).
+[Plan](plan_gm_post_tour_json_fiable.md), [rapport](rapport_gm_post_tour_json_sandbox_20261110.md).
+Prochain lot inchangé : [R](prompt_reprise_rumination_sous_texte_lot_r.md).
+
 ## LLM juge J3 — plusieurs tours (9 novembre, code)
 
 `npm run eval:judge:sequences` rejoue des séquences de 3 à 5 tours sur sandbox (historique, mémoire structurée, conseil
 GM du tour précédent), en mémoire, sans session ni ligne `eval_runs` ; note par tour (grille J1) et note de séquence
 (continuité, reprise d'un fil, rumination, timeline, trajectoire) séparées. Bruit : par tour < 0,3, par séquence < 1,0.
 `lived_v2` confirmé sur plusieurs tours sans recul (longueur +1,02). Rumination en formules répétées, prémisses
-fausses acceptées par Max, GM post-tour illisible ~17 % des tours. 7,87 $ mesurés.
+fausses acceptées par Max, GM post-tour illisible ~17 % des tours (corrigé le 10 novembre). 7,87 $ mesurés.
 [Plan](plan_llm_as_judge.md#lot-j3--juge-sur-plusieurs-tours-9-novembre-2026), [rapport](rapport_llm_juge_j3_sandbox_20261109.md).
 **À faire par Ulrich** : valider le [corpus J3 proposé](corpus_llm_juge_sequences_j3.md) (rien n'est saisi dans
 Notion) ; Romed : arbitrages A–F pour les séquences C et D. Prochain lot :

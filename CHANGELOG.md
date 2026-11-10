@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [GM post-tour : JSON lisible à chaque tour] — 2026-11-10
+
+- Diagnostic sur sandbox (juge J3) : les post-tours illisibles (17/72) étaient **tous tronqués** par le plafond de
+  950 tokens (`finish_reason: length`). L'objet était indenté dans un bloc \`\`\`json et `memory_delta` recopiait
+  la mémoire antérieure en objets `{id, text, sourceTurn}`, que le nettoyage ignore de toute façon.
+- Contrat technique GM (`GM_RUNTIME_OUTPUT_INSTRUCTIONS`, code) : objet compact sur une ligne, sans markdown ;
+  `memory_delta` = nouveautés du dernier échange seulement, jamais une copie de la mémoire, `lastExchange` toujours
+  renseigné. MÉMOIRE AVANT LE TOUR présente ses entrées en chaînes « id — texte » (plus de gabarit d'objet à
+  recopier). Sens des champs inchangé.
+- Plancher de sortie GM `GM_MIN_MAX_TOKENS` = 1600 (au lieu de 950), appliqué à la lecture des réglages :
+  `admin_settings` n'est pas modifié. Écran LLM : curseur 1600–3000.
+- Diagnostic borné d'un post-tour illisible (`validation_issues[].output_shape` `empty` | `truncated` | `no_object` |
+  `syntax`, `finish_reason`, `completion_tokens`, `output_chars`, jamais le texte) : rapport J3 et Admin › Sessions.
+  Extraction déplacée dans `src/agents/gmJsonOutput.ts` ; tests sur une sortie réelle anonymisée.
+- Mesures sandbox ([rapport](docs/rapport_gm_post_tour_json_sandbox_20261110.md), [plan](docs/plan_gm_post_tour_json_fiable.md),
+  8,72 $) : illisibles **23,6 % → 0 %**, conseils transmis 44/56 → 56/56, mémoire absorbée 54/72 → 63/72, au plus
+  757 tokens produits ; notes du juge sans recul au-delà du bruit. Reste : un refus de la relation par le moteur
+  annule tout le `memory_delta` du tour (9/72), règle existante à décider à part.
+
 ## [LLM juge, lot J3 : juge sur plusieurs tours] — 2026-11-09
 
 - `npm run eval:judge:sequences -- --candidate optimized_v3 [--reference-json …] [--candidate-json @fichier] [--repeats 2]` :

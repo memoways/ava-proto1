@@ -941,6 +941,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                           <p key={index} className="text-amber-400 mt-0.5">
                             {issue.code}{issue.reason ? ` : ${issue.reason}` : ""}
                             {issue.missing_fields?.length ? ` — champs manquants : ${issue.missing_fields.join(", ")}` : ""}
+                            {issue.output_shape ? ` — forme : ${issue.output_shape}${issue.finish_reason ? `, fin ${issue.finish_reason}` : ""}${issue.completion_tokens != null ? `, ${issue.completion_tokens} tokens` : ""}` : ""}
                           </p>
                         ))}
                         {evalEntry.next_turn_guidance && (

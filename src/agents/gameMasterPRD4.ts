@@ -1,8 +1,9 @@
 import { withTimeout } from '@/services/asyncUtils';
 import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS, recoverHandoffAssessment, RECOVERED_HANDOFF_GUIDANCE, RECOVERED_HANDOFF_REASON } from '@/services/handoffCoordinator';
 import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
-import { GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
+import { GM_MIN_MAX_TOKENS, GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
 import { formatVideoCandidateLine } from '@/services/videoCandidateLine';
+import { describeUnreadableGmOutput, extractGmJson } from '@/agents/gmJsonOutput';
 import { selectSpeechState } from '@/services/speechRugosity';
 import type { OpenHandoffRequest } from '@/services/characterHandoffState';
 import type { ResponseDeliveryReceipt } from '@/services/responseDelivery';
@@ -237,42 +238,9 @@ Règles "memory_delta" :
 
 Pas de markdown, pas de \`\`\`. Uniquement l'objet JSON.`;
 
-function extractJson(text: string): unknown {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
-  try { return JSON.parse(trimmed); } catch { /* scan below */ }
-
-  for (const candidate of jsonObjectCandidates(trimmed)) {
-    try { return JSON.parse(candidate); } catch { /* try next balanced object */ }
-  }
-  return undefined;
-}
-
-function jsonObjectCandidates(text: string): string[] {
-  const out: string[] = [];
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-    } else if (ch === "{") {
-      if (depth === 0) start = i;
-      depth += 1;
-    } else if (ch === "}" && depth > 0) {
-      depth -= 1;
-      if (depth === 0 && start >= 0) out.push(text.slice(start, i + 1));
-    }
-  }
-  return out;
+/** Prompt form of stored memory items: "id — text". */
+export function formatMemoryItems(items: ReadonlyArray<{ id: string; text: string }> | undefined): string[] {
+  return (items ?? []).map((item) => `${item.id} — ${item.text}`);
 }
 
 function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): string {
@@ -287,11 +255,14 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
         .join("\n")
     : "(aucune)";
   const memory = input.conversationMemoryBefore;
+  // Items are shown as "id — text" strings, not objects: the id stays available
+  // for resolvedThreadIds and the model has no object template to echo back
+  // (J3 measure: echoed {id,text,sourceTurn} objects drove the truncations).
   const memoryBefore = memory ? JSON.stringify({
-    interlocutor: memory.interlocutor,
-    openThreads: memory.openThreads,
-    commitments: memory.commitments,
-    topics: memory.topics.slice(-8),
+    interlocutor: { ...memory.interlocutor, traits: formatMemoryItems(memory.interlocutor.traits) },
+    openThreads: formatMemoryItems(memory.openThreads),
+    commitments: formatMemoryItems(memory.commitments),
+    topics: formatMemoryItems(memory.topics.slice(-8)),
     relationship: memory.relationship,
     lastExchange: memory.lastExchange,
     lastTurn: memory.lastTurn,
@@ -538,7 +509,7 @@ export async function evaluatePostTurnPRD4(
   let service: ServiceObservation = { service: "gm", requested_provider: "openrouter", requested_model: null, resolved_provider: "openrouter", resolved_model: null, effective_provider: null, effective_model: null, transport: "http_batch" };
   let result: PRD4PostTurnEvaluation;
   let model = "";
-  let effectiveMaxTokens = 950;
+  let effectiveMaxTokens = GM_MIN_MAX_TOKENS;
   const allVideos = input.handoffContext?.candidateText !== undefined ? []
     : await withTimeout('gm_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
   // Only eligible candidates reach the prompt and the accepted ids.
@@ -570,13 +541,13 @@ export async function evaluatePostTurnPRD4(
   try {
     const llm = getLLMSettings();
     model = input.modelOverride?.trim() || llm.LLM_MODEL_GM;
-    effectiveMaxTokens = Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, 950);
+    effectiveMaxTokens = Math.max(llm.LLM_MAX_TOKENS_GM ?? 0, GM_MIN_MAX_TOKENS);
     const callRes = await spans.run("gm_generation", () => callLLMWithUsage(
       messages,
       {
         model,
         temperature: 0.2,
-        // Le réglage GM historique (souvent 180) suffit aux labels mais pas à
+        // Le réglage GM historique (souvent 180, puis 950) ne suffit pas à
         // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
         // ajouter d'appel LLM.
         max_tokens: effectiveMaxTokens,
@@ -593,14 +564,16 @@ export async function evaluatePostTurnPRD4(
     if (input.signal?.aborted) throw new DOMException('Obsolete GM evaluation', 'AbortError');
     llmTrace = callRes.diagnosticTrace;
     rawResponse = callRes.content;
-    const parsed = spans.runSync("gm_validation_json", () => extractJson(callRes.content));
+    const parsed = spans.runSync("gm_validation_json", () => extractGmJson(callRes.content));
     if (!isCompleteGMJson(parsed)) {
       const isObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
       const missing = REQUIRED_GM_JSON_FIELDS.filter(field => !isObject || !Object.prototype.hasOwnProperty.call(parsed, field));
       const code = parsed === undefined ? "json_unreadable" : "schema_incomplete";
-      validationIssues.push(code === "json_unreadable" ? { code } : { code, missing_fields: missing });
+      validationIssues.push(code === "json_unreadable"
+        ? { code, ...describeUnreadableGmOutput(callRes.content, callRes.finishReason, callRes.usage?.completion_tokens) }
+        : { code, missing_fields: missing });
       // Never log response text outside opt-in diagnostics.
-      console.warn("[GM-PRD4] validation:", code, code === "schema_incomplete" ? missing : []);
+      console.warn("[GM-PRD4] validation:", code, code === "schema_incomplete" ? missing : validationIssues[validationIssues.length - 1]);
       diagnosticError = code === "json_unreadable" ? "Réponse JSON illisible" : `Schéma GM incomplet : ${missing.join(", ")}`;
       result = { ...DEFAULT_RESULT, notes: diagnosticError };
       executionStatus = "invalid";

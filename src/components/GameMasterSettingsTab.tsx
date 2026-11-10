@@ -35,6 +35,7 @@ import {
   GM_TONE_OPTIONS,
 } from "@/services/gameMasterPromptBuilder";
 import { getGameplaySettings, getLLMSettings, listLlmConfigModels, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
+import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, RuntimeCharacter } from "@/types";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
@@ -814,7 +815,7 @@ export default function GameMasterSettingsTab() {
                 {listLlmConfigModels().map((model) => <SelectItem key={model.id} value={model.id}>{model.label} · {model.id}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Le test reste sans effet réel et conserve le plancher JSON GM de 950 tokens.</p>
+            <p className="text-xs text-muted-foreground">Le test reste sans effet réel et conserve le plancher JSON GM de {GM_MIN_MAX_TOKENS} tokens.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <Textarea value={testUser} onChange={(event) => setTestUser(event.target.value)} placeholder="Message utilisateur" />

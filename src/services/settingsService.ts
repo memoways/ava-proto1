@@ -1,6 +1,7 @@
 import { HANDS_FREE_DEFAULTS, normalizeHandsFreeSettings, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import defaultSettings from "@/config/settings.json";
 import { DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC } from "@/services/videoEligibility";
+import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { ELEVENLABS_EXPRESSIVE_MODEL, ELEVENLABS_MODEL_CAPABILITIES, normalizeElevenLabsModelId } from "../../supabase/functions/_shared/elevenLabsModels";
 import {
   deleteEnvironmentSetting,
@@ -225,8 +226,8 @@ const llmDefaults: LLMSettings = {
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
   LLM_TEMPERATURE_GM: 0.3,
   // Le GM produit l'évaluation complète, sa mémoire et ses garde-fous en JSON.
-  // Le plan P3 impose un plancher effectif de 950 pour éviter les sorties tronquées.
-  LLM_MAX_TOKENS_GM: 950,
+  // Plancher effectif (P3 : 950, relevé à 1600 le 10 novembre 2026) pour éviter les sorties tronquées.
+  LLM_MAX_TOKENS_GM: GM_MIN_MAX_TOKENS,
   LLM_REASONING: {},
 };
 
@@ -306,7 +307,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     LLM_MODEL_GM: gmModel.modelId,
     LLM_MAX_TOKENS: clampCharacterMaxTokens(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS),
     LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
-    LLM_MAX_TOKENS_GM: Math.max(950, Math.floor(Number(settings.LLM_MAX_TOKENS_GM) || llmDefaults.LLM_MAX_TOKENS_GM)),
+    LLM_MAX_TOKENS_GM: Math.max(GM_MIN_MAX_TOKENS, Math.floor(Number(settings.LLM_MAX_TOKENS_GM) || llmDefaults.LLM_MAX_TOKENS_GM)),
     LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
   };
 }

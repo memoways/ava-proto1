@@ -405,6 +405,11 @@ export interface PRD4PostTurnEvaluation {
       | "handoff_proof_recovered";
     missing_fields?: string[];
     reason?: import("@/services/characterHandoff").CharacterHandoffAuditReason;
+    /** json_unreadable only: bounded shape of the output, never its text. */
+    output_shape?: import("@/agents/gmJsonOutput").GmOutputShape;
+    finish_reason?: string | null;
+    output_chars?: number;
+    completion_tokens?: number | null;
   }>;
   /** Personnage du tour, attribué par le runtime et jamais par le modèle. */
   character_key?: import("./conversationMemory").RuntimeCharacter;
