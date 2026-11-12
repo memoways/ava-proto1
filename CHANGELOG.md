@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Capacité Soleure et migration Coolify] — 2026-11-12
+
+- [Étude et plan](docs/plan_capacite_soleure_migration_coolify.md) : comparaison Lovable / Coolify, analyse statique ciblée, hypothèses de capacité et de coûts, migration et campagne de mesure. Aucune capacité démontrée ni migration engagée. [Reprise](docs/prompt_reprise_capacite_soleure_lot_1.md).
+
 ## [Plan de rappel sortant de Max] — 2026-11-12
 
 - [Plan et prompt de reprise](docs/plan_rappel_sortant_max.md) : expérience souhaitée, pistes
