@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Capacité Soleure (12 novembre)** : [étude Lovable / Coolify et migration](plan_capacite_soleure_migration_coolify.md), analyse statique et scénarios de coût ; aucune capacité démontrée ni migration décidée. [Reprise mesures](prompt_reprise_capacite_soleure_lot_1.md).
+
 **Rappel sortant de Max (12 novembre)** : [plan et prompt de reprise](plan_rappel_sortant_max.md)
 préparés pour Soleure. Étude de faisabilité complète et prototype non lancés ; choix techniques,
 coûts complets et compatibilité Lovable / WhatsApp restent à vérifier.
