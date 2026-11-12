@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Capacité Soleure — serveur physique et trois jours] — 2026-11-12
+
+- [Étude actualisée](docs/plan_capacite_soleure_migration_coolify.md) avec serveur Supermicro partagé, mesures de marge à recueillir et scénarios de 30 à 500 conversations sur trois jours. Aucune capacité réelle démontrée.
+
 ## [Capacité Soleure et migration Coolify] — 2026-11-12
 
 - [Étude et plan](docs/plan_capacite_soleure_migration_coolify.md) : comparaison Lovable / Coolify, analyse statique ciblée, hypothèses de capacité et de coûts, migration et campagne de mesure. Aucune capacité démontrée ni migration engagée. [Reprise](docs/prompt_reprise_capacite_soleure_lot_1.md).
