@@ -814,7 +814,6 @@ export type Database = {
       }
       external_test_invitations: {
         Row: {
-          code_ciphertext: string | null
           code_hash: string
           created_at: string
           created_by_user_id: string
@@ -829,7 +828,6 @@ export type Database = {
           valid_from: string
         }
         Insert: {
-          code_ciphertext?: string | null
           code_hash: string
           created_at?: string
           created_by_user_id: string
@@ -844,7 +842,6 @@ export type Database = {
           valid_from?: string
         }
         Update: {
-          code_ciphertext?: string | null
           code_hash?: string
           created_at?: string
           created_by_user_id?: string
