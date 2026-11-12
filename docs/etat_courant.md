@@ -35,6 +35,14 @@ jamais été comparés à un jugement humain ; `lived_v2` et le conseil GM touch
 jusqu'au calibrage du juge (Ulrich), à une définition éditoriale de la rumination (Romed, Ulrich) et à la relecture
 des corpus. Devoirs, scénarios sandbox et ordre : [bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md).
 
+## Multilingue FR / EN / DE (12 novembre, plan)
+
+Rien n'existe pour la langue dans le code (session, interface, STT, TTS, avatars, prompts, règles du moteur : tout
+est français en dur). Décisions d'Ulrich : langue fixe par session, sélecteur + lien, Hochdeutsch, personnages natifs,
+faits et RAG en français avec voix adaptée par langue, traductions en base validées par un natif, services par
+langue, FR + DE publics à Soleure, anglais pilote en sandbox. Onze lots M1–M11, aucun code livré.
+[Plan](plan_multilingue_ava.md), [prompt M1 « socle »](prompt_reprise_multilingue_lot_m1.md), non lancé.
+
 ## GM post-tour lisible (10 novembre, code)
 
 Les post-tours illisibles relevés par J3 étaient tous tronqués à 950 tokens (objet indenté, mémoire antérieure

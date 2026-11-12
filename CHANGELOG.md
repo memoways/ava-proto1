@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Plan multilingue FR / EN / DE] — 2026-11-12
+
+- [Plan](docs/plan_multilingue_ava.md) : état des lieux (aucune notion de langue dans le code), décisions d'Ulrich,
+  architecture cible (langue fixe par session, table `translations`, faits et RAG en français avec voix adaptée par
+  langue, services STT / TTS / avatar par langue, lexiques du moteur, sous-titres par piste), onze lots M1–M11,
+  chantiers à venir pris en compte, risques, postes de budget, questions ouvertes.
+- [Prompt de reprise M1 « socle »](docs/prompt_reprise_multilingue_lot_m1.md), non lancé. Aucun code modifié.
+
 ## [Pause : bilan et devoirs avant le lot R] — 2026-11-10
 
 - [Bilan de la pause](docs/bilan_pause_juge_parole_rumination_20261110.md) : ce que les lots C1, J1–J3, P et GM ont
