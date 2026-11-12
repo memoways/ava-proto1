@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Plan de rappel sortant de Max] — 2026-11-12
+
+- [Plan et prompt de reprise](docs/plan_rappel_sortant_max.md) : expérience souhaitée, pistes
+  d'architecture, coûts indicatifs et questions à étudier plus tard. L'étude complète et le
+  prototype ne sont pas lancés ; aucun code modifié.
+
 ## [Plan multilingue FR / EN / DE] — 2026-11-12
 
 - [Plan](docs/plan_multilingue_ava.md) : état des lieux (aucune notion de langue dans le code), décisions d'Ulrich,

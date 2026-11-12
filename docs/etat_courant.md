@@ -1,5 +1,9 @@
 # Ava — état courant
 
+**Rappel sortant de Max (12 novembre)** : [plan et prompt de reprise](plan_rappel_sortant_max.md)
+préparés pour Soleure. Étude de faisabilité complète et prototype non lancés ; choix techniques,
+coûts complets et compatibilité Lovable / WhatsApp restent à vérifier.
+
 Mise à jour : 10 novembre 2026 (GM post-tour lisible). Entrée courte de reprise, historique dans CHANGELOG.
 
 ## Priorité produit
