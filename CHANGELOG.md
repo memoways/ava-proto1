@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Accès GitHub des agents] — 2026-11-13
+
+- Instructions Ava alignées sur la voie GitHub dédiée et sur l’accès 1Password sans sollicitation humaine. Aucun changement applicatif.
+
 ## [Capacité Soleure — serveur physique et trois jours] — 2026-11-12
 
 - [Étude actualisée](docs/plan_capacite_soleure_migration_coolify.md) avec serveur Supermicro partagé, mesures de marge à recueillir et scénarios de 30 à 500 conversations sur trois jours. Aucune capacité réelle démontrée.
