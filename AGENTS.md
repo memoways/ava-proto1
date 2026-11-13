@@ -161,11 +161,11 @@ Chaque appel émet un jeton d’une heure limité au seul dépôt Ava.
   (refus « without `workflows` permission » sinon). Ne rien demander à Ulrich pour ça.
 - **Lectures publiques :** peuvent rester anonymes (`git -c credential.helper=`).
 
-Secours seulement si la voie directe échoue (clé absente, refus distant) : une
-seule session `bash .github/scripts/github-1password.sh session` par lot, App
-`ava-delivery`, jamais d’appel au coffre commande par commande ni de relance
-automatique. Échec explicite sans repli personnel ; ne pas recréer d’App ou de
-clé par session/worktree. La fusion reste exclusivement la garde versionnée.
+Si la voie directe échoue, 1Password est utilisable uniquement si une session
+déjà disponible fonctionne sans solliciter Ulrich. Si une validation est nécessaire,
+arrêter cette voie et poursuivre le travail indépendant ; aucune demande répétée.
+Échec explicite sans repli personnel ; ne pas recréer d’App ou de clé par
+session/worktree. La fusion reste exclusivement la garde versionnée.
 [Voie d’accès et historique](docs/plan_authentification_github_sans_trousseau.md).
 Aucune reconnexion personnelle ni changement système pour débloquer une livraison.
 
@@ -174,9 +174,10 @@ Aucune reconnexion personnelle ni changement système pour débloquer une livrai
 Une sonde d'identité puis une lecture de ressource suffisent au premier diagnostic.
 Classer : outil absent/Unknown tool, réseau/sandbox, stockage sécurisé, mauvais
 workspace ou refus distant. Un échec isolé ne prouve pas une expiration OAuth.
-GitHub natif en priorité ; si son outil est indisponible, repli `git`/`gh` autorisé
-par Ulrich, identité existante et remote exact vérifiés depuis le contexte système
-autorisé. Ne pas répéter les sondes identiques ni réinstaller/réauthentifier.
+GitHub utilise directement le lanceur dédié et `git`/`gh`, avec identité et remote
+exacts vérifiés depuis le contexte réseau autorisé. Les erreurs natives `Unknown
+tool` sont établies : ne pas les re-sonder sans changement vérifiable et demande
+explicite. Ne pas réinstaller ni réauthentifier automatiquement.
 Notion reste sur le connecteur natif du workspace voulu ; si indisponible, signaler
 les lectures/écritures non faites, poursuivre les travaux indépendants autorisés,
 sans navigateur ni transfert de sources. Détails d'identité dans le routage ci-dessus.
