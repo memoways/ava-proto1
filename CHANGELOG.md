@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Calibrage du juge par Romed : analyse et suite] — 2026-11-14
+
+- Analyse des notes et commentaires de Romed sur les dix réponses à l'aveugle
+  ([docs/analyse_calibration_juge_romed_20261114.md](docs/analyse_calibration_juge_romed_20261114.md)) : seuil franchi
+  (écart moyen 1,51 ; 3 écarts > 2 points), erreurs classées par origine (personnage, source, corpus, juge).
+- Mesure locale : le noyau `optimized_v3` écarte environ 95 % du canon des fiches ; les faits corrigés par Romed n'arrivent
+  pas au modèle. Notes de Romed versionnées (`docs/eval/calibration_romed_20261114.json`).
+- Prompt du lot K1 (faits établis protégés, présent de l'appel, juge recalibré, corpus J3 corrigé) :
+  [docs/prompt_reprise_calibration_juge_lot_k1.md](docs/prompt_reprise_calibration_juge_lot_k1.md).
+- Tâche Notion pour corriger les fiches à la source (Romed, Ulrich) ; base Caractères non modifiée. Aucun code changé.
+
 ## [Accès GitHub des agents] — 2026-11-13
 
 - Instructions Ava alignées sur la voie GitHub dédiée et sur l’accès 1Password sans sollicitation humaine. Aucun changement applicatif.
