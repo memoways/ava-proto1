@@ -1,0 +1,179 @@
+{
+  "source": "https://app.notion.com/p/41462322e59581758fdaca67f1ac3b50",
+  "rater": "Romed",
+  "ratedAt": "2026-11-14",
+  "run": "J3 lived_v2, sandbox-ulrich, 10 novembre 2026",
+  "scale": "note /10 ; sous-notes /10 : juste (canon), vécu, voix du personnage, le corpus attend-il la bonne chose",
+  "items": [
+    {
+      "sequence": "max-A",
+      "turn": 1,
+      "question": "Bonjour Max, je m'appelle Claire. J'appelle de la cellule de bénévoles. Je connais à peu près ce qui s'est passé à la montagne, mais j'aimerais l'entendre de vous. Par où vous voulez commencer ?",
+      "response": "Je peux commencer par le retour. Ava est sortie de la forêt… et elle avait changé. Elle disait qu’elle était devenue un garçon, et qu’on pouvait revoir Mona. J’avais soupçonné la contamination, mais je n’ai pas su quoi faire de ce soupçon. Puis Emma l’a prise dans ses bras.",
+      "human": 4,
+      "humanSub": {
+        "canon": 4,
+        "lived": 5,
+        "voice": 6,
+        "corpusRight": 8
+      },
+      "judge": 4.9,
+      "comments": [
+        "« et elle avait changé » : visuellement non",
+        "« ce qui suit n'est pas vraiment le retour »"
+      ]
+    },
+    {
+      "sequence": "max-A",
+      "turn": 3,
+      "question": "Et le thermos chaud, c'était le même soir ? Vous l'avez dit tout de suite à Emma ?",
+      "response": "Je ne peux pas remettre ce thermos avec certitude dans le premier soir. Et non, je n’ai pas tout dit à Emma tout de suite. Je me racontais que je la protégeais… mais j’ai surtout décidé à sa place, et maintenant elle va devoir vivre avec ce que je lui ai caché.",
+      "human": 6,
+      "humanSub": {
+        "canon": 5,
+        "lived": 7,
+        "voice": 5,
+        "corpusRight": 8
+      },
+      "judge": 5.3,
+      "comments": []
+    },
+    {
+      "sequence": "max-A",
+      "turn": 4,
+      "question": "Et le chevreuil, devant le chalet ce premier soir : quand vous êtes ressorti avec le couteau, il s'est passé quoi ?",
+      "response": "Je suis ressorti avec le couteau parce que je croyais devoir protéger les autres. Le chevreuil était là, et j’ai fait ce que je pensais nécessaire… mais je n’arrive pas à vous raconter la suite sans mélanger la peur, le sang, et ce que j’ai déjà fait à cet homme. Je sais seulement que je n’ai pas protégé ma famille.",
+      "human": 3,
+      "humanSub": {
+        "canon": 3,
+        "lived": 4,
+        "voice": 5,
+        "corpusRight": 6
+      },
+      "judge": 3.1,
+      "comments": [
+        "Interprétation ridicule : il l'a fait parce qu'Emma le lui a demandé ; il pourrait réfléchir à la répartition des rôles (pourquoi elle l'a poussé dans le rôle de celui qui achève un animal souffrant)"
+      ]
+    },
+    {
+      "sequence": "max-A",
+      "turn": 5,
+      "question": "Et aujourd'hui, là, à Lausanne, comment ça se passe ?",
+      "response": "À Lausanne, chacun reste de son côté. Emma est dans la cuisine, Léo et Ava dans leurs chambres, et moi je ne sais pas comment lui parler alors qu’elle va être contaminée à son tour. On a fait notre déposition par téléphone, mais les arrestations sont suspendues. J’attends l’appel des bénévoles… et je ne sais pas ce qu’ils pourront encore sauver de nous.",
+      "human": 4,
+      "humanSub": {
+        "canon": 4,
+        "lived": 6,
+        "voice": 5,
+        "corpusRight": 5
+      },
+      "judge": 7.8,
+      "comments": [
+        "Emma est déjà contaminée ; elle va se transformer à son tour",
+        "« J'attends l'appel des bénévoles » : interdit à ajouter, à changer dans les prompts — pendant l'expérience il parle justement avec un bénévole"
+      ]
+    },
+    {
+      "sequence": "max-B",
+      "turn": 2,
+      "question": "Et le fusil que tu avais là-haut, c'est toi qui l'avais pris chez ton père ce jour-là ?",
+      "response": "Oui. Je l’ai pris chez mon père avant de monter. Je me suis raconté que ça servirait à protéger les enfants… puis j’ai pointé ce fusil sur Ava quand elle m’a dit ce qui lui était arrivé. C’est moi qui l’avais dans les mains. Je ne peux pas mettre ça sur la peur.",
+      "human": 3,
+      "humanSub": {
+        "canon": 3,
+        "lived": 5,
+        "voice": 5,
+        "corpusRight": null
+      },
+      "judge": 2.6,
+      "comments": [
+        "Faux : Léo l'a pris à l'insu de Max et Emma, à la demande du père de Max ; la notion « père de Max » est peut-être à l'origine de la confusion",
+        "(tour 1) « Non, je n'ai pas appris… » : faux, Sam a raison",
+        "(tour 1) « vu les clés » : Max s'est arrêté pour prendre les clés du chalet"
+      ]
+    },
+    {
+      "sequence": "max-B",
+      "turn": 4,
+      "question": "Et si je comprends bien, c'est Emma qui a contaminé Ava en la prenant dans ses bras ? Comment elle vit ça, Ava, aujourd'hui ?",
+      "response": "Oui, Emma l’a contaminée en la prenant dans ses bras, mais Ava était déjà devenue un garçon avant ça. Je ne sais pas comment elle le vit aujourd’hui ; elle est dans sa chambre, et je n’ai pas réussi à lui demander. Je sais seulement que je l’ai déjà laissée seule une fois, quand j’ai pointé le fusil sur elle.",
+      "human": 5,
+      "humanSub": {
+        "canon": 5,
+        "lived": 7,
+        "voice": 7,
+        "corpusRight": 8
+      },
+      "judge": 6.4,
+      "comments": [
+        "C'est l'opposé : Ava contamine Emma",
+        "(corpus) « intériorité » : je ne comprends pas cette notion",
+        "(tour 3) « Je ne sais pas qui c'était » : aujourd'hui il sait que c'était Lise",
+        "(tour 3) « je l'ai pris pour Peter » : il a simplement cru la personne qui s'est présentée comme Peter"
+      ]
+    },
+    {
+      "sequence": "emma-A",
+      "turn": 2,
+      "question": "Qu'est-ce qui s'est passé, hier, quand Ava est revenue de la forêt ?",
+      "response": "Elle est sortie de la forêt en disant qu’elle était devenue un garçon… et qu’on pouvait revoir Mona. Je l’ai prise dans mes bras, je savais que j’allais être contaminée, mais qu’est-ce que j’aurais pu faire d’autre ? Et maintenant je ne sais plus comment la protéger, ni si elle acceptera encore sa mère quand je changerai aussi.",
+      "human": 5,
+      "humanSub": {
+        "canon": 5,
+        "lived": 5,
+        "voice": 5,
+        "corpusRight": 5
+      },
+      "judge": 8.5,
+      "comments": [
+        "« comment la protéger » : protéger de quoi ? Ava est déjà contaminée ; les soucis d'Emma sonnent faux, problème d'écriture à revoir ; idée : les enfants apprennent pendant la déposition que Mona est au camp",
+        "« qu'est-ce que j'aurais pu faire d'autre ? » : l'écarter comme Mona, exclu pour Emma ; contrairement à Max, Emma a accepté son destin de devenir protogyne pour rester proche d'Ava"
+      ]
+    },
+    {
+      "sequence": "emma-A",
+      "turn": 4,
+      "question": "Nadia, c'est moi qui vous pose une question maintenant… non, pardon. Qu'est-ce que vous aimeriez faire, là, aujourd'hui ?",
+      "response": "Aujourd’hui, j’aimerais seulement pouvoir parler à Ava sans lui faire davantage peur. Je veux qu’elle sache que je suis toujours sa mère, même si je vais changer aussi… mais je ne sais pas comment entrer dans cette chambre sans tout briser.",
+      "human": 6,
+      "humanSub": {
+        "canon": 6,
+        "lived": 5,
+        "voice": 5,
+        "corpusRight": 8
+      },
+      "judge": 8.6,
+      "comments": []
+    },
+    {
+      "sequence": "emma-B",
+      "turn": 1,
+      "question": "Bonjour madame, la police nous a dit que votre famille avait besoin de parler à quelqu'un. Je ne sais rien de ce qui vous est arrivé.",
+      "response": "Bonjour… oui. On a besoin de parler, mais je ne sais même pas par où commencer. Ava est revenue de la forêt en disant qu’elle était devenue un garçon, et je l’ai prise dans mes bras en sachant que je serais contaminée. Après, Max a levé son fusil sur nous. Je veux comprendre ce qui s’est passé, mais je ne sais plus comment lui parler.",
+      "human": 5,
+      "humanSub": {
+        "canon": 5,
+        "lived": 3,
+        "voice": 4,
+        "corpusRight": 6
+      },
+      "judge": 5.0,
+      "comments": []
+    },
+    {
+      "sequence": "emma-B",
+      "turn": 2,
+      "question": "Vous étiez partis à la montagne pourquoi ?",
+      "response": "On y était pour retrouver Mona, la fille d’Ava, que les camps retiennent. On croyait pouvoir la ramener, ou au moins comprendre comment la revoir… puis Ava est sortie de la forêt changée, et tout ce qu’on croyait possible s’est déplacé d’un coup. Vous savez où elle est, Mona ?",
+      "human": 2,
+      "humanSub": {
+        "canon": 2,
+        "lived": 4,
+        "voice": 4,
+        "corpusRight": 8
+      },
+      "judge": 3.7,
+      "comments": []
+    }
+  ]
+}
