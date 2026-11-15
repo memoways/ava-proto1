@@ -8,13 +8,16 @@ Prompt : [prompt_reprise_calibration_juge_lot_k1.md](prompt_reprise_calibration_
 - **Le juge note désormais comme Romed, sous le seuil** : écart moyen 0,82 à 0,85 point (1,51 au calibrage, 1,22 rejugé
   avec l'ancienne grille), aucun écart de plus de 2 points (3 au calibrage). Limite : la grille a été réglée sur ces dix
   réponses ; Romed doit renoter un nouvel échantillon pour le confirmer.
-- **Max et Emma ont les faits établis sous les yeux** : un bloc protégé « FAITS ÉTABLIS » (1 075 caractères, tiré de la
-  fiche) entre dans le noyau `optimized_v3` sans le grossir ; « tu attends l'appel » n'apparaît plus dans aucun prompt.
+- **Max et Emma ont les faits établis sous les yeux** : un bloc protégé « FAITS ÉTABLIS » (environ 1 300 caractères avec
+  sa consigne d'usage, faits tirés de la fiche) entre dans le noyau `optimized_v3` sans le grossir ; « tu attends
+  l'appel » n'apparaît plus dans aucun prompt ; le canon choisi selon la question apporte maintenant les titres de
+  timeline et le sujet sensible qu'elle touche (couteau, chevreuil disparu, fusil, Mona au camp).
 - **Ce que ça coûte** : la fin de la « Manière de parler » (641 caractères pour Max, 1 037 pour Emma : « Ce qui passe sans
   être dit », « Marqueurs », « Ce que tu évites ») sort du noyau. Les états de parole et l'ouverture restent entiers.
-- **Ce qui manque encore vient des fiches** : cinq faits de la liste de contrôle restent absents du prompt parce que la
-  fiche ne les écrit pas ou les écrit de travers (fusil pris par Léo, Lise « présentée comme » Peter, chevreuil disparu,
-  raison du geste d'Emma, raison du départ). Ils attendent la [tâche Notion](https://app.notion.com/p/41862322e59581a0bf56de43cc238e27).
+- **Ce qui manque encore vient des fiches** : quatre faits de la liste de contrôle restent absents du prompt parce que la
+  fiche ne les écrit pas ou les écrit de travers (fusil pris par Léo, Lise « présentée comme » Peter, raison du geste
+  d'Emma, raison du départ). Et une phrase source fait reculer Max B1 (voir les mesures). Ils attendent la
+  [tâche Notion](https://app.notion.com/p/41862322e59581a0bf56de43cc238e27).
 
 ## Plan court
 
@@ -40,9 +43,9 @@ Prompt : [prompt_reprise_calibration_juge_lot_k1.md](prompt_reprise_calibration_
 | | Avant | Après |
 |---|---|---|
 | PRÉSENT (protégé) | « Il attend l'appel d'une cellule de bénévoles… » | « Il parle en ce moment avec la personne d'une cellule de bénévoles dont il attendait l'appel… » |
-| FAITS ÉTABLIS (protégé, nouveau) | — | 1 076 car. (Max), 1 072 (Emma), après le PRÉSENT, avant l'identité et la voix |
+| FAITS ÉTABLIS (protégé, nouveau) | — | consigne d'usage (237 car.) + faits 1 076 (Max), 1 072 (Emma), après le PRÉSENT, avant l'identité et la voix |
 | Manière de parler (protégée) | 2 683 (Max), 2 751 (Emma) | 2 038 (Max), 1 708 (Emma) : ouverture et états de parole entiers |
-| Canon choisi selon la question | premier morceau d'une période de la timeline | les titres de timeline que la question touche (quatre au plus), puis le reste |
+| Canon choisi selon la question | premier morceau d'une période de la timeline | le sujet sensible que la question nomme (un au plus), les titres de timeline qu'elle touche (quatre au plus), puis le reste |
 | Noyau total | ≤ 7 000 | ≤ 7 000 (inchangé) ; prompt complet inchangé à 60 caractères près |
 
 - **Place prise sur la voix, au plus juste** : la manière de parler cède ses derniers paragraphes, un par un depuis la
@@ -50,8 +53,15 @@ Prompt : [prompt_reprise_calibration_juge_lot_k1.md](prompt_reprise_calibration_
   ouverture ni la liste des états de parole (lue par la consigne « état de parole du tour »). Ce qui est cédé apparaît
   dans la trace du prompt (statut `budget`). Si le bloc ne peut pas entrer, l'ancien noyau est joué tel quel : les faits
   ne rendent jamais une fiche injouable.
+- **Consigne d'usage** en tête du bloc : « quelques faits sûrs, pas la liste de tout ce que tu sais ; ne nie jamais un
+  fait parce qu'il manque ici ». Mesure : sans elle, puis avec elle en fin de bloc, puis en tête, Max B1 nie toujours que
+  son père ait envoyé Mona au camp (voir les mesures) ; elle reste parce qu'elle décrit le bloc, pas parce qu'elle a réglé
+  ce cas.
+- **Sujet sensible nommé** : quand la question nomme le sujet par son intitulé (« - Mona : … », « - Le fusil : … »), ce
+  sujet passe avant les fragments génériques (un seul, 500 caractères au plus). Pour B1, il apporte « elle est dans un
+  camp à cause de ton père ».
 - **Titres de timeline** : un titre par unité, comparé à la question sur son intitulé (pas sur le lieu ni l'heure, communs
-  à des dizaines de titres), les mots rares comptant plus que « chalet » ou « vous ». « Emma te tend le couteau pour le
+  à des dizaines de titres), les mots rares comptant plus que « chalet » et les mots outils (« chez », « vous ») ignorés. « Emma te tend le couteau pour le
   chevreuil » arrive ainsi pour la question du chevreuil, « Le fusil de ton père, donné à Léo dans ton dos » pour celle
   du fusil. La période (« Il y a cinq jours… ») est rendue une fois au-dessus de ses titres.
 - **Interrupteur** : `establishedFacts` (défaut : actif). Le juge peut rejouer l'ancien noyau en mémoire
@@ -77,11 +87,12 @@ Prompt : [prompt_reprise_calibration_juge_lot_k1.md](prompt_reprise_calibration_
 | Emma a pris Ava dans ses bras en sachant | Emma A2 | absent | présent |
 | **Léo a pris le fusil, à la demande du père** | Max B2 | absent | **absent** : la fiche ne le dit pas (titre ambigu) |
 | **Lise s'était présentée comme Peter** | Max B3 | absent | **absent** : la fiche dit « prise pour Peter » |
-| **Le chevreuil avait disparu** | Max A4 | absent | **absent** : seulement dans un souvenir du RAG |
+| Le chevreuil avait disparu | Max A4 | absent | présent (titre J−5.17 « Dehors, le chevreuil a disparu ») |
+| Mona au camp à cause du père de Max | Max B1 | absent | présent (sujet sensible), mais contredit par une phrase source (mesures) |
 | **Emma : rester proche d'Ava** | Emma A2 | absent | **absent** : raison absente de la fiche |
 | **Partis pour protéger les enfants** | Emma B2 | absent | **absent** : écrit dans « Qui tu es », non retenu pour cette question |
 
-Les cinq écarts en gras se règlent dans Notion : titres avec un agent explicite, et le champ « Ce que tu sais
+Les quatre écarts en gras se règlent dans Notion : titres avec un agent explicite, et le champ « Ce que tu sais
 aujourd'hui » pour les raisons des gestes et les croyances corrigées.
 
 ### Juge
@@ -140,11 +151,46 @@ rejugements (60 appels juge), chacun sous son plafond (0,5 à 0,8 $).
 
 ### Séquences J3 v2 : ancien noyau contre « faits établis + présent de l'appel »
 
-RESULTATS_SEQUENCES
+Commande : `npm run eval:judge:sequences -- --reference optimized_v3 --candidate optimized_v3 --reference-json
+'{"establishedFacts":false}' --candidate-json '{"establishedFacts":true}' --repeats 2 --max-cost-usd 4`. Corpus J3 v2,
+nouvelle grille du juge des deux côtés, mêmes réglages (`openai/gpt-5.6-luna`, T 1,4, 360 tokens).
+
+**Run final** `5d02aa4c` (15 novembre, code livré) — [rapport](eval/j3_k1_faits_etablis_final_20261115.md) ; 2,23 $
+mesurés, plafond 4 $.
+
+| | Référence (ancien noyau) | Candidat (K1) | Δ | Bruit |
+|---|---:|---:|---:|---:|
+| Note par tour /10 | 4,61 | 4,67 | +0,06 | ± 0,30 |
+| **Note de séquence /10** | 5,23 | 6,19 | **+0,96** | ± 0,68 |
+| Continuité des faits /5 | 2,38 | 3,38 | +1,00 | |
+| Timeline sur la durée /5 | 2,50 | 3,25 | +0,75 | |
+
+- **Gain net sur la séquence** (au-delà du bruit) : Max A +1,67, Max B +1,67, Emma B +1,25 ; Emma A −0,75.
+- **Par tour** : Max A5 « aujourd'hui à Lausanne » +2,45 (Max n'attend plus l'appel ; Emma « contaminée depuis hier »),
+  Max B4 +1,63 (sens de la contamination), Emma A3 +1,26. Reculs : Emma B1 −1,35, Emma A2 −1,22, Emma A1 −0,95 — Emma
+  déballe plus tôt (contamination, transformation) dès l'accueil ; à écouter, et à cadrer par le champ « Ce que tu sais
+  aujourd'hui » plutôt que par un paragraphe d'identité entier.
+- **Max B1** (« ton père a envoyé Mona en camp ») : −2,9 au premier run (14 novembre, avant la sélection du sujet
+  sensible), −1,75 sur Max B seul en 3 passages ([rapport](eval/j3_k1_max_b_3passages_20261115.md)), −0,03 au run final
+  en 2 passages. Avec le bloc, Max dit souvent « Mona est dans un camp de quarantaine parce qu'elle a été contaminée » :
+  la phrase source « Elle est toujours dans un camp de quarantaine » est lue comme la cause. Recul **non réglé** par le
+  code (consigne d'usage essayée en fin puis en tête du bloc) ; correction de source, reprise au lot K2.
+- Premier run complet du 14 novembre (avant la sélection par titres et sujets sensibles) : par tour +0,07, séquence
+  −0,10, dans le bruit ([rapport](eval/j3_k1_faits_etablis_20261114.md)).
+
+**Décision du lot** : le bloc et le présent de l'appel sont joués par défaut (demandés par le lot ; la continuité gagne
+au-delà du bruit, aucun recul global). Coût total des mesures du lot : environ 8,5 $ (calibrages 1,2 $, séquences
+2,26 + 0,94 × 3 + 2,23 $), chaque run sous son plafond. Écoute humaine indispensable avant toute publication.
 
 ## Validations
 
-VALIDATIONS
+- `npm run test:quality` vert (lint, typage, régressions, 1 926 tests unitaires, 42 d'intégration, build) ;
+  `npm run test:delivery` vert (36 tests).
+- Tests du lot : `src/services/establishedFacts.test.ts` (source du bloc, appel en cours, budget, liste de contrôle des
+  19 faits), `src/services/evalJudgeK1.test.ts` (repère canon, plafond, illisible, calibrage).
+- Budget : noyau ≤ 7 000 caractères sur les 18 tours du corpus ; prompt complet inchangé à 60 caractères près ;
+  invariants d'identité intacts (tests `maxAgent.identity`, `maxOptimizedPromptCompiler*`).
+- `admin_settings` jamais écrit (garde `fetch`, 0 tentative) ; aucune écriture Notion ; aucune session créée.
 
 ## Hors périmètre, non fait
 

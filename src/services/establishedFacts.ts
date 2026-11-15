@@ -12,11 +12,13 @@ import type { CharacterPrompt } from "./characterPromptService";
 export const ESTABLISHED_FACTS_TITLE = "FAITS ÉTABLIS — CE QUI EST VRAI AU MOMENT DE L'APPEL";
 export const ESTABLISHED_FACTS_MAX_CHARS = 1_200;
 /**
- * Usage line under the block (no fact in it). Measured on 14 November 2026:
- * without it, Max read the block as a closed list and denied true facts it
- * does not mention (« je n'ai pas ce fait-là », 5 answers out of 5).
+ * Usage line at the head of the block (no fact in it): the block is not a
+ * closed list. Measured on 14 November 2026 (Max B1): Max still denies that
+ * his father sent Mona to the camp, because the source sentence « Elle est
+ * toujours dans un camp de quarantaine » reads as the cause; that sentence is
+ * to be fixed in Notion, the line alone does not fix it.
  */
-export const ESTABLISHED_FACTS_USAGE_LINE = "Ce bloc dit ce qui est sûr aujourd'hui ; il ne dit pas tout. Ce qu'il ne mentionne pas n'est pas faux pour autant : pour le reste, fie-toi à ta timeline et à tes souvenirs.";
+export const ESTABLISHED_FACTS_USAGE_LINE = "Quelques faits sûrs au moment de l'appel, pas la liste de tout ce que tu sais : ce qui n'y figure pas reste vrai s'il est dans ta timeline, tes sujets sensibles ou tes souvenirs. Ne nie jamais un fait parce qu'il manque ici.";
 /** Played by default; the judge's reference side turns it off in memory to compare. */
 export const ESTABLISHED_FACTS_DEFAULT = true;
 

@@ -3,7 +3,8 @@
 **Lot K1 — faits établis et juge calibré (14 novembre, code)** : le noyau `optimized_v3` porte un bloc protégé
 « FAITS ÉTABLIS » tiré de la fiche, « tu attends l'appel » est lu comme l'appel en cours (personnage et GM), et le juge
 vérifie le canon avec un plafond. Calibrage sur les dix réponses de Romed : écart moyen 1,51 → 0,82 à 0,85, écarts > 2
-points 3 → 0 (réglé sur ces dix réponses, à confirmer). La fin de la manière de parler ne se joue plus (641 car. Max,
+points 3 → 0 (réglé sur ces dix réponses, à confirmer). Séquences J3 v2 : continuité +0,96 (au-delà du bruit), note par
+tour +0,06 ; Emma déballe plus tôt, Max B1 lit « camp de quarantaine » comme la cause (fiche à corriger). La fin de la manière de parler ne se joue plus (641 car. Max,
 1 037 Emma) : écoute à faire. **À faire par Ulrich** : appliquer la migration `ce_que_tu_sais_aujourdhui` dans le chat
 Lovable. Romed et Ulrich : fiches à la source, relecture du corpus J3 v2, dix nouvelles réponses à noter.
 [Plan et mesures](plan_calibration_juge_lot_k1.md) · prochain lot : [K2](prompt_reprise_fiches_corrigees_lot_k2.md).

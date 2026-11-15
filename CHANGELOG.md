@@ -18,6 +18,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   une fois puis écartée des moyennes (jamais 0).
 - **Calibrage** : `npm run eval:judge:calibrate` rejuge les dix réponses notées par Romed. Écart moyen 1,51 → 0,82 à
   0,85 ; écarts > 2 points : 3 → 0. Réglé sur ces dix réponses : à confirmer sur un nouvel échantillon.
+- **Mesure J3 v2** (sandbox-ulrich, 2,23 $) : note de séquence +0,96 au-delà du bruit (continuité des faits +1,0,
+  timeline +0,75), note par tour +0,06 ; reculs d'Emma à l'accueil et de Max B1 (phrase source sur le camp de Mona).
 - **Corpus J3 v2** corrigé d'après Romed (neuf tours), statut « corrigé d'après Romed, à revalider » ; rien n'est saisi
   dans Notion. Liste de contrôle des faits canoniques versionnée et testée (`docs/eval/faits_canon_k1.json`).
 - `sync-notion` lit le champ optionnel ; migration additive `ce_que_tu_sais_aujourdhui` à appliquer par le chat Lovable.

@@ -37,8 +37,11 @@ ne le fais pas à la place d'Ulrich ou de Romed : rends la main avec **une seule
 - Juge : repère canon élargi, vérification du canon avant toute note, plafond (≤ 3 si `canon_timeline` = 0, ≤ 4 si ≤ 1),
   réponse illisible écartée. Calibrage sur les dix réponses de Romed : écart moyen 0,82 à 0,85, aucun écart > 2 points
   (1,51 et 3 avant). **Réglé sur ces dix réponses : non confirmé sur d'autres.**
-- Liste de contrôle `docs/eval/faits_canon_k1.json` : cinq faits encore absents du prompt, tous par défaut de la fiche
-  (fusil pris par Léo, Lise présentée comme Peter, chevreuil disparu, raison du geste d'Emma, raison du départ).
+- Liste de contrôle `docs/eval/faits_canon_k1.json` : quatre faits encore absents du prompt, tous par défaut de la fiche
+  (fusil pris par Léo, Lise présentée comme Peter, raison du geste d'Emma, raison du départ).
+- **Recul mesuré à corriger à la source** : avec le bloc, Max B1 nie que son père ait envoyé Mona au camp (5 réponses sur
+  6) ; la phrase source « Elle est toujours dans un camp de quarantaine » (paragraphe « Ce qui est vrai aujourd'hui »)
+  est lue comme la cause. Le champ « Ce que tu sais aujourd'hui » doit dire pourquoi Mona est au camp.
 - Corpus J3 v2 (`docs/eval/sequences_j3_v2.json`) : statut « corrigé d'après Romed, à revalider » ; rien dans Notion.
 - Outils : `npm run eval:judge:calibrate`, `npm run eval:judge:sheets`, `npm run eval:judge:sequences`.
 
@@ -52,8 +55,8 @@ note comme Romed ; rendre le corpus J3 officiel. C'est la condition pour rouvrir
 1. **Resynchronisation `fields_only` de sandbox-ulrich** (`sync-notion` avec `environment_id: "sandbox-ulrich"` explicite,
    jamais `prod`), puis `npm run eval:judge:sheets` et comparaison avec la copie de test.
 2. **Copie de test et liste de contrôle** : nouvelle copie datée dans `src/agents/__fixtures__/` (l'ancienne reste pour
-   les tests qui la citent) ; `docs/eval/faits_canon_k1.json` mis à jour : les cinq faits absents doivent devenir
-   présents, sinon l'écart est expliqué et renvoyé à la fiche.
+   les tests qui la citent) ; `docs/eval/faits_canon_k1.json` mis à jour : les quatre faits absents doivent devenir
+   présents, sinon l'écart est expliqué et renvoyé à la fiche. Remesurer Max B (3 passages) : B1 ne doit plus reculer.
 3. **Neutralisation de l'appel** : si les fiches disent désormais le présent de l'appel, vérifier que
    `neutralizeAwaitedCall` ne transforme plus rien ; garder la fonction comme filet (test).
 4. **Budget de la voix** : mesurer ce que la manière de parler cède avec le nouveau champ ; si le champ dépasse

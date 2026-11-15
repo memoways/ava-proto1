@@ -373,7 +373,7 @@ function protectedCharacterSections(character: CharacterPrompt, establishedFacts
       ? { ...section, content: manner } : section),
   ];
   const extracted = establishedFacts ? characterEstablishedFacts(character)?.content ?? null : null;
-  const facts = extracted ? `${extracted}\n${ESTABLISHED_FACTS_USAGE_LINE}` : null;
+  const facts = extracted ? `${ESTABLISHED_FACTS_USAGE_LINE}\n${extracted}` : null;
   if (!facts) return { sections: base(null), yielded: [] };
   const limit = OPTIMIZED_V3_LIMITS.staticChars;
   const fitsWith = (room: number) => (manner: string) => protectedSize(base(facts, manner), canonicalName) + room <= limit;

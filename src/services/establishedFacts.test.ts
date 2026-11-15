@@ -91,7 +91,7 @@ describe("optimized_v3 core with established facts", () => {
       const prompt = result.finalSystemPrompt;
       const facts = characterEstablishedFacts(sheetAtCallTime(sheet(name)))!.content;
       // The usage line keeps the block from being read as a closed list.
-      expect(prompt).toContain(`## ${ESTABLISHED_FACTS_TITLE}\n${facts}\n${ESTABLISHED_FACTS_USAGE_LINE}`);
+      expect(prompt).toContain(`## ${ESTABLISHED_FACTS_TITLE}\n${ESTABLISHED_FACTS_USAGE_LINE}\n${facts}`);
       expect(prompt.indexOf(ESTABLISHED_FACTS_TITLE)).toBeLessThan(prompt.indexOf("## MANIÈRE DE PARLER"));
       expect(prompt.split("Ce qui est vrai aujourd'hui").length - 1).toBe(1);
       expect(result.budget?.staticChars).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.staticChars);
