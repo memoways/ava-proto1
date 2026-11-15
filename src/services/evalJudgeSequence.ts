@@ -417,7 +417,7 @@ export interface SequenceTurnTrace {
 
 export interface SequenceRunDeps {
   runTurn: (config: EvalTurnConfig, request: SequenceTurnRequest, signal?: AbortSignal) => Promise<SequenceTurnTrace>;
-  judgeTurn: (item: EvalItem, response: string, context: { priorExchanges: string; canonReference: string }, signal?: AbortSignal) => Promise<EvalJudgeScore>;
+  judgeTurn: (item: EvalItem, response: string, context: { priorExchanges: string; canonReference: string }, signal?: AbortSignal) => Promise<EvalJudgeScore | null>;
   judgeSequence: (sequence: EvalSequence, transcript: TranscriptTurn[], canonReference: string, signal?: AbortSignal) => Promise<SequenceJudgeScore>;
 }
 
@@ -536,6 +536,8 @@ export async function runEvalSequence(input: {
         if (isAbortError(error)) throw error;
         judgeError = `juge : ${errorText(error)}`;
       }
+      // Lot K1: an unreadable judge answer leaves the turn without a note; it is never scored 0.
+      if (!judge && !judgeError) judgeError = "juge : réponse illisible, tour écarté des moyennes";
     }
     const sub = judge ? readJudgeSubScores(judge) : null;
     const next = advanceSequenceState(state, {

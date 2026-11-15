@@ -92,7 +92,8 @@ export function createEvalCostGuard(input: { capUsd: number | null; perTurnUsd: 
 
 export interface EvalRunDeps {
   runTurn: (item: EvalItem, config: EvalTurnConfig, signal: AbortSignal) => Promise<IsolatedEvalTurnTrace>;
-  judge: (item: EvalItem, maxResponse: string, judgeModel: string, signal: AbortSignal, canonReference?: string) => Promise<EvalJudgeScore>;
+  /** null when the judge's answer stayed unreadable: the turn is stored without a note and left out of the means. */
+  judge: (item: EvalItem, maxResponse: string, judgeModel: string, signal: AbortSignal, canonReference?: string) => Promise<EvalJudgeScore | null>;
   saveResult: (input: {
     runId: string;
     item: EvalItem;

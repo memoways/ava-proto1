@@ -293,6 +293,8 @@ export async function simulateMaxResponse(
     situationSummaryOverride?: string;
     /** Evaluation-only output contract wording for this call. */
     streamContract?: ResponseStreamContractVariant;
+    /** Evaluation-only: `false` rebuilds the core without the established facts (lot K1 reference side). */
+    establishedFacts?: boolean;
     onSpeechToken?: (text: string) => void;
     finishSpeech?: (normalCompletion?: boolean) => string;
     recoverySpeechOnly?: boolean;
@@ -302,6 +304,7 @@ export async function simulateMaxResponse(
   const promptBuildStartedAt = performance.now();
   const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext, opts?.promptVariant, {
     situationSummary: opts?.situationSummaryOverride,
+    establishedFacts: opts?.establishedFacts,
   });
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
   const llm = getLLMSettings();
@@ -537,7 +540,7 @@ export async function buildMaxSystemPrompt(
   characterName: string = "Max",
   characterContext?: CharacterExecutionContext,
   variantOverride?: MaxPromptVariant,
-  evaluation?: { situationSummary?: string },
+  evaluation?: { situationSummary?: string; establishedFacts?: boolean },
 ): Promise<MaxPromptAssemblyTrace> {
   const variant = variantOverride ?? (() => {
     try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
@@ -753,6 +756,7 @@ export async function buildMaxSystemPrompt(
       postVideoContext: input.postVideoContext,
       watchedVideos: input.watchedVideos,
       ragCandidates: input.ragCandidates,
+      establishedFacts: evaluation?.establishedFacts,
     });
   }
 

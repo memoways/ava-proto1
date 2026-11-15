@@ -1,8 +1,16 @@
 # Ava — état courant
 
+**Lot K1 — faits établis et juge calibré (14 novembre, code)** : le noyau `optimized_v3` porte un bloc protégé
+« FAITS ÉTABLIS » tiré de la fiche, « tu attends l'appel » est lu comme l'appel en cours (personnage et GM), et le juge
+vérifie le canon avec un plafond. Calibrage sur les dix réponses de Romed : écart moyen 1,51 → 0,82 à 0,85, écarts > 2
+points 3 → 0 (réglé sur ces dix réponses, à confirmer). La fin de la manière de parler ne se joue plus (641 car. Max,
+1 037 Emma) : écoute à faire. **À faire par Ulrich** : appliquer la migration `ce_que_tu_sais_aujourdhui` dans le chat
+Lovable. Romed et Ulrich : fiches à la source, relecture du corpus J3 v2, dix nouvelles réponses à noter.
+[Plan et mesures](plan_calibration_juge_lot_k1.md) · prochain lot : [K2](prompt_reprise_fiches_corrigees_lot_k2.md).
+
 **Calibrage du juge par Romed (14 novembre)** : seuil franchi (écart moyen 1,5 ; 3 écarts > 2 points) ; le juge laisse
 passer les erreurs de canon que le corpus n'écrit pas, et le noyau `optimized_v3` écarte ~95 % du canon des fiches.
-[Analyse](analyse_calibration_juge_romed_20261114.md). Prochain lot code : [K1, faits établis et juge calibré](prompt_reprise_calibration_juge_lot_k1.md).
+[Analyse](analyse_calibration_juge_romed_20261114.md). Lot K1 livré (ci-dessus).
 Corrections de source (fiches) : [tâche Notion](https://app.notion.com/p/41862322e59581a0bf56de43cc238e27), par Romed et Ulrich.
 
 **Capacité Soleure (12 novembre)** : [étude Lovable / Coolify et migration](plan_capacite_soleure_migration_coolify.md), analyse statique et scénarios sur trois jours, serveur Supermicro partagé documenté ; aucune capacité démontrée ni migration décidée. [Reprise mesures](prompt_reprise_capacite_soleure_lot_1.md).

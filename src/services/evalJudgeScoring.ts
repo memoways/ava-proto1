@@ -1,5 +1,5 @@
 import type { EvalItem, EvalResult, EvalTurnConfig, EvalJudgeScore, EvalFactor } from "@/services/evalJudgePipeline";
-import { evalCharacterKey, mean, median, stddev, parseUsdPerMillion, PLAY_CRITERIA_KEYS, SPEECH_QUALITY_KEYS } from "@/services/evalJudgePipeline";
+import { evalCharacterKey, mean, median, stddev, parseUsdPerMillion, PLAY_CRITERIA_KEYS, SPEECH_QUALITY_KEYS, UNREADABLE_JUDGE_RATIONALE } from "@/services/evalJudgePipeline";
 import { listLlmConfigModels } from "@/services/settingsService";
 import { loadEnvironmentSetting, saveEnvironmentSetting } from "@/services/environmentContext";
 
@@ -142,6 +142,8 @@ export type JudgeSubScores = Pick<
 export function readJudgeSubScores(raw: unknown): JudgeSubScores | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
+  // Results stored before lot K1 scored an unreadable judge answer 0 everywhere: leave them out.
+  if (value.rationale === UNREADABLE_JUDGE_RATIONALE) return null;
   const num = (key: string) => {
     const parsed = Number(value[key]);
     return Number.isFinite(parsed) ? Math.min(5, Math.max(0, parsed)) : null;
@@ -198,13 +200,33 @@ export function weightedScore(judge: JudgeSubScores, weights: EvalScoreWeights):
     total += weight;
   }
   if (total <= 0) return 0;
-  return Number(((weighted / total) * 10).toFixed(3));
+  return Number(Math.min((weighted / total) * 10, canonCap(judge.canon_timeline)).toFixed(3));
+}
+
+/**
+ * Lot K1 — a contradiction of the canon caps the weighted note, whatever the
+ * other criteria say: Romed rates such answers 2 to 4. Values measured on his
+ * calibration of 14 November 2026 (docs/plan_calibration_juge_lot_k1.md).
+ */
+export const CANON_CONTRADICTION_CAPS: Record<number, number> = { 0: 3, 1: 4 };
+
+export function canonCap(canonTimeline: number | null | undefined): number {
+  if (canonTimeline == null || !Number.isFinite(canonTimeline)) return 10;
+  if (canonTimeline <= 0) return CANON_CONTRADICTION_CAPS[0];
+  if (canonTimeline <= 1) return CANON_CONTRADICTION_CAPS[1];
+  return 10;
+}
+
+export function describeCanonCap(): string {
+  return `plafond canon : note ≤ ${CANON_CONTRADICTION_CAPS[0]} si canon_timeline = 0, ≤ ${CANON_CONTRADICTION_CAPS[1]} si canon_timeline ≤ 1`;
 }
 
 export function scoreOfResult(row: EvalResult, weights: EvalScoreWeights): number | null {
   const sub = readJudgeSubScores(row.judge_json);
   if (sub) return weightedScore(sub, weights);
-  return typeof row.overall_score === "number" ? row.overall_score : null;
+  const unreadable = row.judge_json && typeof row.judge_json === "object"
+    && (row.judge_json as Record<string, unknown>).rationale === UNREADABLE_JUDGE_RATIONALE;
+  return !unreadable && typeof row.overall_score === "number" ? row.overall_score : null;
 }
 
 // ---------------------------------------------------------------- corpus audit

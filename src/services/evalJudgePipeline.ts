@@ -8,6 +8,8 @@ import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import type { RuntimeCharacter } from "@/types";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { isResponseStreamContractVariant, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
+import { characterEstablishedFacts, neutralizeAwaitedCall, withoutEstablishedFacts } from "@/services/establishedFacts";
+import type { CharacterPrompt } from "@/services/characterPromptService";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -63,6 +65,8 @@ export interface EvalTurnExtras {
   /** Short provenance of the candidate PRÉSENT (generator version), shown in labels and reports. */
   situationSummarySource?: string;
   streamContract?: ResponseStreamContractVariant;
+  /** Lot K1: `false` plays the core and the frame without the established facts (reference side). */
+  establishedFacts?: boolean;
 }
 
 export interface EvalTurnConfig extends EvalLiveSnapshot, EvalTurnExtras {
@@ -95,6 +99,8 @@ export interface EvalJudgeScore {
   character_voice: number;
   overall: number;
   rationale: string;
+  /** Lot K1: one sentence when the corpus target itself looks at odds with the canon; empty otherwise. */
+  corpus_doubt?: string;
   raw: string;
 }
 
@@ -182,6 +188,10 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
   if ("streamContract" in value) {
     if (isResponseStreamContractVariant(value.streamContract)) overrides.streamContract = value.streamContract;
     else errors.push(`streamContract inconnu : ${String(value.streamContract)}`);
+  }
+  if ("establishedFacts" in value) {
+    if (typeof value.establishedFacts === "boolean") overrides.establishedFacts = value.establishedFacts;
+    else errors.push("establishedFacts doit être true ou false");
   }
   if ("situationSummarySource" in value && typeof value.situationSummarySource === "string" && value.situationSummarySource.trim()) {
     overrides.situationSummarySource = value.situationSummarySource.trim().slice(0, 80);
@@ -323,10 +333,10 @@ export function parseUsdPerMillion(raw: string): number {
 const CHARACTER_TOKENS_IN = 4_200;
 const CHARACTER_TOKENS_OUT = 110;
 const GM_COST_PER_TURN_USD = 0.0026;
-const JUDGE_TOKENS_IN = 2_900;
+const JUDGE_TOKENS_IN = 4_700; // widened canon reference (lot K1, measured 14 November 2026)
 const JUDGE_TOKENS_OUT = 180;
 const MEASURED_JUDGE_COST_PER_CALL_USD: Record<string, number> = {
-  "anthropic/claude-sonnet-5.5": 0.0136,
+  "anthropic/claude-sonnet-5.5": 0.0205, // 0.0136 before the widened canon reference of lot K1
 };
 
 function catalogCallCost(modelId: string, tokensIn: number, tokensOut: number, fallbackIn = "$1", fallbackOut = "$3"): number {
@@ -368,16 +378,24 @@ export function clampScore(value: unknown, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-export function parseJudgeResponse(raw: string): EvalJudgeScore {
+/** Stored by results judged before lot K1, when an unreadable answer was scored 0 everywhere. */
+export const UNREADABLE_JUDGE_RATIONALE = "JSON juge illisible";
+
+/**
+ * Reads the judge's JSON. An unreadable answer (no JSON object, or no numeric
+ * `gold_fidelity`) returns null: it is excluded from every mean, never scored 0.
+ */
+export function parseJudgeResponse(raw: string): EvalJudgeScore | null {
   const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  let parsed: Record<string, unknown> = {};
+  let parsed: Record<string, unknown> | null = null;
   if (jsonMatch) {
     try {
       parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
     } catch {
-      parsed = {};
+      parsed = null;
     }
   }
+  if (!parsed || typeof parsed !== "object" || !Number.isFinite(Number(parsed.gold_fidelity ?? NaN))) return null;
   const play: Partial<Record<PlayCriterionKey, number>> = {};
   for (const key of PLAY_CRITERIA_KEYS) {
     if (parsed[key] !== undefined && parsed[key] !== null) play[key] = clampScore(parsed[key], 0, 5);
@@ -394,7 +412,8 @@ export function parseJudgeResponse(raw: string): EvalJudgeScore {
     length_ok: parsed.length_ok === true || parsed.length_ok === "true",
     character_voice: clampScore(parsed.character_voice, 0, 5),
     overall: clampScore(parsed.overall, 0, 10),
-    rationale: typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 800) : "JSON juge illisible",
+    rationale: typeof parsed.rationale === "string" ? parsed.rationale.slice(0, 800) : "",
+    ...(typeof parsed.corpus_doubt === "string" && parsed.corpus_doubt.trim() ? { corpus_doubt: parsed.corpus_doubt.trim().slice(0, 300) } : {}),
     raw,
   };
 }
@@ -408,6 +427,7 @@ export function evalCharacterKey(characterName: string | null | undefined): Runt
 }
 
 const CANON_FIELD_CHARS = 1_800;
+const JUDGE_ATTEMPTS = 2;
 
 function clip(text: string | undefined, limit: number): string {
   const value = (text ?? "").trim();
@@ -438,12 +458,34 @@ export function judgeTimelineExcerpt(timeline: string | undefined): string {
   return `${kept}…\n${tail}`;
 }
 
-/** Read-only canon excerpt from the synced character sheet, for the judge only. */
-export function buildJudgeCanonReference(fields: { situation_summary?: string; timeline?: string; maniere_de_parler?: string } | null): string {
+const CANON_IDENTITY_CHARS = 1_400;
+const CANON_INTERDICTS_CHARS = 3_600;
+
+type JudgeCanonFields = Partial<Pick<CharacterPrompt,
+  "situation_summary" | "timeline" | "maniere_de_parler" | "identite_fondamentale" | "ce_que_tu_ne_fais_jamais" | "ce_que_tu_sais_aujourdhui">>;
+
+/**
+ * Read-only canon excerpt from the synced character sheet, for the judge only.
+ * Lot K1: read at call time (the awaited call is taking place) and widened to
+ * the established facts, the identity and the character's own interdicts,
+ * where contamination, family ties and chronology are written.
+ */
+export function buildJudgeCanonReference(fields: JudgeCanonFields | null): string {
   if (!fields) return "";
+  const sheet = {
+    character_id: "", qui_tu_es: "", ce_que_tu_sais_utilisateur: "", dynamique_conversation: "", sujets_sensibles: "",
+    references_intellectuelles: "", identite_fondamentale: "", ce_que_tu_ne_fais_jamais: "", timeline: "", situation_summary: "",
+    ...fields,
+  } as CharacterPrompt;
+  const facts = characterEstablishedFacts(sheet)?.content ?? "";
+  const identity = neutralizeAwaitedCall(facts ? withoutEstablishedFacts(sheet).identite_fondamentale : sheet.identite_fondamentale);
   const parts = [
-    fields.situation_summary?.trim() ? `### Situation présente\n${clip(fields.situation_summary, CANON_FIELD_CHARS)}` : "",
-    fields.timeline?.trim() ? `### Timeline (périodes, Mona, puis les derniers jours en entier)\n${judgeTimelineExcerpt(fields.timeline)}` : "",
+    "Au moment de l'appel, l'appel attendu a lieu : le personnage parle avec la personne qui devait appeler ; il n'attend plus cet appel.",
+    fields.situation_summary?.trim() ? `### Situation présente\n${clip(neutralizeAwaitedCall(fields.situation_summary), CANON_FIELD_CHARS)}` : "",
+    facts ? `### Faits établis au moment de l'appel\n${facts}` : "",
+    fields.timeline?.trim() ? `### Timeline (périodes, Mona, puis les derniers jours en entier)\n${neutralizeAwaitedCall(judgeTimelineExcerpt(fields.timeline))}` : "",
+    identity.trim() ? `### Identité\n${clip(identity, CANON_IDENTITY_CHARS)}` : "",
+    fields.ce_que_tu_ne_fais_jamais?.trim() ? `### Ce que le personnage ne fait jamais\n${clip(fields.ce_que_tu_ne_fais_jamais, CANON_INTERDICTS_CHARS)}` : "",
     fields.maniere_de_parler?.trim() ? `### Manière de parler\n${clip(fields.maniere_de_parler, 900)}` : "",
   ].filter(Boolean);
   return parts.join("\n\n");
@@ -496,10 +538,17 @@ Note la réponse ci-dessous dans cette conversation : une reprise de ce qui a é
 ` : ""}## RÉPONSE DE ${characterName.toLocaleUpperCase("fr")}
 ${response}
 
+## VÉRIFICATION DU CANON — AVANT TOUTE NOTE
+Vérifie chaque fait affirmé dans la réponse contre les REPÈRES CANON, même quand la cible (RÉPONSE VISÉE, MUST INCLUDE, MUST NOT, NOTES) ne le demande pas : qui a fait quoi, qui est qui (liens de parenté), ce qui est déjà arrivé et ce qui reste à venir, dans quel sens s'est faite une contamination, ce que le personnage sait aujourd'hui.
+- Un fait contraire aux repères, ou une prémisse fausse du joueur reprise à son compte, donne canon_timeline ≤ 1, même si tout le reste est conforme à la cible.
+- L'appel a lieu : ${firstName} parle avec la personne qui devait appeler. Dire qu'il attend encore cet appel contredit le présent.
+- Une crainte, un projet ou une motivation que les repères rendent sans objet (vouloir empêcher ce qui est déjà arrivé, protéger d'un danger déjà advenu) ou qu'ils n'étayent pas est une invention : canon_timeline ≤ 2, et lived_impact ne dépasse pas 3, car ce vécu n'est pas le sien.
+- Si la cible elle-même semble contredire les repères, suis les repères et dis-le en une phrase dans "corpus_doubt" ; sinon laisse cette chaîne vide.
+
 ## JEU DU PERSONNAGE — QUATRE CRITÈRES (0 à 5)
 - not_meta : ${firstName} vit la situation de l'intérieur ; il n'explique pas l'histoire, le dispositif ni son propre rôle comme un narrateur. 0 = résumé de situation ou commentaire sur la fiction.
 - lived_impact : les faits passent par ce qu'ils font à sa vie, à son corps, à sa famille ; une énumération de faits sans leur effet vécu vaut au plus 2.
-- canon_timeline : rien ne contredit la fiche, la timeline ni le présent ; un souvenir (ex. J−2 à l'hôtel) n'est jamais raconté comme le présent (l'appartement). 0 = contradiction nette.
+- canon_timeline : rien ne contredit la fiche, la timeline ni le présent ; un souvenir (ex. J−2 à l'hôtel) n'est jamais raconté comme le présent (l'appartement). 0 = contradiction nette d'un fait établi ; 1 = prémisse fausse du joueur acceptée, ou fait secondaire faux ; 2 = invention non étayée par les repères.
 - distinct_voice : on reconnaît ${firstName}, pas ${otherName} ni un assistant ; vocabulaire, rythme et rapport aux autres lui sont propres.
 Le défaut principal à détecter : un personnage trop méta qui énumère des faits sans leur impact.
 
@@ -525,6 +574,7 @@ Retourne UNIQUEMENT un JSON :
   "canon_timeline": 0-5,
   "distinct_voice": 0-5,
   "overall": 0-10,
+  "corpus_doubt": "",
   "rationale": "2 phrases max"
 }`;
 }
@@ -672,6 +722,7 @@ export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: Run
     promptVariant,
     situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
     streamContract: config.streamContract,
+    establishedFacts: config.establishedFacts,
     ragTopK,
     ragThreshold: config.ragThreshold,
     ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
@@ -733,22 +784,31 @@ export async function runIsolatedEvalTurn(
   };
 }
 
+/**
+ * One judge call. An unreadable answer is replayed once; if it stays
+ * unreadable the result is null and the turn is left out of every mean.
+ */
 export async function judgeIsolatedEvalTurn(
   item: EvalItem,
   maxResponse: string,
   judgeModel: string,
   opts?: { signal?: AbortSignal; canonReference?: string; priorExchanges?: string },
-): Promise<EvalJudgeScore> {
-  const result = await callLLMWithUsage(
-    [{ role: "system", content: buildJudgePrompt(item, maxResponse, opts?.canonReference ?? "", opts?.priorExchanges ?? "") }],
-    {
-      model: judgeModel,
-      temperature: 0,
-      max_tokens: 500,
-      feature_key: EVAL_FEATURE_KEY,
-      signal: opts?.signal,
-      timeoutMs: 25_000,
-    },
-  );
-  return parseJudgeResponse(result.content);
+): Promise<EvalJudgeScore | null> {
+  const prompt = buildJudgePrompt(item, maxResponse, opts?.canonReference ?? "", opts?.priorExchanges ?? "");
+  for (let attempt = 1; attempt <= JUDGE_ATTEMPTS; attempt += 1) {
+    const result = await callLLMWithUsage(
+      [{ role: "system", content: prompt }],
+      {
+        model: judgeModel,
+        temperature: 0,
+        max_tokens: 650,
+        feature_key: EVAL_FEATURE_KEY,
+        signal: opts?.signal,
+        timeoutMs: 25_000,
+      },
+    );
+    const score = parseJudgeResponse(result.content);
+    if (score) return score;
+  }
+  return null;
 }

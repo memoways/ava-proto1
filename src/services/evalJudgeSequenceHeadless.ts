@@ -2,7 +2,8 @@ import { parseHeadlessEvalArgs, type HeadlessEvalOptions } from "@/services/eval
 import { EVAL_PROMPT_VARIANTS } from "@/services/evalJudgePipeline";
 
 /** Pure options of `npm run eval:judge:sequences` (lot J3). */
-export const DEFAULT_SEQUENCE_CORPUS = "docs/eval/sequences_j3_v1.json";
+/** v2 since lot K1: v1 corrected after Romed's calibration (v1 stays versioned to reread older runs). */
+export const DEFAULT_SEQUENCE_CORPUS = "docs/eval/sequences_j3_v2.json";
 export const DEFAULT_SEQUENCE_REPEATS = 2;
 
 export interface HeadlessSequenceOptions extends Omit<HeadlessEvalOptions, "resumeRunId" | "candidatePresent"> {

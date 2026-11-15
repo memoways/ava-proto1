@@ -14,6 +14,15 @@ import {
   withoutCharacterEmbodiment,
   withoutCharacterLivedImpact,
 } from '@/services/characterEmbodiment';
+import {
+  ESTABLISHED_FACTS_DEFAULT,
+  ESTABLISHED_FACTS_TITLE,
+  ESTABLISHED_FACTS_USAGE_LINE,
+  characterEstablishedFacts,
+  neutralizeAwaitedCall,
+  sheetAtCallTime,
+  withoutEstablishedFacts,
+} from "@/services/establishedFacts";
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
 import {
   POST_VIDEO_SECTION_MAX_CHARS,
@@ -30,8 +39,10 @@ export const OPTIMIZED_V3_LIMITS = {
   ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
   ragItemChars: MAX_MAX_RAG_ITEM_CHARS,
   ragItems: MAX_MAX_RAG_ITEMS,
+  /** Room kept for question-relevant canon when the speaking manner yields to the established facts. */
+  minCanonChars: 650,
   relationshipChars: 1_400,
-  frameChars: 1_400,
+  frameChars: 1_650, // 1 400 + the shared « présent de l'appel » line (lot K1); the total context limit is unchanged
   postVideoChars: POST_VIDEO_SECTION_MAX_CHARS,
   watchedVideosChars: WATCHED_VIDEOS_SECTION_MAX_CHARS,
 };
@@ -64,6 +75,9 @@ interface CandidateUnit {
   text: string;
   score: number;
   rank?: number;
+  /** Timeline titles (lot K1): period heading rendered once above its titles, in sheet order. */
+  group?: string;
+  order?: number;
 }
 
 interface SelectedUnit extends CandidateUnit {
@@ -97,6 +111,12 @@ export interface OptimizedPromptInput {
   watchedVideos?: string;
   ragCandidates?: OptimizedRagCandidate[];
   identityInvariant?: string;
+  /**
+   * Lot K1: protected « FAITS ÉTABLIS » block and the awaited call read as the
+   * call in progress. Played by default; `false` rebuilds the previous core
+   * (judge reference side, in memory).
+   */
+  establishedFacts?: boolean;
 }
 
 /** The generated present is a dense list of facts: it anchors coherence but
@@ -148,6 +168,18 @@ function shingleSet(value: string, width = 5): Set<string> {
   }
   return out;
 }
+
+/** Above every field base score: timeline titles relevant to the question fill the canon room first. */
+const TIMELINE_TITLE_PRIORITY = 1_000;
+/** A question word counts fully when at most this many titles carry it, then proportionally less. */
+const TIMELINE_RARE_TERM_TITLES = 3;
+const TIMELINE_TITLE_MIN_RELEVANCE = 90;
+const TIMELINE_PRIORITY_TITLES = 4;
+/** Function words (accents removed) that never make a title relevant to a question. */
+const TITLE_STOPWORDS = new Set(["chez", "avec", "dans", "pour", "vous", "nous", "quand", "comme", "tout", "toute", "tous", "cette", "etre", "avoir", "fait", "faire", "encore", "aussi", "alors", "donc", "bien", "juste", "avant", "apres", "moins", "plus", "votre", "notre", "leur", "leurs", "elle", "elles", "celui", "cela", "sans", "sous", "vers", "entre", "meme", "tres", "puis", "etait", "avais", "avait", "avez", "sont", "suis"]);
+/** One named sensitive subject at most, short enough to leave room for the titles. */
+const SENSITIVE_SUBJECT_PRIORITY = 2_000;
+const SENSITIVE_SUBJECT_MAX_CHARS = 500;
 
 type ComparisonProfile = { normalized: string; terms: Set<string>; shingles: Set<string> };
 
@@ -281,35 +313,139 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
   return baseScore + overlap * 90 + recentTimelineBoost;
 }
 
-function protectedCharacterSections(character: CharacterPrompt) {
-  const present = character.situation_summary.trim();
-  const lived = characterLivedImpact(character);
-  return [
-    ...(present ? [{ key: 'situation_summary', title: PRESENT_TITLE, content: present }] : []),
-    ...(lived ? [{ key: 'vecu', title: LIVED_IMPACT_TITLE, content: lived.content }] : []),
-    ...characterEmbodiment(character),
-  ];
+interface ProtectedSection { key: string; title: string; content: string }
+
+function staticSize(units: Array<Pick<CandidateUnit, "sourceKey" | "title" | "text">>, canonicalName: string): number {
+  const core = renderGroupedStatic(units as CandidateUnit[], 'core', canonicalName);
+  const canon = renderGroupedStatic(units as CandidateUnit[], 'canon', canonicalName);
+  return (core ? `\n\n# NOYAU DE ${canonicalName.toLocaleUpperCase('fr')}\n${core}`.length : 0)
+    + (canon ? `\n\n# CANON PERTINENT\n${canon}`.length : 0);
 }
 
-function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string): { selected: SelectedUnit[]; all: SelectedUnit[] } {
+const protectedSize = (sections: ProtectedSection[], canonicalName: string) =>
+  staticSize(sections.map(section => ({ sourceKey: section.key, title: section.title, text: section.content })), canonicalName);
+
+/**
+ * The speaking manner gives up trailing paragraphs, last first, only as far as
+ * the established facts need. Its opening and the speech-state list (read by
+ * the turn's speech directive) are never touched.
+ */
+function boundSpeakingManner(manner: string, fits: (candidate: string) => boolean): { content: string; dropped: string[] } {
+  const blocks = manner.replace(/\r\n?/g, "\n").split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
+  let keepAtLeast = 1;
+  blocks.forEach((block, index) => { if (/^- .+ : /m.test(block)) keepAtLeast = index + 1; });
+  const dropped: string[] = [];
+  while (blocks.length > keepAtLeast && !fits(blocks.join("\n\n"))) dropped.unshift(blocks.pop()!);
+  return dropped.length ? { content: blocks.join("\n\n"), dropped } : { content: manner, dropped };
+}
+
+/**
+ * Lot K1 — one unit per timeline title, so the titles the question touches are
+ * the ones kept (« Emma te tend le couteau pour le chevreuil »), instead of the
+ * first lines of one period. Each title keeps its period heading for rendering.
+ */
+function timelineTitleUnits(timeline: string): Array<{ text: string; group?: string }> {
+  const out: Array<{ text: string; group?: string }> = [];
+  for (const paragraph of timeline.replace(/\r/g, "").split(/\n\s*\n+/).map(value => value.trim()).filter(Boolean)) {
+    const lines = paragraph.split("\n").map(value => value.trim()).filter(Boolean);
+    const titles = lines.filter(line => /^SOUVENIR\b/.test(line));
+    if (!titles.length) {
+      splitUnits(paragraph).forEach(text => out.push({ text }));
+      continue;
+    }
+    const heading = lines.filter(line => !/^SOUVENIR\b/.test(line)).join(" ");
+    titles.forEach(text => out.push({ text, group: heading || undefined }));
+  }
+  return out;
+}
+
+function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? ""): {
+  sections: ProtectedSection[];
+  yielded: string[];
+} {
+  const present = character.situation_summary.trim();
+  const lived = characterLivedImpact(character);
+  const base = (facts: string | null, manner?: string): ProtectedSection[] => [
+    ...(present ? [{ key: 'situation_summary', title: PRESENT_TITLE, content: present }] : []),
+    ...(facts ? [{ key: 'faits_etablis', title: ESTABLISHED_FACTS_TITLE, content: facts }] : []),
+    ...(lived ? [{ key: 'vecu', title: LIVED_IMPACT_TITLE, content: lived.content }] : []),
+    ...characterEmbodiment(character).map(section => section.key === 'maniere_de_parler' && manner !== undefined
+      ? { ...section, content: manner } : section),
+  ];
+  const extracted = establishedFacts ? characterEstablishedFacts(character)?.content ?? null : null;
+  const facts = extracted ? `${extracted}\n${ESTABLISHED_FACTS_USAGE_LINE}` : null;
+  if (!facts) return { sections: base(null), yielded: [] };
+  const limit = OPTIMIZED_V3_LIMITS.staticChars;
+  const fitsWith = (room: number) => (manner: string) => protectedSize(base(facts, manner), canonicalName) + room <= limit;
+  const manner = character.maniere_de_parler?.trim() ?? "";
+  // First try to keep room for one relevant canon unit; then only require the core to fit.
+  let bounded = boundSpeakingManner(manner, fitsWith(OPTIMIZED_V3_LIMITS.minCanonChars));
+  if (!fitsWith(0)(bounded.content)) bounded = boundSpeakingManner(manner, fitsWith(0));
+  // The facts never make a sheet unplayable: without room, the previous core is kept.
+  if (!fitsWith(0)(bounded.content)) return { sections: base(null), yielded: [] };
+  return { sections: base(facts, bounded.content), yielded: bounded.dropped };
+}
+
+function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string, establishedFacts: boolean): { selected: SelectedUnit[]; all: SelectedUnit[] } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
-  const selectable = withoutCharacterLivedImpact(withoutCharacterEmbodiment(character));
+  const protectedCore = protectedCharacterSections(character, establishedFacts, canonicalName);
+  const hasFacts = protectedCore.sections.some(section => section.key === 'faits_etablis');
+  const withoutProtected = withoutCharacterLivedImpact(withoutCharacterEmbodiment(character));
+  const selectable = hasFacts ? withoutEstablishedFacts(withoutProtected) : withoutProtected;
   FIELD_SPECS.forEach((spec, fieldIndex) => {
     // The current scene is one atomic editorial unit, never a relevance candidate.
     if (spec.key === 'situation_summary') return;
+    if (hasFacts && spec.key === 'timeline') {
+      const titleUnits = timelineTitleUnits(selectable.timeline || "");
+      // Match the question against the title itself, not the place and time of day shared by many titles.
+      const titleTerms = titleUnits.map(unit => keywords(unit.group ? unit.text.slice(unit.text.lastIndexOf(" — ") + 3) : unit.text));
+      // A word found in many titles (« chalet », « vous ») says little: rare words carry the match.
+      const frequency = new Map<string, number>();
+      titleTerms.forEach(terms => terms.forEach(term => frequency.set(term, (frequency.get(term) ?? 0) + 1)));
+      titleUnits.forEach((unit, unitIndex) => {
+        const base = spec.baseScore - fieldIndex;
+        let relevance = 0;
+        titleTerms[unitIndex].forEach(term => {
+          if (queryTerms.has(term) && !TITLE_STOPWORDS.has(term)) relevance += 90 * Math.min(1, TIMELINE_RARE_TERM_TITLES / (frequency.get(term) ?? 1));
+        });
+        candidates.push({
+          id: `static:timeline:${unitIndex}`,
+          source: "static",
+          sourceKey: spec.key,
+          title: spec.title,
+          text: unit.text,
+          group: unit.group,
+          order: unitIndex,
+          // A title the question touches goes before any other relevance fragment;
+          // without any, the most recent titles (end of the sheet) come first.
+          score: (unit.group && relevance >= TIMELINE_TITLE_MIN_RELEVANCE ? TIMELINE_TITLE_PRIORITY : base) + relevance + unitIndex * 0.01,
+        });
+      });
+      return;
+    }
     splitUnits(selectable[spec.key] || "").forEach((text, unitIndex) => {
+      // A lone heading or separator (« --- », a title without its paragraph) carries nothing.
+      if (hasFacts && normalizeForComparison(text).length < 20) return;
+      const base = spec.baseScore - unitIndex * 3 - fieldIndex;
+      let score = scoreText(text, queryTerms, base, spec.key);
+      // Lot K1: the sensitive subject the question names by its own label (« - Mona : … »)
+      // goes with the relevant timeline titles, before the generic fragments.
+      const label = spec.key === "sujets_sensibles" ? text.match(/^[-*•]\s*([^:\n]{2,40}?)\s*:/)?.[1] : undefined;
+      if (hasFacts && label && text.length <= SENSITIVE_SUBJECT_MAX_CHARS && [...keywords(label)].some(term => queryTerms.has(term))) {
+        score += SENSITIVE_SUBJECT_PRIORITY - base;
+      }
       candidates.push({
         id: `static:${spec.key}:${unitIndex}`,
         source: "static",
         sourceKey: spec.key,
         title: spec.title,
         text,
-        score: scoreText(text, queryTerms, spec.baseScore - unitIndex * 3 - fieldIndex, spec.key),
+        score,
       });
     });
   });
-  const protectedUnits: SelectedUnit[] = protectedCharacterSections(character).map(section => ({
+  const protectedUnits: SelectedUnit[] = protectedCore.sections.map(section => ({
     id: `static:${section.key}:protected`, source: 'static', sourceKey: section.key,
     title: section.title, text: section.content, score: 10_000, status: 'selected',
     originalChars: section.content.length, removedChars: 0, reason: 'included',
@@ -317,6 +453,11 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   const selected: CandidateUnit[] = [...protectedUnits];
   const decisions = new Map<string, SelectedUnit>();
   protectedUnits.forEach(unit => decisions.set(unit.id, unit));
+  const yieldedUnits: SelectedUnit[] = protectedCore.yielded.map((text, index) => ({
+    id: `static:maniere_de_parler:yielded:${index}`, source: 'static', sourceKey: 'maniere_de_parler',
+    title: 'MANIÈRE DE PARLER', text, score: 0, status: 'budget',
+    originalChars: text.length, removedChars: text.length, reason: 'budget',
+  }));
   const contractReference: CandidateUnit = {
     id: "contract:conversation",
     source: "contract",
@@ -325,14 +466,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     text: contract,
     score: 10_000,
   };
-  // Account for the exact rendered headings as well as editorial text.
-  const staticSize = (units: CandidateUnit[]) => {
-    const core = renderGroupedStatic(units, 'core', canonicalName);
-    const canon = renderGroupedStatic(units, 'canon', canonicalName);
-    return (core ? `\n\n# NOYAU DE ${canonicalName.toLocaleUpperCase('fr')}\n${core}`.length : 0)
-      + (canon ? `\n\n# CANON PERTINENT\n${canon}`.length : 0);
-  };
-  if (staticSize(selected) > OPTIMIZED_V3_LIMITS.staticChars) {
+  if (staticSize(selected, canonicalName) > OPTIMIZED_V3_LIMITS.staticChars) {
     throw new Error('Présent canonique et parole éditoriale trop longs pour le noyau optimized_v3 : génération interdite');
   }
   const trySelect = (candidate: CandidateUnit) => {
@@ -355,7 +489,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       decisions.set(candidate.id, { ...effective, status: "duplicate_static", keptBy: duplicate.id, originalChars: candidate.text.length, removedChars: candidate.text.length, reason: "duplicate" });
       return;
     }
-    if (staticSize([...selected, effective]) > OPTIMIZED_V3_LIMITS.staticChars) {
+    if (staticSize([...selected, effective], canonicalName) > OPTIMIZED_V3_LIMITS.staticChars) {
       decisions.set(candidate.id, { ...effective, status: "budget", originalChars: candidate.text.length, removedChars: novelty.removedChars, reason: "budget" });
       return;
     }
@@ -375,6 +509,12 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   const requiredSpecs = FIELD_SPECS
     .filter((item) => item.required)
     .sort((a, b) => Number(b.key === "timeline") - Number(a.key === "timeline"));
+  // Lot K1: the timeline titles and sensitive subjects the question touches come
+  // before the other fields' generic fragments, a few at most.
+  candidates.filter((candidate) => candidate.sourceKey === "sujets_sensibles" && candidate.score >= SENSITIVE_SUBJECT_PRIORITY)
+    .sort((a, b) => b.score - a.score).slice(0, 1).forEach(trySelect);
+  candidates.filter((candidate) => candidate.sourceKey === "timeline" && candidate.score >= TIMELINE_TITLE_PRIORITY)
+    .sort((a, b) => b.score - a.score).slice(0, TIMELINE_PRIORITY_TITLES).forEach(trySelect);
   for (const spec of requiredSpecs) {
     const best = candidates.filter((candidate) => candidate.sourceKey === spec.key).sort((a, b) => b.score - a.score)[0];
     if (best) trySelect(best);
@@ -382,7 +522,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   candidates.sort((a, b) => b.score - a.score).forEach(trySelect);
   const selectedIds = new Set(selected.map((candidate) => candidate.id));
   const selectedWithStatus = [...decisions.values()].filter((candidate) => selectedIds.has(candidate.id));
-  const all = [...protectedUnits, ...candidates.map((candidate) => decisions.get(candidate.id) ?? {
+  const all = [...protectedUnits, ...yieldedUnits, ...candidates.map((candidate) => decisions.get(candidate.id) ?? {
     ...candidate,
     status: "lower_rank" as const,
     originalChars: candidate.text.length,
@@ -401,18 +541,34 @@ function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", ch
     if (lived) blocks.push(`## ${lived.title}\n${lived.text}`);
   }
   for (const spec of FIELD_SPECS.filter((item) => item.group === group)) {
-    const parts = units.filter((unit) => unit.sourceKey === spec.key).map((unit) => unit.text);
+    const own = units.filter((unit) => unit.sourceKey === spec.key);
+    const grouped = own.some((unit) => unit.order !== undefined);
+    const parts: string[] = [];
+    let heading: string | undefined;
+    for (const unit of grouped ? [...own].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) : own) {
+      if (grouped && unit.group && unit.group !== heading) parts.push(unit.group);
+      heading = unit.group;
+      parts.push(unit.text);
+    }
     const title = spec.title === "INVARIANTS DU PERSONNAGE"
       ? `INVARIANTS DE ${characterName.toLocaleUpperCase("fr")}`
       : spec.title;
     if (parts.length) blocks.push(`## ${title}\n${parts.join("\n")}`);
+    if (spec.key === 'situation_summary') {
+      // Established facts sit right after the present, before identity and voice.
+      const facts = units.find(unit => unit.sourceKey === 'faits_etablis');
+      if (facts) blocks.push(`## ${facts.title}\n${facts.text}`);
+    }
   }
   return blocks.join("\n\n");
 }
 
 export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPromptAssemblyTrace {
   if (!input.character) throw new Error("Fiche personnage absente : génération interdite");
-  const canonicalName = input.character.name?.trim() || input.characterName.trim();
+  const establishedFacts = input.establishedFacts ?? ESTABLISHED_FACTS_DEFAULT;
+  // Read at call time: the awaited call is the one taking place (in memory, the sheet is untouched).
+  const character = establishedFacts ? sheetAtCallTime(input.character) : input.character;
+  const canonicalName = character.name?.trim() || input.characterName.trim();
   if (!canonicalName) throw new Error("Fiche personnage incohérente : identité absente");
   const firstName = canonicalName.split(/\s+/)[0].toLocaleLowerCase("fr");
   if (firstName !== input.characterName.trim().split(/\s+/)[0].toLocaleLowerCase("fr")) {
@@ -421,7 +577,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const contract = conversationContract(canonicalName, input.identityInvariant);
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
-  const staticSelection = selectStaticUnits(input.character, query, contract, canonicalName);
+  const staticSelection = selectStaticUnits(character, query, contract, canonicalName, establishedFacts);
   const core = renderGroupedStatic(staticSelection.selected, "core", canonicalName);
   if (!core) throw new Error("Fiche personnage incohérente : noyau éditorial vide");
   const canon = renderGroupedStatic(staticSelection.selected, "canon", canonicalName);
@@ -527,7 +683,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
   const ragBlocks: string[] = [];
   for (const candidate of input.ragCandidates ?? []) {
-    const clean = cleanRagContent(candidate.content);
+    const clean = establishedFacts ? neutralizeAwaitedCall(cleanRagContent(candidate.content)) : cleanRagContent(candidate.content);
     const unit: CandidateUnit = {
       id: candidate.id,
       source: "rag",
@@ -584,7 +740,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.length ? [RAG_USAGE_LINE, ...ragBlocks].join("\n\n") : "", OPTIMIZED_V3_LIMITS.ragChars, "rag");
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
-  if (protectedCharacterSections(input.character).some(section => !deliveredCore.includes(section.content))) {
+  if (protectedCharacterSections(character, establishedFacts, canonicalName).sections.some(section => !deliveredCore.includes(section.content))) {
     throw new Error('Présent canonique ou parole éditoriale incomplets : génération interdite');
   }
   const staticRendered = [core, canon].filter(Boolean).join("\n\n");
@@ -598,14 +754,14 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     baseSystemPrompt: staticRendered,
     baseSource: {
       kind: "compiled",
-      characterId: input.character.character_id,
+      characterId: character.character_id,
       canonicalName,
-      updatedAt: input.character.updated_at ?? null,
+      updatedAt: character.updated_at ?? null,
     },
     characterPrompt: {
-      characterId: input.character.character_id,
+      characterId: character.character_id,
       canonicalName,
-      updatedAt: input.character.updated_at ?? null,
+      updatedAt: character.updated_at ?? null,
       renderedSections: staticRendered,
     },
     technicalRules: contract,

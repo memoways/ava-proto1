@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Lot K1 — faits établis dans le prompt et juge calibré] — 2026-11-14
+
+- **Noyau `optimized_v3`** : bloc protégé « FAITS ÉTABLIS » (≤ 1 200 caractères, tiré de la fiche : champ Notion optionnel
+  « Ce que tu sais aujourd'hui », sinon paragraphe « Ce qui est vrai aujourd'hui » et liens de parenté de la timeline),
+  placé après le PRÉSENT et avant la voix, sans grossir le noyau : la fin de la manière de parler cède la place
+  (641 caractères pour Max, 1 037 pour Emma ; ouverture et états de parole entiers). Titres de timeline choisis un par un
+  selon la question.
+- **Présent de l'appel** : la fiche est lue au moment de l'appel (« tu attends l'appel » devient l'appel en cours) et le
+  cadre commun porte la même phrase pour le personnage et le Game Master.
+- **Juge** : repère canon élargi (faits établis, identité, interdits), vérification du canon avant toute note, plafond de
+  la note quand `canon_timeline` ≤ 1 (≤ 3 à 0, ≤ 4 à 1), attente du corpus douteuse signalée, réponse illisible rejouée
+  une fois puis écartée des moyennes (jamais 0).
+- **Calibrage** : `npm run eval:judge:calibrate` rejuge les dix réponses notées par Romed. Écart moyen 1,51 → 0,82 à
+  0,85 ; écarts > 2 points : 3 → 0. Réglé sur ces dix réponses : à confirmer sur un nouvel échantillon.
+- **Corpus J3 v2** corrigé d'après Romed (neuf tours), statut « corrigé d'après Romed, à revalider » ; rien n'est saisi
+  dans Notion. Liste de contrôle des faits canoniques versionnée et testée (`docs/eval/faits_canon_k1.json`).
+- `sync-notion` lit le champ optionnel ; migration additive `ce_que_tu_sais_aujourdhui` à appliquer par le chat Lovable.
+  Base Caractères non modifiée. [Plan et mesures](docs/plan_calibration_juge_lot_k1.md) ·
+  [prompt du lot K2](docs/prompt_reprise_fiches_corrigees_lot_k2.md).
+
 ## [Calibrage du juge par Romed : analyse et suite] — 2026-11-14
 
 - Analyse des notes et commentaires de Romed sur les dix réponses à l'aveugle

@@ -50,8 +50,13 @@ D'abord un instrument de mesure, ensuite les améliorations. Chaque changement d
    - Reformuler la consigne « livre d'abord ton contenu ».
    - Puis écoute (AP5).
 4. **J3 — juge sur plusieurs tours.** Livré en code le 9 novembre ([plan](plan_llm_as_judge.md#lot-j3--juge-sur-plusieurs-tours-9-novembre-2026), [rapport](rapport_llm_juge_j3_sandbox_20261109.md)) : `npm run eval:judge:sequences` rejoue 3 à 5 tours avec historique, mémoire et boucle GM, en mémoire ; note par tour (J1) et note de séquence séparées. Bruit : par tour < 0,3, par séquence < 1,0. `lived_v2` confirmé sans recul sur plusieurs tours (longueur +1,02). Corpus J3 proposé ([document](corpus_llm_juge_sequences_j3.md)), à valider ; séquences C et D en attente des arbitrages A–F de Romed. Prompt d'origine : [prompt_reprise_llm_juge_lot_j3.md](prompt_reprise_llm_juge_lot_j3.md).
-4 bis. **K1 — faits établis et juge calibré** (14 novembre) : le calibrage de Romed franchit le seuil ; K1 passe avant
-   tout lot mesuré par le juge. [Analyse](analyse_calibration_juge_romed_20261114.md), [prompt](prompt_reprise_calibration_juge_lot_k1.md).
+4 bis. **K1 — faits établis et juge calibré.** Livré en code le 14 novembre ([plan et mesures](plan_calibration_juge_lot_k1.md)) :
+   bloc protégé « FAITS ÉTABLIS » dans le noyau, présent de l'appel partagé avec le GM, juge qui vérifie le canon avec un
+   plafond, corpus J3 v2 corrigé d'après Romed. Calibrage : écart moyen 1,51 → 0,82 à 0,85, aucun écart > 2 points
+   (réglé sur les dix réponses de Romed). [Analyse](analyse_calibration_juge_romed_20261114.md), [prompt d'origine](prompt_reprise_calibration_juge_lot_k1.md).
+4 ter. **K2 — fiches corrigées, juge confirmé, corpus validé.** Après les corrections de source dans Notion (Romed, Ulrich),
+   la relecture du corpus v2 et dix nouvelles réponses notées : resynchro sandbox, liste de contrôle, calibrage de
+   confirmation, saisie du corpus. [Prompt](prompt_reprise_fiches_corrigees_lot_k2.md).
 5. **R — rumination et sous-texte.** **Bloqué depuis le 10 novembre** : calibrage humain du juge, définition
    éditoriale de la rumination et relecture des corpus d'abord ([bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md)). Décision prise **à partir des mesures de J3** : complément de fiche ou consigne au Game Master. Rien n'est ajouté avant d'avoir mesuré. Mesures J3 : rumination présente mais en formules répétées, fil peu repris, prémisses fausses acceptées. [Prompt](prompt_reprise_rumination_sous_texte_lot_r.md).
 6. **S — storyworld spatial.** Réponses de Romed au questionnaire, enrichissement des souvenirs, puis vérification par le sous-corpus du carnage.

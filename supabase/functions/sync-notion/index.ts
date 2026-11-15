@@ -154,6 +154,28 @@ const PROMPT_FIELD_ALIASES: Record<string, string[]> = {
   maniere_de_parler: ["Manière de parler", "Maniere de parler"],
 };
 
+/**
+ * Optional editorial fields (lot K1): never a mapping warning when absent.
+ * Written only when the Notion property exists, so the sync keeps working
+ * before the column is created and while the field is unused.
+ */
+const OPTIONAL_PROMPT_FIELD_ALIASES: Record<string, string[]> = {
+  ce_que_tu_sais_aujourdhui: [
+    "Ce que tu sais aujourd'hui",
+    "Ce que tu sais aujourd’hui",
+    "Ce que tu sais aujourd hui",
+  ],
+};
+
+function extractOptionalPromptFields(props: Record<string, NotionProperty>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [col, aliases] of Object.entries(OPTIONAL_PROMPT_FIELD_ALIASES)) {
+    const alias = aliases.find((name) => name in props);
+    if (alias) out[col] = extractRichText(props[alias]).trim();
+  }
+  return out;
+}
+
 interface MappingWarning {
   field: string;
   expected_notion_property: string;
@@ -630,19 +652,24 @@ serve(async (req) => {
         filledCount = Object.values(promptFields).filter((v) => v && v.trim()).length;
         situationSummary = await generateSituationSummary(name, pageContent, promptFields);
 
-        const { error: promptErr } = await supabase
+        const promptRow = {
+          character_id: charRow.id,
+          environment_id: targetEnvironmentId,
+          ...promptFields,
+          speech_states: parseSpeechStates(promptFields.maniere_de_parler || ''),
+          situation_summary: situationSummary,
+          updated_at: new Date().toISOString(),
+        };
+        const optionalFields = extractOptionalPromptFields(props);
+        const upsertPrompt = (row: Record<string, unknown>) => supabase
           .from('character_prompts')
-          .upsert(
-            {
-              character_id: charRow.id,
-              environment_id: targetEnvironmentId,
-              ...promptFields,
-              speech_states: parseSpeechStates(promptFields.maniere_de_parler || ''),
-              situation_summary: situationSummary,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'character_id,environment_id' },
-          );
+          .upsert(row, { onConflict: 'character_id,environment_id' });
+        let { error: promptErr } = await upsertPrompt({ ...promptRow, ...optionalFields });
+        if (promptErr && Object.keys(optionalFields).some((col) => promptErr!.message.includes(col))) {
+          // Optional column not created yet: keep the regular fields, never fail the sync on it.
+          console.warn(`[sync-notion] optional field skipped for ${name}: ${promptErr.message}`);
+          ({ error: promptErr } = await upsertPrompt(promptRow));
+        }
         if (promptErr) {
           console.error(`[sync-notion] character_prompts upsert error for ${name}:`, promptErr);
           characterSyncErrors.push(

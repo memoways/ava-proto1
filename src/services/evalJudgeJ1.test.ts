@@ -158,7 +158,7 @@ describe("J1 judge grid — prompt", () => {
     expect(canon).toContain("### Situation présente");
     expect(canon).toContain("J−2 hôtel");
     expect(canon).not.toContain("Manière de parler");
-    expect(canon.length).toBeLessThan(2100);
+    expect(canon.length).toBeLessThan(2300); // + the K1 line on the call in progress
     expect(buildJudgeCanonReference(null)).toBe("");
   });
 
@@ -240,12 +240,12 @@ describe("J1 judge grid — weights and backward compatibility", () => {
 });
 
 describe("J1 cost estimate", () => {
-  it("prices the judge as measured on the sandbox run (126 turns ≈ $2.10)", () => {
+  it("prices the judge as measured on the sandbox (126 turns ≈ $2.10 in J1, ≈ $2.97 with the K1 canon reference)", () => {
     const configs = buildReferenceCandidateConfigs({ ...live, model: "openai/gpt-5.6-luna" }, {}, { promptVariant: "rich_v2" });
     const estimate = estimateEvalRun(21, configs, 3);
     expect(estimate.turns).toBe(126);
-    expect(estimate.estimatedCostUsd).toBeGreaterThan(1.9);
-    expect(estimate.estimatedCostUsd).toBeLessThan(2.3);
+    expect(estimate.estimatedCostUsd).toBeGreaterThan(2.8);
+    expect(estimate.estimatedCostUsd).toBeLessThan(3.2);
     expect(estimateEvalRun(21, configs, 3, "openai/gpt-5-mini").estimatedCostUsd).toBeLessThan(estimate.estimatedCostUsd);
   });
 });

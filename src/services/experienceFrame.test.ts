@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { buildExperienceFrame, experiencePathFromFilmAnswer, normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { normalizeDirectorConfig } from "@/services/experienceOrchestration";
 import { restrictHandoffToActiveCharacters } from "@/agents/gameMasterPRD4";
+import { CALL_PRESENT_INVARIANT } from "./establishedFacts";
 
 const enabled = normalizeExperienceFrameConfig({ enabled: true });
 
 describe("experienceFrame", () => {
   it("keeps editorial framing off by default when no film answer exists", () => {
-    expect(buildExperienceFrame({ config: undefined, filmAnswer: null })).toEqual({ enabled: false, path: null, prompt: "" });
+    // Lot K1: the present of the call is factual context, shared whatever the editorial frame.
+    expect(buildExperienceFrame({ config: undefined, filmAnswer: null })).toEqual({ enabled: false, path: null, prompt: CALL_PRESENT_INVARIANT });
+    expect(buildExperienceFrame({ config: undefined, filmAnswer: null, callPresent: false })).toEqual({ enabled: false, path: null, prompt: "" });
   });
 
   it.each([ ["vu", "seen"], ["pas_vu", "unseen"] ] as const)("shares the %s answer even with editorial framing disabled", (filmAnswer, path) => {

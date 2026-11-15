@@ -9,6 +9,7 @@
  */
 import type { ConversationMessage, ExperienceFrameConfig, FilmAnswer } from "@/types";
 import { characterDisplayName } from './characterConversation';
+import { CALL_PRESENT_INVARIANT, ESTABLISHED_FACTS_DEFAULT } from './establishedFacts';
 
 export type ExperiencePath = "seen" | "unseen";
 
@@ -60,6 +61,8 @@ export interface ExperienceFrameInput {
   /** Faits sur l'interlocuteur déjà acquis (prénom, statut…), issus de la mémoire. */
   knownAboutPlayer?: string[];
   callTransfer?: ConversationMessage['callTransfer'];
+  /** Lot K1 invariant « the awaited call is the one taking place »; `false` only for the judge's reference side. */
+  callPresent?: boolean;
 }
 
 export interface ExperienceFrame {
@@ -78,7 +81,10 @@ export function buildExperienceFrame(input: ExperienceFrameInput): ExperienceFra
   const transfer = input.callTransfer;
   const source = transfer && (transfer.from === 'emma' || transfer.from === 'max') ? characterDisplayName(transfer.from) : null;
   const transferContext = source ? `CONTINUITÉ DE L'APPEL : cet appel t'a été ${transfer?.returning ? 'repassé' : 'passé'} par ${source}. Tu sais qu'une discussion était en cours : tu as seulement perçu sa voix, sans connaître ses mots ni les confidences échangées. ${transfer?.returning ? 'Reprends ta propre conversation avec cet interlocuteur et tes seuls souvenirs.' : 'Accueille cet interlocuteur comme un appel transféré, sans prétendre déjà le connaître.'} Ne rejoue pas l'accueil d'un appel initial et ne répète pas l'annonce du transfert à chaque tour.` : '';
-  const facts = [filmContext, transferContext].filter(Boolean);
+  // Like the film answer, the present of the call is factual context shared
+  // identically by the character and the GM, whatever the editorial frame.
+  const callPresent = (input.callPresent ?? ESTABLISHED_FACTS_DEFAULT) ? CALL_PRESENT_INVARIANT : "";
+  const facts = [callPresent, filmContext, transferContext].filter(Boolean);
   if (!config.enabled) return { enabled: false, path, prompt: facts.join('\n') };
   const lines: string[] = [...facts];
   if (config.frameText) lines.push(config.frameText);
