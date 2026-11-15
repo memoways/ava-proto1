@@ -3,6 +3,9 @@
 Tu exécutes et livres **uniquement le lot K2** dans `/Users/ulrich/CodeProjects/memoways/ava-proto1`
 (remote `https://github.com/memoways/ava-proto1`).
 
+> **Ne pas lancer avant que Romed et Ulrich aient corrigé les fiches Max et Emma dans la base Caractères** (condition 2
+> ci-dessous). Avant cela, ce lot n'a rien à mesurer : il s'arrête à la vérification des conditions.
+
 **Avant de commencer**
 - Lis AGENTS.md, `docs/etat_courant.md`, le [plan du lot K1](plan_calibration_juge_lot_k1.md) en entier et
   l'[analyse du calibrage par Romed](analyse_calibration_juge_romed_20261114.md) ; puis, pour le domaine touché seulement,
@@ -14,14 +17,18 @@ Tu exécutes et livres **uniquement le lot K2** dans `/Users/ulrich/CodeProjects
 
 ## Conditions de départ — à vérifier, sinon s'arrêter et le dire
 
-Ce lot ne démarre que si les quatre points humains ci-dessous sont faits. Vérifie-les en lecture seule ; si l'un manque,
+Ce lot ne démarre que si les quatre points ci-dessous sont faits. Vérifie-les en lecture seule ; si l'un manque,
 ne le fais pas à la place d'Ulrich ou de Romed : rends la main avec **une seule** action précise.
 
-1. **Migration appliquée** : la colonne `character_prompts.ce_que_tu_sais_aujourdhui` existe (lecture SQL par le MCP
-   Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`) et `sync-notion` est redéployée.
+1. **Migration appliquée — fait le 15 novembre** : colonne `character_prompts.ce_que_tu_sais_aujourdhui` vérifiée en base
+   (MCP Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`), migration Lovable `drizzle/migrations/0018_…`, types
+   régénérés (main `6e40a07`), `sync-notion` redéployée depuis `bb995dd`. Revérifier seulement que la colonne existe.
 2. **Fiches corrigées dans Notion par Romed et Ulrich** ([tâche](https://app.notion.com/p/41862322e59581a0bf56de43cc238e27)) :
-   champ « Ce que tu sais aujourd'hui » créé et rempli pour Max et Emma ; présent écrit comme le présent de l'appel ;
-   titres de timeline avec un agent explicite (fusil, clés, Lise).
+   - champ « Ce que tu sais aujourd'hui » créé et rempli pour Max et Emma, qui devient **la seule place des faits
+     établis** : le paragraphe « Ce qui est vrai aujourd'hui » de l'identité fondamentale y est déplacé, pas recopié ;
+   - présent écrit comme le présent de l'appel (« tu parles avec la personne que tu attendais »), dans l'identité, la
+     timeline (aujourd'hui.01) et partout ailleurs : plus aucun « tu attends l'appel » ;
+   - titres de timeline avec un agent explicite (fusil, clés, Lise) ; raison pour laquelle Mona est au camp.
 3. **Corpus J3 v2 relu** par Romed et Ulrich ([section v2](corpus_llm_juge_sequences_j3.md#corpus-v2--corrigé-daprès-romed-14-novembre-lot-k1)),
    avec leurs corrections écrites (commentaires Notion ou message d'Ulrich).
 4. **Dix nouvelles réponses notées par Romed** (échantillon du run K1 ou d'un run plus récent), au format de
@@ -29,11 +36,16 @@ ne le fais pas à la place d'Ulrich ou de Romed : rends la main avec **une seule
 
 ## Point de départ vérifié (14 novembre 2026, fin du lot K1)
 
-- Noyau `optimized_v3` : bloc protégé « FAITS ÉTABLIS » (≤ 1 200 car.), tiré du champ « Ce que tu sais aujourd'hui » s'il
-  est rempli, sinon du paragraphe « Ce qui est vrai aujourd'hui » de l'identité ; la fiche est lue au moment de l'appel
-  (« tu attends l'appel » devient l'appel en cours) ; la fin de la manière de parler cède la place (641 car. pour Max,
-  1 037 pour Emma). Interrupteur d'évaluation `establishedFacts` (défaut actif). Code : `src/services/establishedFacts.ts`,
-  `src/agents/maxOptimizedPromptCompiler.ts`.
+- Main `bb995dd` (K1), puis `6e40a07` (migration Lovable). **Publié en production par Ulrich le 15 novembre** : le bloc
+  et le présent de l'appel se jouent en production, sur les fiches non encore corrigées.
+- Noyau `optimized_v3` : bloc protégé « FAITS ÉTABLIS » (≤ 1 200 car. + consigne d'usage), tiré du champ « Ce que tu sais
+  aujourd'hui » s'il est rempli, sinon du paragraphe « Ce qui est vrai aujourd'hui » de l'identité ; la fin de la manière
+  de parler cède la place (641 car. pour Max, 1 037 pour Emma). Interrupteur d'évaluation `establishedFacts` (défaut
+  actif). Code : `src/services/establishedFacts.ts`, `src/agents/maxOptimizedPromptCompiler.ts`.
+- **Deux corrections encore écrites dans le code, provisoires** (K1, en attendant les fiches) :
+  `neutralizeAwaitedCall` / `sheetAtCallTime` réécrivent « tu attends l'appel » en mémoire (personnage, souvenirs RAG,
+  repère du juge) ; `CALL_PRESENT_INVARIANT` (« l'appel attendu a lieu maintenant… ») est une phrase en dur dans le cadre
+  commun (`experienceFrame.ts`), alors que le contenu éditorial du cadre doit vivre dans l'orchestration publiée.
 - Juge : repère canon élargi, vérification du canon avant toute note, plafond (≤ 3 si `canon_timeline` = 0, ≤ 4 si ≤ 1),
   réponse illisible écartée. Calibrage sur les dix réponses de Romed : écart moyen 0,82 à 0,85, aucun écart > 2 points
   (1,51 et 3 avant). **Réglé sur ces dix réponses : non confirmé sur d'autres.**
@@ -50,6 +62,13 @@ ne le fais pas à la place d'Ulrich ou de Romed : rends la main avec **une seule
 Confirmer sur des fiches corrigées et sur un échantillon neuf que les personnages disent les faits justes et que le juge
 note comme Romed ; rendre le corpus J3 officiel. C'est la condition pour rouvrir le lot R.
 
+## Principe : une seule logique, la fiche
+
+Les faits des personnages ne vivent qu'à un endroit : la fiche Notion. Le code choisit et protège des passages de la
+fiche ; il ne corrige ni ne complète aucun fait. Une règle de l'expérience (pas un fait de personnage) vit dans
+l'orchestration publiée, éditable dans l'admin, pas en dur. Ce lot retire les deux corrections provisoires de K1 dès que
+les fiches les rendent inutiles, et remplace le filet par un test qui **signale** une fiche fautive au lieu de la masquer.
+
 ## Travail attendu
 
 1. **Resynchronisation `fields_only` de sandbox-ulrich** (`sync-notion` avec `environment_id: "sandbox-ulrich"` explicite,
@@ -57,8 +76,22 @@ note comme Romed ; rendre le corpus J3 officiel. C'est la condition pour rouvrir
 2. **Copie de test et liste de contrôle** : nouvelle copie datée dans `src/agents/__fixtures__/` (l'ancienne reste pour
    les tests qui la citent) ; `docs/eval/faits_canon_k1.json` mis à jour : les quatre faits absents doivent devenir
    présents, sinon l'écart est expliqué et renvoyé à la fiche. Remesurer Max B (3 passages) : B1 ne doit plus reculer.
-3. **Neutralisation de l'appel** : si les fiches disent désormais le présent de l'appel, vérifier que
-   `neutralizeAwaitedCall` ne transforme plus rien ; garder la fonction comme filet (test).
+3. **Une seule logique — retirer les corrections provisoires de K1** :
+   - vérifier sur la nouvelle copie que `neutralizeAwaitedCall` ne transforme plus rien (aucun « attend(s) l'appel ») ;
+     si c'est le cas, **supprimer** la neutralisation partout (`sheetAtCallTime` dans le compilateur, souvenirs RAG,
+     `buildJudgeCanonReference`) et ses tests ; si une fiche dit encore « tu attends l'appel », ne pas supprimer : le
+     dire à Romed et s'arrêter sur ce point ;
+   - remplacer le filet par un garde-fou qui signale : un test sur la copie de test, et un avertissement de
+     `npm run eval:judge:sheets`, qui échouent ou préviennent si une fiche contient « attend(s) l'appel » ;
+   - déplacer `CALL_PRESENT_INVARIANT` dans la configuration d'orchestration (`ExperienceFrameConfig`, publiée,
+     éditable dans Admin › Expérience › Orchestration), partagée à l'identique par le personnage et le GM comme
+     aujourd'hui ; valeur par défaut = le texte actuel, pour ne rien changer au jeu ; publication de la configuration
+     par Ulrich, sandbox d'abord ;
+   - champ rempli = seule source : quand « Ce que tu sais aujourd'hui » est rempli, ne plus extraire ni sélectionner le
+     paragraphe « Ce qui est vrai aujourd'hui » de l'identité (même s'il est resté) ; s'il reste dans la fiche, le
+     signaler à Romed (doublon dans Notion) ; test ;
+   - nettoyage : les types Supabase connaissent désormais la colonne (`6e40a07`) : retirer le transtypage de
+     `loadCharacterPrompt` et vérifier que l'admin des fiches n'expose pas ce champ en écriture (base en lecture seule).
 4. **Budget de la voix** : mesurer ce que la manière de parler cède avec le nouveau champ ; si le champ dépasse
    1 200 caractères, le dire à Romed plutôt que de couper davantage la voix.
 5. **Calibrage de confirmation** : `npm run eval:judge:calibrate -- --file <nouvel échantillon>` ; si le critère n'est pas
@@ -73,6 +106,8 @@ note comme Romed ; rendre le corpus J3 officiel. C'est la condition pour rouvrir
 ## Critères de sortie
 
 - Liste de contrôle : tous les faits présents pour leurs questions, ou écart expliqué et renvoyé à Notion.
+- Une seule logique : plus aucune réécriture de fiche dans le code ; la phrase du présent de l'appel vient de la
+  configuration publiée ; un test signale toute fiche qui dit encore « tu attends l'appel ».
 - Calibrage : critère atteint sur le nouvel échantillon **et** sur celui du 14 novembre.
 - Corpus J3 validé et saisi ; `npm run test:quality` et `npm run test:delivery` verts.
 
@@ -100,7 +135,8 @@ tests automatiques avec LLM juge » (reçu de livraison). Recette humaine distin
 ## Première action
 
 `git status`, `git fetch --prune`, main propre ; vérifier les quatre conditions de départ (SQL en lecture pour la
-colonne, lecture Notion Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2` pour les fiches et la tâche).
+colonne, lecture Notion Gamilab `7e1a9a09-09cb-4deb-a306-83a29b831bc2` pour les fiches et la tâche). Pour les fiches :
+le champ « Ce que tu sais aujourd'hui » rempli, et aucun « tu attends l'appel » restant.
 
 ## Clôture
 
