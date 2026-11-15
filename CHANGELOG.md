@@ -23,6 +23,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - **Corpus J3 v2** corrigé d'après Romed (neuf tours), statut « corrigé d'après Romed, à revalider » ; rien n'est saisi
   dans Notion. Liste de contrôle des faits canoniques versionnée et testée (`docs/eval/faits_canon_k1.json`).
 - `sync-notion` lit le champ optionnel ; migration additive `ce_que_tu_sais_aujourdhui` à appliquer par le chat Lovable.
+  `package-lock.json` resynchronisé : les deux plugins `@lovable.dev/*` ajoutés par Lovable (`ce5c819`) manquaient
+  au lock et `npm ci` échouait sur toute PR.
   Base Caractères non modifiée. [Plan et mesures](docs/plan_calibration_juge_lot_k1.md) ·
   [prompt du lot K2](docs/prompt_reprise_fiches_corrigees_lot_k2.md).
 
