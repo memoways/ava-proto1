@@ -16,11 +16,13 @@ export interface CharacterPrompt {
   maniere_de_parler?: string;
   speech_states?: Array<{ name: string; description: string }>;
   situation_summary: string;
+  /** Optional Notion field « Ce que tu sais aujourd'hui » (lot K1); empty until the column and the field exist. */
+  ce_que_tu_sais_aujourdhui?: string;
   updated_at?: string;
 }
 
 export const CHARACTER_PROMPT_FIELDS: Array<{
-  key: Exclude<keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at" | "speech_states">, never>;
+  key: Exclude<keyof Omit<CharacterPrompt, "character_id" | "name" | "situation_summary" | "updated_at" | "speech_states" | "ce_que_tu_sais_aujourdhui">, never>;
   label: string;
   hint: string;
 }> = [
@@ -119,6 +121,7 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
       maniere_de_parler: row.maniere_de_parler || "",
       speech_states: Array.isArray(row.speech_states) ? (row.speech_states as CharacterPrompt["speech_states"]) : [],
       situation_summary: row.situation_summary || "",
+      ce_que_tu_sais_aujourdhui: (row as { ce_que_tu_sais_aujourdhui?: string | null }).ce_que_tu_sais_aujourdhui || "",
       updated_at: row.updated_at,
     };
     if (requestEpoch !== promptCacheEpoch) return prompt;
@@ -186,7 +189,7 @@ export async function resolveCanonicalCharacterName(name: string): Promise<strin
 
 export async function saveCharacterPrompt(
   characterId: string,
-  partial: Partial<Omit<CharacterPrompt, "character_id" | "name" | "updated_at">>,
+  partial: Partial<Omit<CharacterPrompt, "character_id" | "name" | "updated_at" | "ce_que_tu_sais_aujourdhui">>,
 ): Promise<void> {
   const payload = { character_id: characterId, environment_id: getActiveEnvironment(), ...partial };
   const { error } = await supabase

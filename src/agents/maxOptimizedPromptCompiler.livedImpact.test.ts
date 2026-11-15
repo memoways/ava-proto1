@@ -9,6 +9,7 @@ import {
 } from "./maxOptimizedPromptCompiler";
 import { characterLivedImpact } from "@/services/characterEmbodiment";
 import type { CharacterPrompt } from "@/services/characterPromptService";
+import { neutralizeAwaitedCall } from "@/services/establishedFacts";
 
 const asPrompt = (row: (typeof sheets)[number]) => row as unknown as CharacterPrompt;
 
@@ -26,7 +27,8 @@ describe("optimized_v3 — ce que ça te fait (parole sous le choc)", () => {
     });
     const prompt = result.finalSystemPrompt;
     expect(prompt).toContain(`## ${LIVED_IMPACT_TITLE}\n${lived!.content}`);
-    expect(prompt).toContain(`## ${PRESENT_TITLE}\n${sheet.situation_summary.trim()}`);
+    // Lot K1: the present is read at call time (the awaited call is taking place).
+    expect(prompt).toContain(`## ${PRESENT_TITLE}\n${neutralizeAwaitedCall(sheet.situation_summary.trim())}`);
     expect(prompt.indexOf(LIVED_IMPACT_TITLE)).toBeLessThan(prompt.indexOf(PRESENT_TITLE));
     // Paid once: the lived paragraph is not selected again as a relevance fragment.
     expect(prompt.split(lived!.content.split("\n")[2]).length - 1).toBe(1);

@@ -132,7 +132,7 @@ describe("J3 sequence corpus", () => {
     expect(corpus.sequences.map((entry) => `${entry.id}:${entry.turns.length}`)).toEqual(["max-A:5", "max-B:5", "emma-A:4", "emma-B:4"]);
     expect(new Set(corpus.sequences.map((entry) => entry.characterKey))).toEqual(new Set(["max", "emma"]));
     expect(corpus.sequences.map((entry) => entry.filmSeen)).toEqual([true, true, true, false]);
-    expect(DEFAULT_SEQUENCE_CORPUS).toBe("docs/eval/sequences_j3_v1.json");
+    expect(DEFAULT_SEQUENCE_CORPUS).toBe("docs/eval/sequences_j3_v2.json");
   });
 
   it("rejects a sequence outside 3 to 5 turns, an unknown character and a duplicate id", () => {

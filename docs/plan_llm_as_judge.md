@@ -296,3 +296,23 @@ pour décider du lot R (rumination et sous-texte) sur des mesures.
 
 Hors périmètre J3 : fiches Notion, grille J1 par tour, STT/TTS, production, publication Lovable.
 Suite : [prompt du lot R](prompt_reprise_rumination_sous_texte_lot_r.md).
+
+## Lot K1 — faits établis et juge calibré (14 novembre 2026)
+
+Détail, mesures et rapports : [plan_calibration_juge_lot_k1.md](plan_calibration_juge_lot_k1.md). Origine : le
+[calibrage de Romed](analyse_calibration_juge_romed_20261114.md) a franchi le seuil fixé à la pause du 10 novembre.
+
+- **Repère canon** (`buildJudgeCanonReference`) : situation lue au moment de l'appel, faits établis, timeline, identité,
+  interdits, manière de parler ; environ 4 700 tokens par appel, 0,0205 $ mesuré (estimation de coût recalée).
+- **Grille** : section « Vérification du canon — avant toute note » ; échelle de `canon_timeline` précisée (0 fait établi
+  contredit, 1 prémisse fausse acceptée ou fait secondaire faux, 2 invention non étayée) ; champ `corpus_doubt`.
+- **Plafond** (`CANON_CONTRADICTION_CAPS`, appliqué par `weightedScore`) : ≤ 3 si `canon_timeline` = 0, ≤ 4 si ≤ 1. Il
+  s'applique aussi aux anciens résultats relus (leur note pondérée peut baisser) ; un résultat sans le critère est intact.
+- **Illisible** : `parseJudgeResponse` rend `null`, rejeu une fois (`judgeIsolatedEvalTurn`), tour enregistré sans note ;
+  les anciens « JSON juge illisible » sont écartés à la lecture (`readJudgeSubScores`, `scoreOfResult`).
+- **Calibrage** : `npm run eval:judge:calibrate` (`src/services/evalJudgeCalibration.ts`), critère : écart moyen ≤ 1 et
+  moins de 3 écarts > 2 points. Résultat : 0,82 à 0,85 et 0 écart (1,51 et 3 avant).
+- **Référence contre candidat** : interrupteur `establishedFacts` dans l'instantané JSON (en mémoire) ; le corpus de
+  séquences par défaut est la v2.
+
+Suite : [prompt du lot K2](prompt_reprise_fiches_corrigees_lot_k2.md).

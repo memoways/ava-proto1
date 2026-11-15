@@ -128,6 +128,8 @@ export interface PRD4TurnInput {
     situationSummary?: string;
     /** In-memory output contract wording for reference/candidate runs; never persisted. */
     streamContract?: ResponseStreamContractVariant;
+    /** In-memory lot K1 switch: `false` plays the core and the frame without the established facts; never persisted. */
+    establishedFacts?: boolean;
     /**
      * Sequence replay (judge J3): structured memory rebuilt in memory from the
      * previous GM deltas. Read only when there is no session; never persisted.
@@ -365,6 +367,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,
     callTransfer: latestCallTransfer(activeCharacter, input.conversationHistory),
+    callPresent: evaluationOverrides?.establishedFacts,
     knownAboutPlayer: [
       visibleStructuredMemory?.interlocutor?.name ? `prénom : ${visibleStructuredMemory.interlocutor.name}` : "",
       visibleStructuredMemory?.interlocutor?.role ? `statut évoqué : ${visibleStructuredMemory.interlocutor.role}` : "",
@@ -434,6 +437,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           promptVariant: evaluationOverrides?.promptVariant,
           situationSummaryOverride: evaluationOverrides?.situationSummary,
           streamContract: evaluationOverrides?.streamContract,
+          establishedFacts: evaluationOverrides?.establishedFacts,
           onSpeechToken: retry || !input.streamControl ? undefined : text => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
             input.streamControl!.onToken(text);

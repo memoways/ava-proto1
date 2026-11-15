@@ -4,7 +4,9 @@ Date : 9 novembre 2026. Lot J3 ([feuille de route](feuille_de_route_jeu_personna
 [plan du juge](plan_llm_as_judge.md)). **Statut : saisi dans la base corpus Notion le 10 novembre (Actif décoché) après un accord global ; relecture
 ligne à ligne par Ulrich et Romed à faire** ([bilan de la pause](bilan_pause_juge_parole_rumination_20261110.md)) :
 Emma A et B sont entièrement écrites par un agent.
-Fichier lu par le rejeu : [`docs/eval/sequences_j3_v1.json`](eval/sequences_j3_v1.json).
+Fichier lu par le rejeu : [`docs/eval/sequences_j3_v2.json`](eval/sequences_j3_v2.json) depuis le lot K1
+(14 novembre) — **statut : corrigé d'après Romed, à revalider** ; voir [la section v2](#corpus-v2--corrigé-daprès-romed-14-novembre-lot-k1).
+La v1 ([`sequences_j3_v1.json`](eval/sequences_j3_v1.json)) reste versionnée pour relire les runs du 9 et du 10 novembre.
 
 ## Sources lues (lecture seule, 9 novembre)
 
@@ -74,6 +76,28 @@ restent donc hors du corpus J3** jusqu'à ces réponses.
 
 Le texte complet de chaque tour (question, réponse visée, faits requis, alternatives, interdits, continuité) est
 dans le fichier JSON. Il sera recopié ici dans la version validée.
+
+## Corpus v2 — corrigé d'après Romed (14 novembre, lot K1)
+
+Source : notes et commentaires de Romed sur dix réponses ([analyse](analyse_calibration_juge_romed_20261114.md)).
+Neuf tours changent ; les questions ne changent pas. **Rien n'est saisi dans la base corpus Notion** : la v2 se relit
+ici et dans le fichier JSON, puis se saisit après validation de Romed et d'Ulrich.
+
+| Tour | Ce que la v1 disait | Ce que dit la v2 (Romed) |
+|---|---|---|
+| Max A1 | — | interdit ajouté : dire qu'Ava avait changé d'apparence (rien ne se voit) |
+| Max A4 | « le chevreuil a disparu », sans la raison du geste | il est ressorti parce qu'Emma le lui a demandé (elle lui a tendu le couteau) ; interdit : une autre raison inventée (« protéger les autres ») ; il peut s'interroger sur ce rôle |
+| Max A5 | exigeait « attente sans nouvelles » | exigence retirée ; interdits : dire qu'il attend l'appel (il parle avec Claire), dire qu'Emma « va être contaminée » (elle l'est depuis hier) |
+| Max B1 | confirmation en précisant | Sam a raison : Max confirme ; il l'a appris en s'arrêtant chez son père pour prendre les clés du chalet ; interdits : nier, dire qu'il a seulement « vu » les clés |
+| Max B2 | « son père l'a donné à Léo, dans son dos » | Léo a pris le fusil chez le père de Max, à la demande de celui-ci, à l'insu de Max et d'Emma |
+| Max B3 | Lise « explication probable », certitude interdite | Max sait aujourd'hui que c'était Lise ; elle s'était présentée comme Peter et il l'a crue ; interdit : dire qu'il ne sait pas |
+| Max B4 | « je ne sais pas » sur l'« intériorité » d'Ava | c'est Ava qui a contaminé Emma ; il dit qu'il ne sait pas ce que vit Ava (mot « intériorité » retiré) |
+| Emma A2 | le geste, sans sa raison | elle a accepté d'être contaminée pour rester proche d'Ava, l'écarter comme Mona était exclu ; interdits : vouloir « protéger » Ava de la contamination, présenter l'étreinte comme subie |
+| Emma B2 | « Mona, l'aînée » | Mona, **sa** fille aînée ; interdits : la présenter autrement (« la fille d'Ava »), dire qu'ils sont partis pour la retrouver |
+
+À revalider en particulier : la raison du geste en A4 (« elle lui a tendu le couteau », titre J−5.16 de la fiche de Max),
+la formulation du choix d'Emma en A2, et B3 (« sœur de Peter, devenue protogyne », repris de la v1). Emma A4, que Romed
+note 6 contre 8,6 pour le juge sans commentaire, n'est pas modifié.
 
 ## Saisie dans la base corpus — après validation seulement
 
