@@ -155,6 +155,7 @@ export type Database = {
       character_prompts: {
         Row: {
           ce_que_tu_ne_fais_jamais: string
+          ce_que_tu_sais_aujourdhui: string | null
           ce_que_tu_sais_utilisateur: string
           character_id: string
           created_at: string
@@ -174,6 +175,7 @@ export type Database = {
         }
         Insert: {
           ce_que_tu_ne_fais_jamais?: string
+          ce_que_tu_sais_aujourdhui?: string | null
           ce_que_tu_sais_utilisateur?: string
           character_id: string
           created_at?: string
@@ -193,6 +195,7 @@ export type Database = {
         }
         Update: {
           ce_que_tu_ne_fais_jamais?: string
+          ce_que_tu_sais_aujourdhui?: string | null
           ce_que_tu_sais_utilisateur?: string
           character_id?: string
           created_at?: string

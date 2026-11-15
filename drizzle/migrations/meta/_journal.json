@@ -127,6 +127,13 @@
       "when": 1794498496091,
       "tag": "0017_tighten_permissive_rls_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794734327869,
+      "tag": "0018_add_ce_que_tu_sais_aujourdhui",
+      "breakpoints": true
     }
   ]
 }
