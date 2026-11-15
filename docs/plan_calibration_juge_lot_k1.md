@@ -199,8 +199,13 @@ Notion. Aucune resynchronisation. Lot R, rumination, STT/TTS, production. La mig
 
 ## Suite
 
-- **Ulrich** : appliquer la migration `ce_que_tu_sais_aujourdhui` dans le chat Lovable (colonne additive, vide) et
-  vérifier le redéploiement de `sync-notion`.
+- **Fait le 15 novembre** : migration `ce_que_tu_sais_aujourdhui` appliquée par le chat Lovable (colonne vérifiée,
+  migration `drizzle/migrations/0018_…`, types régénérés, main `6e40a07`), `sync-notion` redéployée depuis `bb995dd` ;
+  publication en production par Ulrich.
+- **Une seule logique** : deux corrections restent provisoirement dans le code, en attendant les fiches — la réécriture
+  en mémoire de « tu attends l'appel » et la phrase du présent de l'appel dans le cadre commun. Aucun fait de personnage
+  n'est écrit dans le code. K2 supprime la première, déplace la seconde dans l'orchestration publiée et fait du champ
+  « Ce que tu sais aujourd'hui » la seule source des faits établis.
 - **Romed et Ulrich** : [tâche Notion des fiches](https://app.notion.com/p/41862322e59581a0bf56de43cc238e27) (créer et
   remplir « Ce que tu sais aujourd'hui », titres avec agent explicite, présent écrit comme le présent de l'appel) ;
   relire le corpus v2 ; renoter dix réponses du run K1 ; écoute sandbox (la fin de la manière de parler ne se joue plus).

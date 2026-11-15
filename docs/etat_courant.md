@@ -5,8 +5,10 @@
 vérifie le canon avec un plafond. Calibrage sur les dix réponses de Romed : écart moyen 1,51 → 0,82 à 0,85, écarts > 2
 points 3 → 0 (réglé sur ces dix réponses, à confirmer). Séquences J3 v2 : continuité +0,96 (au-delà du bruit), note par
 tour +0,06 ; Emma déballe plus tôt, Max B1 lit « camp de quarantaine » comme la cause (fiche à corriger). La fin de la manière de parler ne se joue plus (641 car. Max,
-1 037 Emma) : écoute à faire. **À faire par Ulrich** : appliquer la migration `ce_que_tu_sais_aujourdhui` dans le chat
-Lovable. Romed et Ulrich : fiches à la source, relecture du corpus J3 v2, dix nouvelles réponses à noter.
+1 037 Emma) : écoute à faire. Migration `ce_que_tu_sais_aujourdhui` appliquée et `sync-notion` redéployée (Lovable,
+15 novembre) ; **publié en production par Ulrich le 15 novembre**. À faire par Romed et Ulrich : fiches à la source (le
+champ « Ce que tu sais aujourd'hui » devient la seule place des faits), relecture du corpus J3 v2, dix réponses à noter.
+Ensuite seulement, K2 retire les deux corrections provisoires écrites dans le code (une seule logique : la fiche).
 [Plan et mesures](plan_calibration_juge_lot_k1.md) · prochain lot : [K2](prompt_reprise_fiches_corrigees_lot_k2.md).
 
 **Calibrage du juge par Romed (14 novembre)** : seuil franchi (écart moyen 1,5 ; 3 écarts > 2 points) ; le juge laisse

@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Prompt K2 : une seule logique] — 2026-11-15
+
+- [Prompt du lot K2](docs/prompt_reprise_fiches_corrigees_lot_k2.md) : ne démarre qu'après les fiches corrigées ; retire
+  la réécriture provisoire de « tu attends l'appel », déplace la phrase du présent de l'appel dans l'orchestration
+  publiée, fait du champ « Ce que tu sais aujourd'hui » la seule source des faits ; garde-fou qui signale une fiche
+  fautive. Migration K1 appliquée par Lovable et publication production d'Ulrich notées. Aucun code changé.
+
 ## [Lot K1 — faits établis dans le prompt et juge calibré] — 2026-11-14
 
 - **Noyau `optimized_v3`** : bloc protégé « FAITS ÉTABLIS » (≤ 1 200 caractères, tiré de la fiche : champ Notion optionnel
