@@ -104,6 +104,8 @@ export interface OptimizedPromptInput {
   temporalContext?: string;
   gmGuidance?: string;
   speechState?: string;
+  /** Lot D — bloc d'état du personnage déjà compilé. */
+  characterState?: string;
   relationshipDirective?: string;
   experienceFrame?: string;
   guards?: string;
@@ -672,6 +674,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame, OPTIMIZED_V3_LIMITS.frameChars, "runtime");
   append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
   append("speech_state", "PAROLE DU TOUR", input.speechState, 800, "runtime");
+  append("character_state", "ÉTAT DU PERSONNAGE À CE TOUR", input.characterState, 900, "runtime");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");

@@ -401,7 +401,8 @@ export interface PRD4PostTurnEvaluation {
   validation_issues?: Array<{
     code: "json_unreadable" | "schema_incomplete" | "unknown_speech_state"
       | "handoff_assessment_missing" | "handoff_assessment_invalid" | "handoff_proof_rejected"
-      | "handoff_proof_recovered";
+      | "handoff_proof_recovered"
+      | import("@/services/characterState").StateDeltaIssue;
     missing_fields?: string[];
     reason?: import("@/services/characterHandoff").CharacterHandoffAuditReason;
     /** json_unreadable only: bounded shape of the output, never its text. */
@@ -439,6 +440,12 @@ export interface PRD4PostTurnEvaluation {
   gm_mode?: GmMode;
   /** Exact text the GM handed to the character for THIS turn (from the previous post-turn). */
   injected?: GmInjectedToCharacter;
+  /** Lot D — state radar the character played with at THIS turn (null/absent: no state profile). */
+  character_state_used?: import("@/services/characterState").StateLevels | null;
+  /** Lot D — state after the validated GM delta, applied from the next turn. */
+  character_state_after?: import("@/services/characterState").StateLevels | null;
+  /** Lot D — signed changes actually applied after step and bounds. */
+  character_state_applied?: Partial<Record<import("@/services/characterState").StateAxis, number>> | null;
 }
 
 export type GmMode = "off" | "light" | "full";

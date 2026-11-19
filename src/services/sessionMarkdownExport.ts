@@ -1,4 +1,5 @@
 import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
+import { describeStateLevels, type StateLevels } from "@/services/characterState";
 import type { ConversationPipelineTimings } from "@/types";
 import { displayNameForCharacter } from "./characterRegistry";
 import { messageCharacter } from "./sessionCharacters";
@@ -119,7 +120,9 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
     const speaker = m.role === "user" ? "Utilisateur" : character ? displayNameForCharacter(character) : `Message ${text(m.role)}`;
     lines.push(`**${speaker} :**`, "", typeof m.content === "string" ? m.content : text(m.content), "");
     if (m.role !== "user" && character && gm.length) {
-      lines.push(`> **GM → personnage :** ${describeGmToCharacter(findGmEntryForReply(gm as never, turn, character) as never).replace(/\n+/g, " ")}`, "");
+      const gmEntry = findGmEntryForReply(gm as never, turn, character) as { character_state_used?: StateLevels | null } | null;
+      lines.push(`> **GM → personnage :** ${describeGmToCharacter(gmEntry as never).replace(/\n+/g, " ")}`, "");
+      if (gmEntry?.character_state_used) lines.push(`> **État joué :** ${describeStateLevels(gmEntry.character_state_used)}`, "");
     }
   }
   if (!messages.length) lines.push("Aucun échange enregistré.", "");

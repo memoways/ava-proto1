@@ -135,6 +135,8 @@ export function buildGmOffEvaluation(input: {
   injected: GmInjectedToCharacter;
   orchestrationVersionId: string | null;
   orchestrationConfig: ExperienceDirectorConfig | null;
+  /** Lot D: fixed initial state played this turn (no GM, so no evolution). */
+  characterState?: import("@/services/characterState").StateLevels | null;
 }): PRD4PostTurnEvaluation {
   return {
     engagement_delta: 0,
@@ -165,5 +167,10 @@ export function buildGmOffEvaluation(input: {
     speech_guidance: "off",
     gm_mode: "off",
     injected: input.injected,
+    ...(input.characterState ? {
+      character_state_used: input.characterState,
+      character_state_after: input.characterState,
+      character_state_applied: {},
+    } : {}),
   };
 }

@@ -37,6 +37,7 @@ export const RICH_V2_DYNAMIC_SECTION_CHARS = {
   session_summary: 1_200,
   gm_guidance: 350,
   speech_state: 800,
+  character_state: 900,
   turn_guards: 500,
   rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
   post_video: POST_VIDEO_SECTION_MAX_CHARS,

@@ -30,6 +30,7 @@ import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import { resolveGmMode } from "@/services/gmSpeechGuidance";
+import { buildGmStateSection, validateStateDelta, type CharacterStateProfile, type StateLevels } from "@/services/characterState";
 import {
   normalizeRelationshipState,
   relationshipStateToProposal,
@@ -96,6 +97,11 @@ export interface PRD4PostTurnInput {
   gmMode?: import("@/types").GmMode;
   /** Exact GM -> character payload injected on THIS turn, logged for the history. */
   injectedToCharacter?: import("@/types").GmInjectedToCharacter;
+  /**
+   * Lot D — state radar of the active character: profile and the levels the
+   * character played with at THIS turn. Absent = no state section, no delta.
+   */
+  characterState?: { profile: CharacterStateProfile; levels: StateLevels } | null;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -281,6 +287,9 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
   const characterAttribution = input.characterContext
     ? `${input.characterContext.displayName} | character_id=${input.characterContext.characterId} | notion_page_id=${input.characterContext.notionPageId} | environment=${input.characterContext.environmentId} | prompt_version=${input.characterContext.promptUpdatedAt}`
     : input.currentCharacter;
+  const characterStateSection = input.characterState
+    ? buildGmStateSection({ ...input.characterState, characterKey: input.currentCharacter, turnIndex: input.turnIndex })
+    : "";
   const relationshipPolicy = input.relationshipPolicy
     ? JSON.stringify({
         characterKey: input.relationshipPolicy.characterKey,
@@ -335,7 +344,7 @@ ${input.speechStates?.length
 
 ## RUGOSITÉ DE PAROLE RÉGLÉE
 ${rugosityDirectorDirective(input.rugosite ?? 0)}
-
+${characterStateSection ? `\n${characterStateSection}\n` : ""}
 ## ÉTAT DE PAROLE JOUÉ CE TOUR (déclaré par le personnage)
 ${input.speechStatePlayed?.trim() || "(non déclaré)"}
 
@@ -565,6 +574,8 @@ export async function evaluatePostTurnPRD4(
   let executionStatus: NonNullable<PRD4PostTurnEvaluation["execution_status"]> = "executed";
   let executionReason: NonNullable<PRD4PostTurnEvaluation["execution_reason"]> = "executed";
   const validationIssues: NonNullable<PRD4PostTurnEvaluation["validation_issues"]> = [];
+  let stateAfter: StateLevels | null = input.characterState?.levels ?? null;
+  let stateApplied: Partial<Record<keyof StateLevels, number>> = {};
   try {
     const llm = getLLMSettings();
     model = input.modelOverride?.trim() || llm.LLM_MODEL_GM;
@@ -688,6 +699,18 @@ export async function evaluatePostTurnPRD4(
         }
       }
     }
+    if (input.characterState && executionStatus === "executed") {
+      // Lot D: deterministic validation, applied from the next turn. No extra AI call.
+      const stateDelta = validateStateDelta({
+        raw: (parsed as { character_state_delta?: unknown }).character_state_delta,
+        profile: input.characterState.profile,
+        current: input.characterState.levels,
+        expected: { characterKey: input.currentCharacter, turnIndex: input.turnIndex },
+      });
+      for (const code of stateDelta.issues) validationIssues.push({ code });
+      stateAfter = stateDelta.next;
+      stateApplied = stateDelta.applied;
+    }
     model = callRes.model || model;
   } catch (err) {
     console.error("[GM-PRD4] error:", err);
@@ -767,6 +790,11 @@ export async function evaluatePostTurnPRD4(
     speech_guidance: (input.gmMode ?? resolveGmMode(input.orchestrationConfig)) === "full" ? "on" : "off",
     gm_mode: input.gmMode ?? resolveGmMode(input.orchestrationConfig),
     ...(input.injectedToCharacter ? { injected: input.injectedToCharacter } : {}),
+    ...(input.characterState ? {
+      character_state_used: input.characterState.levels,
+      character_state_after: stateAfter,
+      character_state_applied: stateApplied,
+    } : {}),
     speech_state_played: selectSpeechState(input.speechStatePlayed, input.speechStates ?? []),
     speech_rugosite: input.rugosite ?? 0,
     speech_settings_version: input.speechSettingsVersion ?? null,

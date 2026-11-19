@@ -1,5 +1,8 @@
 # Prompt de reprise — Réglages GM, lot D : état du personnage (radar 5 dimensions)
 
+> **Livré le 19 novembre 2026** (voir le plan, « État des lots »). Conservé comme historique ; reste à faire : migration
+> Lovable, validation des dimensions avec Romed, recette sandbox.
+
 À copier dans un nouveau chat Ava (Claude Code, Codex ou Cursor).
 
 ---
