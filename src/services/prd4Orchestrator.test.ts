@@ -72,7 +72,7 @@ import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
-import { fetchCharacterSpeechRuntime } from "@/services/experienceOrchestration";
+import { fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { loadCharacterPrompt } from '@/services/characterPromptService';
 import speechSheets from '@/agents/__fixtures__/speechSandbox20261025.json';
 import { getGameplaySettings } from "@/services/settingsService";
@@ -1039,5 +1039,79 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       expect(history.at(-2)?.content).toBe(`session-${session}-turn-35`);
       expect(history.at(-1)?.content).toBe(`max:session-${session}-turn-35`);
     }
+  });
+
+  describe("GM speech guidance switch", () => {
+    const pinned = (speechGuidance?: boolean) => vi.mocked(fetchPinnedDirectorRuntime).mockResolvedValueOnce({
+      versionId: "gm-ab", versionNumber: 7, prompt: "DIRECTOR",
+      config: (speechGuidance === undefined ? { editor: {} } : { editor: { speechGuidance } }) as never,
+    });
+    const parts = [
+      { kind: "gm_advice" as const, text: "Laisse-le parler de sa sœur." },
+      { kind: "switch_request" as const, text: "Règle de passage." },
+    ];
+
+    it.each([MAX_CONTEXT, EMMA_CONTEXT])("$characterKey keeps today's guidance when the switch is on or absent", async (characterContext) => {
+      for (const value of [true, undefined]) {
+        pinned(value);
+        const sheet = speechSheets.find(entry => entry.name.startsWith(characterContext.displayName))!;
+        vi.mocked(loadCharacterPrompt).mockResolvedValueOnce(sheet as never);
+        const result = await processPRD4Turn({ sessionId: "ab-on", characterContext, conversationHistory: [],
+          userMessage: "Et ensuite ?", userRole: null, timeElapsedSeconds: 30, diagnosticTraceEnabled: true,
+          gmGuidance: "Laisse-le parler de sa sœur. Règle de passage.", gmGuidanceParts: parts,
+          gmTopicsCovered: ["la soeur"], gmSpeechState: sheet.speech_states[1].name });
+        const maxInput = vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0];
+        expect(maxInput.gmGuidance).toEqual({ guidance: "Laisse-le parler de sa sœur. Règle de passage.", topicsCovered: ["la soeur"] });
+        expect(maxInput.speechStateDirective).toBe(sheet.speech_states[1].name);
+        expect(result.gmSpeechGuidance).toBe("on");
+        await result.postTurnPromise;
+      }
+    });
+
+    it.each([MAX_CONTEXT, EMMA_CONTEXT])("$characterKey receives no GM advice, speech state or topics when off, but keeps the passage rules", async (characterContext) => {
+      pinned(false);
+      const sheet = speechSheets.find(entry => entry.name.startsWith(characterContext.displayName))!;
+      vi.mocked(loadCharacterPrompt).mockResolvedValueOnce(sheet as never);
+      const result = await processPRD4Turn({ sessionId: "ab-off", characterContext, conversationHistory: [],
+        userMessage: "Et ensuite ?", userRole: null, timeElapsedSeconds: 30, diagnosticTraceEnabled: true,
+        gmGuidance: "Laisse-le parler de sa sœur. Règle de passage.", gmGuidanceParts: parts,
+        gmTopicsCovered: ["la soeur"], gmSpeechState: sheet.speech_states[1].name });
+      const maxInput = vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0];
+      expect(maxInput.gmGuidance).toEqual({ guidance: "Règle de passage.", topicsCovered: [] });
+      expect(maxInput.speechStateDirective).toBeNull();
+      expect(result.gmSpeechGuidance).toBe("off");
+      await result.postTurnPromise;
+      // The GM itself still runs on the same turn, with the same pinned version.
+      expect(evaluatePostTurnPRD4).toHaveBeenCalledTimes(1);
+      const trace = vi.mocked(enqueueConversationTurnTrace).mock.calls.at(-1)![0];
+      expect(trace.gm.causalGuidance.speechGuidance).toEqual({ mode: "off",
+        withheld: { advice: "Laisse-le parler de sa sœur.", speechState: sheet.speech_states[1].name, topicsCovered: 1 } });
+      expect(trace.memory.gmSpeechStateProposed).toBeNull();
+    });
+
+    it("drops a plain GM advice string when off and leaves nothing to inject", async () => {
+      pinned(false);
+      const result = await processPRD4Turn({ sessionId: "ab-legacy", conversationHistory: [], userMessage: "Bonjour",
+        userRole: null, timeElapsedSeconds: 0, gmGuidance: "Recadre-le.", gmTopicsCovered: ["x"] });
+      expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].gmGuidance).toBeUndefined();
+      await result.postTurnPromise;
+    });
+
+    it("keeps a GM handoff proposal when off: passages are not speech guidance", async () => {
+      pinned(false);
+      const result = await processPRD4Turn({ sessionId: "ab-handoff", conversationHistory: [], userMessage: "Oui",
+        userRole: null, timeElapsedSeconds: 0, gmGuidance: "Propose de parler à Emma.",
+        gmGuidanceParts: [{ kind: "handoff_proposal", text: "Propose de parler à Emma." }] });
+      expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].gmGuidance).toEqual({ guidance: "Propose de parler à Emma.", topicsCovered: [] });
+      await result.postTurnPromise;
+    });
+
+    it("lets a sessionless replay force the switch off", async () => {
+      const result = await processPRD4Turn({ sessionId: null, conversationHistory: [], userMessage: "Bonjour",
+        userRole: null, timeElapsedSeconds: 0, gmGuidance: "Recadre-le.", evaluationOverrides: { gmSpeechGuidance: false } });
+      expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].gmGuidance).toBeUndefined();
+      expect(result.gmSpeechGuidance).toBe("off");
+      await result.postTurnPromise.catch(() => undefined);
+    });
   });
 });

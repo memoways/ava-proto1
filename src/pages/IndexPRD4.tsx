@@ -1,3 +1,4 @@
+import { joinGuidanceParts, type GmGuidancePart } from '@/services/gmSpeechGuidance';
 import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
@@ -371,7 +372,8 @@ const IndexPRD4 = () => {
   // Lot 5 : vidéos vues pendant la page de jeu, dans l'ordre (ni GM ni personnage ne les oublient).
   const watchedVideosRef = useRef<WatchedVideo[]>([]);
   // Boucle GM→Max : guidance produite par le post-tour N, consommée au tour N+1.
-  const pendingGmGuidanceRef = useRef<string | null>(null);
+  // Origin is kept so the GM speech guidance switch withholds only the GM advice.
+  const pendingGmGuidanceRef = useRef<GmGuidancePart | null>(null);
   const pendingSpeechStateRef = useRef<string | null>(null);
   const pendingEmotionalStateRef = useRef<string | null>(null);
   const gmTopicsCoveredRef = useRef<string[]>([]);
@@ -1159,11 +1161,13 @@ const IndexPRD4 = () => {
         setHandoffPortraits({ [restoredOffer.targetCharacter]: targetProfile?.portraitUrl ?? null });
       }).catch(() => {});
     }
-    pendingGmGuidanceRef.current = latestGm?.execution_status === "executed"
-      ? latestGm.next_turn_guidance?.trim() || null
-      : null;
-    pendingSpeechStateRef.current = latestGm?.execution_status === "executed"
-      ? latestGm.next_speech_state ?? null
+    // Second gate at the source: advice from a GM whose pinned version turned
+    // speech guidance off is never queued, even if a later lookup times out.
+    const resumedGuidanceAllowed = latestGm?.execution_status === "executed" && latestGm.speech_guidance !== "off";
+    const resumedAdvice = resumedGuidanceAllowed ? latestGm?.next_turn_guidance?.trim() : "";
+    pendingGmGuidanceRef.current = resumedAdvice ? { kind: "gm_advice", text: resumedAdvice } : null;
+    pendingSpeechStateRef.current = resumedGuidanceAllowed
+      ? latestGm?.next_speech_state ?? null
       : null;
     pendingEmotionalStateRef.current = null;
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
@@ -1788,7 +1792,11 @@ const IndexPRD4 = () => {
         const switchGuidance = requestedSwitch
           ? buildSwitchRequestGuidance(activeCharacterRef.current, requestedSwitch)
           : null;
-        const gmGuidance = [pendingGmGuidanceRef.current, switchGuidance].filter(Boolean).join(" ") || null;
+        const gmGuidanceParts: GmGuidancePart[] = [
+          ...(pendingGmGuidanceRef.current ? [pendingGmGuidanceRef.current] : []),
+          ...(switchGuidance ? [{ kind: "switch_request" as const, text: switchGuidance }] : []),
+        ];
+        const gmGuidance = joinGuidanceParts(gmGuidanceParts);
         pendingGmGuidanceRef.current = null;
         // Consommation one-shot : un état de parole périmé ne survit pas à son tour.
         const gmSpeechState = pendingSpeechStateRef.current;
@@ -1899,6 +1907,7 @@ const IndexPRD4 = () => {
           postVideoContext,
           watchedVideos: formatWatchedVideos(watchedVideosRef.current) || undefined,
           gmGuidance,
+          gmGuidanceParts,
           gmTopicsCovered: gmTopicsCoveredRef.current,
           gmSpeechState,
           playedSpeechStateRef,
@@ -2443,8 +2452,11 @@ const IndexPRD4 = () => {
         void result.postTurnPromise.then(async (ev) => {
           if (!isCurrentTurn()) return;
           const gmExecuted = ev.execution_status === "executed";
-          pendingGmGuidanceRef.current = gmExecuted ? ev.next_turn_guidance?.trim() || null : null;
-          pendingSpeechStateRef.current = gmExecuted ? ev.next_speech_state ?? null : null;
+          // Second gate at the source (see resume): an "off" version never queues advice.
+          const speechGuidanceAllowed = gmExecuted && ev.speech_guidance !== "off";
+          const nextAdvice = speechGuidanceAllowed ? ev.next_turn_guidance?.trim() : "";
+          pendingGmGuidanceRef.current = nextAdvice ? { kind: "gm_advice", text: nextAdvice } : null;
+          pendingSpeechStateRef.current = speechGuidanceAllowed ? ev.next_speech_state ?? null : null;
           if (gmExecuted) {
             pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
               ?? pendingEmotionalStateRef.current;
@@ -2472,6 +2484,7 @@ const IndexPRD4 = () => {
             action: ev.action ?? { type: "none" },
             orchestration_version_id: ev.orchestration_version_id ?? null,
             execution_status: ev.execution_status ?? "executed",
+            speech_guidance: ev.speech_guidance ?? "on",
           });
           if (gmExecuted && ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
@@ -2514,7 +2527,7 @@ const IndexPRD4 = () => {
 
           if (guarded.action.type === 'handoff') {
             // Guidance is a proposal to the character, never permission or a UI offer.
-            pendingGmGuidanceRef.current = guarded.action.proposalGuidance;
+            pendingGmGuidanceRef.current = { kind: "handoff_proposal", text: guarded.action.proposalGuidance };
           } else if (guarded.action.type === "end") {
             const minimumClosureSeconds = getSessionMinimumClosureSeconds(configuredSessionDurationRef.current);
             if (elapsed >= minimumClosureSeconds && !endedRef.current) {
@@ -2531,6 +2544,7 @@ const IndexPRD4 = () => {
           ...result.timings,
           rag_matches: result.ragMatches,
           trace_id: result.traceId,
+          gm_speech_guidance: result.gmSpeechGuidance ?? "on",
         });
         if (maxMsg.pipeline?.first_sound_status === "measured" && typeof maxMsg.pipeline.total_ms === "number") {
           turnLatenciesRef.current.push(maxMsg.pipeline.total_ms);

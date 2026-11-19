@@ -60,6 +60,7 @@ import {
 import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
+import { isGmSpeechGuidanceEnabled, resolveCharacterGuidance, type GmGuidancePart } from './gmSpeechGuidance';
 import type { ConversationMessage, ConversationTurnTraceV1, ExperienceDirectorConfig, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 import type { ConversationMemoryV1 } from "@/types/conversationMemory";
 
@@ -102,6 +103,12 @@ export interface PRD4TurnInput {
   userPostureRaw?: string | null;
   /** Boucle GM→Max : next_turn_guidance produit par le post-tour du tour précédent. */
   gmGuidance?: string | null;
+  /**
+   * Origin of each piece of `gmGuidance` (GM advice, handoff proposal, switch
+   * request). When present it replaces `gmGuidance`, so the speech guidance
+   * switch can withhold only the GM advice.
+   */
+  gmGuidanceParts?: GmGuidancePart[];
   /** Boucle GM→Max : sujets déjà couverts, cumulés sur la session. */
   gmTopicsCovered?: string[];
   /** Boucle GM→Max : état de parole proposé par le post-tour précédent. */
@@ -130,6 +137,8 @@ export interface PRD4TurnInput {
     streamContract?: ResponseStreamContractVariant;
     /** In-memory lot K1 switch: `false` plays the core and the frame without the established facts; never persisted. */
     establishedFacts?: boolean;
+    /** In-memory GM speech guidance switch for sessionless replays; never persisted. */
+    gmSpeechGuidance?: boolean;
     /**
      * Sequence replay (judge J3): structured memory rebuilt in memory from the
      * previous GM deltas. Read only when there is no session; never persisted.
@@ -179,6 +188,8 @@ export interface PRD4TurnResult {
    * (overlay cinematics are guarded with it before the post-turn GM exists).
    */
   director?: { versionId: string | null; config: ExperienceDirectorConfig | null };
+  /** GM speech guidance switch applied to this turn (pinned orchestration version). */
+  gmSpeechGuidance?: "on" | "off";
 }
 
 export type PRD4LatencySegmentEvent =
@@ -337,7 +348,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // La proposition du GM n'est retenue que si elle nomme un état de la fiche.
   const speechStates = characterPrompt.speech_states ?? [];
   input.onSpeechRuntimeReady?.({ rugosite, states: speechStates.map(state => state.name) });
-  const proposedSpeechState = speechRuntime ? selectSpeechState(input.gmSpeechState, speechStates) : null;
+  const gmProposedSpeechState = speechRuntime ? selectSpeechState(input.gmSpeechState, speechStates) : null;
   const visibleStructuredMemory = structuredMemory
     ? filterConversationMemoryForCharacter(structuredMemory, activeCharacter)
     : null;
@@ -368,6 +379,16 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   // still in flight: character and GM must receive the exact same frame.
   const frameRuntime = await directorRuntimeSnapshotPromise;
   input.signal?.throwIfAborted();
+  // Speech guidance switch, read from the version pinned to the session: the
+  // GM keeps running, only its advice to the character is withheld.
+  const characterGuidance = resolveCharacterGuidance({
+    enabled: evaluationOverrides?.gmSpeechGuidance ?? isGmSpeechGuidanceEnabled(frameRuntime.config),
+    parts: input.gmGuidanceParts,
+    legacyGuidance: input.gmGuidance,
+    topicsCovered: input.gmTopicsCovered,
+    speechState: gmProposedSpeechState,
+  });
+  const proposedSpeechState = characterGuidance.speechState;
   const experienceFrame = buildExperienceFrame({
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,
@@ -400,8 +421,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       sessionDurationSeconds,
       turnIndex,
     },
-    gmGuidance: input.gmGuidance?.trim()
-      ? { guidance: input.gmGuidance, topicsCovered: input.gmTopicsCovered }
+    gmGuidance: characterGuidance.guidance
+      ? { guidance: characterGuidance.guidance, topicsCovered: characterGuidance.topicsCovered }
       : undefined,
     relationshipDirective: relationshipDirective.prompt,
     experienceFrame: experienceFrame.prompt || undefined,
@@ -722,6 +743,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           guidance: maxInput.gmGuidance?.guidance ?? null,
           topicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
           source: maxInput.gmGuidance ? "previous_post_turn" : "none",
+          speechGuidance: { mode: characterGuidance.mode, withheld: characterGuidance.withheld },
         },
         preTurnPlanner: { status: "not_executed", reason: "disabled_in_prd4_live" },
         validator: { status: "not_executed", reason: "disabled_in_prd4_live" },
@@ -837,6 +859,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     labelPromise,
     traceId,
     director: { versionId: frameRuntime.versionId ?? null, config: frameRuntime.config ?? null },
+    gmSpeechGuidance: characterGuidance.mode,
   };
 }
 

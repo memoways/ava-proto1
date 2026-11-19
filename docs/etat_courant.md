@@ -1,5 +1,11 @@
 # Ava — état courant
 
+**Guidage de parole du GM : interrupteur A/B (19 novembre, code)** : Réglages GM → « Guidage de parole du GM » (défaut
+activé). Désactivé, le personnage ne reçoit plus le conseil, l'état de parole proposé ni les sujets abordés ; le GM
+continue (cinématiques, passages, mémoire, fin). Les recadrages des garde-fous tombent avec le conseil (arbitrage
+possible). Écoute A/B Ulrich + Romed en sandbox à faire ; production non publiée.
+[Plan et protocole](plan_guidage_parole_gm_ab.md) · [reprise lot 2](prompt_reprise_guidage_parole_gm_lot_2.md).
+
 **Cinématiques : interruption ou superposition (19 novembre, code)** : mode au choix dans Expérience → Cinématiques
 (défaut inchangé « Interrompre ») ; la superposition choisit sa vidéo sur le texte de la réplique (le GM décide trop
 tard) et la montre pendant la voix, son −15 dB d'essai. Recette Ulrich + Romed en sandbox à faire ; production non

@@ -496,6 +496,18 @@ export default function GameMasterSettingsTab() {
                       aria-label="Autoriser les cinématiques pilotées par le GM"
                     />
                   </div>
+                  <div className="flex items-center justify-between gap-3 rounded border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Guidage de parole du GM <Hint level="secondaire" text="Pour comparer réponses guidées et naturelles. Off ne transmet plus au personnage le conseil du tour suivant, l’état de parole proposé ni les sujets déjà abordés. Le GM continue de tourner : mémoire, relation, cinématiques, passages et fin d’appel restent actifs, et son conseil reste visible dans l’historique des sessions. Les recadrages des garde-fous (hors-sujet, faux statut, dérapage) passent par ce conseil : ils ne sont plus transmis non plus." /></p>
+                      <p className="text-xs text-muted-foreground">Off coupe seulement le conseil au personnage, pas le GM. Fixé par session (version publiée).</p>
+                    </div>
+                    <Switch
+                      checked={config.editor.speechGuidance !== false}
+                      disabled={selected.status !== "draft"}
+                      onCheckedChange={(checked) => patchEditor({ speechGuidance: checked })}
+                      aria-label="Transmettre le guidage de parole du GM au personnage"
+                    />
+                  </div>
                 </div>
 
                 <fieldset className="space-y-3 rounded border p-3">

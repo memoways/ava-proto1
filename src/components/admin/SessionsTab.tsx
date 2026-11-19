@@ -90,6 +90,7 @@ interface GmPostTurnEntry {
   latency_ms?: number;
   next_turn_guidance?: string;
   topics_covered?: string[];
+  speech_guidance?: "on" | "off";
 }
 
 const HANDOFF_STAGES: Record<string, string> = {
@@ -898,6 +899,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <div className="mb-3 border rounded p-3 bg-muted/20">
                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                   Game Master post-turn ({selected.gm_post_turn_log.length} évaluations)
+                  {" · "}guidage de parole : {selected.gm_post_turn_log.some((entry) => entry.speech_guidance === "off") ? "désactivé" : "activé"}
                 </p>
                 <ScrollArea className="h-48">
                   <div className="space-y-1.5">
@@ -947,6 +949,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                         {evalEntry.next_turn_guidance && (
                           <p className="text-muted-foreground mt-0.5 italic">
                             → {evalEntry.next_turn_guidance}
+                            {evalEntry.speech_guidance === "off" && " (guidage de parole désactivé : non transmis au personnage)"}
                           </p>
                         )}
                         {Array.isArray(evalEntry.topics_covered) && evalEntry.topics_covered.length > 0 && (

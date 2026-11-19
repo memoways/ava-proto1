@@ -130,6 +130,7 @@ describe("validateDirectorDecision", () => {
         priorities: ["narrative_continuity"],
         allowHandoffs: true,
         allowCinematics: true,
+        speechGuidance: true,
         customInstructions: "",
         handoffRules: [{ targetCharacter: "emma", themes: ["police"], topics: [] }],
         projectContext: "",

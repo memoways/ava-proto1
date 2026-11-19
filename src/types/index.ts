@@ -431,6 +431,11 @@ export interface PRD4PostTurnEvaluation {
   orchestration_version_id?: string | null;
   /** Configuration publiée qui a produit cette décision, pour les garde-fous runtime. */
   orchestration_config?: ExperienceDirectorConfig | null;
+  /**
+   * GM speech guidance switch of the pinned version: "off" means next_turn_guidance
+   * and next_speech_state were logged but not sent to the character. Absent = on.
+   */
+  speech_guidance?: "on" | "off";
 }
 
 export interface HandoffTopicRule {
@@ -445,6 +450,12 @@ export interface ExperienceDirectorEditorConfig {
   priorities: Array<"narrative_continuity" | "player_engagement" | "safety" | "pace">;
   allowHandoffs: boolean;
   allowCinematics: boolean;
+  /**
+   * Speech guidance from the post-turn GM to the character (next_turn_guidance,
+   * proposed speech state, covered topics). `false` withholds it for A/B tests
+   * without stopping the GM. Absent = true (historical behaviour).
+   */
+  speechGuidance: boolean;
   customInstructions: string;
   handoffRules: HandoffTopicRule[];
   /** Enjeux, promesse et règles méta du projet, rédigés dans l'app (remplace la fiche Notion GM). */

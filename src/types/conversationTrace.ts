@@ -251,6 +251,11 @@ export interface ConversationTurnTraceV1 {
       guidance: string | null;
       topicsCovered: string[];
       source: "previous_post_turn" | "none";
+      /** GM speech guidance switch for this turn; absent from older traces (= on). */
+      speechGuidance?: {
+        mode: "on" | "off";
+        withheld: { advice: string | null; speechState: string | null; topicsCovered: number };
+      };
     };
     preTurnPlanner: {
       status: "not_executed";
