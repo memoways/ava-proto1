@@ -118,6 +118,13 @@ Livraison technique ≠ validation artistique. Pour chaque mode, mêmes situatio
 5. Noter pour chaque cinématique : pertinence image/parole (0–3), intelligibilité de la voix (0–3), fluidité (0–3),
    double lecture ou son résiduel (oui/non), préférence de mode. Ajuster ensuite le dB si besoin.
 
+## Recette du 19 novembre (Ulrich, sandbox)
+
+Une seule cinématique sur deux sessions de 14–15 tours, sans lien avec la discussion. Événements : 20 sélections
+`overlay_selection_timeout` sur 22 (le modèle GM `google/gemini-2.5-flash` répond au-delà de 2 s ; le proxy ne
+désactive pas sa réflexion), 1 réussite (944 ms, choisie sur le prénom « Emma » seul). Tours écartés par les
+garde-fous non journalisés. Traitement : lot 2.
+
 ## Suite
 
 [Prompt de reprise — lot 2](prompt_reprise_cinematiques_superposition_lot_2.md) : après la recette, ajuster les
