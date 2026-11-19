@@ -38,8 +38,14 @@ export function voiceIdError(id: string): string | null {
 export function getCharacterVoices(): CharacterVoiceCatalogue {
  try { const raw = readEnvironmentStorage(CHARACTER_VOICES_KEY); return raw ? clean(JSON.parse(raw)) : {}; } catch { return {}; }
 }
+/** Per character and provider: the sandbox ID wins, otherwise the shared (production) ID is inherited. */
+export function mergeVoiceCatalogues(base: CharacterVoiceCatalogue, override: CharacterVoiceCatalogue): CharacterVoiceCatalogue {
+ const result = clean(base);
+ for (const [character, row] of Object.entries(clean(override))) result[character] = { ...result[character], ...row };
+ return result;
+}
 export async function loadCharacterVoicesFromDB(): Promise<CharacterVoiceCatalogue> {
- return clean(await loadEnvironmentSetting<CharacterVoiceCatalogue>(CHARACTER_VOICES_KEY, {}));
+ return clean(await loadEnvironmentSetting<CharacterVoiceCatalogue>(CHARACTER_VOICES_KEY, {}, mergeVoiceCatalogues));
 }
 /** Saves, then rereads the stored value; a different readback is reported, never assumed saved. */
 export async function saveCharacterVoices(value: CharacterVoiceCatalogue): Promise<CharacterVoiceCatalogue> {
@@ -47,7 +53,9 @@ export async function saveCharacterVoices(value: CharacterVoiceCatalogue): Promi
  for (const row of Object.values(next)) for (const id of Object.values(row)) { const error = voiceIdError(id ?? ''); if (error) throw new Error(error); }
  await saveEnvironmentSetting(CHARACTER_VOICES_KEY, next);
  const confirmed = await loadCharacterVoicesFromDB();
- if (JSON.stringify(confirmed) !== JSON.stringify(next)) throw new Error('Relecture différente : voix non confirmées. Rechargez la page.');
+ // Inherited shared IDs may appear in the readback; every ID just saved must come back unchanged.
+ const mismatch = Object.entries(next).some(([character, row]) => Object.entries(row).some(([provider, id]) => confirmed[character]?.[provider as TTSProviderId] !== id));
+ if (mismatch) throw new Error('Relecture différente : voix non confirmées. Rechargez la page.');
  return confirmed;
 }
 export function characterVoice(catalogue: CharacterVoiceCatalogue, character: string, provider: TTSProviderId | null | undefined): string | null {

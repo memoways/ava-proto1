@@ -5,7 +5,7 @@ vi.mock('../environmentContext', async original => ({
  loadEnvironmentSetting: vi.fn(async (_key: string, defaults: unknown) => store.tamper ? { max: { fish: 'other' } } : store.value ?? defaults),
  saveEnvironmentSetting: vi.fn(async (key: string, value: unknown) => { store.saved.push([key, value]); store.value = structuredClone(value); }),
 }));
-import { CHARACTER_VOICES_KEY, characterVoice, profilesToSync, saveCharacterVoices, seedFromProfiles, voiceIdError } from './characterVoices';
+import { CHARACTER_VOICES_KEY, characterVoice, mergeVoiceCatalogues, profilesToSync, saveCharacterVoices, seedFromProfiles, voiceIdError } from './characterVoices';
 
 const profiles = [
  { id: 'p-max', character_key: 'max', tts_provider: 'gradium', tts_voice_id: 'max-old' },
@@ -20,6 +20,10 @@ describe('AP4-bis — one voice catalogue for four characters and five providers
   expect(store.saved).toEqual([[CHARACTER_VOICES_KEY, saved]]);
   store.tamper = true;
   await expect(saveCharacterVoices({ max: { fish: 'max-fish' } })).rejects.toThrow('Relecture différente');
+ });
+ it('inherits shared IDs per character and provider; a sandbox ID overrides only its own slot', () => {
+  expect(mergeVoiceCatalogues({ max: { gradium: 'g', fish: 'f' }, emma: { fish: 'e' } }, { max: { fish: 'sandbox' } }))
+   .toEqual({ max: { gradium: 'g', fish: 'sandbox' }, emma: { fish: 'e' } });
  });
  it('rejects IDs with spaces or too long before writing', async () => {
   expect(voiceIdError('abc def')).toMatch(/espace/); expect(voiceIdError('x'.repeat(201))).toMatch(/trop long/); expect(voiceIdError('')).toBeNull();

@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Socle commun des réglages (19 novembre)** : sandbox et voix héritent de la production champ par champ ; migrations de copie Ulrich → Romed/Benoît/Julien et catalogue prod à faire appliquer par Lovable (prod : go requis). [Plan et reprise](plan_socle_commun_reglages.md).
+
 **Lot K1 — faits établis et juge calibré (14 novembre, code)** : le noyau `optimized_v3` porte un bloc protégé
 « FAITS ÉTABLIS » tiré de la fiche, « tu attends l'appel » est lu comme l'appel en cours (personnage et GM), et le juge
 vérifie le canon avec un plafond. Calibrage sur les dix réponses de Romed : écart moyen 1,51 → 0,82 à 0,85, écarts > 2
