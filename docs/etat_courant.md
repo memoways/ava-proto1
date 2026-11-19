@@ -2,8 +2,7 @@
 
 **Latence Max en vidéo Tavus, lot T1 (19 novembre, code)** : la première ligne ElevenLabs part vers Tavus au fil de l'eau
 (PCM 24 kHz, morceaux de 250 ms) ; repli sur le blob si le flux échoue avant le premier octet ; seul Tavus est concerné.
-Nouveau span `pre_turn_handoff_wait`. **À faire** : une session Tavus sandbox-ulrich après synchro Lovable, mesurer
-`video_wait_ms` (< 1,2 s visé) et écouter (lèvres, coupures). [Analyse](analyse_latence_tavus_20261119.md) ·
+Nouveau span `pre_turn_handoff_wait`. **Mesuré** (sandbox-ulrich) : `video_wait_ms` médian 1,0 s, `output_estimated` 3,9 s, aucun repli ; reste l'attente de passage (1,3–1,6 s sur 2 tours de 7) et l'écoute d'Ulrich. [Analyse](analyse_latence_tavus_20261119.md) ·
 [reprise lot T2](prompt_reprise_latence_tavus_lot_t2.md).
 
 **Latence Max en vidéo Tavus (19 novembre, analyse)** : Max audible à 5,4–6,0 s en Tavus contre 3,5–3,8 s en Anam/TTS. Les lots GM du jour n'ajoutent rien de mesurable ; la cause est la voix d'Ava envoyée à Tavus (#161) qui attend le blob ElevenLabs complet (1,6–2,2 s). Correction proposée : flux PCM vers Tavus. [Analyse](analyse_latence_tavus_20261119.md) · [reprise lot T1](prompt_reprise_latence_tavus_lot_t1.md).

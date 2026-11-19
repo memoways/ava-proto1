@@ -86,8 +86,17 @@ origin/main et synchro Lovable. Production non publiée.
 
 Reprise : [prompt du lot T1](prompt_reprise_latence_tavus_lot_t1.md).
 
-## Lot T1 livré (code) — mesures à compléter
+## Lot T1 livré et mesuré (19 novembre, session sandbox-ulrich `c293829f…`)
 
-Flux PCM de la première ligne vers Tavus implémenté (PR du lot T1). Mesure sur une session Tavus sandbox-ulrich après
-synchro Lovable : **à renseigner** (`video_wait_ms` médian, `output_estimated`, tours en repli, span
-`pre_turn_handoff_wait`, écoute d'Ulrich).
+Flux PCM de la première ligne vers Tavus fusionné (#214, `7d8fce7`). Session après synchro, 7 tours complétés :
+
+| | Avant (`3251b70f…`, `c25ce8ce…`) | Après T1 |
+|---|---|---|
+| `video_wait_ms` médian | 2,2–2,6 s | **0,996 s** (883–1104 ms) |
+| `output_estimated` médian | 5,4–6,0 s | **3,93 s** (3,65–5,60 s) |
+| Transport TTS | `rest` | `http_stream_pcm`, aucun repli |
+
+Cibles atteintes (< 1,2 s et < 4,5 s en médiane). Deux tours sur sept restent à 5,2 et 5,6 s : ce sont ceux dont le span
+`pre_turn_handoff_wait` dure 1,3 s (tour 7) et 1,6 s (tour 3), contre ~0,1 s pour les autres. Cause du retard de
+~0,9 s confirmée : l'attente du passage avant le tour. Écoute d'Ulrich (lèvres, coupures) : à confirmer par lui.
+Suite : lot T2.
