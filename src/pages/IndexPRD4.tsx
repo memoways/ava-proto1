@@ -2517,6 +2517,7 @@ const IndexPRD4 = () => {
             orchestration_version_id: ev.orchestration_version_id ?? null,
             execution_status: ev.execution_status ?? "executed",
             speech_guidance: ev.speech_guidance ?? "on",
+            gm_mode: ev.gm_mode ?? "full",
           });
           if (gmExecuted && ev.labels) {
             const total = (ev.labels.themes?.length ?? 0) + (ev.labels.topics?.length ?? 0) + (ev.labels.intentions?.length ?? 0);
@@ -2576,7 +2577,7 @@ const IndexPRD4 = () => {
           ...result.timings,
           rag_matches: result.ragMatches,
           trace_id: result.traceId,
-          gm_speech_guidance: result.gmSpeechGuidance ?? "on",
+          gm_mode: result.gmMode ?? "full",
         });
         if (maxMsg.pipeline?.first_sound_status === "measured" && typeof maxMsg.pipeline.total_ms === "number") {
           turnLatenciesRef.current.push(maxMsg.pipeline.total_ms);

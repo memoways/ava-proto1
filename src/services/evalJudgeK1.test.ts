@@ -140,3 +140,15 @@ describe("judge calibration against a human rater", () => {
     expect(report).toContain("Critère non atteint");
   });
 });
+
+describe("GM mode for replaying a corpus in off / light / full (lot C)", () => {
+  it("reads gmMode from a snapshot and passes it to the turn, in memory", () => {
+    for (const mode of ["off", "light", "full"]) {
+      expect(parseSnapshotOverrides(`{"gmMode": "${mode}"}`)).toEqual({ overrides: { gmMode: mode }, errors: [] });
+    }
+    expect(parseSnapshotOverrides('{"gmMode": "fort"}').errors).toEqual(["gmMode doit être off, light ou full"]);
+    const config = { promptVariant: "optimized_v3", ragTopK: 4, ragRetrieveK: 8, gmMode: "off" } as unknown as EvalTurnConfig;
+    expect(buildEvalTurnOverrides(config, "max").gmMode).toBe("off");
+    expect(buildEvalTurnOverrides({ ...config, gmMode: undefined }, "max").gmMode).toBeUndefined();
+  });
+});

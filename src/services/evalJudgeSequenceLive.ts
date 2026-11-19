@@ -77,7 +77,7 @@ export async function runSequenceEvalTurn(
   const canonFields = await loadCharacterPrompt(characterContext.characterId).catch(() => null);
   const errors = [
     turn.characterError ? `Personnage en repli : ${turn.characterError}` : null,
-    !gm ? `GM sans état terminal en ${SEQUENCE_GM_WAIT_MS / 1000} s` : gm.execution_status && gm.execution_status !== "executed" ? `GM ${gm.execution_status}` : null,
+    !gm ? `GM sans état terminal en ${SEQUENCE_GM_WAIT_MS / 1000} s` : gm.execution_status && gm.execution_status !== "executed" && gm.execution_status !== "skipped" ? `GM ${gm.execution_status}` : null,
   ].filter(Boolean);
   return {
     response: turn.maxResponse,

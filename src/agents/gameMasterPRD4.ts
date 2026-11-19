@@ -29,7 +29,7 @@ import { handoffSpeechEvidence, materializeHandoffAssessment, validateCharacterH
 import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
-import { isGmSpeechGuidanceEnabled } from "@/services/gmSpeechGuidance";
+import { resolveGmMode } from "@/services/gmSpeechGuidance";
 import {
   normalizeRelationshipState,
   relationshipStateToProposal,
@@ -92,6 +92,10 @@ export interface PRD4PostTurnInput {
   speechStatePlayed?: string | null;
   recentSpeechStates?: Array<string | null>;
   speechSettingsVersion?: string;
+  /** GM mode of the turn (the call is never made in "off"); logged with the entry. */
+  gmMode?: import("@/types").GmMode;
+  /** Exact GM -> character payload injected on THIS turn, logged for the history. */
+  injectedToCharacter?: import("@/types").GmInjectedToCharacter;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
 }
@@ -760,7 +764,9 @@ export async function evaluatePostTurnPRD4(
     validation_issues: validationIssues,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
-    speech_guidance: isGmSpeechGuidanceEnabled(input.orchestrationConfig) ? "on" : "off",
+    speech_guidance: (input.gmMode ?? resolveGmMode(input.orchestrationConfig)) === "full" ? "on" : "off",
+    gm_mode: input.gmMode ?? resolveGmMode(input.orchestrationConfig),
+    ...(input.injectedToCharacter ? { injected: input.injectedToCharacter } : {}),
     speech_state_played: selectSpeechState(input.speechStatePlayed, input.speechStates ?? []),
     speech_rugosite: input.rugosite ?? 0,
     speech_settings_version: input.speechSettingsVersion ?? null,

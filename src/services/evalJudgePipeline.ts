@@ -8,6 +8,8 @@ import { toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import type { RuntimeCharacter } from "@/types";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { isResponseStreamContractVariant, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
+import { GM_MODES } from "@/services/gmSpeechGuidance";
+import type { GmMode } from "@/types";
 import { characterEstablishedFacts, neutralizeAwaitedCall, withoutEstablishedFacts } from "@/services/establishedFacts";
 import type { CharacterPrompt } from "@/services/characterPromptService";
 
@@ -67,6 +69,8 @@ export interface EvalTurnExtras {
   streamContract?: ResponseStreamContractVariant;
   /** Lot K1: `false` plays the core and the frame without the established facts (reference side). */
   establishedFacts?: boolean;
+  /** Lot C: GM mode of the replay (off / light / full); absent = as the pinned version plays it. */
+  gmMode?: GmMode;
 }
 
 export interface EvalTurnConfig extends EvalLiveSnapshot, EvalTurnExtras {
@@ -192,6 +196,10 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
   if ("establishedFacts" in value) {
     if (typeof value.establishedFacts === "boolean") overrides.establishedFacts = value.establishedFacts;
     else errors.push("establishedFacts doit être true ou false");
+  }
+  if ("gmMode" in value) {
+    if (typeof value.gmMode === "string" && (GM_MODES as readonly string[]).includes(value.gmMode)) overrides.gmMode = value.gmMode as GmMode;
+    else errors.push("gmMode doit être off, light ou full");
   }
   if ("situationSummarySource" in value && typeof value.situationSummarySource === "string" && value.situationSummarySource.trim()) {
     overrides.situationSummarySource = value.situationSummarySource.trim().slice(0, 80);
@@ -723,6 +731,7 @@ export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: Run
     situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
     streamContract: config.streamContract,
     establishedFacts: config.establishedFacts,
+    gmMode: config.gmMode,
     ragTopK,
     ragThreshold: config.ragThreshold,
     ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),

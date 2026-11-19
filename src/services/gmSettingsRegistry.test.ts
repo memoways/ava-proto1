@@ -20,7 +20,7 @@ describe("gmSettingsRegistry", () => {
     const ids = GM_SETTINGS_REGISTRY.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toEqual(expect.arrayContaining([
-      "tone", "guidanceLength", "priorities", "allowHandoffs", "allowCinematics", "speechGuidance",
+      "tone", "guidanceLength", "priorities", "allowHandoffs", "allowCinematics", "gmMode",
       "frameEnabled", "frameText", "frameExposure", "framePosture", "forbidSpontaneousHandoff", "activeCharacters",
       "minimumHandoffTurn", "maximumHandoffsPerSession", "minimumTurnsBetweenHandoffs", "directorTimeoutMs",
       "handoffRules", "projectContext", "openQuestions", "opennessPace", "derailTolerance", "falseStatusGuidance",
@@ -61,9 +61,13 @@ describe("gmSettingsRegistry", () => {
   it("states code effects in plain words and reacts to the value", () => {
     expect(settingFragments("directorTimeoutMs", DEFAULT_DIRECTOR_CONFIG)[0]).toMatchObject({ destination: "code" });
     expect(settingFragments("directorTimeoutMs", DEFAULT_DIRECTOR_CONFIG)[0].text).toContain("12000 ms");
-    const off = settingFragments("speechGuidance", withEditor({ speechGuidance: false }));
-    expect(off).toEqual([expect.objectContaining({ destination: "code" })]);
-    expect(off[0].text).not.toBe(settingFragments("speechGuidance", DEFAULT_DIRECTOR_CONFIG)[0].text);
+    const texts = (["off", "light", "full"] as const).map((mode) => {
+      const fragments = settingFragments("gmMode", withEditor({ gmMode: mode }));
+      expect(fragments).toEqual([expect.objectContaining({ destination: "code" })]);
+      return fragments[0].text;
+    });
+    expect(new Set(texts).size).toBe(3);
+    expect(texts[0]).toMatch(/aucun appel/i);
     expect(settingFragments("characterTimeCues", withEditor({ characterTimeCues: false }))[0].text).toMatch(/aucun repère/i);
     expect(settingFragments("characterTimeCues", DEFAULT_DIRECTOR_CONFIG)[0]).toMatchObject({ destination: "character_prompt" });
     expect(settingFragments("characterTimeCues", DEFAULT_DIRECTOR_CONFIG)[0].text).toContain("fin proche");

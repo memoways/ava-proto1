@@ -1,5 +1,13 @@
 # Ava — état courant
 
+**Réglages GM lisibles, lot C (19 novembre, code)** : `editor.gmMode` off / léger / fort remplace `speechGuidance`
+(`false` → léger, absent → fort ; v13 « GM désactivé » devient léger, aucune migration). Off : aucun appel GM post-tour
+(ni mémoire GM, passage proposé, cinématique ; fin au minuteur) ; le tour est tout de même journalisé. Chaque tour
+persiste `gm_mode` et `injected` (texte exact transmis au personnage) ; historique des sessions et export Markdown
+affichent « GM → personnage ». Juge J3 : `gmMode` remplace l'ancien réglage. Limite : en off, le passage validé par le GM
+(preuve de consentement) n'est pas disponible, la demande explicite du joueur ne reçoit que la règle de procédure
+côté personnage. À écouter en sandbox ; production non publiée. [Reprise lot B](prompt_reprise_reglages_gm_lot_b.md).
+
 **Réglages GM lisibles, lot A (19 novembre, code)** : les réglages GM agissent désormais sur toutes les versions,
 `builtin://` compris (sandbox-romed et sandbox-benoit recevaient zéro réglage) : bloc compilé à chaque tour depuis la
 config épinglée, sans double bloc. Registre unique des 24 réglages ; aperçu « ➜ envoyé au GM / au personnage / appliqué

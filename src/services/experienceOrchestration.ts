@@ -5,6 +5,7 @@ import { getActiveEnvironment } from "@/services/environmentContext";
 import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
 import { normalizeRugosite } from "@/services/speechRugosity";
+import { normalizeGmMode } from "@/services/gmSpeechGuidance";
 
 /** Personnages activables : ceux marqués actifs dans le registre central. */
 export function registryActiveCharacterKeys(): string[] {
@@ -86,7 +87,7 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     priorities: ["narrative_continuity", "player_engagement", "safety", "pace"],
     allowHandoffs: true,
     allowCinematics: true,
-    speechGuidance: true,
+    gmMode: "full",
     characterTimeCues: true,
     customInstructions: "",
     handoffRules: [],
@@ -133,6 +134,8 @@ function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"][
 
 export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig> | null | undefined): ExperienceDirectorConfig {
   const editor = value?.editor;
+  // Legacy speechGuidance is replaced by gmMode and never written back.
+  const { speechGuidance: _legacySpeechGuidance, ...editorWithoutLegacy } = (editor ?? {}) as Partial<ExperienceDirectorConfig["editor"]> & { speechGuidance?: unknown };
   const priorities = editor?.priorities?.filter((priority) =>
     priority === "narrative_continuity"
     || priority === "player_engagement"
@@ -153,10 +156,10 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
     directorTimeoutMs: Math.min(30_000, Math.max(3_000, Math.round(Number(value?.directorTimeoutMs) || DEFAULT_DIRECTOR_CONFIG.directorTimeoutMs))),
     editor: {
       ...DEFAULT_DIRECTOR_CONFIG.editor,
-      ...editor,
+      ...editorWithoutLegacy,
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
-      // Only an explicit false turns the guidance off; older versions keep it.
-      speechGuidance: editor?.speechGuidance !== false,
+      // gmMode wins; the legacy speechGuidance:false of older versions reads as light.
+      gmMode: normalizeGmMode(editor as { gmMode?: unknown; speechGuidance?: unknown } | undefined),
       characterTimeCues: editor?.characterTimeCues !== false,
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),

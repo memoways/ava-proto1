@@ -383,7 +383,7 @@ export interface PRD4PostTurnEvaluation {
   max_tokens?: number;
   created_at?: string;
   /** Distinguishes a valid GM result from a parse failure or runtime failure. */
-  execution_status?: "executed" | "invalid" | "failed";
+  execution_status?: "executed" | "invalid" | "failed" | "skipped";
   /** Technical classification kept separate from the parent voice-turn status. */
   execution_reason?:
     | "executed"
@@ -394,7 +394,9 @@ export interface PRD4PostTurnEvaluation {
     | "incomplete_schema"
     | "relationship_invalid"
     | "persistence_failed"
-    | "runtime_error";
+    | "runtime_error"
+    /** GM mode "off": the post-turn GM was deliberately not called. */
+    | "gm_off";
   /** Bounded technical metadata only: no raw response, quotes or transcript. */
   validation_issues?: Array<{
     code: "json_unreadable" | "schema_incomplete" | "unknown_speech_state"
@@ -433,6 +435,21 @@ export interface PRD4PostTurnEvaluation {
    * and next_speech_state were logged but not sent to the character. Absent = on.
    */
   speech_guidance?: "on" | "off";
+  /** GM mode of the pinned version (off / light / full). Absent on entries logged before lot C. */
+  gm_mode?: GmMode;
+  /** Exact text the GM handed to the character for THIS turn (from the previous post-turn). */
+  injected?: GmInjectedToCharacter;
+}
+
+export type GmMode = "off" | "light" | "full";
+
+export interface GmInjectedToCharacter {
+  /** Guidance string injected into the character prompt; empty when nothing was sent. */
+  text: string;
+  /** GM proposed speech state sent to the character, if any. */
+  speechState: string | null;
+  /** Topics already covered, sent with the guidance. */
+  topicsCovered: string[];
 }
 
 export interface HandoffTopicRule {
@@ -448,11 +465,13 @@ export interface ExperienceDirectorEditorConfig {
   allowHandoffs: boolean;
   allowCinematics: boolean;
   /**
-   * Speech guidance from the post-turn GM to the character (next_turn_guidance,
-   * proposed speech state, covered topics). `false` withholds it for A/B tests
-   * without stopping the GM. Absent = true (historical behaviour).
+   * How much the GM acts on the call, fixed for the session (pinned version).
+   * full = everything (historical behaviour); light = the GM runs but its speech
+   * guidance (advice, speech state, covered topics) is not sent to the character;
+   * off = no post-turn GM call at all. Absent = full. The legacy boolean
+   * `speechGuidance: false` is read as light.
    */
-  speechGuidance: boolean;
+  gmMode: GmMode;
   /**
    * Time cues in the character prompt (elapsed time, turn, start/middle/end
    * phase). `false` removes them. Absent = true (historical behaviour).

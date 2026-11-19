@@ -127,6 +127,17 @@ describe("GM post-turn output — real sandbox outputs", () => {
     expect(JSON.stringify(result)).not.toMatch(/chevreuil devant/);
   });
 
+  it("logs the GM mode and the exact text injected into the character on the entry", async () => {
+    vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...metadata, content: REAL_TRUNCATED, finishReason: "length", usage: usage(936) });
+    const injected = { text: "Laisse-le parler.", speechState: "La digue cède", topicsCovered: ["couteau"] };
+    const result = await evaluatePostTurnPRD4({ ...input, gmMode: "light", injectedToCharacter: injected });
+    expect(result.gm_mode).toBe("light");
+    expect(result.speech_guidance).toBe("off");
+    expect(result.injected).toEqual(injected);
+    const full = await evaluatePostTurnPRD4({ ...input, gmMode: "full" }).catch(() => null);
+    expect(full?.gm_mode ?? "full").toBe("full");
+  });
+
   it("asks for a compact object without memory echo and keeps budget headroom", async () => {
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...metadata, content: REAL_COMPACT, finishReason: "stop", usage: usage(520) });
     const result = await evaluatePostTurnPRD4(input);

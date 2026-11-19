@@ -91,7 +91,9 @@ export function aggregateLatencySession(session: SessionRow, characterFilter: st
     const gmEntry = [...gmLog].reverse().find((entry) =>
       entry.turn_index === turnIndex && entry.character_key === character,
     );
-    const gmStatus = gmEntry?.execution_status ?? (gmEntry ? "executed" : "not_measured");
+    // A GM-off turn has no call to time: same as not measured.
+    const gmStatus = gmEntry?.execution_status === "skipped" ? "not_measured"
+      : gmEntry?.execution_status ?? (gmEntry ? "executed" : "not_measured");
     turns.push({
       ...msg.pipeline,
       ...(typeof gmEntry?.latency_ms === "number" && gmEntry.latency_ms > 0

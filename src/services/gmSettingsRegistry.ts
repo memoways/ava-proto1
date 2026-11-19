@@ -126,7 +126,7 @@ export function customInstructionsFragment(config: ExperienceDirectorConfig): st
 // ---------------------------------------------------------------------------
 
 export type GmSettingId =
-  | "tone" | "guidanceLength" | "priorities" | "allowHandoffs" | "allowCinematics" | "speechGuidance"
+  | "tone" | "guidanceLength" | "priorities" | "allowHandoffs" | "allowCinematics" | "gmMode"
   | "frameEnabled" | "frameText" | "frameExposure" | "framePosture" | "forbidSpontaneousHandoff" | "activeCharacters"
   | "minimumHandoffTurn" | "maximumHandoffsPerSession" | "minimumTurnsBetweenHandoffs" | "directorTimeoutMs"
   | "handoffRules" | "projectContext" | "openQuestions" | "opennessPace" | "derailTolerance" | "falseStatusGuidance"
@@ -156,6 +156,13 @@ const handoffCode = (config: ExperienceDirectorConfig) => handoffsActive(config)
   ? `Le garde valide chaque proposition de passage : au moins ${config.minimumHandoffTurn} échange(s) complet(s), ${config.maximumHandoffsPerSession} passage(s) max par session, ${config.minimumTurnsBetweenHandoffs} tour(s) entre deux. Les mêmes seuils s'appliquent aux demandes explicites du joueur.`
   : "Le garde refuse toute proposition de passage du GM. Une demande explicite du joueur reste possible.";
 
+/** One sentence per mode: what it cuts. Shown under the selector and in the preview. */
+export const GM_MODE_TEXT: Record<"off" | "light" | "full", string> = {
+  off: "Aucun appel GM après les tours : ni mémoire structurée, relation, passage proposé par le GM, cinématique ni conseil ; la fin se fait au minuteur. Le personnage garde sa fiche, le RAG, l'historique de la conversation et le cadre ; la demande explicite du joueur de changer de personnage garde sa règle de procédure.",
+  light: "Le GM tourne (mémoire, relation, passages, cinématiques, fin d'appel) mais le conseil du tour suivant, l'état de parole proposé et les sujets déjà abordés ne sont pas transmis au personnage ; le conseil reste visible dans l'historique.",
+  full: "Tout est actif : le conseil du tour suivant, l'état de parole proposé et les sujets déjà abordés sont transmis au personnage, en plus de la mémoire, des passages, des cinématiques et de la fin d'appel.",
+};
+
 export const GM_SETTINGS_REGISTRY: readonly GmSettingEntry[] = [
   { id: "tone", label: "Posture du directeur", destinations: ["gm_prompt"], fragment: (c) => [gm(toneFragment(c))] },
   { id: "guidanceLength", label: "Longueur de la guidance", destinations: ["gm_prompt"], fragment: (c) => [gm(guidanceLengthFragment(c))] },
@@ -166,10 +173,8 @@ export const GM_SETTINGS_REGISTRY: readonly GmSettingEntry[] = [
     fragment: (c) => [gm(cinematicsFragment(c)), code(c.editor.allowCinematics
       ? "Le garde laisse passer une cinématique proposée si les règles de l'onglet Cinématiques la valident."
       : "Le garde bloque toute action cinematic du GM.")] },
-  { id: "speechGuidance", label: "Guidage de parole du GM", destinations: ["code"],
-    fragment: (c) => [code(c.editor.speechGuidance !== false
-      ? "Le conseil du tour suivant, l'état de parole proposé et les sujets déjà abordés sont transmis au personnage."
-      : "Le conseil du tour suivant, l'état de parole proposé et les sujets déjà abordés ne sont plus transmis au personnage ; le GM continue de tourner et son conseil reste visible dans l'historique.")] },
+  { id: "gmMode", label: "Mode du GM (off / léger / fort)", destinations: ["code"],
+    fragment: (c) => [code(GM_MODE_TEXT[c.editor.gmMode ?? "full"] ?? GM_MODE_TEXT.full)] },
   { id: "frameEnabled", label: "Cadre commun de l'expérience", destinations: ["character_prompt", "gm_prompt"],
     fragment: (c) => frameFragments(c, () => "Cadre commun activé : cadre, exposition selon le parcours et posture sont envoyés à chaque tour.") },
   { id: "frameText", label: "Cadre (rôle de l'interlocuteur)", destinations: ["character_prompt", "gm_prompt"],
