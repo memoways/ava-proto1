@@ -10,9 +10,9 @@ interruptions répétées pendant l'attente, (3) évaluer, sans l'implémenter d
 
 État attendu (à vérifier d'abord) : le lot T1 est fusionné sur main (`avatarAudioBridge.ts` option `streamFirstLine`,
 `elevenLabsPcmStream.ts`, span client `pre_turn_handoff_wait`). Avant T1 : Max audible à 5,4–6,0 s (médiane), attente
-vidéo 2,2–2,6 s ; cible T1 : `video_wait_ms` médian < 1,2 s, `output_estimated` < 4,5 s. Si la mesure T1 de
-l'analyse est encore vide, la faire en premier : une session Tavus sandbox-ulrich (jouée par Ulrich), puis lecture de
-`voice_turn_events` et `llm_usage` via le MCP Lovable Ava `1265958d-b74e-40f2-917d-182fe05163fc`.
+vidéo 2,2–2,6 s ; cible T1 : `video_wait_ms` médian < 1,2 s, `output_estimated` < 4,5 s. La mesure T1 est faite (session `c293829f…` : `video_wait_ms` médian 0,996 s, `output_estimated` 3,93 s) ; le span
+`pre_turn_handoff_wait` vaut ~0,1 s sauf aux tours 3 et 7 (1,6 s et 1,3 s) : c'est la cause des tours en retard. Lecture via le MCP Lovable Ava
+`1265958d-b74e-40f2-917d-182fe05163fc` (`voice_turn_events`, `metadata_json->server`).
 
 Lire d'abord : `AGENTS.md`, `CLAUDE.md`, `docs/etat_courant.md`, `git status`, les six commits récents de `main`, le début du
 CHANGELOG, l'analyse, `src/services/streamingAvatar/avatarAudioBridge.ts`, `src/pages/IndexPRD4.tsx` (~1755-1800,
