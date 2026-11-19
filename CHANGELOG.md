@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles : lot B, priorités d'analyse en curseurs 0–3] — 2026-11-19
+
+- **Curseurs 0–3** : `editor.priorityLevels` (0 ignoré, 1 léger, 2 normal, 3 prioritaire) remplace la liste de cases
+  `priorities` (lue à l'ouverture : cochée → 2, décochée → 0, jamais réécrite) ; `schemaVersion` passe à 2. Sécurité
+  plancher à 1, affiché dans l'interface. Vérifié en lecture via Lovable : toutes les versions publiées ont les 4 axes
+  cochés ou aucun champ, donc cran 2 partout, aucune migration.
+- **Texte envoyé au GM** : fragment par axe et par cran (`src/services/gmPriorities.ts`) et règle « En cas de conflit
+  entre ces priorités, applique d'abord : X (3), puis Y (2)… » générée seulement quand les niveaux diffèrent. Tous les
+  axes à 2 compilent exactement le texte d'avant (snapshots de parité inchangés). Aperçu automatique sous les curseurs.
+- **Juge J3** : l'instantané accepte `priorityLevels` (rejeu en mémoire d'un profil de priorités).
+- **Mesure : effet non démontré.** Rejeu J3 de deux profils extrêmes (36 tours chacun) : conseils du GM quasi identiques,
+  notes dans le bruit. Cran non réduit (le levier est faible, pas trop fin) ; décision après recette sandbox.
+  Aucun appel IA ajouté ; production non publiée.
+  [Plan et mesure](docs/plan_reglages_gm_lisibles_gradues.md) · [reprise lot D](docs/prompt_reprise_reglages_gm_lot_d.md) ·
+  [cadrage lot E](docs/prompt_reprise_courbe_experience_gm_lot_e.md).
+
 ## [Réglages GM lisibles : lot C, modes GM off / léger / fort] — 2026-11-19
 
 - **Mode du GM** : `editor.gmMode` (`off` | `light` | `full`) remplace `editor.speechGuidance` (`false` → `light`, sinon

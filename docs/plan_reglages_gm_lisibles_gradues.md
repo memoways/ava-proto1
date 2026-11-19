@@ -17,7 +17,12 @@ Plan validé par Ulrich le 19 novembre 2026. Lot A livré le 19 novembre (voir �
   (historique, export), `gmMode` pour le juge J3, sélecteur 3 crans. Écarts : la surcharge `gmSpeechGuidance` n'était pas
   branchée au juge (ajout de `gmMode` au snapshot) ; en off, le passage validé par le GM n'est pas disponible (seule la
   règle de procédure de la demande explicite subsiste) ; `injected` se lit sur l'entrée du tour où le texte est reçu.
-- **B — à faire** : [prompt de reprise](prompt_reprise_reglages_gm_lot_b.md). Puis D, E.
+- **B — livré (19 novembre)** : `editor.priorityLevels` (0–3, plancher sécurité à 1), `src/services/gmPriorities.ts`
+  (fragments par axe et cran, règle d'arbitrage générée seulement quand les niveaux diffèrent ; tout à 2 = texte
+  historique à l'octet près), 4 curseurs dans Réglages GM, surcharge `priorityLevels` dans les instantanés du juge.
+  Lecture Lovable : toutes les versions publiées (prod, sandbox-ulrich/romed/benoit/julien) ont les 4 axes cochés ou
+  aucun champ → tout passe au cran 2, aucune migration. **Effet mesurable : non démontré** (voir « Mesure du lot B »).
+  Suite : [lot D](prompt_reprise_reglages_gm_lot_d.md), puis [lot E](prompt_reprise_courbe_experience_gm_lot_e.md).
 
 ## Contexte
 
@@ -129,6 +134,21 @@ interrupteur courbe ouverte / dirigée ; **directions** à atteindre (pas des ph
 choix ; lien avec des indications à porter par les fiches (Romed) ; articulation avec le radar du lot D, la clôture à
 80 % et les triggers narratifs ([tâche](https://app.notion.com/p/2083482bf92f477aa47b66cf473fac25)). Mise à jour de la
 tâche Notion GM (tâches uniquement).
+
+## Mesure du lot B (19 novembre, J3, sandbox-ulrich)
+
+Rejeu `npm run eval:judge:sequences -- --reference optimized_v3 --candidate optimized_v3 --reference-json
+'{"priorityLevels":{"narrative_continuity":0,"player_engagement":0,"safety":1,"pace":3}}' --candidate-json
+'{"priorityLevels":{"narrative_continuity":3,"player_engagement":3,"safety":1,"pace":0}}' --repeats 1` : 4 séquences,
+36 tours par profil, 1,12 $, aucune écriture. Notes : Δ par tour −0,16 (dans le bruit, seuil 0,30), Δ séquence −0,29.
+Conseils GM (`gmGuidanceOut`, 18 par profil) : quasi identiques, de la forme « X doit continuer à raconter… » ; aucun
+mot de rythme ou de clôture dans les deux profils ; continuité 5 vs 2 mentions, engagement 3 vs 0, sur de très petits
+nombres. **Conclusion : la différence n'est pas visible dans les conseils sur ce corpus** (5 tours, loin de la clôture ;
+le conseil de tour est dominé par « continuer le fil »). Le plan prévoyait de réduire à 3 crans dans ce cas : non fait,
+car supprimer un cran n'ajouterait pas d'effet (le levier est faible, pas trop fin). Le texte compilé diffère bel et bien
+(tests, aperçu), et l'effet attendu se situe plutôt dans la clôture, les recadrages et les décisions du GM, que ce corpus
+ne sollicite pas. Pistes : séquence longue jusqu'à la clôture, corpus de dérapages, ou recette humaine sandbox ; décision
+de garder 4 crans, passer à 3 ou rendre les consignes plus directives à prendre par Ulrich après recette.
 
 ## Ordre et livraison
 

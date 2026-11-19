@@ -6,6 +6,7 @@ import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
 import { normalizeRugosite } from "@/services/speechRugosity";
 import { normalizeGmMode } from "@/services/gmSpeechGuidance";
+import { normalizePriorityLevels } from "@/services/gmPriorities";
 
 /** Personnages activables : ceux marqués actifs dans le registre central. */
 export function registryActiveCharacterKeys(): string[] {
@@ -76,7 +77,7 @@ export const DEFAULT_OPEN_QUESTIONS: string[] = [
 ];
 
 export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   minimumHandoffTurn: 4,
   maximumHandoffsPerSession: 8,
   minimumTurnsBetweenHandoffs: 2,
@@ -84,7 +85,7 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   editor: {
     tone: "balanced",
     guidanceLength: "balanced",
-    priorities: ["narrative_continuity", "player_engagement", "safety", "pace"],
+    priorityLevels: { narrative_continuity: 2, player_engagement: 2, safety: 2, pace: 2 },
     allowHandoffs: true,
     allowCinematics: true,
     gmMode: "full",
@@ -135,19 +136,15 @@ function sanitizeHandoffRules(raw: unknown): ExperienceDirectorConfig["editor"][
 export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig> | null | undefined): ExperienceDirectorConfig {
   const editor = value?.editor;
   // Legacy speechGuidance is replaced by gmMode and never written back.
-  const { speechGuidance: _legacySpeechGuidance, ...editorWithoutLegacy } = (editor ?? {}) as Partial<ExperienceDirectorConfig["editor"]> & { speechGuidance?: unknown };
-  const priorities = editor?.priorities?.filter((priority) =>
-    priority === "narrative_continuity"
-    || priority === "player_engagement"
-    || priority === "safety"
-    || priority === "pace"
-  );
+  // Legacy `priorities` (checkbox list) is read into priorityLevels and never written back.
+  const { speechGuidance: _legacySpeechGuidance, priorities: legacyPriorities, ...editorWithoutLegacy } = (editor ?? {}) as Partial<ExperienceDirectorConfig["editor"]> & { speechGuidance?: unknown; priorities?: unknown };
   const rawMaxHandoffs = Number(value?.maximumHandoffsPerSession);
   // Older versions stored a never-read handoffTarget: drop it on read.
   const { handoffTarget: _legacyHandoffTarget, ...rest } = (value ?? {}) as Partial<ExperienceDirectorConfig> & { handoffTarget?: unknown };
   return {
     ...DEFAULT_DIRECTOR_CONFIG,
     ...rest,
+    schemaVersion: 2,
     minimumHandoffTurn: Math.min(20, Math.max(1, Math.round(Number(value?.minimumHandoffTurn) || DEFAULT_DIRECTOR_CONFIG.minimumHandoffTurn))),
     maximumHandoffsPerSession: Number.isFinite(rawMaxHandoffs)
       ? Math.min(20, Math.max(0, Math.round(rawMaxHandoffs)))
@@ -157,7 +154,7 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
     editor: {
       ...DEFAULT_DIRECTOR_CONFIG.editor,
       ...editorWithoutLegacy,
-      priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
+      priorityLevels: normalizePriorityLevels(editor?.priorityLevels, legacyPriorities),
       // gmMode wins; the legacy speechGuidance:false of older versions reads as light.
       gmMode: normalizeGmMode(editor as { gmMode?: unknown; speechGuidance?: unknown } | undefined),
       characterTimeCues: editor?.characterTimeCues !== false,

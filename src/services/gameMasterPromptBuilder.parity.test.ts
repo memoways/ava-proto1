@@ -15,7 +15,7 @@ const CASES = {
       ...DEFAULT_DIRECTOR_CONFIG.editor,
       tone: "directive",
       guidanceLength: "short",
-      priorities: ["safety", "pace"],
+      priorityLevels: { narrative_continuity: 0, player_engagement: 0, safety: 2, pace: 2 },
       allowCinematics: false,
       customInstructions: "Ne jamais presser le joueur.",
       handoffRules: [{ targetCharacter: "emma", themes: ["famille"], topics: ["enfance"] }],

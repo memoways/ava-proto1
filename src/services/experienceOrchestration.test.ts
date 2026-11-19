@@ -24,24 +24,15 @@ describe("normalizeDirectorConfig", () => {
     expect(result.editor.customInstructions).toBe("Keep the answer short.");
   });
 
-  it("restores editor defaults when priorities are invalid or empty", () => {
-    const invalidPriorities = ["pace", "invented", "player_engagement"] as Array<
-      "narrative_continuity" | "player_engagement" | "safety" | "pace" | "invented"
-    >;
+  it("reads invalid or empty legacy priorities without crashing", () => {
+    const invalidPriorities = ["pace", "invented", "player_engagement"];
+    expect(normalizeDirectorConfig({
+      editor: { ...DEFAULT_DIRECTOR_CONFIG.editor, priorityLevels: undefined, priorities: invalidPriorities } as never,
+    }).editor.priorityLevels).toEqual({ narrative_continuity: 0, player_engagement: 2, safety: 1, pace: 2 });
 
     expect(normalizeDirectorConfig({
-      editor: {
-        ...DEFAULT_DIRECTOR_CONFIG.editor,
-        priorities: invalidPriorities as typeof DEFAULT_DIRECTOR_CONFIG.editor.priorities,
-      },
-    }).editor.priorities).toEqual(["pace", "player_engagement"]);
-
-    expect(normalizeDirectorConfig({
-      editor: {
-        ...DEFAULT_DIRECTOR_CONFIG.editor,
-        priorities: [] as typeof DEFAULT_DIRECTOR_CONFIG.editor.priorities,
-      },
-    }).editor.priorities).toEqual(DEFAULT_DIRECTOR_CONFIG.editor.priorities);
+      editor: { ...DEFAULT_DIRECTOR_CONFIG.editor, priorityLevels: undefined, priorities: [] } as never,
+    }).editor.priorityLevels).toEqual(DEFAULT_DIRECTOR_CONFIG.editor.priorityLevels);
   });
 });
 

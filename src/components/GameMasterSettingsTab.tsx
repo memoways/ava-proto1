@@ -9,7 +9,6 @@ import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, GM_CODE_VERSIO
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -31,7 +30,6 @@ import {
 import {
   buildExperienceDirectorPrompt,
   GM_GUIDANCE_OPTIONS,
-  GM_PRIORITY_OPTIONS,
   GM_TONE_OPTIONS,
 } from "@/services/gameMasterPromptBuilder";
 import { getGameplaySettings, getLLMSettings, listLlmConfigModels, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
@@ -39,7 +37,15 @@ import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { getSessionMinimumClosureSeconds } from "@/config/experienceRuntime";
 import { GM_RUNTIME_OUTPUT_INSTRUCTIONS } from "@/services/gameMasterContract";
 import { GmSettingPreview } from "@/components/GmSettingPreview";
-import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, GmMode, RuntimeCharacter } from "@/types";
+import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, GmMode, PriorityKey, PriorityLevel, RuntimeCharacter } from "@/types";
+import { Slider } from "@/components/ui/slider";
+import {
+  PRIORITY_AXIS_LABELS,
+  PRIORITY_KEYS,
+  PRIORITY_LEVEL_NAMES,
+  PRIORITY_LEVEL_TEXT,
+  PRIORITY_SAFETY_FLOOR,
+} from "@/services/gmPriorities";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { GM_MODE_TEXT } from "@/services/gmSettingsRegistry";
 
@@ -351,11 +357,8 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
     }));
   };
 
-  const togglePriority = (priority: ExperienceDirectorEditorConfig["priorities"][number], checked: boolean) => {
-    const priorities = checked
-      ? [...new Set([...config.editor.priorities, priority])]
-      : config.editor.priorities.filter((candidate) => candidate !== priority);
-    patchEditor({ priorities });
+  const setPriorityLevel = (key: PriorityKey, level: PriorityLevel) => {
+    patchEditor({ priorityLevels: { ...config.editor.priorityLevels, [key]: level } });
   };
 
   if (loading) return <p className="text-sm text-muted-foreground">Chargement des réglages GM…</p>;
@@ -465,21 +468,32 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
                   </div>
                 </div>
 
-                <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium">Priorités d’analyse (sélection multiple) <Hint level="expert" text="Ce que le Game Master privilégie quand plusieurs objectifs se contredisent. Laisser par défaut sauf test ciblé." /></legend>
-                  <p className="text-xs text-muted-foreground">Elles orientent l’arbitrage du LLM lorsqu’un échange satisfait plusieurs objectifs.</p>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {GM_PRIORITY_OPTIONS.map((option) => {
-                      const id = `gm-priority-${option.value}`;
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-medium">Priorités d’analyse (curseurs 0–3) <Hint level="expert" text="Ce que le Game Master privilégie quand plusieurs objectifs se contredisent. 0 ignoré, 1 léger, 2 normal (comportement historique), 3 prioritaire. Laisser à 2 sauf test ciblé." /></legend>
+                  <p className="text-xs text-muted-foreground">Elles orientent l’arbitrage du GM. Quand les niveaux diffèrent, une règle « en cas de conflit, applique d’abord… » est ajoutée. Sans effet si le mode du GM est « off ».</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {PRIORITY_KEYS.map((key) => {
+                      const level = config.editor.priorityLevels[key];
+                      const floor = key === "safety" ? PRIORITY_SAFETY_FLOOR : 0;
                       return (
-                        <div key={option.value} className="flex items-start gap-2 rounded border p-2">
-                          <Checkbox
-                            id={id}
-                            checked={config.editor.priorities.includes(option.value)}
+                        <div key={key} className="space-y-2 rounded border p-3" data-testid={`gm-priority-${key}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm">{PRIORITY_AXIS_LABELS[key]}</Label>
+                            <span className="text-xs font-medium">{level} · {PRIORITY_LEVEL_NAMES[level]}</span>
+                          </div>
+                          <Slider
+                            min={floor}
+                            max={3}
+                            step={1}
+                            value={[level]}
                             disabled={selected.status !== "draft"}
-                            onCheckedChange={(checked) => togglePriority(option.value, checked === true)}
+                            aria-label={`Niveau de priorité : ${PRIORITY_AXIS_LABELS[key]}`}
+                            onValueChange={([next]) => setPriorityLevel(key, next as PriorityLevel)}
                           />
-                          <Label htmlFor={id} className="cursor-pointer text-xs font-normal leading-snug">{option.label}</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {level === 0 ? "Ignoré : cet axe n’est pas envoyé au GM." : PRIORITY_LEVEL_TEXT[key][level as 1 | 2 | 3]}
+                          </p>
+                          {key === "safety" && <p className="text-xs text-muted-foreground">Plancher à 1 : la sécurité ne peut pas être coupée.</p>}
                         </div>
                       );
                     })}

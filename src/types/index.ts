@@ -458,10 +458,18 @@ export interface HandoffTopicRule {
   topics: string[];
 }
 
+export type PriorityKey = "narrative_continuity" | "player_engagement" | "safety" | "pace";
+export type PriorityLevel = 0 | 1 | 2 | 3;
+export type PriorityLevels = Record<PriorityKey, PriorityLevel>;
+
 export interface ExperienceDirectorEditorConfig {
   tone: "discreet" | "balanced" | "directive";
   guidanceLength: "short" | "balanced" | "detailed";
-  priorities: Array<"narrative_continuity" | "player_engagement" | "safety" | "pace">;
+  /**
+   * Analysis priorities as 0–3 levels (0 ignored, 1 light, 2 normal, 3 top
+   * priority). Safety is floored at 1. Replaces the legacy `priorities` list.
+   */
+  priorityLevels: PriorityLevels;
   allowHandoffs: boolean;
   allowCinematics: boolean;
   /**
@@ -508,7 +516,7 @@ export interface ExperienceFrameConfig {
 }
 
 export interface ExperienceDirectorConfig {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   minimumHandoffTurn: number;
   maximumHandoffsPerSession: number;
   minimumTurnsBetweenHandoffs: number;
