@@ -247,6 +247,7 @@ export type Database = {
           qualitative_tests_validated: boolean
           rag_validated: boolean
           rugosite: number
+          state_profile: Json | null
           tts_provider: string | null
           tts_voice_id: string | null
           updated_at: string
@@ -267,6 +268,7 @@ export type Database = {
           qualitative_tests_validated?: boolean
           rag_validated?: boolean
           rugosite?: number
+          state_profile?: Json | null
           tts_provider?: string | null
           tts_voice_id?: string | null
           updated_at?: string
@@ -287,6 +289,7 @@ export type Database = {
           qualitative_tests_validated?: boolean
           rag_validated?: boolean
           rugosite?: number
+          state_profile?: Json | null
           tts_provider?: string | null
           tts_voice_id?: string | null
           updated_at?: string
@@ -1735,6 +1738,14 @@ export type Database = {
           rugosite: number
           settings_version: string
         }[]
+      }
+      get_character_state_profile: {
+        Args: {
+          p_character_key: string
+          p_environment_id: string
+          p_session_id?: string
+        }
+        Returns: Json
       }
       get_pinned_orchestration_runtime: {
         Args: { p_session_id: string }
