@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Latence Max en vidéo Tavus (19 novembre, analyse)** : Max audible à 5,4–6,0 s en Tavus contre 3,5–3,8 s en Anam/TTS. Les lots GM du jour n'ajoutent rien de mesurable ; la cause est la voix d'Ava envoyée à Tavus (#161) qui attend le blob ElevenLabs complet (1,6–2,2 s). Correction proposée : flux PCM vers Tavus. [Analyse](analyse_latence_tavus_20261119.md) · [reprise lot T1](prompt_reprise_latence_tavus_lot_t1.md).
+
 **Courbe d'expérience du GM, lot E1 (19 novembre, code non branché)** : moteur pur de directions (`experienceDirection.ts`), option B validée par Ulrich ; catalogue provisoire à valider avec Romed. Rien d'actif. Reprise : [lot E2](prompt_reprise_courbe_experience_gm_lot_e2.md).
 
 **Courbe d'expérience du GM, lot E (19 novembre, cadrage seulement)** : [cadrage](cadrage_courbe_experience_gm.md) ; aucun code ; décisions attendues d'Ulrich (catalogue de directions avec Romed, option B, mode light). Reprise : [lot E1](prompt_reprise_courbe_experience_gm_lot_e1.md).

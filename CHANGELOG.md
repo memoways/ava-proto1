@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus : analyse et plan du lot T1] — 2026-11-19
+
+- `docs/analyse_latence_tavus_20261119.md` (sans code) : mesures avant/après des sessions du 19 novembre ; lots GM sans effet
+  mesurable ; retard Tavus dû à l'attente du blob ElevenLabs complet avant l'envoi Echo audio. Prompt de reprise du lot T1
+  (flux PCM vers Tavus) dans `docs/`.
+
 ## [Courbe d'expérience du GM : lot E1, moteur de directions] — 2026-11-19
 
 - `src/services/experienceDirection.ts` : moteur pur `resolveExperienceDirection` (cinq directions provisoires :
