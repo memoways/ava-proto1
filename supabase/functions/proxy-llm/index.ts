@@ -27,6 +27,8 @@ interface LLMRequest {
   timeout_ms?: number;
   /** Explicit reasoning toggle from client. undefined => disabled by default for reasoning models. */
   reasoning?: boolean;
+  /** Opt-in: reasoning off even for models that think by default (see payload.ts). */
+  disable_reasoning?: boolean;
   /** Admin diagnostic mode: return request metadata, never credentials/headers. */
   diagnostic_trace?: boolean;
   // Special action for cost lookup
@@ -218,6 +220,7 @@ serve(async (req) => {
           top_p: body.top_p,
           timeout_ms: body.timeout_ms,
           reasoning: body.reasoning === true,
+          disable_reasoning: body.disable_reasoning === true,
         },
         upstreamPayload: upstreamTracePayload,
         requestedModel: model,
@@ -269,6 +272,7 @@ serve(async (req) => {
           top_p: body.top_p,
           timeout_ms: body.timeout_ms,
           reasoning: body.reasoning === true,
+          disable_reasoning: body.disable_reasoning === true,
         },
         upstreamPayload: upstreamTracePayload,
         requestedModel: model,

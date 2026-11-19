@@ -55,7 +55,9 @@ import {
 import { withTimeout } from "@/services/asyncUtils";
 import {
   CINEMATIC_IDLE,
+  CINEMATIC_OVERLAY_REVEAL_MS,
   CINEMATIC_OVERLAY_START_DEADLINE_MS,
+  OVERLAY_MIN_REMAINING_SPEECH_MS,
   cinematicDroppedBeforePlayback,
   cinematicHoldsInput,
   cinematicInterruptRunning,
@@ -73,7 +75,12 @@ import {
   type CinematicTransitionEvent,
   type CinematicTransitionState,
 } from "@/services/cinematicTransition";
-import { selectOverlayVideo } from "@/services/overlayVideoSelector";
+import {
+  OVERLAY_SELECTOR_MAX_TOKENS,
+  overlaySelectionTimeoutMs,
+  recentOverlayExchanges,
+  selectOverlayVideo,
+} from "@/services/overlayVideoSelector";
 import { callLLMWithUsage } from "@/services/openRouterLLM";
 import { holdMicrophone, type MicHold } from "@/services/micHold";
 import {
@@ -2163,7 +2170,7 @@ const IndexPRD4 = () => {
         // Reserved at decision time: a waiting video is never offered twice and counts for spacing
         // (the same counters for both presentations).
         const reserveCinematic = (video: VideoTriggerRow, decision: { reason: string | null; confidence: number | null;
-          orchestrationVersionId: string | null; source: string; latencyMs?: number }) => {
+          orchestrationVersionId: string | null; source: string; latencyMs?: number; extra?: Record<string, unknown> }) => {
           const sid = sessionIdRef.current;
           cinematicMetaRef.current = { turnId, turnIndex, reason: decision.reason, confidence: decision.confidence,
             orchestrationVersionId: decision.orchestrationVersionId, previousLastVideoTurn: lastVideoTurnRef.current };
@@ -2180,7 +2187,7 @@ const IndexPRD4 = () => {
             character: activeCharacterRef.current,
             orchestrationVersionId: decision.orchestrationVersionId,
             payload: { videoId: video.id, reason: decision.reason, confidence: decision.confidence, presentation,
-              source: decision.source, ...(decision.latencyMs != null ? { selectionMs: decision.latencyMs } : {}) },
+              source: decision.source, ...(decision.latencyMs != null ? { selectionMs: decision.latencyMs } : {}), ...decision.extra },
           });
         };
 
@@ -2244,35 +2251,59 @@ const IndexPRD4 = () => {
             if (cinematicRef.current.phase !== "idle" || !result.maxResponse.trim() || result.handoffPreparationBlocked) return;
             const videos = await withTimeout('overlay_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
             const noLabels = { themes: [], topics: [], intentions: [] };
-            const allowed = (video: VideoTriggerRow) => guardDirector({ labels: noLabels, nextTurnGuidance: null, memoryDelta: null,
-              action: { type: "cinematic", videoId: video.id, reason: "overlay", confidence: 1 } }, director, videos, null).accepted;
+            const guardVideo = (video: VideoTriggerRow) => guardDirector({ labels: noLabels, nextTurnGuidance: null, memoryDelta: null,
+              action: { type: "cinematic", videoId: video.id, reason: "overlay", confidence: 1 } }, director, videos, null);
+            const allowed = (video: VideoTriggerRow) => guardVideo(video).accepted;
             // Frequency, eligibility and played videos first: no selection call when nothing may play.
-            const candidates = videos.filter((video) => Boolean(video.video_url) && allowed(video));
-            if (!candidates.length) return;
+            const playable = videos.filter((video) => Boolean(video.video_url));
+            const candidates = playable.filter(allowed);
+            if (!candidates.length) {
+              // Lot 2: a turn kept free by the backoffice rules (first video, spacing, maximum) is visible.
+              const guardReasons: Record<string, number> = {};
+              for (const video of playable) {
+                const reason = guardVideo(video).blockedReason ?? "unknown";
+                guardReasons[reason] = (guardReasons[reason] ?? 0) + 1;
+              }
+              const mainReason = Object.entries(guardReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "no_video";
+              const rules = videoTriggerSettingsRef.current;
+              logOverlaySkip("overlay_no_allowed_video", { guardReason: mainReason, guardReasons, videos: playable.length,
+                // The backoffice rules as applied this turn, to check the spacing against the settings.
+                rules: { minTurnsBeforeFirst: rules.MIN_TURNS_BEFORE_FIRST, minTurnsBetween: rules.MIN_TURNS_BETWEEN,
+                  maxPerSession: rules.MAX_PER_SESSION, lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
+                  played: triggeredVideoIdsRef.current.length } });
+              return;
+            }
             const before = replyStillAhead();
             if (!before.inFlight || !before.enough) {
               logOverlaySkip(before.inFlight ? "overlay_reply_too_short" : "overlay_reply_over", { remainingSpeechMs: before.remainingSpeechMs });
               return;
             }
             const llm = getLLMSettings();
+            const selectorModel = llm.LLM_MODEL_GM;
+            const timeoutMs = overlaySelectionTimeoutMs(before.remainingSpeechMs,
+              OVERLAY_MIN_REMAINING_SPEECH_MS + CINEMATIC_OVERLAY_REVEAL_MS);
             const selection = await selectOverlayVideo({
               replyText: result.maxResponse,
               userMessage: userText,
               characterName: characterDisplayName(turnCharacter),
               candidates,
+              recentExchanges: recentOverlayExchanges(conversationRef.current, { userMessage: userText, replyText: result.maxResponse }),
               signal: outputController.signal,
+              timeoutMs,
             }, async (messages, options) => (await callLLMWithUsage(messages, {
-              model: llm.LLM_MODEL_GM,
+              model: selectorModel,
               temperature: 0,
-              max_tokens: 160,
+              max_tokens: OVERLAY_SELECTOR_MAX_TOKENS,
               reasoning: false,
+              disableReasoning: true,
               timeoutMs: options.timeoutMs,
               signal: options.signal,
               feature_key: "prd4_overlay_video_selection",
               session_id: sid ?? undefined,
             })).content);
             if (selection.status !== "selected") {
-              logOverlaySkip(`overlay_selection_${selection.status}`, { selectionMs: selection.latencyMs, detail: selection.detail ?? null });
+              logOverlaySkip(`overlay_selection_${selection.status}`, { selectionMs: selection.latencyMs, detail: selection.detail ?? null,
+                timeoutMs, model: selectorModel, candidates: candidates.length });
               return;
             }
             const video = candidates.find((candidate) => candidate.id === selection.videoId) ?? null;
@@ -2283,7 +2314,8 @@ const IndexPRD4 = () => {
               return;
             }
             reserveCinematic(video, { reason: selection.reason || null, confidence: selection.confidence,
-              orchestrationVersionId: director.versionId, source: "overlay_selector", latencyMs: selection.latencyMs });
+              orchestrationVersionId: director.versionId, source: "overlay_selector", latencyMs: selection.latencyMs,
+              extra: { replyCue: selection.replyCue, videoCue: selection.videoCue, timeoutMs, model: selectorModel, candidates: candidates.length } });
             dispatchCinematicRef.current({
               type: "decided",
               video,

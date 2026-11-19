@@ -81,7 +81,9 @@ Réglage par environnement (production / sandbox), comme les autres règles de d
 `experience_events` : `cinematic_recommended` (`presentation`, `source` = `game_master` ou `overlay_selector`,
 `selectionMs`), `cinematic_played` (`presentation`, `decisionToStartMs`), `cinematic_completed` (`outcome`
 `reply_ended`/`completed`, `visibleMs`), `cinematic_blocked` (`overlay_reply_too_short`, `overlay_reply_over`,
-`overlay_selection_none|low_confidence|invalid|timeout|error`, `transition_cancelled`). PostHog : mêmes événements avec
+`overlay_selection_none|low_confidence|weak_link|invalid|timeout|error`, `overlay_no_allowed_video` (lot 2, avec
+`guardReason`/`guardReasons`), `transition_cancelled`). Lot 2 : `selectionMs`, `timeoutMs`, `model`, `candidates`,
+`replyCue`/`videoCue` sur les recommandations et refus de la sélection. PostHog : mêmes événements avec
 `presentation`.
 
 ## Tests livrés
@@ -125,7 +127,70 @@ Une seule cinématique sur deux sessions de 14–15 tours, sans lien avec la dis
 désactive pas sa réflexion), 1 réussite (944 ms, choisie sur le prénom « Emma » seul). Tours écartés par les
 garde-fous non journalisés. Traitement : lot 2.
 
+## Lot 2 — fréquence et pertinence (19 novembre)
+
+### Causes confirmées (lecture seule, MCP Lovable, sandbox-ulrich)
+
+1. **Rareté = sélection hors délai.** Sessions `969600fd…` et `b6ba2c63…` : 22 tentatives, 20
+   `overlay_selection_timeout` (≈ 2 001 ms), 1 `overlay_selection_error` (tour interrompu), 1 réussite (944 ms).
+   `llm_usage` (`prd4_overlay_video_selection`, `google/gemini-2.5-flash`) : 19 erreurs « Conversation turn aborted »
+   (notre abandon), 1 réussite (1 820 tokens d'entrée, 97 de sortie). Le proxy n'envoie aucun paramètre de réflexion à
+   Gemini 2.5 Flash (`isReasoningModel` ne couvre que OpenAI/DeepSeek/Grok) : la réflexion dynamique par défaut reste
+   active. Mesure directe de la latence impossible depuis le poste (le proxy exige une identité de jeu anonyme ;
+   aucune identité créée pour une sonde) : la mesure avant/après passe par la télémétrie du jeu (`selectionMs`,
+   `timeoutMs`, `model` désormais journalisés).
+2. **Garde-fous conformes aux réglages.** Sandbox-ulrich : 1re vidéo au tour 4, 4 tours entre deux vidéos, pas de
+   maximum. Aucun événement aux tours 1–3 ni 7–9 (vidéo au tour 6) : attendu, mais invisible.
+3. **Une vidéo pertinente perdue.** Tour 5 (« j'ai pris le fusil et j'ai tiré sur l'homme que j'avais ligoté… mort dans
+   l'abri ») : « mort Peter » (contexte : Peter attaché sous l'abri) correspondait exactement ; la sélection a expiré.
+   De plus, 14 vidéos Max de même priorité pour 12 places : « mort Peter », 13e dans l'ordre de la base, pouvait être
+   coupée avant même l'appel.
+4. **Lien faible accepté.** Tour 6 : « Emma regard feu avec Max » (0,7) choisie sur « … ce que ça fera à Emma » ; raison
+   libre et vague, aucun fil de conversation donné au sélecteur.
+5. **GM post-tour.** Ses recommandations dans ces sessions sont génériques (« Correspondance thématique GM »,
+   confiance 0,5, à chaque tour, jamais « mort Peter » au tour du fusil) : pas de candidate prioritaire GM retenue.
+
+### Choix retenus (code)
+
+- **Réflexion coupée sur demande explicite** : `disable_reasoning` (client `disableReasoning`) → proxy
+  `reasoning: { enabled: false, exclude: true }` pour `google/gemini-2.5-flash*` uniquement ; sans ce drapeau, le
+  payload des autres appelants (GM compris) est inchangé. Pro jamais touché. Redéploiement `proxy-llm` par Lovable.
+- **Requête plus courte** : lignes candidates compactes (`formatCompactVideoCandidateLine`, textes ≤ 160 car., sans
+  `type`), identifiants courts `v1…v16` remappés côté code, sortie JSON seule ≤ 120 tokens.
+- **Échéance tirée de la parole restante** : `overlaySelectionTimeoutMs` = parole restante − (2,5 s + 0,4 s de fondu),
+  bornée 1,2–5 s (3 s si inconnue) ; les contrôles « assez de réplique » avant/après la sélection restent.
+  Lancement plus tôt (première phrase en flux) non retenu : l'échéance dynamique donne déjà 5 s sur une réplique
+  typique (~20 s) sans risquer de choisir sur un texte partiel ; à revoir si la télémétrie montre encore des délais.
+- **Ordre des candidates** : priorité, puis à priorité égale les vidéos dont les textes partagent le plus de mots
+  concrets avec la réplique ; 16 places (lignes compactes).
+- **Pertinence** : les deux échanges précédents sont donnés comme contexte ; consigne « lien CONCRET (lieu, action,
+  objet, événement ou souvenir précis) ; un prénom seul ou un thème commun ne suffisent pas ». Réponse structurée
+  `replyCue` (mots de la réplique) ↔ `videoCue` (élément de la vidéo), vérifiée par le code (`checkOverlayLink`) :
+  indice cité dans la réplique, contenant un mot concret autre qu'un prénom (`name_only`), écho dans les textes de la
+  vidéo, et mot commun réplique/vidéo sauf confiance ≥ 0,85 (paraphrase). Seuil de confiance 0,6 → **0,7**. Refus
+  journalisé `overlay_selection_weak_link` avec la cause.
+- **Tours écartés visibles** : `overlay_no_allowed_video` avec `guardReason` (motif dominant) et `guardReasons`
+  (décompte par motif : `cinematic_cooldown` — avant la 1re vidéo ou entre deux —, `cinematic_limit_reached`,
+  `cinematic_already_played`, éligibilité…) et `rules` (réglages appliqués ce tour, dernier tour vidéo, vidéos jouées)
+  pour vérifier l'espacement contre le backoffice.
+- Réglages du backoffice strictement respectés : plus de vidéos = ne plus en perdre, pas de garde-fou contourné.
+  Mode « Interrompre » inchangé.
+
+### Tests
+
+Cas réels figés dans `overlayVideoSelector.fixtures.ts` (vidéos Max de la base, copie en lecture seule) : « Emma »
+→ `weak_link/name_only` ; « fusil » → « mort Peter » accepté et classé premier ; bloc compact < 75 % du format GM ;
+échéance, fil récent, identifiants courts. Proxy : Gemini inchangé sans drapeau, coupé avec, Pro et réflexion
+demandée intacts.
+
+### Mesure après déploiement (sandbox)
+
+Après redéploiement de `proxy-llm` par Lovable : sur une session de 15 tours en superposition, compter dans
+`experience_events` les `cinematic_recommended` (source `overlay_selector`), `selectionMs` (médiane, max) et les
+`cinematic_blocked` par `blockedReason` ; dans `llm_usage`, la part `completed` de `prd4_overlay_video_selection`.
+Cible : plus aucun `timeout` majoritaire ; chaque tour sans vidéo explicable par un motif journalisé.
+
 ## Suite
 
-[Prompt de reprise — lot 2](prompt_reprise_cinematiques_superposition_lot_2.md) : après la recette, ajuster les
-paramètres et traiter ses constats.
+[Prompt de reprise — lot 3](prompt_reprise_cinematiques_superposition_lot_3.md) : mesure avant/après en sandbox,
+recette de pertinence Ulrich + Romed, ajustements (seuils, échéance, lancement anticipé si besoin).

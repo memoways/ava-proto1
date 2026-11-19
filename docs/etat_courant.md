@@ -13,11 +13,12 @@ continue (cinématiques, passages, mémoire, fin). Les recadrages des garde-fous
 possible). Écoute A/B Ulrich + Romed en sandbox à faire ; production non publiée.
 [Plan et protocole](plan_guidage_parole_gm_ab.md) · [reprise lot 2](prompt_reprise_guidage_parole_gm_lot_2.md).
 
-**Cinématiques : interruption ou superposition (19 novembre, code)** : mode au choix dans Expérience → Cinématiques
-(défaut inchangé « Interrompre ») ; la superposition choisit sa vidéo sur le texte de la réplique (le GM décide trop
-tard) et la montre pendant la voix, son −15 dB d'essai. Recette sandbox du 19 novembre : une seule vidéo, hors sujet ;
-20 sélections sur 22 hors délai (2 s, Gemini 2.5 Flash sans raisonnement désactivé). Lot 2 à lancer ; production non
-publiée. [Plan et protocole](plan_cinematiques_interruption_superposition.md) · [reprise lot 2](prompt_reprise_cinematiques_superposition_lot_2.md).
+**Cinématiques : interruption ou superposition (19 novembre, code, lot 2)** : mode au choix dans Expérience →
+Cinématiques (défaut « Interrompre », inchangé). Lot 2 après la recette (1 vidéo hors sujet, 20 sélections sur 22 hors
+délai) : réflexion de Gemini coupée pour ce seul appel, requête compacte, échéance selon la parole restante (≤ 5 s),
+lien concret exigé (un prénom seul refusé), tours sans vidéo journalisés avec leur motif. À faire : vérifier le
+redéploiement `proxy-llm` par Lovable, mesurer en sandbox, recette de pertinence Ulrich + Romed ; production non publiée.
+[Plan](plan_cinematiques_interruption_superposition.md) · [reprise lot 3](prompt_reprise_cinematiques_superposition_lot_3.md).
 
 **Socle commun des réglages (19 novembre)** : sandbox et voix héritent de la production champ par champ ; migrations de copie Ulrich → Romed/Benoît/Julien et catalogue prod à faire appliquer par Lovable (prod : go requis). [Plan et reprise](plan_socle_commun_reglages.md).
 

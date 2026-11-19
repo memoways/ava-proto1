@@ -57,4 +57,34 @@ describe("proxy-llm — payload OpenRouter exact", () => {
 
     expect(result.upstreamBody.reasoning).toEqual({ effort: "minimal", exclude: true });
   });
+
+  it("laisse Gemini 2.5 Flash inchangé sans demande explicite (GM et autres appelants)", () => {
+    const result = buildOpenRouterPayload({
+      messages: [{ role: "user", content: "Test" }],
+      model: "google/gemini-2.5-flash",
+      reasoning: false,
+    });
+    expect(result.upstreamBody).not.toHaveProperty("reasoning");
+  });
+
+  it("coupe la réflexion de Gemini 2.5 Flash sur demande explicite (sélection en superposition)", () => {
+    const flash = buildOpenRouterPayload({
+      messages: [{ role: "user", content: "Test" }],
+      model: "google/gemini-2.5-flash",
+      reasoning: false,
+      disable_reasoning: true,
+    });
+    expect(flash.upstreamBody.reasoning).toEqual({ enabled: false, exclude: true });
+    const lite = buildOpenRouterPayload({ model: "google/gemini-2.5-flash-lite", disable_reasoning: true });
+    expect(lite.upstreamBody.reasoning).toEqual({ enabled: false, exclude: true });
+  });
+
+  it("ne touche ni Gemini Pro ni une réflexion demandée", () => {
+    expect(buildOpenRouterPayload({ model: "google/gemini-2.5-pro", disable_reasoning: true }).upstreamBody)
+      .not.toHaveProperty("reasoning");
+    expect(buildOpenRouterPayload({ model: "google/gemini-2.5-flash", reasoning: true, disable_reasoning: true }).upstreamBody.reasoning)
+      .toEqual({ enabled: true, exclude: false });
+    expect(buildOpenRouterPayload({ model: "openai/o3-mini", disable_reasoning: true }).upstreamBody.reasoning)
+      .toEqual({ effort: "minimal", exclude: true });
+  });
 });

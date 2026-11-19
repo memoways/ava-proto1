@@ -35,6 +35,8 @@ interface LLMOptions {
   signal?: AbortSignal;
   /** Force enable/disable reasoning. If undefined, reads from LLMSettings.LLM_REASONING[model]. */
   reasoning?: boolean;
+  /** Opt-in: reasoning off even for models that think by default (latency-bound calls only). */
+  disableReasoning?: boolean;
   /** Return the exact sanitized proxy/upstream payload for an admin diagnostic session. */
   diagnostic_trace?: boolean;
 }
@@ -221,6 +223,7 @@ export async function callLLMWithUsage(
         max_tokens: options?.max_tokens,
         timeout_ms: timeoutMs,
         reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
+        ...(options?.disableReasoning === true ? { disable_reasoning: true } : {}),
         diagnostic_trace: options?.diagnostic_trace === true,
       },
       timeoutMs,

@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cinématiques en superposition : lot 2, fréquence et pertinence] — 2026-11-19
+
+- **Plus de sélections perdues** : la sélection en superposition demande explicitement au proxy de couper la réflexion
+  de Gemini 2.5 Flash (`disable_reasoning`, opt-in : GM et autres appelants inchangés ; redéploiement `proxy-llm` par
+  Lovable), envoie des lignes candidates compactes à identifiants courts et attend selon la parole restante (1,2–5 s au
+  lieu de 2 s fixes). Recette du 19 novembre : 20 sélections sur 22 perdues au délai.
+- **Lien concret exigé** : deux échanges précédents en contexte ; réponse `replyCue ↔ videoCue` vérifiée par le code
+  (citée dans la réplique, pas un prénom seul, mot commun avec la vidéo sauf confiance ≥ 0,85) ; confiance minimale
+  0,7. Le cas réel « Emma » est refusé, le cas « fusil » trouve « mort Peter », désormais classée en tête à priorité
+  égale (elle pouvait être coupée par le plafond de 12, porté à 16).
+- **Tours sans vidéo expliqués** : `overlay_no_allowed_video` (motif du garde-fou, réglages appliqués) et
+  `overlay_selection_weak_link` ; `selectionMs`, `timeoutMs`, modèle et indices journalisés. Réglages du backoffice
+  strictement respectés ; mode « Interrompre » inchangé ; production non publiée.
+  [Plan, causes et choix](docs/plan_cinematiques_interruption_superposition.md) · [reprise lot 3](docs/prompt_reprise_cinematiques_superposition_lot_3.md).
+
 ## [Réglages GM lisibles et gradués : plan] — 2026-11-19
 
 - **Plan validé** (documentation seule, aucun code) : registre unique des réglages GM avec aperçu de ce que chacun
