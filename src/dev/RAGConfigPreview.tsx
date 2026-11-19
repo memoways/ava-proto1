@@ -4,15 +4,12 @@ import type { RagIndexDashboardData } from "@/services/ragIndexService";
 
 const GAMEPLAY: GameplaySettings = {
   MAX_PROMPT_VARIANT: "legacy",
-  TRUST_THRESHOLD: 0.62,
   TIMEOUT_SECONDS: 300,
   SHOW_QUESTIONNAIRE: true,
   QUESTIONNAIRE_MODE: "prd4",
   VOICE_INCREMENTAL_OUTPUT: false,
   VOICE_ONLY_UI: false,
   VOICE_HANDS_FREE: { enabled: false, endOfSpeechMs: 900, hesitationExtraMs: 700, bargeInEnabled: true, bargeInMinWords: 2 },
-  MAX_INSULT_TOLERANCE: 3,
-  MIN_QUESTIONS_BEFORE_GATE: 3,
   RAG_TOP_K: 3,
   RAG_RETRIEVE_K: 10,
   RAG_RERANK_ENABLED: true,

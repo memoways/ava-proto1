@@ -46,7 +46,11 @@ export interface LLMSettings {
   LLM_TEMPERATURE: number;
   LLM_MAX_TOKENS: number;
   LLM_TOP_P: number;
-  LLM_TEMPERATURE_GM: number;
+  /**
+   * Temperature of the post-turn GM call. Replaces LLM_TEMPERATURE_GM, which
+   * was stored (0.3) but never applied: the call ran at 0.2, kept as default.
+   */
+  LLM_GM_TEMPERATURE: number;
   LLM_MAX_TOKENS_GM: number;
   /** Par modèle : reasoning activé ou non (défaut : désactivé pour tous). */
   LLM_REASONING: Record<string, boolean>;
@@ -229,7 +233,7 @@ const llmDefaults: LLMSettings = {
   LLM_TEMPERATURE: defaultSettings.LLM_TEMPERATURE,
   LLM_MAX_TOKENS: clampCharacterMaxTokens(defaultSettings.LLM_MAX_TOKENS),
   LLM_TOP_P: defaultSettings.LLM_TOP_P,
-  LLM_TEMPERATURE_GM: 0.3,
+  LLM_GM_TEMPERATURE: 0.2,
   // Le GM produit l'évaluation complète, sa mémoire et ses garde-fous en JSON.
   // Plancher effectif (P3 : 950, relevé à 1600 le 10 novembre 2026) pour éviter les sorties tronquées.
   LLM_MAX_TOKENS_GM: GM_MIN_MAX_TOKENS,
@@ -300,6 +304,11 @@ export function getLLMValidationErrorMessage(issues: LLMValidationIssue[]): stri
   return `Modèle OpenRouter non supporté refusé : ${rejectedModels}. Retour automatique sur ${FALLBACK_OPENROUTER_MODEL}.`;
 }
 
+function normalizeGmTemperature(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number.NaN;
+  return Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : llmDefaults.LLM_GM_TEMPERATURE;
+}
+
 function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
   const maxModel = validateOpenRouterModel("LLM_MODEL", settings.LLM_MODEL);
   const gmModel = validateOpenRouterModel("LLM_MODEL_GM", settings.LLM_MODEL_GM);
@@ -312,6 +321,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     LLM_MODEL_GM: gmModel.modelId,
     LLM_MAX_TOKENS: clampCharacterMaxTokens(settings.LLM_MAX_TOKENS || llmDefaults.LLM_MAX_TOKENS),
     LLM_TOP_P: Math.min(settings.LLM_TOP_P || llmDefaults.LLM_TOP_P, 0.9),
+    LLM_GM_TEMPERATURE: normalizeGmTemperature(settings.LLM_GM_TEMPERATURE),
     LLM_MAX_TOKENS_GM: Math.max(GM_MIN_MAX_TOKENS, Math.floor(Number(settings.LLM_MAX_TOKENS_GM) || llmDefaults.LLM_MAX_TOKENS_GM)),
     LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
   };
@@ -558,7 +568,6 @@ export async function loadQuestionnaireFollowUpSettingsFromDB(): Promise<Questio
 
 export interface GameplaySettings {
   MAX_PROMPT_VARIANT: "legacy" | "compact_v1" | "rich_v2" | "optimized_v3";
-  TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
   /** Affiche le questionnaire PRD4 après l'écran de fin de session. */
   SHOW_QUESTIONNAIRE: boolean;
@@ -567,8 +576,6 @@ export interface GameplaySettings {
    * voice-first conversational questionnaire (docs/plan_questionnaire_conversationnel.md).
    */
   QUESTIONNAIRE_MODE: QuestionnaireMode;
-  MAX_INSULT_TOLERANCE: number;
-  MIN_QUESTIONS_BEFORE_GATE: number;
   RAG_TOP_K: number;
   RAG_RETRIEVE_K: number;
   RAG_RERANK_ENABLED: boolean;
@@ -609,12 +616,9 @@ export function normalizeMaxPromptVariant(
 
 const gameplayDefaults: GameplaySettings = {
   MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(defaultSettings.MAX_PROMPT_VARIANT, "legacy"),
-  TRUST_THRESHOLD: defaultSettings.TRUST_THRESHOLD,
   TIMEOUT_SECONDS: defaultSettings.TIMEOUT_SECONDS,
   SHOW_QUESTIONNAIRE: true,
   QUESTIONNAIRE_MODE: "prd4",
-  MAX_INSULT_TOLERANCE: defaultSettings.MAX_INSULT_TOLERANCE,
-  MIN_QUESTIONS_BEFORE_GATE: defaultSettings.MIN_QUESTIONS_BEFORE_GATE,
   RAG_TOP_K: defaultSettings.RAG_TOP_K,
   RAG_RETRIEVE_K: defaultSettings.RAG_RETRIEVE_K ?? 15,
   RAG_RERANK_ENABLED: defaultSettings.RAG_RERANK_ENABLED ?? true,

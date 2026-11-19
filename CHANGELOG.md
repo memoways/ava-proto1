@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles : lot A, transparence et réglages qui agissent] — 2026-11-19
+
+- **Les réglages GM agissent sur toutes les versions** : le bloc « RÉGLAGES ADMINISTRATEUR ACTIFS » est compilé à chaque
+  tour depuis la config épinglée, y compris pour `builtin://` (sandbox-romed v4, sandbox-benoit v5, vérifié en lecture
+  via Lovable : posture, longueur, priorités, garde-fous, contexte, questions ouvertes et instructions y étaient sans
+  effet ; ils y reçoivent désormais les réglages par défaut, passages limités à 1). Un prompt enregistré voit son bloc
+  figé remplacé, jamais doublé ; texte identique au caractère près pour un brouillon (instantanés), équivalent pour la
+  v7 publiée (seule la ligne Cinématiques prend sa formulation actuelle, la règle hors-monde s'ajoute).
+- **Registre unique** `src/services/gmSettingsRegistry.ts` : 24 réglages, destination (GM, personnage, code) et texte
+  exact ; compilateur et interface le lisent, textes repris sans réécriture.
+- **Réglages GM** : sous chaque réglage, aperçu repliable « ➜ envoyé au GM / au personnage / appliqué par le code » et
+  badge d'effet ; bouton « Voir ce que reçoit le GM » (prompt système complet). Nouvel interrupteur « Repères de temps
+  du personnage » (défaut activé, tracé par tour). La comparaison fixe garde un témoin sans réglages.
+- **Nettoyage** : `handoffTarget` retiré (toléré à la lecture) ; température GM branchée sous une nouvelle clé
+  `LLM_GM_TEMPERATURE` (défaut 0.2 : l'ancienne `LLM_TEMPERATURE_GM`, stockée à 0.3 partout, n'avait jamais été
+  appliquée, la brancher aurait changé le GM) ; clés Gameplay mortes retirées ; test admin à 80 % de clôture comme le
+  runtime ; replis du garde alignés sur `DEFAULT_DIRECTOR_CONFIG`. Aucun appel IA ni migration ; production non publiée.
+  [Plan](docs/plan_reglages_gm_lisibles_gradues.md) · [reprise lot C](docs/prompt_reprise_reglages_gm_lot_c.md).
+
 ## [Cinématiques en superposition : lot 2, fréquence et pertinence] — 2026-11-19
 
 - **Plus de sélections perdues** : la sélection en superposition demande explicitement au proxy de couper la réflexion

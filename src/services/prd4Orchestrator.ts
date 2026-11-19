@@ -1,4 +1,5 @@
 import { ResponseIntentParser, type ResponseIntent, type ResponseStreamContractVariant } from "./responseIntentStream";
+import { isCharacterTimeCuesEnabled } from "@/services/characterTimeCues";
 import { projectDeliveredConversation, type ResponseDeliveryReceipt } from "./responseDelivery";
 import type { OpenHandoffRequest } from './characterHandoffState';
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation, type ProcessSpan } from "./voiceTurnTelemetryV2";
@@ -389,6 +390,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     speechState: gmProposedSpeechState,
   });
   const proposedSpeechState = characterGuidance.speechState;
+  const characterTimeCues = isCharacterTimeCuesEnabled(frameRuntime.config);
+  const temporalValues = { timeElapsedSeconds: input.timeElapsedSeconds, sessionDurationSeconds, turnIndex };
   const experienceFrame = buildExperienceFrame({
     config: frameRuntime.config?.frame,
     filmAnswer: input.hasSeenFilm,
@@ -416,11 +419,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       rank: index + 1,
     })),
     userRoleSummary: resolvedUserRoleSummary,
-    temporalContext: {
-      timeElapsedSeconds: input.timeElapsedSeconds,
-      sessionDurationSeconds,
-      turnIndex,
-    },
+    // « Repères de temps du personnage » (Réglages GM), read from the pinned version.
+    temporalContext: characterTimeCues ? temporalValues : undefined,
     gmGuidance: characterGuidance.guidance
       ? { guidance: characterGuidance.guidance, topicsCovered: characterGuidance.topicsCovered }
       : undefined,
@@ -682,7 +682,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         userPostureRaw: input.userPostureRaw ?? null,
         postVideoContext: input.postVideoContext ?? null,
         watchedVideos: input.watchedVideos ?? null,
-        temporalContext: maxInput.temporalContext!,
+        temporalContext: temporalValues,
+        characterTimeCues,
         gmGuidance: maxInput.gmGuidance?.guidance ?? null,
         gmTopicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
         gmSpeechStateProposed: proposedSpeechState,

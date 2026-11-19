@@ -122,7 +122,6 @@ describe("validateDirectorDecision", () => {
       minimumHandoffTurn: 4,
       maximumHandoffsPerSession: 8,
       minimumTurnsBetweenHandoffs: 2,
-      handoffTarget: "either",
       directorTimeoutMs: 12_000,
       editor: {
         tone: "balanced",
@@ -131,6 +130,7 @@ describe("validateDirectorDecision", () => {
         allowHandoffs: true,
         allowCinematics: true,
         speechGuidance: true,
+        characterTimeCues: true,
         customInstructions: "",
         handoffRules: [{ targetCharacter: "emma", themes: ["police"], topics: [] }],
         projectContext: "",

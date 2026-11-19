@@ -23,6 +23,7 @@ const queryClient = new QueryClient();
 const Admin = lazy(() => import("./pages/Admin"));
 const LatencyTelemetryPreview = import.meta.env.DEV ? lazy(() => import("./dev/LatencyTelemetryPreview")) : null;
 const RAGConfigPreview = import.meta.env.DEV ? lazy(() => import("./dev/RAGConfigPreview")) : null;
+const GmSettingsPreview = import.meta.env.DEV ? lazy(() => import("./dev/GmSettingsPreview")) : null;
 
 function RoutedThemeProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -72,6 +73,7 @@ const App = () => (
             />
             {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
             {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
+            {GmSettingsPreview && <Route path="/__preview/gm-settings" element={<Suspense fallback={null}><GmSettingsPreview /></Suspense>} />}
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

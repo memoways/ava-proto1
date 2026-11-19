@@ -1,6 +1,24 @@
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, ExperienceDirectorGuardrails } from "@/types";
 import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "./characterConversation";
 import { GM_JSON_EXAMPLE, GM_MIN_MAX_TOKENS } from "./gameMasterContract";
+import {
+  cinematicsFragment,
+  customInstructionsFragment,
+  derailFragment,
+  falseStatusFragment,
+  GUIDANCE_LABELS,
+  guidanceLengthFragment,
+  handoffFragment,
+  handoffRulesFragment,
+  OFF_WORLD_GUIDANCE_RULE,
+  openQuestionsFragment,
+  opennessFragment,
+  PRIORITY_LABELS,
+  prioritiesFragment,
+  projectContextFragment,
+  TONE_LABELS,
+  toneFragment,
+} from "./gmSettingsRegistry";
 
 /** Added to the same GM call only when the runtime supplies exact handoff context. */
 export const CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS = `CONTRAT RUNTIME DE PASSAGE — prioritaire sur le schéma historique et sa règle de suggestion au tour suivant.
@@ -26,76 +44,74 @@ Procédure de passage à rappeler dans proposalGuidance sans la réciter au joue
 Budget de sortie ${GM_MIN_MAX_TOKENS} tokens conservé : émettre handoff_assessment avant memory_delta ; fermer l'objet entier. notes : 40 caractères maximum ; next_turn_guidance et proposalGuidance : 100 caractères chacune. Pas de commentaire ni répétition de preuves.
 memory_delta : uniquement les nouveautés du dernier échange, jamais une copie de la mémoire. null si rien de nouveau ; sinon seulement les champs utiles, deux faits courts par liste et lastExchange en 20 mots maximum. N'invente ni n'efface de fait pour raccourcir. Une proposition relationship n'est utile que si elle change l'état, avec métadonnées et preuves exactes ; sinon l'omettre.`;
 
-const TONE_LABELS: Record<ExperienceDirectorEditorConfig["tone"], string> = {
-  discreet: "Discret : observe et intervient seulement lorsqu'une décision est utile.",
-  balanced: "Équilibré : guide la progression sans sur-orchestrer la conversation.",
-  directive: "Directif : formule des guidances plus explicites pour faire avancer l'expérience.",
-};
-
-const GUIDANCE_LABELS: Record<ExperienceDirectorEditorConfig["guidanceLength"], string> = {
-  short: "Très courte : une instruction opérationnelle, sans justification.",
-  balanced: "Équilibrée : une phrase concise avec l'intention principale.",
-  detailed: "Détaillée : jusqu'à deux phrases, avec intention et contrainte narrative.",
-};
-
-const PRIORITY_LABELS: Record<ExperienceDirectorEditorConfig["priorities"][number], string> = {
-  narrative_continuity: "continuité narrative et cohérence des faits",
-  player_engagement: "engagement du joueur et qualité de l'échange",
-  safety: "sécurité, modération charitable et limites du personnage",
-  pace: "rythme, progression et clôture naturelle dans le temps disponible",
-};
-
-const DERAIL_LABELS: Record<ExperienceDirectorGuardrails["derailTolerance"], string> = {
-  low: "faible : dès le premier écart net (insulte, absurde, hors sujet répété), guide le personnage vers un recadrage ; au deuxième, vers une proposition calme de terminer l'appel.",
-  medium: "moyenne : tolère un écart ; au deuxième, recadrage par le personnage ; au troisième, proposition calme de terminer l'appel.",
-  high: "élevée : laisse jouer les détours ; recadre seulement en cas d'insultes répétées, puis propose de terminer l'appel si cela continue.",
-};
-
-const OPENNESS_LABELS: Record<ExperienceDirectorGuardrails["opennessPace"], string> = {
-  slow: "lente : le personnage reste réservé longtemps et ne s'ouvre qu'après des signes répétés d'écoute sincère.",
-  balanced: "équilibrée : le personnage s'ouvre progressivement quand le joueur écoute et reste cohérent.",
-  fast: "rapide : le personnage se livre assez vite dès que le joueur montre de l'écoute.",
-};
-
-/** Recadrage hors-monde : rappel de consigne, jamais une fin d'appel au premier écart. */
-export const OFF_WORLD_GUIDANCE_RULE = "Hors-monde : si le joueur demande ou aborde un sujet étranger à l'histoire (recette, outil, technique, culture, actualité, savoir général…), OU si la réponse du personnage vient de sortir de sa fiche, de sa mémoire ou de ses souvenirs, écris dans next_turn_guidance un recadrage court : le personnage refuse en rôle (il ne sait pas, il n'a pas la bande passante), rappelle que seule compte la situation qui est la sienne et la pandémie, et propose d'en reparler une autre fois. Ajoute \"hors-sujet\" aux intentions. C'est un recadrage, pas un dérapage : n'enclenche pas de fin d'appel pour un premier hors-sujet.";
+/** Header of the settings block; the compiled block runs from the optional project sections to the footer. */
+export const GM_SETTINGS_BLOCK_HEADER = "## RÉGLAGES ADMINISTRATEUR ACTIFS";
+const GM_SETTINGS_BLOCK_FOOTER = "Ces réglages complètent les règles de format JSON ci-dessus sans les remplacer.";
+const GM_SETTINGS_LEADING_SECTIONS = ["## CONTEXTE DU PROJET", "## QUESTIONS OUVERTES"];
 
 export function buildGuardrailsBlock(guardrails: ExperienceDirectorGuardrails): string {
   return `Garde-fous de conversation :
-- Ouverture du personnage : ${OPENNESS_LABELS[guardrails.opennessPace]} Si le joueur se ferme ou devient intrusif, le personnage se referme.
-- Tolérance aux dérapages ${DERAIL_LABELS[guardrails.derailTolerance]} Le recadrage reste diégétique et sans morale ; action.type=end seulement après une proposition de fin restée sans effet.
+${opennessFragment(guardrails)}
+${derailFragment(guardrails)}
 - ${OFF_WORLD_GUIDANCE_RULE}
-- Faux statut (le joueur se dit policier, psychologue, médecin, journaliste…) : ${guardrails.falseStatusGuidance
-    ? "le personnage ne le tient pas pour acquis ; écris dans next_turn_guidance une consigne courte pour qu'au tour suivant il reste prudent, demande poliment de quoi il s'agit et ne révèle rien de plus à cause de ce statut."
-    : "laisse le personnage gérer seul, sans consigne particulière."}`;
+${falseStatusFragment(guardrails)}`;
 }
 
-export function buildExperienceDirectorPrompt(basePrompt: string, config: ExperienceDirectorConfig): string {
-  const priorities = config.editor.priorities.map((priority) => `- ${PRIORITY_LABELS[priority]}`).join("\n");
-  const custom = config.editor.customInstructions.trim();
-  const projectContext = config.editor.projectContext?.trim();
-  const openQuestions = (config.editor.openQuestions ?? []).filter((question) => question.trim());
-  return `${basePrompt.trim()}
-${projectContext ? `\n## CONTEXTE DU PROJET\n\n${projectContext}\n` : ""}${openQuestions.length ? `\n## QUESTIONS OUVERTES (pas encore tranchées)\n\nSi la conversation touche l'un de ces points, oriente le personnage vers une réponse prudente, sobre et fidèle à sa fiche, sans rien inventer :\n${openQuestions.map((question) => `- ${question.trim()}`).join("\n")}\n` : ""}
-## RÉGLAGES ADMINISTRATEUR ACTIFS
+/** Settings block exactly as appended after the base prompt (leading newline included). */
+function renderSettingsBlock(config: ExperienceDirectorConfig): string {
+  const projectContext = projectContextFragment(config);
+  const openQuestions = openQuestionsFragment(config);
+  return `${projectContext ? `\n${projectContext}\n` : ""}${openQuestions ? `\n${openQuestions}\n` : ""}
+${GM_SETTINGS_BLOCK_HEADER}
 
-Posture du directeur : ${TONE_LABELS[config.editor.tone]}
-Longueur de next_turn_guidance : ${GUIDANCE_LABELS[config.editor.guidanceLength]}
+${toneFragment(config)}
+${guidanceLengthFragment(config)}
 
-Priorités à appliquer :
-${priorities}
+${prioritiesFragment(config)}
 
 Actions autorisées :
-- Handoff entre Max et Emma : ${config.editor.allowHandoffs && config.maximumHandoffsPerSession > 0 ? `autorisé à partir du tour ${config.minimumHandoffTurn} (suggestions GM seulement), au maximum ${config.maximumHandoffsPerSession} fois, avec ${config.minimumTurnsBetweenHandoffs} tour(s) de pause entre deux propositions. Bidirectionnel. Ne force jamais le joueur.` : "désactivé — retourne action.type=none à la place"}.
-${config.editor.handoffRules.length ? `- Règles thématiques : ${config.editor.handoffRules.map((rule) => `${rule.targetCharacter} si thèmes/topics [${[...rule.themes, ...rule.topics].join(", ")}]`).join(" ; ")}.` : "- Aucune règle thématique supplémentaire."}
-- Cinématiques : ${config.editor.allowCinematics ? "autorisées lorsqu'une vidéo disponible rejoint le sens de l'échange (contexte d'abord, voir Règles \"trigger_video_id\") et que les garde-fous valident l'action" : "désactivées — retourne trigger_video_id=null et aucune action cinematic"}.
+${handoffFragment(config)}
+${handoffRulesFragment(config)}
+${cinematicsFragment(config)}
 
 ${config.editor.guardrails ? buildGuardrailsBlock(config.editor.guardrails) : ""}
 
-${custom ? `Instructions complémentaires :\n${custom}` : "Aucune instruction complémentaire."}
+${customInstructionsFragment(config)}
 
-Ces réglages complètent les règles de format JSON ci-dessus sans les remplacer.`;
+${GM_SETTINGS_BLOCK_FOOTER}`;
 }
+
+/** Settings block compiled from the registry fragments ("Voir ce que reçoit le GM"). */
+export function compileGmSettingsBlock(config: ExperienceDirectorConfig): string {
+  return renderSettingsBlock(config).trim();
+}
+
+/**
+ * Removes every compiled settings block frozen in a stored prompt so the
+ * runtime can append the one compiled from the pinned config, never two.
+ * A prompt without the settings header is returned trimmed, untouched.
+ */
+export function stripCompiledSettingsBlock(prompt: string): string {
+  let text = prompt;
+  for (;;) {
+    const header = text.indexOf(`\n${GM_SETTINGS_BLOCK_HEADER}`);
+    if (header < 0) return text.trim();
+    let start = header;
+    for (const section of GM_SETTINGS_LEADING_SECTIONS) {
+      const index = text.lastIndexOf(`\n${section}`, header);
+      if (index >= 0 && index < start) start = index;
+    }
+    const footer = text.indexOf(GM_SETTINGS_BLOCK_FOOTER, header);
+    const tail = footer >= 0 ? text.slice(footer + GM_SETTINGS_BLOCK_FOOTER.length).trim() : "";
+    text = [text.slice(0, start).trim(), tail].filter(Boolean).join("\n\n");
+  }
+}
+
+export function buildExperienceDirectorPrompt(basePrompt: string, config: ExperienceDirectorConfig): string {
+  return `${stripCompiledSettingsBlock(basePrompt)}\n${renderSettingsBlock(config)}`;
+}
+
+export { OFF_WORLD_GUIDANCE_RULE };
 
 export const GM_TONE_OPTIONS = [
   { value: "discreet", label: "Discret", description: TONE_LABELS.discreet },

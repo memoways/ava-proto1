@@ -83,6 +83,18 @@ describe("settingsService recent additions", () => {
     expect(getLLMSettings().LLM_MAX_TOKENS).toBe(360);
   });
 
+  it("lot A — GM temperature defaults to the historical 0.2 and ignores the never-applied legacy 0.3", () => {
+    expect(getLLMSettings().LLM_GM_TEMPERATURE).toBe(0.2);
+    localStorage.clear(); localStorage.setItem("ava_llm_settings", JSON.stringify({ LLM_TEMPERATURE_GM: 0.3 }));
+    expect(getLLMSettings().LLM_GM_TEMPERATURE).toBe(0.2);
+    localStorage.clear(); localStorage.setItem("ava_llm_settings", JSON.stringify({ LLM_GM_TEMPERATURE: 0.45 }));
+    expect(getLLMSettings().LLM_GM_TEMPERATURE).toBe(0.45);
+    localStorage.clear(); localStorage.setItem("ava_llm_settings", JSON.stringify({ LLM_GM_TEMPERATURE: 7 }));
+    expect(getLLMSettings().LLM_GM_TEMPERATURE).toBe(1);
+    localStorage.clear(); localStorage.setItem("ava_llm_settings", JSON.stringify({ LLM_GM_TEMPERATURE: "x" }));
+    expect(getLLMSettings().LLM_GM_TEMPERATURE).toBe(0.2);
+  });
+
   it("R1 — default response style asks for 2–3 sentences with a hook, not a reflex question", () => {
     const style = getMaxPromptControlSettings().responseStyle;
     expect(style).toContain("2 à 3 phrases");

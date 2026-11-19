@@ -28,10 +28,12 @@ export const DEFAULT_EXPERIENCE_FRAME_CONFIG: ExperienceFrameConfig = {
   forbidSpontaneousHandoff: true,
 };
 
-const POSTURE_TEXT: Record<ExperienceFrameConfig["posture"], string> = {
+export const EXPERIENCE_FRAME_POSTURE_TEXT: Record<ExperienceFrameConfig["posture"], string> = {
   reserved: "Posture : tu as besoin d'aide mais tu restes pudique ; l'intime se confie à mesure que la douceur et l'écoute s'installent.",
   open: "Posture : tu es plutôt ouvert dès le départ ; la douceur de l'interlocuteur permet d'approfondir.",
 };
+
+export const FORBID_SPONTANEOUS_HANDOFF_TEXT = "Ne renvoie jamais de toi-même vers un autre personnage : ne le fais que si une consigne de mise en scène te le demande.";
 
 export function normalizeExperienceFrameConfig(raw: Partial<ExperienceFrameConfig> | null | undefined): ExperienceFrameConfig {
   const base = DEFAULT_EXPERIENCE_FRAME_CONFIG;
@@ -90,12 +92,12 @@ export function buildExperienceFrame(input: ExperienceFrameInput): ExperienceFra
   if (config.frameText) lines.push(config.frameText);
   const exposure = path === "seen" ? config.exposureSeen : path === "unseen" ? config.exposureUnseen : "";
   if (exposure) lines.push(`Parcours ${path === "seen" ? "briefé (film vu)" : "découverte (film non vu)"} : ${exposure}`);
-  lines.push(POSTURE_TEXT[config.posture]);
+  lines.push(EXPERIENCE_FRAME_POSTURE_TEXT[config.posture]);
   if (config.postureNotes) lines.push(config.postureNotes);
   const known = (input.knownAboutPlayer ?? []).map((item) => item.trim()).filter(Boolean).slice(0, 6);
   if (known.length) lines.push(`Déjà connu de l'interlocuteur (ne pas redemander) : ${known.join(" ; ")}.`);
   if (config.forbidSpontaneousHandoff) {
-    lines.push("Ne renvoie jamais de toi-même vers un autre personnage : ne le fais que si une consigne de mise en scène te le demande.");
+    lines.push(FORBID_SPONTANEOUS_HANDOFF_TEXT);
   }
   return { enabled: true, path, prompt: lines.join("\n") };
 }

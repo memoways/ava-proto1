@@ -2,10 +2,10 @@ import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import type { ExperienceFrameConfig } from "@/types";
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Beaker, Copy, Download, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
+import { Archive, Beaker, Copy, Download, Eye, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
+import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, GM_CODE_VERSION, resolveDirectorSystemPrompt } from "@/agents/gameMasterPRD4";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,9 @@ import {
 } from "@/services/gameMasterPromptBuilder";
 import { getGameplaySettings, getLLMSettings, listLlmConfigModels, loadGameplaySettingsFromDB, type GameplaySettings } from "@/services/settingsService";
 import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
+import { getSessionMinimumClosureSeconds } from "@/config/experienceRuntime";
+import { GM_RUNTIME_OUTPUT_INSTRUCTIONS } from "@/services/gameMasterContract";
+import { GmSettingPreview } from "@/components/GmSettingPreview";
 import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, RuntimeCharacter } from "@/types";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
@@ -75,7 +78,8 @@ function statusVariant(status: ExperienceOrchestrationVersion["status"]): "defau
   return "secondary";
 }
 
-export default function GameMasterSettingsTab() {
+/** `previewVersions` (dev preview only) renders the tab offline from fixed versions. */
+export default function GameMasterSettingsTab({ previewVersions }: { previewVersions?: ExperienceOrchestrationVersion[] } = {}) {
   const [versions, setVersions] = useState<ExperienceOrchestrationVersion[]>([]);
   const [sessionsByVersion, setSessionsByVersion] = useState<Record<string, number>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -106,16 +110,25 @@ export default function GameMasterSettingsTab() {
     () => buildExperienceDirectorPrompt(EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, config),
     [config],
   );
+  // What the GM actually receives at runtime: stored prompt (or builtin) plus
+  // the settings block compiled from the version's config.
+  const gmReceivedPrompt = useMemo(() => {
+    const stored = selected?.status === "draft" ? generatedPrompt : selected?.prompt;
+    return `${resolveDirectorSystemPrompt(stored, config)}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}`;
+  }, [config, generatedPrompt, selected]);
+  const [showGmReceived, setShowGmReceived] = useState(false);
 
   const load = async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [nextVersions, nextGameplay, sessions] = await Promise.all([
-        listOrchestrationVersions(),
-        loadGameplaySettingsFromDB(),
-        supabase.from("sessions").select("orchestration_version_id"),
-      ]);
+      const [nextVersions, nextGameplay, sessions] = previewVersions
+        ? [previewVersions, getGameplaySettings(), { data: [] }]
+        : await Promise.all([
+          listOrchestrationVersions(),
+          loadGameplaySettingsFromDB(),
+          supabase.from("sessions").select("orchestration_version_id"),
+        ]);
       setVersions(nextVersions);
       setGameplay(nextGameplay);
       const counts: Record<string, number> = {};
@@ -222,7 +235,7 @@ export default function GameMasterSettingsTab() {
       turnIndex: 4,
       timeElapsedSeconds: 240,
       sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
-      minimumClosureSeconds: Math.floor(gameplay.TIMEOUT_SECONDS * 0.7),
+      minimumClosureSeconds: getSessionMinimumClosureSeconds(gameplay.TIMEOUT_SECONDS),
       systemPromptOverride: generatedPrompt,
       modelOverride: testModel,
       promptVersionOverride: selected.id ? `orchestration:${selected.id}` : GM_CODE_VERSION,
@@ -268,11 +281,13 @@ export default function GameMasterSettingsTab() {
             turnIndex: 4,
             timeElapsedSeconds: 240,
             sessionDurationSeconds: gameplay.TIMEOUT_SECONDS,
-            minimumClosureSeconds: Math.floor(gameplay.TIMEOUT_SECONDS * 0.7),
+            minimumClosureSeconds: getSessionMinimumClosureSeconds(gameplay.TIMEOUT_SECONDS),
             systemPromptOverride: promptVariant.id === "draft" ? generatedPrompt : promptVariant.prompt,
             modelOverride: model,
             promptVersionOverride: selected.id ? `orchestration:${selected.id}` : GM_CODE_VERSION,
             orchestrationConfig: config,
+            // The baseline stays the bare code prompt: compare it with the draft settings.
+            compileSettingsBlock: promptVariant.id !== "baseline",
             persist: false,
             diagnosticTrace: true,
           });
@@ -428,6 +443,7 @@ export default function GameMasterSettingsTab() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">{GM_TONE_OPTIONS.find((option) => option.value === config.editor.tone)?.description}</p>
+                    <GmSettingPreview id="tone" config={config} />
                   </div>
 
                   <div className="space-y-1.5">
@@ -443,6 +459,7 @@ export default function GameMasterSettingsTab() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">{GM_GUIDANCE_OPTIONS.find((option) => option.value === config.editor.guidanceLength)?.description}</p>
+                    <GmSettingPreview id="guidanceLength" config={config} />
                   </div>
                 </div>
 
@@ -465,6 +482,7 @@ export default function GameMasterSettingsTab() {
                       );
                     })}
                   </div>
+                  <GmSettingPreview id="priorities" config={config} />
                 </fieldset>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -484,6 +502,7 @@ export default function GameMasterSettingsTab() {
                       aria-label="Autoriser les suggestions de passage entre personnages"
                     />
                   </div>
+                  <GmSettingPreview id="allowHandoffs" config={config} />
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
                       <p className="text-sm font-medium">Cinématiques pilotées par le GM <Hint level="secondaire" text="Autorise le déclenchement des vidéos pendant la conversation. Les vidéos elles-mêmes se règlent dans l’onglet Cinématiques." /></p>
@@ -496,6 +515,7 @@ export default function GameMasterSettingsTab() {
                       aria-label="Autoriser les cinématiques pilotées par le GM"
                     />
                   </div>
+                  <GmSettingPreview id="allowCinematics" config={config} />
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
                       <p className="text-sm font-medium">Guidage de parole du GM <Hint level="secondaire" text="Pour comparer réponses guidées et naturelles. Off ne transmet plus au personnage le conseil du tour suivant, l’état de parole proposé ni les sujets déjà abordés. Le GM continue de tourner : mémoire, relation, cinématiques, passages et fin d’appel restent actifs, et son conseil reste visible dans l’historique des sessions. Les recadrages des garde-fous (hors-sujet, faux statut, dérapage) passent par ce conseil : ils ne sont plus transmis non plus." /></p>
@@ -508,6 +528,20 @@ export default function GameMasterSettingsTab() {
                       aria-label="Transmettre le guidage de parole du GM au personnage"
                     />
                   </div>
+                  <GmSettingPreview id="speechGuidance" config={config} />
+                  <div className="flex items-center justify-between gap-3 rounded border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Repères de temps du personnage <Hint level="secondaire" text="Le personnage reçoit à chaque tour le temps écoulé, le numéro du tour et une phase (début, milieu, fin proche) pour adapter son rythme. Off pour tester une conversation sans courbe de temps." /></p>
+                      <p className="text-xs text-muted-foreground">Off retire ce repère du prompt du personnage. Fixé par session (version publiée).</p>
+                    </div>
+                    <Switch
+                      checked={config.editor.characterTimeCues !== false}
+                      disabled={selected.status !== "draft"}
+                      onCheckedChange={(checked) => patchEditor({ characterTimeCues: checked })}
+                      aria-label="Envoyer les repères de temps au personnage"
+                    />
+                  </div>
+                  <GmSettingPreview id="characterTimeCues" config={config} />
                 </div>
 
                 <fieldset className="space-y-3 rounded border p-3">
@@ -521,9 +555,11 @@ export default function GameMasterSettingsTab() {
                       aria-label="Activer le cadre commun"
                     />
                   </div>
+                  <GmSettingPreview id="frameEnabled" config={config} />
                   <div className="space-y-1.5">
                     <Label htmlFor="gm-frame-text">Cadre (rôle de l'interlocuteur, absence de relation préalable, faux statut) <Hint text="Texte déjà rédigé. Ne le modifier que si l’on change la promesse de l’expérience." /></Label>
                     <Textarea id="gm-frame-text" className="min-h-28" value={frame.frameText} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ frameText: event.target.value })} />
+                    <GmSettingPreview id="frameText" config={config} />
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1.5">
@@ -535,6 +571,7 @@ export default function GameMasterSettingsTab() {
                       <Textarea id="gm-frame-unseen" value={frame.exposureUnseen} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ exposureUnseen: event.target.value })} />
                     </div>
                   </div>
+                  <GmSettingPreview id="frameExposure" config={config} />
                   <div className="space-y-1.5">
                     <Label>Posture soutien / confiance <Hint level="essentiel" text="« Pudique » : le personnage a besoin d’aide mais se livre progressivement (conseillé). « Ouvert » : il parle librement dès le début, utile pour tester le contenu rapidement." /></Label>
                     <div className="flex gap-2">
@@ -543,11 +580,13 @@ export default function GameMasterSettingsTab() {
                       ))}
                     </div>
                     <Textarea aria-label="Précisions de posture" placeholder="Précisions de posture (facultatif)" value={frame.postureNotes} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ postureNotes: event.target.value })} />
+                    <GmSettingPreview id="framePosture" config={config} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm">Interdire les renvois spontanés vers un autre personnage <Hint text="Empêche le personnage de dire de lui-même « parlez plutôt à Emma ». Laisser activé." /></p>
                     <Switch checked={frame.forbidSpontaneousHandoff} disabled={selected.status !== "draft"} onCheckedChange={(checked) => patchFrame({ forbidSpontaneousHandoff: checked })} aria-label="Interdire les renvois spontanés" />
                   </div>
+                  <GmSettingPreview id="forbidSpontaneousHandoff" config={config} />
                   <div className="space-y-1.5">
                     <Label>Personnages actifs dans cette version <Hint level="essentiel" text="Seuls ces personnages sont proposés au joueur et peuvent être suggérés par le Game Master. Max et Emma pour l’instant ; Ava et Léo ne sont pas prêts." /></Label>
                     <div className="flex flex-wrap gap-2">
@@ -564,6 +603,7 @@ export default function GameMasterSettingsTab() {
                         );
                       })}
                     </div>
+                    <GmSettingPreview id="activeCharacters" config={config} />
                   </div>
                 </fieldset>
 
@@ -580,6 +620,7 @@ export default function GameMasterSettingsTab() {
                       onChange={(event) => patchConfig({ minimumHandoffTurn: Number(event.target.value) })}
                     />
                     <p className="text-xs text-muted-foreground">S’applique aussi aux demandes explicites du joueur.</p>
+                    <GmSettingPreview id="minimumHandoffTurn" config={config} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="max-handoffs">Passages max par session <Hint level="expert" text="Nombre maximum de transferts exécutés dans une session. Les propositions seules ne sont pas comptées." /></Label>
@@ -593,6 +634,7 @@ export default function GameMasterSettingsTab() {
                       onChange={(event) => patchConfig({ maximumHandoffsPerSession: Number(event.target.value) })}
                     />
                     <p className="text-xs text-muted-foreground">Allers-retours inclus. 0 désactive les suggestions GM.</p>
+                    <GmSettingPreview id="maximumHandoffsPerSession" config={config} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="handoff-cooldown">Pause entre deux suggestions <Hint level="expert" text="Nombre de tours minimum entre deux propositions de changement." /></Label>
@@ -606,6 +648,7 @@ export default function GameMasterSettingsTab() {
                       onChange={(event) => patchConfig({ minimumTurnsBetweenHandoffs: Number(event.target.value) })}
                     />
                     <p className="text-xs text-muted-foreground">Nombre de tours utilisateur minimum après un passage.</p>
+                    <GmSettingPreview id="minimumTurnsBetweenHandoffs" config={config} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="director-timeout">Timeout du directeur (ms) <Hint level="expert" text="Temps maximum laissé au Game Master pour décider. Ne pas modifier : technique." /></Label>
@@ -620,6 +663,7 @@ export default function GameMasterSettingsTab() {
                       onChange={(event) => patchConfig({ directorTimeoutMs: Number(event.target.value) })}
                     />
                     <p className="text-xs text-muted-foreground">Un timeout conserve la conversation et produit une décision neutre.</p>
+                    <GmSettingPreview id="directorTimeoutMs" config={config} />
                   </div>
                 </div>
 
@@ -702,6 +746,7 @@ export default function GameMasterSettingsTab() {
                       </Button>
                     </div>
                   ))}
+                  <GmSettingPreview id="handoffRules" config={config} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -717,6 +762,7 @@ export default function GameMasterSettingsTab() {
                   <p className="text-xs text-muted-foreground">
                     Enjeux, promesse et règles du projet transmis au Game Master à chaque tour ({config.editor.projectContext.length}/{PROJECT_CONTEXT_MAX_CHARS} caractères). Remplace l'ancienne fiche Notion. Plus c'est court, plus c'est rapide.
                   </p>
+                  <GmSettingPreview id="projectContext" config={config} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -730,6 +776,7 @@ export default function GameMasterSettingsTab() {
                     className="min-h-20"
                   />
                   <p className="text-xs text-muted-foreground">Points narratifs pas encore tranchés (une par ligne, {OPEN_QUESTIONS_MAX} max.) : le Game Master guide alors vers une réponse prudente.</p>
+                  <GmSettingPreview id="openQuestions" config={config} />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
@@ -747,6 +794,7 @@ export default function GameMasterSettingsTab() {
                         <SelectItem value="fast">Rapide</SelectItem>
                       </SelectContent>
                     </Select>
+                    <GmSettingPreview id="opennessPace" config={config} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Tolérance aux dérapages <Hint level="secondaire" text="Quand le joueur sort du sujet ou provoque : Faible = recadrage rapide, Élevée = on laisse dériver. Moyenne conseillée." /></Label>
@@ -762,7 +810,9 @@ export default function GameMasterSettingsTab() {
                         <SelectItem value="high">Élevée</SelectItem>
                       </SelectContent>
                     </Select>
+                    <GmSettingPreview id="derailTolerance" config={config} />
                   </div>
+                  <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
                     <Label htmlFor="gm-false-status" className="text-sm">Faux statut : consigne au tour suivant <Hint level="essentiel" text="Si le joueur se prétend policier, médecin, ami d’Ava…, le personnage ne valide pas et le Game Master aide à recadrer au tour suivant. Laisser activé." /></Label>
                     <Switch
@@ -771,6 +821,8 @@ export default function GameMasterSettingsTab() {
                       disabled={selected.status !== "draft"}
                       onCheckedChange={(checked) => patchEditor({ guardrails: { ...config.editor.guardrails, falseStatusGuidance: checked } })}
                     />
+                  </div>
+                  <GmSettingPreview id="falseStatusGuidance" config={config} />
                   </div>
                 </div>
 
@@ -785,19 +837,28 @@ export default function GameMasterSettingsTab() {
                     className="min-h-24"
                   />
                   <p className="text-xs text-muted-foreground">Ce texte influence le LLM mais reste subordonné au schéma JSON et aux garde-fous déterministes.</p>
+                  <GmSettingPreview id="customInstructions" config={config} />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Aperçu du prompt généré</Label>
-                <Textarea
-                  value={selected.status === "draft"
-                    ? generatedPrompt
-                    : selected.prompt.startsWith("builtin://") ? generatedPrompt : selected.prompt}
-                  readOnly
-                  className="min-h-[320px] font-mono text-xs"
-                  aria-label="Prompt généré du directeur"
-                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>Ce que reçoit le GM</Label>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setShowGmReceived((value) => !value)} aria-expanded={showGmReceived}>
+                    <Eye className="mr-1 h-3.5 w-3.5" />{showGmReceived ? "Masquer" : "Voir ce que reçoit le GM"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Prompt système exact envoyé au GM à chaque tour : base de la version{selected.prompt.startsWith("builtin://") ? " (prompt intégré au code)" : ""}, bloc de réglages compilé depuis les réglages ci-dessus, puis contrat de sortie JSON.
+                </p>
+                {showGmReceived && (
+                  <Textarea
+                    value={gmReceivedPrompt}
+                    readOnly
+                    className="min-h-[320px] font-mono text-xs"
+                    aria-label="Prompt système reçu par le GM"
+                  />
+                )}
                 <p className="text-xs text-muted-foreground">
                   Variables runtime ajoutées à chaque tour : personnage attribué, profil et posture joueur, mémoire, politique et état relationnels, directive appliquée, temps écoulé, historique récent, dernier échange, vidéos disponibles et déjà jouées.
                 </p>

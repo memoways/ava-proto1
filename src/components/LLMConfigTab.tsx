@@ -351,11 +351,11 @@ export default function LLMConfigTab() {
         <div>
           <div className="flex justify-between mb-1">
             <label className="text-sm font-medium text-muted-foreground">Température</label>
-            <span className="text-sm font-mono">{settings.LLM_TEMPERATURE_GM.toFixed(2)}</span>
+            <span className="text-sm font-mono">{settings.LLM_GM_TEMPERATURE.toFixed(2)}</span>
           </div>
           <Slider
-            value={[settings.LLM_TEMPERATURE_GM]}
-            onValueChange={([v]) => updateLocal({ LLM_TEMPERATURE_GM: v })}
+            value={[settings.LLM_GM_TEMPERATURE]}
+            onValueChange={([v]) => updateLocal({ LLM_GM_TEMPERATURE: v })}
             min={0} max={1} step={0.05}
           />
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
