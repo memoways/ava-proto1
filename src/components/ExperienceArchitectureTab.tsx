@@ -383,7 +383,7 @@ const TURN_STEPS: TurnStep[] = [
     promise: "Comprendre la dynamique du tour et préparer la prochaine intervention sans retarder celle-ci.",
     input: ["Question et réponse du tour", "Historique récent et mémoire avant tour", "Rôle, temps, personnage et orchestration épinglée"],
     process: ["Un seul appel structuré évalue le post-tour.", "Il produit labels, évolution de mémoire, guidance et action recommandée.", "La projection labelPromise réutilise ce résultat : aucun deuxième appel LLM."],
-    output: ["Thèmes, sujets et intentions", "next_turn_guidance consommée au tour N+1", "Action : aucune, cinématique, handoff ou fin"],
+    output: ["Thèmes, sujets et intentions", "next_turn_guidance consommée au tour N+1 (si le guidage de parole est activé)", "Action : aucune, cinématique, handoff ou fin"],
     example: "Labels : confiance, secret ; guidance : « admettre une faute sans tout révéler » ; action recommandée : aucune.",
     resilience: "Le résultat arrive via une promesse séparée. Une erreur du directeur ne bloque ni le texte ni la voix déjà produits.",
   },

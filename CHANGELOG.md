@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Guidage de parole du GM : interrupteur A/B] — 2026-11-19
+
+- **Réglages GM → « Guidage de parole du GM »** (défaut activé, versions existantes inchangées). Désactivé, le personnage
+  ne reçoit plus le conseil du tour suivant, l'état de parole proposé ni les sujets déjà abordés ; le GM tourne toujours
+  (mémoire, relation, cinématiques, passages, fin d'appel) et son conseil reste journalisé « non transmis ». Les
+  propositions de passage et la règle de demande de changement restent transmises.
+- Mode figé par la version d'orchestration épinglée à la session ; tracé par tour (`speech_guidance` du journal GM,
+  trace diagnostique, PostHog) et affiché dans l'historique des sessions. Aucun appel ni migration ajoutés.
+- Dépendance signalée : les recadrages des garde-fous du GM passent par ce conseil et ne sont plus transmis en mode
+  désactivé. [Plan, cartographie et protocole d'écoute](docs/plan_guidage_parole_gm_ab.md).
+
 ## [Cinématiques : interruption ou superposition] — 2026-11-19
 
 - **Choix du mode** dans Backoffice → Expérience → Cinématiques : « Interrompre la conversation » (défaut, comportement

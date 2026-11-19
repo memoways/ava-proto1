@@ -87,6 +87,7 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     priorities: ["narrative_continuity", "player_engagement", "safety", "pace"],
     allowHandoffs: true,
     allowCinematics: true,
+    speechGuidance: true,
     customInstructions: "",
     handoffRules: [],
     projectContext: DEFAULT_PROJECT_CONTEXT,
@@ -153,6 +154,8 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
       ...DEFAULT_DIRECTOR_CONFIG.editor,
       ...editor,
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
+      // Only an explicit false turns the guidance off; older versions keep it.
+      speechGuidance: editor?.speechGuidance !== false,
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
       projectContext: typeof editor?.projectContext === "string"

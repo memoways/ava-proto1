@@ -29,6 +29,7 @@ import { handoffSpeechEvidence, materializeHandoffAssessment, validateCharacterH
 import { rugosityDirectorDirective } from "@/services/speechRugosity";
 import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
+import { isGmSpeechGuidanceEnabled } from "@/services/gmSpeechGuidance";
 import {
   normalizeRelationshipState,
   relationshipStateToProposal,
@@ -737,6 +738,7 @@ export async function evaluatePostTurnPRD4(
     validation_issues: validationIssues,
     orchestration_version_id: input.orchestrationVersionId ?? null,
     orchestration_config: input.orchestrationConfig ?? null,
+    speech_guidance: isGmSpeechGuidanceEnabled(input.orchestrationConfig) ? "on" : "off",
     speech_state_played: selectSpeechState(input.speechStatePlayed, input.speechStates ?? []),
     speech_rugosite: input.rugosite ?? 0,
     speech_settings_version: input.speechSettingsVersion ?? null,
