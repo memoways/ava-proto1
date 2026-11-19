@@ -6,7 +6,16 @@ export interface OpenRouterPayloadInput {
   top_p?: number;
   stream?: boolean;
   reasoning?: boolean;
+  /**
+   * Opt-in: turn reasoning off even for models that think by default (Gemini 2.5 Flash).
+   * Only short, latency-bound calls send it (overlay video selection); without it the
+   * payload is unchanged for every other caller.
+   */
+  disable_reasoning?: boolean;
 }
+
+/** Gemini 2.5 Flash / Flash-Lite think by default and can turn it off; Pro cannot (left untouched). */
+const GEMINI_FLASH_THINKING = /^google\/gemini-2\.5-flash(?:$|[-:])/i;
 
 /** Pure constructor used by the proxy so diagnostics and tests observe its exact defaults. */
 export function buildOpenRouterPayload(body: OpenRouterPayloadInput) {
@@ -23,6 +32,7 @@ export function buildOpenRouterPayload(body: OpenRouterPayloadInput) {
     /^deepseek\/deepseek-(chat-v3\.1|r1)/.test(model) ||
     /^x-ai\/grok-(4|3-mini)/.test(model);
   const reasoningRequested = body.reasoning === true;
+  const forceReasoningOff = !reasoningRequested && body.disable_reasoning === true;
 
   const upstreamBody: Record<string, unknown> = {
     model,
@@ -43,6 +53,8 @@ export function buildOpenRouterPayload(body: OpenRouterPayloadInput) {
       : isOpenAIReasoning
         ? { effort: "minimal", exclude: true }
         : { enabled: false, exclude: true };
+  } else if (forceReasoningOff && GEMINI_FLASH_THINKING.test(model)) {
+    upstreamBody.reasoning = { enabled: false, exclude: true };
   }
 
 

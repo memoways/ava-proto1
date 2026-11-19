@@ -31,3 +31,20 @@ export function formatVideoCandidateLine(video: VideoTriggerRow): string {
     + (context ? ` | contexte="${context}"` : "")
     + (description ? ` | description="${description}"` : "");
 }
+
+/**
+ * Shorter line for the overlay selector, which must answer while the reply is spoken:
+ * the same fields, texts capped tighter (fewer input tokens, faster answer).
+ */
+export const COMPACT_VIDEO_LINE_TEXT_MAX_CHARS = 160;
+
+/** `shortId` (e.g. « v3 ») replaces the UUID: ~20 tokens saved per line, mapped back by the caller. */
+export function formatCompactVideoCandidateLine(video: VideoTriggerRow, shortId: string = video.id): string {
+  const max = COMPACT_VIDEO_LINE_TEXT_MAX_CHARS;
+  const themes = (video.themes ?? []).join(", ") || "—";
+  const description = capVideoText(video.description, max) || capVideoText(video.ai_description, max);
+  const context = capVideoText(video.context, max);
+  return `- id=${shortId} | titre="${capVideoText(video.title, 80)}" | priorité=${video.priority ?? "?"} | thèmes=[${themes}]`
+    + (context ? ` | contexte="${context}"` : "")
+    + (description ? ` | description="${description}"` : "");
+}

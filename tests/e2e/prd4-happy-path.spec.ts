@@ -652,7 +652,9 @@ async function installNetworkFakes(
         if (selection.delayMs) await new Promise(resolve => setTimeout(resolve, selection.delayMs));
         return json(route, {
           id: `overlay-selection-${overlaySelectionCount}`, model: "e2e-model",
-          choices: [{ message: { content: JSON.stringify({ videoId: selection.videoId, confidence: 0.9, reason: "la réplique évoque ce lieu" }) }, finish_reason: "stop" }],
+          choices: [{ message: { content: JSON.stringify({ videoId: selection.videoId, confidence: 0.9,
+            // Lot 2: a concrete link quoted from the reply and echoed by the video texts.
+            replyCue: "Je me souviens de ce dimanche", videoCue: "un souvenir familial" }) }, finish_reason: "stop" }],
           usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
         });
       }
