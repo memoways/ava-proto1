@@ -6,6 +6,8 @@ publiée en sandbox-ulrich (v11), prod (v8) et sandbox-julien (v9) inchangés. L
 une Description IA ; lot 6 (consigne d'analyse) préparé
 ([prompt lot 6](prompt_reprise_selection_videos_lot_6.md)).
 Source : analyse de la mécanique vidéo (session du 2026-11-01) et décisions d'Ulrich.
+Suite (2026-11-19) : mode « Superposer à la réponse », avec sélection dédiée sur la réplique —
+[plan](plan_cinematiques_interruption_superposition.md).
 
 ## État actuel (résumé)
 

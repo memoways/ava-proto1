@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cinematicPresentationFrom, type CinematicPresentation } from "@/services/cinematicTransition";
 import { toast } from "sonner";
 import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import {
@@ -111,6 +113,45 @@ function VideoTriggerRulesPanel() {
       <p className="text-xs text-muted-foreground">
         Gouvernent <em>quand</em> une cinématique peut se déclencher pendant une session, indépendamment du matching thématique.
       </p>
+
+      <fieldset className="border rounded p-3 space-y-2" data-testid="cinematic-presentation">
+        <legend className="px-1 text-sm font-medium">Intégration dans la conversation</legend>
+        <RadioGroup
+          value={cinematicPresentationFrom(settings.PRESENTATION)}
+          onValueChange={(value) => update({ PRESENTATION: cinematicPresentationFrom(value) as CinematicPresentation })}
+          className="grid gap-2 md:grid-cols-2"
+        >
+          <label htmlFor="cinematic-presentation-interrupt" className="flex cursor-pointer items-start gap-2 rounded border p-3">
+            <RadioGroupItem id="cinematic-presentation-interrupt" value="interrupt" className="mt-0.5" />
+            <span>
+              <span className="block text-sm font-medium">Interrompre la conversation</span>
+              <span className="block text-xs text-muted-foreground">Après la réponse, fondu au noir, la vidéo seule, puis retour au personnage. Comportement actuel.</span>
+            </span>
+          </label>
+          <label htmlFor="cinematic-presentation-overlay" className="flex cursor-pointer items-start gap-2 rounded border p-3">
+            <RadioGroupItem id="cinematic-presentation-overlay" value="overlay" className="mt-0.5" />
+            <span>
+              <span className="block text-sm font-medium">Superposer à la réponse</span>
+              <span className="block text-xs text-muted-foreground">La vidéo remplace l'image du personnage pendant la réponse qui l'a motivée, son atténué. Sans vidéo prête à temps, la réponse reste normale.</span>
+            </span>
+          </label>
+        </RadioGroup>
+        <div className="max-w-xs">
+          <label htmlFor="cinematic-overlay-gain" className="text-xs font-medium text-muted-foreground">Son de la vidéo sous la voix (dB)</label>
+          <Input
+            id="cinematic-overlay-gain"
+            type="number"
+            max={0}
+            min={-60}
+            step={1}
+            value={settings.OVERLAY_VIDEO_GAIN_DB}
+            disabled={cinematicPresentationFrom(settings.PRESENTATION) !== "overlay"}
+            onChange={(e) => update({ OVERLAY_VIDEO_GAIN_DB: Math.min(0, Math.max(-60, Number(e.target.value) || 0)) })}
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Superposition seulement. −15 dB = valeur d'essai, à valider à l'écoute. Sur iPhone/iPad, le volume ne se règle pas : la vidéo y reste muette.</p>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Les règles de fréquence ci-dessous s'appliquent aux deux modes.</p>
+      </fieldset>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="flex items-center justify-between border rounded p-3 col-span-2 md:col-span-1">

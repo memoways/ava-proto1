@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cinématiques : interruption ou superposition] — 2026-11-19
+
+- **Choix du mode** dans Backoffice → Expérience → Cinématiques : « Interrompre la conversation » (défaut, comportement
+  du lot 3b inchangé, configurations existantes préservées) ou « Superposer à la réponse » ; son de la vidéo sous la
+  voix réglable (−15 dB d'essai). Mêmes règles de fréquence et de garde-fous dans les deux modes.
+- **Superposition** : le GM post-tour ne décide qu'après la réplique entendue ; une sélection dédiée lit le texte de la
+  réplique dès qu'il existe (appel court, échéance 2 s, catalogue partagé avec le GM, confiance ≥ 0,6). La vidéo,
+  préchargée muette, remplace l'image du personnage seulement si elle joue et que la voix est audible, puis revient au
+  personnage à la fin de la réplique, à une interruption ou à la fin du média. Rien n'est retenu ; sans vidéo à temps,
+  la réplique reste normale. iPhone : vidéo muette (volume non réglable).
+- Tests : machine d'états, sélecteur, lecteur, écran (desktop et appel smartphone), réglages ; trois E2E de
+  superposition, lot 3b inchangé. [Plan, limites et protocole de recette](docs/plan_cinematiques_interruption_superposition.md).
+
 ## [Socle commun des réglages] — 2026-11-19
 
 - Les réglages se résolvent champ par champ : défauts ← production ← sandbox ; un catalogue de voix sandbox partiel

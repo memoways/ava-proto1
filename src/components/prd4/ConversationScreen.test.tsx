@@ -209,3 +209,21 @@ it('keeps preparation and failure disabled until an authorized offer, then locks
   expect(ready).toHaveTextContent('Connexion…');
   expect(ready).not.toHaveClass('animate-handoff-ready');
 });
+it("overlay cinematic: the character's image gives way to the video, the conversation controls stay", () => {
+  const { container, rerender } = render(<ConversationScreen {...baseProps} activeCharacter="max" audioState="max_speaking"
+    conversationLog={[]} streamingAvatarActive streamingAvatarState="speaking" attachAvatarMedia={vi.fn()} />);
+  const root = container.firstElementChild as HTMLElement;
+  expect(root).not.toHaveAttribute("data-cinematic-overlay");
+  expect(root.className).toContain("bg-background");
+  const avatar = screen.getByLabelText("Flux vidéo en direct de Max");
+
+  rerender(<ConversationScreen {...baseProps} activeCharacter="max" audioState="max_speaking" cinematicOverlay
+    conversationLog={[]} streamingAvatarActive streamingAvatarState="speaking" attachAvatarMedia={vi.fn()} />);
+  expect(root).toHaveAttribute("data-cinematic-overlay", "true");
+  expect(root.className).toContain("bg-transparent");
+  // The avatar media stays mounted (its voice goes on), only invisible.
+  expect(screen.getByLabelText("Flux vidéo en direct de Max")).toBe(avatar);
+  expect(avatar.className).toContain("opacity-0");
+  expect(screen.getByRole("button", { name: "Terminer" })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Max répond");
+});

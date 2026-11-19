@@ -4,11 +4,23 @@ import {
   CINEMATIC_FADE_IN_MS,
   CINEMATIC_FADE_OUT_MS,
   CINEMATIC_IDLE,
+  CINEMATIC_OVERLAY_CLOSE_MS,
+  CINEMATIC_OVERLAY_START_DEADLINE_MS,
   CINEMATIC_REVEAL_MS,
+  DEFAULT_OVERLAY_VIDEO_GAIN_DB,
+  OVERLAY_MIN_REMAINING_SPEECH_MS,
+  OVERLAY_SPEECH_CHARS_PER_SECOND,
   cinematicDroppedBeforePlayback,
   cinematicHoldsInput,
+  cinematicInterruptRunning,
+  cinematicOverlayActive,
+  cinematicOverlayVisible,
   cinematicPhaseDurationMs,
+  cinematicPresentationFrom,
   cinematicShowsVideo,
+  estimatedRemainingSpeechMs,
+  overlayHasTimeToShow,
+  overlayVideoVolume,
   cinematicTransitionStep,
   cinematicVeilOpacity,
   cinematicVeilTransitionMs,
@@ -165,5 +177,98 @@ describe("cinematic transition helpers", () => {
     expect(cinematicDroppedBeforePlayback(fading, run([{ type: "skip" }], fading))).toBe(true);
     const playing = run([{ type: "fade_out_done", at: 2 }], fading);
     expect(cinematicDroppedBeforePlayback(playing, run([{ type: "cancel" }], playing))).toBe(false);
+  });
+});
+
+describe("cinematic overlay presentation", () => {
+  const overlay = (replySpeaking = true): CinematicTransitionEvent<Video> =>
+    ({ type: "decided", video, at: 1_000, conversationBusy: true, playerSpeaking: false, presentation: "overlay", replySpeaking });
+  const showing = () => run([overlay(), { type: "media_started", at: 1_400 }]);
+
+  it("waits for the media, then shows over the audible reply without holding input", () => {
+    const waiting = run([overlay()]);
+    expect(waiting).toMatchObject({ phase: "overlay_waiting", presentation: "overlay", replySpeaking: true, mediaReady: false });
+    expect(cinematicHoldsInput(waiting)).toBe(false);
+    expect(cinematicOverlayActive(waiting)).toBe(true);
+    expect(cinematicOverlayVisible(waiting)).toBe(false);
+    expect(cinematicShowsVideo(waiting)).toBe(false);
+    expect(cinematicVeilOpacity(waiting)).toBe(0);
+    expect(cinematicInterruptRunning(waiting)).toBe(false);
+
+    const shown = showing();
+    expect(shown).toMatchObject({ phase: "overlay_showing", startedAt: 1_400 });
+    expect(cinematicOverlayVisible(shown)).toBe(true);
+    expect(cinematicHoldsInput(shown)).toBe(false);
+    expect(cinematicVeilOpacity(shown)).toBe(0);
+  });
+
+  it("decided before the voice is audible: shows only once both media and voice are ready", () => {
+    const mediaFirst = run([overlay(false), { type: "media_started", at: 1_200 }]);
+    expect(mediaFirst).toMatchObject({ phase: "overlay_waiting", mediaReady: true, replySpeaking: false });
+    expect(run([{ type: "reply_speaking", at: 1_500 }], mediaFirst)).toMatchObject({ phase: "overlay_showing", startedAt: 1_500 });
+  });
+
+  it("drops the video, never the reply, when it cannot show in time", () => {
+    for (const event of [
+      { type: "start_deadline" },
+      { type: "reply_ended" },
+      { type: "conversation_idle" },
+      { type: "turn_abandoned" },
+      { type: "video_ended", outcome: "error" },
+      { type: "cancel" },
+    ] as CinematicTransitionEvent<Video>[]) {
+      const waiting = run([overlay()]);
+      const next = run([event], waiting);
+      expect(next).toEqual(CINEMATIC_IDLE);
+      expect(cinematicDroppedBeforePlayback(waiting, next)).toBe(true);
+    }
+  });
+
+  it("closes back to the character when the reply ends, the player interrupts or the media ends", () => {
+    expect(run([{ type: "reply_ended" }], showing())).toMatchObject({ phase: "overlay_closing", outcome: "reply_ended" });
+    expect(run([{ type: "turn_started" }], showing())).toMatchObject({ phase: "overlay_closing", outcome: "reply_ended" });
+    expect(run([{ type: "video_ended", outcome: "completed" }], showing())).toMatchObject({ phase: "overlay_closing", outcome: "completed" });
+    expect(run([{ type: "video_ended", outcome: "error" }], showing())).toMatchObject({ phase: "overlay_closing", outcome: "error" });
+    const closing = run([{ type: "reply_ended" }], showing());
+    expect(cinematicOverlayActive(closing)).toBe(false);
+    expect(cinematicPhaseDurationMs("overlay_closing")).toBe(CINEMATIC_OVERLAY_CLOSE_MS);
+    // A late media end during the crossfade changes nothing; the fade ends at idle.
+    expect(run([{ type: "video_ended", outcome: "completed" }], closing)).toBe(closing);
+    expect(run([{ type: "close_done" }], closing)).toEqual(CINEMATIC_IDLE);
+    expect(cinematicDroppedBeforePlayback(showing(), closing)).toBe(false);
+    expect(run([{ type: "cancel" }], showing())).toEqual(CINEMATIC_IDLE);
+  });
+
+  it("interrupt mode is unchanged and remains the default", () => {
+    expect(run([decided(true)])).toMatchObject({ phase: "pending", presentation: "interrupt" });
+    expect(cinematicInterruptRunning(run([decided(true)]))).toBe(true);
+    expect(cinematicPresentationFrom(undefined)).toBe("interrupt");
+    expect(cinematicPresentationFrom("overlay")).toBe("overlay");
+    expect(cinematicPresentationFrom("superpose")).toBe("interrupt");
+    // Overlay-only events are ignored by an interrupt cinematic.
+    const pending = run([decided(true)]);
+    expect(run([{ type: "reply_ended" }, { type: "media_started", at: 2 }, { type: "start_deadline" }], pending)).toBe(pending);
+  });
+});
+
+describe("overlay sound and timing", () => {
+  it("converts the attenuation to a media volume", () => {
+    expect(overlayVideoVolume(-15)).toBeCloseTo(0.178, 3);
+    expect(overlayVideoVolume(0)).toBe(1);
+    expect(overlayVideoVolume(6)).toBe(1);
+    expect(overlayVideoVolume(-200)).toBe(0.001);
+    expect(overlayVideoVolume("x")).toBe(overlayVideoVolume(DEFAULT_OVERLAY_VIDEO_GAIN_DB));
+  });
+
+  it("starts an overlay only when enough of the reply remains", () => {
+    const long = "x".repeat(OVERLAY_SPEECH_CHARS_PER_SECOND * 10); // ~10 s of speech
+    expect(estimatedRemainingSpeechMs(long, null, 5_000)).toBe(10_000);
+    expect(estimatedRemainingSpeechMs(long, 1_000, 5_000)).toBe(6_000);
+    expect(estimatedRemainingSpeechMs(long, 0, 20_000)).toBe(0);
+    expect(estimatedRemainingSpeechMs("", 0, 1)).toBeNull();
+    expect(overlayHasTimeToShow(6_000)).toBe(true);
+    expect(overlayHasTimeToShow(OVERLAY_MIN_REMAINING_SPEECH_MS - 1)).toBe(false);
+    expect(overlayHasTimeToShow(null)).toBe(true);
+    expect(CINEMATIC_OVERLAY_START_DEADLINE_MS).toBeLessThanOrEqual(3_000);
   });
 });

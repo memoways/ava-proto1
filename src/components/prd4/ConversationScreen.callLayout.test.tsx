@@ -94,4 +94,13 @@ describe("ConversationScreen — smartphone call layout", () => {
     expect(container.querySelector("[data-layout=call]")).toBeNull();
     expect(container.querySelector("video")).not.toBeNull();
   });
+
+  it("overlay cinematic on the smartphone call screen: portrait hidden, controls kept", () => {
+    const { container } = render(<ConversationScreen {...baseProps} audioState="max_speaking" cinematicOverlay />);
+    const root = container.querySelector("[data-layout=call]") as HTMLElement;
+    expect(root).toHaveAttribute("data-cinematic-overlay", "true");
+    expect(root.className).toContain("bg-transparent");
+    expect(screen.getByTestId("call-portrait").className).toContain("opacity-0");
+    expect(screen.getByRole("button", { name: /Terminer/ })).toBeInTheDocument();
+  });
 });

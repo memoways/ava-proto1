@@ -60,7 +60,7 @@ import {
 import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
-import type { ConversationMessage, ConversationTurnTraceV1, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
+import type { ConversationMessage, ConversationTurnTraceV1, ExperienceDirectorConfig, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 import type { ConversationMemoryV1 } from "@/types/conversationMemory";
 
 export interface PRD4TurnInput {
@@ -174,6 +174,11 @@ export interface PRD4TurnResult {
   /** Label pass lancé en parallèle du personnage (résout en général avant la fin du TTS). */
   labelPromise: Promise<PRD4LabelResult>;
   traceId: string | null;
+  /**
+   * Published director runtime pinned for this turn, known before the reply plays
+   * (overlay cinematics are guarded with it before the post-turn GM exists).
+   */
+  director?: { versionId: string | null; config: ExperienceDirectorConfig | null };
 }
 
 export type PRD4LatencySegmentEvent =
@@ -831,6 +836,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     postTurnPromise,
     labelPromise,
     traceId,
+    director: { versionId: frameRuntime.versionId ?? null, config: frameRuntime.config ?? null },
   };
 }
 

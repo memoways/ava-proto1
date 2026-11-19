@@ -185,4 +185,46 @@ describe("GumletVideoPlayer", () => {
     fireEvent.click(screen.getByRole("button", { name: /Plein écran/ }));
     expect(enter).toHaveBeenCalledTimes(1);
   });
+
+  it("overlay: muted while hidden, attenuated once shown, silent where volume cannot be set", () => {
+    const url = "https://gumlet.tv/watch/6acc8341689a80cf2e4a427d";
+    const onPlaying = vi.fn();
+    const { rerender } = render(
+      <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} active muted volume={0.178}
+        onPlaying={onPlaying} allowFullscreen={false} touchFirst showSkip={false} />,
+    );
+    const player = screen.getByLabelText("Video player") as HTMLVideoElement;
+    expect(player.muted).toBe(true);
+    expect(screen.queryByRole("button", { name: /Plein écran/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Passer/ })).not.toBeInTheDocument();
+    fireEvent.playing(player);
+    expect(onPlaying).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} active muted={false} volume={0.178}
+        onPlaying={onPlaying} allowFullscreen={false} touchFirst showSkip={false} />,
+    );
+    expect(player.muted).toBe(false);
+    expect(player.volume).toBeCloseTo(0.178, 3);
+    // A user agent resetting the sound is corrected back to the requested attenuation.
+    player.volume = 1;
+    fireEvent.volumeChange(player);
+    expect(player.volume).toBeCloseTo(0.178, 3);
+
+    // iOS: volume is read-only (always 1) → the attenuated video stays silent instead.
+    Object.defineProperty(player, "volume", { configurable: true, get: () => 1, set: () => {} });
+    rerender(
+      <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} active muted={false} volume={0.17}
+        onPlaying={onPlaying} allowFullscreen={false} touchFirst showSkip={false} />,
+    );
+    expect(player.muted).toBe(true);
+  });
+
+  it("does not report playing while hidden (preload)", () => {
+    const onPlaying = vi.fn();
+    render(<GumletVideoPlayer videoUrl="https://gumlet.tv/watch/6acc8341689a80cf2e4a427d" onComplete={() => {}} onSkip={() => {}}
+      active={false} onPlaying={onPlaying} />);
+    fireEvent.playing(screen.getByLabelText("Video player"));
+    expect(onPlaying).not.toHaveBeenCalled();
+  });
 });

@@ -50,6 +50,17 @@ interface GumletVideoPlayerProps {
   touchFirst?: boolean;
   /** Optional overlay content (e.g. HUD) rendered on top of the video. */
   children?: React.ReactNode;
+  /** Keep the media silent while it plays (overlay mode: hidden until the voice is audible). Default false. */
+  muted?: boolean;
+  /**
+   * Media volume 0..1 (default 1). Where the browser ignores `volume` (iOS), a value below 1
+   * falls back to silence so the video never covers the character's voice.
+   */
+  volume?: number;
+  /** The media really started playing while active. */
+  onPlaying?: () => void;
+  /** Overlay: the video stands in for the character during a reply — no fullscreen button. */
+  allowFullscreen?: boolean;
 }
 
 /**
@@ -67,6 +78,10 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   showSkip = true,
   touchFirst = false,
   children,
+  muted = false,
+  volume = 1,
+  onPlaying,
+  allowFullscreen = true,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,7 +89,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const onCompleteRef = useRef(onComplete);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const onPlayingRef = useRef(onPlaying);
   const activeRef = useRef(active);
+  const mutedRef = useRef(muted);
+  const volumeRef = useRef(volume);
+  /** Set once the browser ignores `volume` (iOS): attenuated playback then stays silent. */
+  const volumeUnsupportedRef = useRef(false);
   const sourceGenerationRef = useRef(0);
   const hasCompletedRef = useRef(false);
   const stoppingRef = useRef(false);
@@ -93,7 +113,27 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
   onErrorRef.current = onError;
+  onPlayingRef.current = onPlaying;
   activeRef.current = active;
+  mutedRef.current = muted;
+  volumeRef.current = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : 1));
+
+  /** Effective silence: requested, or an attenuation the browser cannot apply. */
+  const desiredMuted = () => mutedRef.current || (volumeRef.current < 1 && volumeUnsupportedRef.current);
+
+  /** Applies the requested sound (default: audible at full volume, as before). */
+  const applyAudio = useCallback((video: HTMLVideoElement) => {
+    const wanted = volumeRef.current;
+    try { video.volume = wanted; } catch { /* read-only volume */ }
+    if (wanted < 1 && Math.abs(video.volume - wanted) > 0.01) volumeUnsupportedRef.current = true;
+    const silent = desiredMuted();
+    video.defaultMuted = silent;
+    video.muted = silent;
+  }, []);
+
+  /** The element drifted from the requested sound (autoplay policy, user agent). */
+  const audioDrifted = (video: HTMLVideoElement) =>
+    video.muted !== desiredMuted() || (!volumeUnsupportedRef.current && Math.abs(video.volume - volumeRef.current) > 0.01);
 
   const pauseVideo = useCallback((video: HTMLVideoElement | null) => {
     if (video && canControlNativeMedia()) video.pause();
@@ -158,9 +198,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
     playbackRequestedRef.current = true;
     stoppingRef.current = false;
-    video.defaultMuted = false;
-    video.muted = false;
-    video.volume = 1;
+    applyAudio(video);
 
     if (!canControlNativeMedia()) return;
     const generation = sourceGenerationRef.current;
@@ -198,10 +236,17 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         console.warn("[Video] Audible autoplay failed:", error);
       }
     }
-  }, []);
+  }, [applyAudio]);
 
   const playWithAudioRef = useRef(playWithAudio);
   playWithAudioRef.current = playWithAudio;
+
+  // Sound changes while playing (overlay: muted while hidden, attenuated once shown).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || stoppingRef.current || !(activeRef.current || playbackRequestedRef.current)) return;
+    applyAudio(video);
+  }, [applyAudio, muted, volume]);
 
   useImperativeHandle(ref, () => ({
     playWithAudio,
@@ -392,7 +437,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         onLoadedData={() => {
           if (activeRef.current || playbackRequestedRef.current) playWithAudio();
         }}
-        onPlaying={() => { if (activeRef.current) hasPlayedRef.current = true; }}
+        onPlaying={() => {
+          if (!activeRef.current) return;
+          hasPlayedRef.current = true;
+          onPlayingRef.current?.();
+        }}
         onPlay={() => {
           const video = videoRef.current;
           if (!video || stoppingRef.current) return;
@@ -401,20 +450,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
             try { video.currentTime = 0; } catch { /* metadata may not exist yet */ }
             return;
           }
-          if (video.muted || video.volume !== 1) {
-            video.defaultMuted = false;
-            video.muted = false;
-            video.volume = 1;
-          }
+          if (audioDrifted(video)) applyAudio(video);
         }}
         onVolumeChange={() => {
           const video = videoRef.current;
           if (!video || stoppingRef.current || !activeRef.current) return;
-          if (video.muted || video.volume !== 1) {
-            video.defaultMuted = false;
-            video.muted = false;
-            video.volume = 1;
-          }
+          if (audioDrifted(video)) applyAudio(video);
         }}
         onEnded={completeOnce}
         onError={() => {
@@ -426,7 +467,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
       {active ? children : null}
 
-      {active && touchFirst ? (
+      {active && touchFirst && allowFullscreen ? (
         <button
           type="button"
           onClick={enterFullscreen}
