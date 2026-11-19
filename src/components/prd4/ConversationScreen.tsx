@@ -55,6 +55,12 @@ interface Props {
   /** A cinematic is coming: discreet capsule under the characters, with « Ignorer ». */
   cinematicAnnounced?: boolean;
   onIgnoreCinematic?: () => void;
+  /**
+   * Overlay cinematic visible: the character's image (photo, avatar stream, call portrait)
+   * fades out and the screen turns transparent over the video; the avatar media stays
+   * mounted so its voice goes on, and every control stays usable.
+   */
+  cinematicOverlay?: boolean;
   handoffCallingTarget?: "max" | "emma";
   onAcceptHandoff?: () => void;
   onRejectHandoff?: () => void;
@@ -89,6 +95,7 @@ const ConversationScreen = ({
   inputHeld = false,
   cinematicAnnounced = false,
   onIgnoreCinematic,
+  cinematicOverlay = false,
   handoffCallingTarget = "emma",
   onAcceptHandoff,
   onRejectHandoff,
@@ -362,7 +369,8 @@ const ConversationScreen = ({
     return (
       <div
         data-layout="call"
-        className="relative flex min-h-[100svh] flex-col overflow-hidden bg-background"
+        data-cinematic-overlay={cinematicOverlay ? "true" : undefined}
+        className={cn("relative flex min-h-[100svh] flex-col overflow-hidden transition-colors duration-500", cinematicOverlay ? "bg-transparent" : "bg-background")}
         style={{
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
@@ -398,8 +406,9 @@ const ConversationScreen = ({
             alt={`Portrait d’${displayName}`}
             data-testid="call-portrait"
             className={cn(
-              "h-36 w-36 rounded-full border-2 object-cover transition-shadow",
+              "h-36 w-36 rounded-full border-2 object-cover transition-[box-shadow,opacity] duration-500",
               audioState === "max_speaking" ? "border-primary shadow-[0_0_40px_-6px_hsl(var(--primary)/0.8)]" : "border-border",
+              cinematicOverlay && "opacity-0",
             )}
           />
           <h1 className="font-serif text-3xl text-foreground">{displayName}</h1>
@@ -425,13 +434,14 @@ const ConversationScreen = ({
   return (
     <div
       data-touch-first={touchFirst ? "true" : undefined}
-      className={cn("relative flex flex-col overflow-hidden bg-background", touchFirst ? "min-h-[100svh]" : "min-h-screen")}
+      data-cinematic-overlay={cinematicOverlay ? "true" : undefined}
+      className={cn("relative flex flex-col overflow-hidden transition-colors duration-500", cinematicOverlay ? "bg-transparent" : "bg-background", touchFirst ? "min-h-[100svh]" : "min-h-screen")}
     >
       {/* Background photo (Max plein cadre) — masquée dès qu'une image vidéo existe */}
       <div
         className={cn(
           "absolute inset-0 bg-cover bg-center transition-opacity duration-500",
-          photoVisible ? "opacity-100" : "opacity-0",
+          photoVisible && !cinematicOverlay ? "opacity-100" : "opacity-0",
         )}
         style={{ backgroundImage: `url(${backgroundPortrait})` }}
         aria-hidden
@@ -442,7 +452,7 @@ const ConversationScreen = ({
           className={cn(
             "absolute inset-0 h-full w-full transition-opacity duration-300",
             avatarVideoFit === "contain" ? "object-contain" : "object-cover",
-            frozenVisible ? "opacity-100" : "opacity-0",
+            frozenVisible && !cinematicOverlay ? "opacity-100" : "opacity-0",
           )}
           aria-hidden
         />
@@ -462,7 +472,7 @@ const ConversationScreen = ({
           className={cn(
             "absolute inset-0 h-full w-full transition-opacity duration-300",
             avatarVideoFit === "contain" ? "object-contain" : "object-cover",
-            videoVisible ? "opacity-100" : "opacity-0",
+            videoVisible && !cinematicOverlay ? "opacity-100" : "opacity-0",
           )}
           aria-label={`Flux vidéo en direct de ${displayName}`}
         />

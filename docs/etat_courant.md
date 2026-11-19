@@ -1,5 +1,10 @@
 # Ava — état courant
 
+**Cinématiques : interruption ou superposition (19 novembre, code)** : mode au choix dans Expérience → Cinématiques
+(défaut inchangé « Interrompre ») ; la superposition choisit sa vidéo sur le texte de la réplique (le GM décide trop
+tard) et la montre pendant la voix, son −15 dB d'essai. Recette Ulrich + Romed en sandbox à faire ; production non
+publiée. [Plan et protocole](plan_cinematiques_interruption_superposition.md) · [reprise lot 2](prompt_reprise_cinematiques_superposition_lot_2.md).
+
 **Socle commun des réglages (19 novembre)** : sandbox et voix héritent de la production champ par champ ; migrations de copie Ulrich → Romed/Benoît/Julien et catalogue prod à faire appliquer par Lovable (prod : go requis). [Plan et reprise](plan_socle_commun_reglages.md).
 
 **Lot K1 — faits établis et juge calibré (14 novembre, code)** : le noyau `optimized_v3` porte un bloc protégé

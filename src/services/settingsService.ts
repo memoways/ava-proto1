@@ -1,6 +1,11 @@
 import { HANDS_FREE_DEFAULTS, normalizeHandsFreeSettings, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import defaultSettings from "@/config/settings.json";
 import { DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC } from "@/services/videoEligibility";
+import {
+  DEFAULT_CINEMATIC_PRESENTATION,
+  DEFAULT_OVERLAY_VIDEO_GAIN_DB,
+  type CinematicPresentation,
+} from "@/services/cinematicTransition";
 import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { ELEVENLABS_EXPRESSIVE_MODEL, ELEVENLABS_MODEL_CAPABILITIES, normalizeElevenLabsModelId } from "../../supabase/functions/_shared/elevenLabsModels";
 import {
@@ -688,6 +693,14 @@ export interface VideoTriggerSettings {
   MIN_LABELS_REQUIRED: number;
   /** Parcours « film pas vu » : extraits du film à montrer avant une vidéo transformée. */
   MIN_EXTRACTS_BEFORE_CINEMATIC: number;
+  /**
+   * « interrupt » (défaut, comportement historique) : la vidéo suspend la conversation après la réponse.
+   * « overlay » : la vidéo remplace l'image du personnage pendant la réponse qui l'a motivée.
+   * Une valeur absente ou inconnue vaut « interrupt ». Mêmes règles de fréquence dans les deux modes.
+   */
+  PRESENTATION: CinematicPresentation;
+  /** Mode superposition : atténuation du son de la vidéo sous la voix, en dB (≤ 0). */
+  OVERLAY_VIDEO_GAIN_DB: number;
 }
 
 const VIDEO_TRIGGER_STORAGE_KEY = "ava_video_trigger_settings";
@@ -699,6 +712,8 @@ export const videoTriggerDefaults: VideoTriggerSettings = {
   MAX_PER_SESSION: 0,
   MIN_LABELS_REQUIRED: 1,
   MIN_EXTRACTS_BEFORE_CINEMATIC: DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC,
+  PRESENTATION: DEFAULT_CINEMATIC_PRESENTATION,
+  OVERLAY_VIDEO_GAIN_DB: DEFAULT_OVERLAY_VIDEO_GAIN_DB,
 };
 
 export function getVideoTriggerSettings(): VideoTriggerSettings {

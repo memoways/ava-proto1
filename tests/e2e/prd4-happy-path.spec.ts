@@ -63,6 +63,8 @@ interface NetworkFakeOptions {
   elevenLabsSettings?: Record<string, unknown>;
   /** Other `admin_settings` rows served by the fake database (key → value). */
   extraSettings?: Record<string, unknown>;
+  /** Overlay cinematic selector answer (default: the E2E video, confidence 0.9). */
+  overlaySelection?: { videoId: string | null; delayMs?: number };
 }
 
 function json(route: Route, body: unknown, status = 200) {
@@ -88,6 +90,7 @@ async function installNetworkFakes(
   let followUpCallCount = 0;
   const syncQuestionnaireBodies: Array<Record<string, unknown>> = [];
   let gmPostTurnCount = 0;
+  let overlaySelectionCount = 0;
   let ragCallCount = 0;
   let summaryCallCount = 0;
   let summaryLastTurn = 0;
@@ -124,6 +127,8 @@ async function installNetworkFakes(
       __e2eLongAudioMs?: number;
       __e2eAudioState?: { ended: number; paused: number };
       __e2eNativeVideoState?: { playing: boolean; playCount: number; pauseCount: number };
+      /** Fake play() also emits « playing » (overlay cinematics wait for real playback). */
+      __e2eVideoPlayingEvent?: boolean;
       __e2eSTTFinals?: number;
       __e2eGradiumTexts?: string[];
       __e2eGradiumSetups?: number;
@@ -143,6 +148,9 @@ async function installNetworkFakes(
         if (this instanceof HTMLVideoElement && testWindow.__e2eNativeVideoState) {
           testWindow.__e2eNativeVideoState.playing = true;
           testWindow.__e2eNativeVideoState.playCount += 1;
+          if (testWindow.__e2eVideoPlayingEvent) {
+            window.setTimeout(((element: HTMLVideoElement) => () => element.dispatchEvent(new Event("playing")))(this), 50);
+          }
         }
         return Promise.resolve();
       },
@@ -638,6 +646,16 @@ async function installNetworkFakes(
           usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
         });
       }
+      if (system.includes("Tu choisis une vidéo à montrer PENDANT")) {
+        overlaySelectionCount += 1;
+        const selection = options.overlaySelection ?? { videoId: "44444444-4444-4444-8444-444444444444" };
+        if (selection.delayMs) await new Promise(resolve => setTimeout(resolve, selection.delayMs));
+        return json(route, {
+          id: `overlay-selection-${overlaySelectionCount}`, model: "e2e-model",
+          choices: [{ message: { content: JSON.stringify({ videoId: selection.videoId, confidence: 0.9, reason: "la réplique évoque ce lieu" }) }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
+        });
+      }
       if (system.includes("analyste du Game Master")) {
         labelCallCount += 1;
         content = JSON.stringify(
@@ -759,6 +777,7 @@ async function installNetworkFakes(
   return {
     getMaxTurnCount: () => maxTurnCount,
     getGmPostTurnCount: () => gmPostTurnCount,
+    getOverlaySelectionCount: () => overlaySelectionCount,
     getSessionRow: () => sessionRow,
     changeSessionRow: (patch: Record<string, unknown>) => Object.assign(sessionRow, patch),
     getMaxMessageCounts: () => maxMessageCounts,
@@ -1473,6 +1492,108 @@ test("lot 3b : mains libres, Ignorer annule la séquence annoncée sans la jouer
   expect(await veilPhase(page)).toBe("idle");
   const skipped = fakes.getExperienceEvents().find((event) => event.event_type === "cinematic_skipped");
   expect(skipped?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, skipped: true, stage: "pending" });
+  expect(fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_played")).toBe(false);
+});
+
+// ---- Cinématiques superposées à la réponse ------------------------------------
+const OVERLAY_SETTINGS = { ava_video_trigger_settings: { PRESENTATION: "overlay", OVERLAY_VIDEO_GAIN_DB: -15 } };
+const overlayRoot = (page: Page) => page.locator("[data-cinematic-overlay=true]");
+
+/** PTT turns 1–3; the third reply lasts `replyMs` and is the one the GM illustrates. */
+async function speakThreeTurns(page: Page, transcripts: string[], replyMs: number) {
+  await startCharacterConversation(page, "Max");
+  for (let turn = 1; turn <= 3; turn += 1) {
+    await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Démarrer l'enregistrement" }).click();
+    await expect(page.getByText(transcripts[turn - 1], { exact: false })).toBeVisible();
+    if (turn === 3) {
+      await page.evaluate((ms) => {
+        const testWindow = window as Window & { __e2eLongAudioMs?: number; __e2eVideoPlayingEvent?: boolean };
+        testWindow.__e2eLongAudioMs = ms;
+        testWindow.__e2eVideoPlayingEvent = true;
+      }, replyMs);
+    }
+    await page.getByRole("button", { name: "Arrêter l'enregistrement" }).click();
+  }
+}
+
+test("superposition : la vidéo remplace Max pendant sa réponse, son atténué, sans couper ni retenir la parole", async ({ page }) => {
+  test.setTimeout(60_000);
+  const transcripts = ["Parle-moi de Max.", "Que sais-tu au sujet d'Ava ?", "Montre-moi le souvenir familial."];
+  const longReply = "Je me souviens de ce dimanche au bord du lac, le vent soufflait fort, les bateaux rentraient au port et la lumière tombait doucement sur l'eau.";
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3, ttsSuccess: true,
+    characterReplies: [undefined, undefined, longReply] as unknown as string[], extraSettings: OVERLAY_SETTINGS });
+  await speakThreeTurns(page, transcripts, 5_000);
+  const endedBefore = (await audioState(page)).ended;
+
+  // Shown over the reply: the conversation screen stays (transparent), no black veil, no « Passer ».
+  await expect(overlayRoot(page)).toBeVisible({ timeout: 10_000 });
+  expect(await veilPhase(page)).toBe("overlay_showing");
+  expect(await nativeVideoPlaying(page)).toBe(true);
+  await expect(page.getByRole("button", { name: /Passer/ })).toHaveCount(0);
+  await expect(page.getByTestId("cinematic-announced")).toHaveCount(0);
+  const sound = await page.locator("video[aria-label='Video player']").evaluate((video: HTMLVideoElement) =>
+    ({ muted: video.muted, volume: video.volume }));
+  expect(sound.muted).toBe(false);
+  expect(sound.volume).toBeCloseTo(0.178, 2);
+  expect((await audioState(page)).paused).toBe(0);
+  expect((await audioState(page)).ended).toBe(endedBefore);
+
+  // The reply ends: back to Max, listening reopens at once (nothing was held).
+  await expect(overlayRoot(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect.poll(() => veilPhase(page), { timeout: 5_000 }).toBe("idle");
+  expect((await audioState(page)).ended).toBeGreaterThan(endedBefore);
+  expect((await audioState(page)).paused).toBe(0);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled();
+
+  const events = fakes.getExperienceEvents();
+  // Chosen on the reply text by the dedicated selector, never by the post-reply GM.
+  expect(fakes.getOverlaySelectionCount()).toBe(1);
+  const recommended = events.find((event) => event.event_type === "cinematic_recommended");
+  expect(recommended?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, presentation: "overlay", source: "overlay_selector" });
+  const played = events.find((event) => event.event_type === "cinematic_played");
+  expect(played?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, presentation: "overlay", deferrals: 0 });
+  expect(Number(played?.payload.decisionToStartMs)).toBeLessThan(2_500);
+  const completed = events.find((event) => event.event_type === "cinematic_completed");
+  expect(completed?.payload).toMatchObject({ videoId: CINEMATIC_E2E_VIDEO_ID, presentation: "overlay", outcome: "reply_ended" });
+  expect(events.filter((event) => event.event_type === "cinematic_played")).toHaveLength(1);
+});
+
+test("superposition : réponse trop courte — pas de vidéo, la réponse reste normale et la vidéo reste disponible", async ({ page }) => {
+  test.setTimeout(60_000);
+  const transcripts = ["Parle-moi de Max.", "Que sais-tu au sujet d'Ava ?", "Montre-moi le souvenir familial."];
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3, ttsSuccess: true, extraSettings: OVERLAY_SETTINGS });
+  await speakThreeTurns(page, transcripts, 1_500);
+  await expect.poll(() => fakes.getExperienceEvents().some((event) =>
+    event.event_type === "cinematic_blocked"
+      && ["overlay_reply_too_short", "overlay_reply_over"].includes(String(event.payload.blockedReason))), { timeout: 10_000 }).toBe(true);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+  await expect(overlayRoot(page)).toHaveCount(0);
+  expect(await veilPhase(page)).toBe("idle");
+  expect(await nativeVideoPlaying(page)).toBe(false);
+  expect((await audioState(page)).paused).toBe(0);
+  expect(fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_played")).toBe(false);
+  expect(fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_recommended")).toBe(false);
+  // Not enough reply left: no selection call at all.
+  expect(fakes.getOverlaySelectionCount()).toBe(0);
+});
+
+test("superposition : aucune vidéo pertinente selon la sélection — la réponse reste normale", async ({ page }) => {
+  test.setTimeout(60_000);
+  const transcripts = ["Parle-moi de Max.", "Que sais-tu au sujet d'Ava ?", "Raconte-moi ta journée."];
+  const longReply = "Ce matin j'ai rangé l'atelier, trié des vis, puis j'ai attendu le facteur qui n'est jamais venu, et la soirée a passé sans bruit.";
+  const fakes = await installNetworkFakes(page, transcripts, { triggerVideoAtLabel: 3, ttsSuccess: true,
+    characterReplies: [undefined, undefined, longReply] as unknown as string[], extraSettings: OVERLAY_SETTINGS,
+    overlaySelection: { videoId: null } });
+  await speakThreeTurns(page, transcripts, 4_000);
+  await expect.poll(() => fakes.getExperienceEvents().some((event) =>
+    event.event_type === "cinematic_blocked" && event.payload.blockedReason === "overlay_selection_none"), { timeout: 10_000 }).toBe(true);
+  await expect(page.getByRole("button", { name: "Démarrer l'enregistrement" })).toBeEnabled({ timeout: 10_000 });
+  await expect(overlayRoot(page)).toHaveCount(0);
+  expect(await nativeVideoPlaying(page)).toBe(false);
+  expect((await audioState(page)).paused).toBe(0);
+  // The post-reply GM recommended this video, but overlay mode never plays it after the reply.
+  expect(fakes.getGmPostTurnCount()).toBeGreaterThanOrEqual(3);
   expect(fakes.getExperienceEvents().some((event) => event.event_type === "cinematic_played")).toBe(false);
 });
 
