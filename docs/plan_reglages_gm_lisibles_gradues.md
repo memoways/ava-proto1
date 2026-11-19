@@ -23,6 +23,21 @@ Plan validé par Ulrich le 19 novembre 2026. Lot A livré le 19 novembre (voir �
   Lecture Lovable : toutes les versions publiées (prod, sandbox-ulrich/romed/benoit/julien) ont les 4 axes cochés ou
   aucun champ → tout passe au cran 2, aucune migration. **Effet mesurable : non démontré** (voir « Mesure du lot B »).
   Suite : [lot D](prompt_reprise_reglages_gm_lot_d.md), puis [lot E](prompt_reprise_courbe_experience_gm_lot_e.md).
+- **D — livré (code, 19 novembre)** : `src/services/characterState.ts` (modèle, fragments par axe et niveau 0–5,
+  validation déterministe de `character_state_delta`, séries d'historique), colonne `state_profile` jsonb et RPC
+  `get_character_state_profile` (migration `20261119140000_character_state_profile.sql`, **à coller dans le chat Lovable
+  après fusion**), bloc « ÉTAT DU PERSONNAGE À CE TOUR » juste après « PAROLE DU TOUR » dans les quatre compilateurs,
+  section « ## ÉTAT DU PERSONNAGE » côté GM, éditeur de radar (Recharts) dans Réglages personnages, mini-radar et courbes
+  dans l'historique des sessions, ligne « État joué » dans l'export Markdown. Constat Lovable du 19 novembre :
+  `character_runtime_profiles` = 20 lignes (4 personnages × 5 environnements), RLS admin seulement, la lecture joueur
+  passe par une RPC `SECURITY DEFINER`. Écarts au plan : (1) une **seconde RPC** de lecture plutôt que de modifier
+  `get_character_speech_runtime` (absente des migrations du dépôt, changer son type de retour aurait imposé de la
+  recréer à l'aveugle) ; elle fige le profil sur l'instantané de session dès que celui-ci existe (au plus tard au
+  tour 2) ; (2) les fragments d'axe vivent dans `characterState.ts`, pas dans `gmSettingsRegistry.ts` (qui décrit les
+  réglages du GM, pas ceux des personnages) ; (3) `state_profile` NULL = fonction absente, aucune ligne n'est
+  initialisée : tout est neutre tant qu'un administrateur n'active pas le radar d'un personnage. **Dimensions à valider
+  avec Romed** : non consignées avant ce lot, les cinq libellés sont éditables par personnage ; la validation reste à
+  obtenir avant d'activer le radar en production.
 
 ## Contexte
 
@@ -123,7 +138,9 @@ Ainsi l'UI montre sous chaque réglage « ➜ envoyé au GM : … » ou « ➜ a
    et champ optionnel `character_state_delta` dans la sortie JSON post-tour. Validation déterministe : ±maxStep,
    bornes, personnage et tour source corrects, résultat tardif ignoré (mêmes protections que le conseil en attente).
    Appliqué au tour suivant, sans appel ajouté. Mode off : état initial fixe ; light : évolution conservée, état transmis
-   (c'est un état, pas un conseil de parole — à confirmer à l'écoute).
+   (c'est un état, pas un conseil de parole — à confirmer à l'écoute). Format réalisé :
+   `character_state_delta: { characterKey, sourceTurn, changes: { axe: entier signé } }` ; personnage ou tour source
+   différents (résultat tardif) = delta ignoré en entier ; pas au-delà de `maxStepPerTurn` et bornes = écrêtés.
 6. Trace : état par tour dans `gm_post_turn_log`, mini-radar + courbe par dimension dans l'historique des sessions.
 7. Lien `emotionalState` → prosodie inchangé dans ce lot.
 

@@ -7,6 +7,7 @@ import { AVA_CHARACTER_REGISTRY } from "@/services/characterRegistry";
 import { normalizeRugosite } from "@/services/speechRugosity";
 import { normalizeGmMode } from "@/services/gmSpeechGuidance";
 import { normalizePriorityLevels } from "@/services/gmPriorities";
+import { normalizeStateProfile, type CharacterStateProfile } from "@/services/characterState";
 
 /** Personnages activables : ceux marqués actifs dans le registre central. */
 export function registryActiveCharacterKeys(): string[] {
@@ -53,6 +54,8 @@ export interface CharacterRuntimeProfile {
   knowledge_isolation_validated: boolean;
   /** Rugosité de parole 0–3 (0 = comportement actuel). */
   rugosite: number;
+  /** Lot D — raw `state_profile` jsonb (null before configuration); read it with normalizeStateProfile. */
+  state_profile?: unknown;
   updated_at: string;
   environment_id: string;
 }
@@ -259,7 +262,7 @@ export async function updateCharacterRuntimeProfile(
     | "qualitative_tests_validated"
     | "knowledge_isolation_validated"
     | "rugosite"
-  >,
+  > & { state_profile?: unknown },
 ): Promise<void> {
   const { error } = await supabase
     .from("character_runtime_profiles" as never)
@@ -469,6 +472,22 @@ export async function fetchCharacterSpeechRuntime(characterKey: string, sessionI
     environmentId: row.environment_id,
     recentStates: Array.isArray(row.recent_states) ? row.recent_states.slice(0, 2).map(value => typeof value === "string" ? value : null) : [],
   };
+}
+
+/**
+ * Lot D — state radar profile of a character, frozen on the session at first
+ * read (like the rugosity) so a back-office edit never shifts a live call.
+ * Null when the character has no profile: no state block, no GM section.
+ */
+export async function fetchCharacterStateProfile(characterKey: string, sessionId: string | null): Promise<CharacterStateProfile | null> {
+  await ensureGameAuth();
+  const { data, error } = await supabase.rpc("get_character_state_profile" as never, {
+    p_character_key: characterKey,
+    p_environment_id: getActiveEnvironment(),
+    ...(sessionId ? { p_session_id: sessionId } : {}),
+  } as never);
+  if (error) throw error;
+  return normalizeStateProfile(data);
 }
 
 export function clearDirectorRuntimeCache(sessionId?: string): void {

@@ -15,6 +15,8 @@ import { characterVoice, loadCharacterVoicesFromDB, seedFromProfiles, type Chara
 import type { TTSProviderId } from '@/services/tts/types';
 import { EffectiveVoiceBlock, useVoiceProfiles } from '@/components/admin/EffectiveVoiceSummary';
 import { DEVICE_CLASSES } from '@/services/deviceClass';
+import { CharacterStateEditor } from "@/components/admin/CharacterStateEditor";
+import { serializeStateProfile, normalizeStateProfile } from "@/services/characterState";
 import {
   fetchCharacterAutoReadiness,
   listCharacterRuntimeProfiles,
@@ -152,6 +154,8 @@ export default function CharacterRuntimeSettingsTab() {
         qualitative_tests_validated: profile.qualitative_tests_validated,
         knowledge_isolation_validated: profile.knowledge_isolation_validated,
         rugosite: profile.rugosite ?? 0,
+        // Lot D: written only when the column exists (after the Lovable migration).
+        ...("state_profile" in profile ? { state_profile: normalizeStateProfile(profile.state_profile) ? serializeStateProfile(normalizeStateProfile(profile.state_profile)!) : null } : {}),
       });
       toast.success(`Profil runtime ${profile.display_name} sauvegardé`);
       await load();
@@ -297,6 +301,12 @@ export default function CharacterRuntimeSettingsTab() {
                     Module la fréquence des états bloqués, des ruptures et la tolérance au silence — jamais les faits. Épinglée à la session au premier tour.
                   </p>
                 </div>
+
+                <CharacterStateEditor
+                  characterName={profile.display_name}
+                  value={profile.state_profile}
+                  onChange={(next) => patchProfile(profile.id, { state_profile: next })}
+                />
 
                 <div className="space-y-2 rounded bg-muted/40 p-3">
                   <label className="flex items-start gap-2 text-xs">

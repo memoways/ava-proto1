@@ -7,6 +7,7 @@ vi.mock("@/agents/gameMasterPRD4", () => ({ evaluatePostTurnPRD4: vi.fn(), commi
 vi.mock("@/services/experienceOrchestration", () => ({
   fetchPinnedDirectorRuntime: vi.fn(async () => ({ versionId: "gm-v1", versionNumber: 1, prompt: "DIRECTOR", config: null })),
   fetchCharacterSpeechRuntime: vi.fn(async () => ({ rugosite: 0, settingsVersion: "test-v1", environmentId: "sandbox-ulrich", recentStates: [] })),
+  fetchCharacterStateProfile: vi.fn(async () => null),
 }));
 vi.mock("@/services/ragService", () => ({
   queryRAGDetailed: vi.fn(),
@@ -74,7 +75,7 @@ import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { fetchConversationMemory } from "@/services/sessionConversationMemory";
-import { fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
+import { fetchCharacterStateProfile, fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
 import { loadCharacterPrompt } from '@/services/characterPromptService';
 import speechSheets from '@/agents/__fixtures__/speechSandbox20261025.json';
 import { getGameplaySettings } from "@/services/settingsService";
@@ -1165,5 +1166,55 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
       expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
       expect(persistPostTurnMemory).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("character state radar (lot D)", () => {
+  const profile = { initial: { combativite: 3, initiative: 3, lucidite: 3, ouverture: 3, agitation: 2 }, gmCanEvolve: true, maxStepPerTurn: 1 };
+  const evolved = { combativite: 3, initiative: 3, lucidite: 3, ouverture: 3, agitation: 5 };
+  const pin = (gmMode: "off" | "light" | "full") => vi.mocked(fetchPinnedDirectorRuntime).mockResolvedValueOnce({
+    versionId: "gm-state", versionNumber: 1, prompt: "DIRECTOR", config: { editor: { gmMode } } as never,
+  });
+  const turn = (extra: Record<string, unknown> = {}) => processPRD4Turn({ sessionId: "state-s", conversationHistory: [],
+    userMessage: "Et ensuite ?", userRole: null, timeElapsedSeconds: 30, ...extra });
+  const normalized = async () => (await import("@/services/characterState")).normalizeStateProfile(profile);
+
+  it("sends no state block when the character has no profile (behaviour unchanged)", async () => {
+    pin("full");
+    await turn();
+    expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].characterState).toBeUndefined();
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls.at(-1)![0].characterState).toBeNull();
+  });
+
+  it("full and light: the evolved state reaches the character and the GM", async () => {
+    for (const mode of ["full", "light"] as const) {
+      vi.mocked(fetchCharacterStateProfile).mockResolvedValueOnce(await normalized());
+      pin(mode);
+      const result = await turn({ characterStateLogged: evolved });
+      await result.postTurnPromise;
+      expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].characterState).toContain("à vif");
+      expect(vi.mocked(evaluatePostTurnPRD4).mock.calls.at(-1)![0].characterState?.levels.agitation).toBe(5);
+    }
+  });
+
+  it("off: the initial state stays fixed, no GM call, and the fixed state is logged", async () => {
+    vi.mocked(evaluatePostTurnPRD4).mockClear();
+    vi.mocked(fetchCharacterStateProfile).mockResolvedValueOnce(await normalized());
+    pin("off");
+    const result = await turn({ characterStateLogged: evolved });
+    const evaluation = await result.postTurnPromise;
+    const sent = vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].characterState ?? "";
+    expect(sent).not.toContain("à vif");
+    expect(sent).toContain("détendu");
+    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+    expect(evaluation.character_state_used?.agitation).toBe(2);
+    expect(evaluation.character_state_after?.agitation).toBe(2);
+  });
+
+  it("a failed profile read never fails the reply: no state this turn", async () => {
+    vi.mocked(fetchCharacterStateProfile).mockRejectedValueOnce(new Error("boom"));
+    pin("full");
+    await turn();
+    expect(vi.mocked(simulateMaxResponse).mock.calls.at(-1)![0].characterState).toBeUndefined();
   });
 });

@@ -122,6 +122,8 @@ export interface MaxAgentInput {
   /** Rugosité de parole 0–3, épinglée à la session (0 = comportement actuel). */
   rugosite?: number;
   speechStateHistory?: Array<string | null>;
+  /** Lot D — bloc « ÉTAT DU PERSONNAGE À CE TOUR » déjà compilé (absent = pas de profil d'état). */
+  characterState?: string;
 }
 
 export interface MaxTemporalContext {
@@ -129,6 +131,8 @@ export interface MaxTemporalContext {
   sessionDurationSeconds: number;
   turnIndex: number;
 }
+
+export const CHARACTER_STATE_SECTION_TITLE = "ÉTAT DU PERSONNAGE À CE TOUR";
 
 export interface MaxGmGuidance {
   /** next_turn_guidance du GM post-tour du tour précédent. */
@@ -659,6 +663,7 @@ export async function buildMaxSystemPrompt(
       ["session_summary", "SOUVENIRS DE LA SESSION", input.sessionSummary],
       ["gm_guidance", "CONSEIL DE MISE EN SCÈNE", input.gmGuidance?.guidance?.trim() ? buildGmGuidanceBlock(input.gmGuidance) : undefined],
       ["speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input)],
+      ["character_state", CHARACTER_STATE_SECTION_TITLE, input.characterState],
       ["rag_context", "CONTEXTE NARRATIF — SOURCE DE VÉRITÉ", input.ragContext],
       ["post_video", "APRÈS LA VIDÉO", input.postVideoContext],
       ["watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos],
@@ -751,6 +756,7 @@ export async function buildMaxSystemPrompt(
       temporalContext: input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined,
       gmGuidance,
       speechState: buildSpeechStateBlock(input),
+      characterState: input.characterState,
       relationshipDirective: input.relationshipDirective,
       experienceFrame: input.experienceFrame,
       guards: guards || undefined,
@@ -852,6 +858,7 @@ export async function buildMaxSystemPrompt(
   appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input));
+  appendDynamicSection("character_state", CHARACTER_STATE_SECTION_TITLE, input.characterState);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);
@@ -1022,6 +1029,7 @@ async function buildRichMaxSystemPrompt(
   appendDynamicSection("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame);
   appendDynamicSection("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective);
   appendDynamicSection("speech_state", "PAROLE DU TOUR", buildSpeechStateBlock(input));
+  appendDynamicSection("character_state", CHARACTER_STATE_SECTION_TITLE, input.characterState);
   appendDynamicSection("temporal_context", "ÉTAT DE L'APPEL", input.temporalContext ? buildTemporalContextBlock(input.temporalContext) : undefined);
   appendDynamicSection("user_role", "RÔLE DE L'INTERLOCUTEUR", input.userRoleSummary);
   appendDynamicSection("session_summary", "MÉMOIRE DE SESSION", input.sessionSummary);

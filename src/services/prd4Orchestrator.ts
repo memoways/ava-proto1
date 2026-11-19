@@ -42,7 +42,8 @@ import {
   createInitialRelationshipState,
   normalizeRelationshipState,
 } from "@/services/relationshipEngine";
-import { fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime, normalizeDirectorConfig } from "@/services/experienceOrchestration";
+import { fetchCharacterSpeechRuntime, fetchCharacterStateProfile, fetchPinnedDirectorRuntime, normalizeDirectorConfig } from "@/services/experienceOrchestration";
+import { compileCharacterStateBlock, resolveCharacterStateForTurn, type StateLevels } from "@/services/characterState";
 import { selectSpeechState } from "@/services/speechRugosity";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -115,6 +116,11 @@ export interface PRD4TurnInput {
   gmTopicsCovered?: string[];
   /** Boucle GM→Max : état de parole proposé par le post-tour précédent. */
   gmSpeechState?: string | null;
+  /**
+   * Lot D — evolved state radar of the active character, validated at the
+   * previous post-turn (absent: the profile's initial state is used).
+   */
+  characterStateLogged?: StateLevels | null;
   /** Reçoit l'état « parole » déclaré par le personnage (flux streamé). */
   playedSpeechStateRef?: { current: string | null };
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
@@ -267,6 +273,12 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       console.warn("[PRD4 orchestrator] Speech runtime unavailable; neutral rendering for this turn:", speechRuntimeStatus);
       return null;
     });
+  // Lot D: state radar profile; a failed read means no state this turn, never a failed reply.
+  const stateProfilePromise = withTimeout("character_state_profile", fetchCharacterStateProfile(activeCharacter, input.sessionId), SUMMARY_FETCH_DEADLINE_MS)
+    .catch((error: unknown) => {
+      console.warn("[PRD4 orchestrator] State profile unavailable; no state block this turn:", error instanceof Error ? error.name : "unknown");
+      return null;
+    });
   const directorRuntimePromise = fetchPinnedDirectorRuntime(input.sessionId).catch(() => ({
     versionId: null,
     versionNumber: null,
@@ -395,6 +407,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     speechState: gmProposedSpeechState,
   });
   const proposedSpeechState = characterGuidance.speechState;
+  // Lot D: off keeps the initial state fixed; light and full keep the evolution.
+  const stateProfile = await stateProfilePromise;
+  const characterStateLevels = resolveCharacterStateForTurn({ profile: stateProfile, mode: gmMode, logged: input.characterStateLogged });
+  const characterStateForGm = stateProfile && characterStateLevels ? { profile: stateProfile, levels: characterStateLevels } : null;
   const characterTimeCues = isCharacterTimeCuesEnabled(frameRuntime.config);
   const temporalValues = { timeElapsedSeconds: input.timeElapsedSeconds, sessionDurationSeconds, turnIndex };
   const experienceFrame = buildExperienceFrame({
@@ -432,6 +448,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     relationshipDirective: relationshipDirective.prompt,
     experienceFrame: experienceFrame.prompt || undefined,
     speechStateDirective: proposedSpeechState,
+    characterState: characterStateForGm ? compileCharacterStateBlock(characterStateForGm.levels, characterStateForGm.profile) : undefined,
     rugosite,
     speechStateHistory: recentSpeechStates,
   };
@@ -544,7 +561,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       // character received) so the history can say "nothing: mode off".
       const skipped: PRD4PostTurnDetailedResult = buildGmOffEvaluation({
         characterKey: activeCharacter, turnIndex, injected: characterGuidance.injected,
-        orchestrationVersionId: frameRuntime.versionId ?? null, orchestrationConfig: frameRuntime.config ?? null });
+        orchestrationVersionId: frameRuntime.versionId ?? null, orchestrationConfig: frameRuntime.config ?? null,
+        characterState: characterStateLevels });
       if (input.sessionId && !candidate) {
         try { await persistPostTurnMemory(input.sessionId, skipped, null, turnIndex, activeCharacter,
           ...((input.postTurnSignal ?? input.signal) ? [(input.postTurnSignal ?? input.signal)!] as const : [])); }
@@ -606,6 +624,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         speechSettingsVersion: speechRuntime?.settingsVersion,
         gmMode,
         injectedToCharacter: characterGuidance.injected,
+        characterState: characterStateForGm,
       });
     } finally {
       input.onLatencySegment?.({

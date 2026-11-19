@@ -1,4 +1,5 @@
 import { joinGuidanceParts, type GmGuidancePart } from '@/services/gmSpeechGuidance';
+import { rebuildCharacterStates, type StateLevels } from '@/services/characterState';
 import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
@@ -383,6 +384,8 @@ const IndexPRD4 = () => {
   const pendingGmGuidanceRef = useRef<GmGuidancePart | null>(null);
   const pendingSpeechStateRef = useRef<string | null>(null);
   const pendingEmotionalStateRef = useRef<string | null>(null);
+  /** Lot D: evolved state radar per character, validated at each post-turn (never read from a late result). */
+  const characterStateRef = useRef<Record<string, StateLevels>>({});
   const gmTopicsCoveredRef = useRef<string[]>([]);
   const activeCharacterRef = useRef<RuntimeCharacter>("max");
   const activeCharacterContextRef = useRef<CharacterExecutionContext | null>(null);
@@ -1177,6 +1180,7 @@ const IndexPRD4 = () => {
       ? latestGm?.next_speech_state ?? null
       : null;
     pendingEmotionalStateRef.current = null;
+    characterStateRef.current = rebuildCharacterStates(session.gm_post_turn_log);
     gmTopicsCoveredRef.current = latestGm?.topics_covered ?? [];
     endedRef.current = false;
     isProcessingRef.current = false;
@@ -1317,6 +1321,7 @@ const IndexPRD4 = () => {
     setHandoffCalling(false);
     pendingGmGuidanceRef.current = null;
     pendingEmotionalStateRef.current = null;
+    characterStateRef.current = {};
     gmTopicsCoveredRef.current = [];
     setSelectedCharacter(startingCharacter);
     dispatchCinematicRef.current({ type: "cancel" }, "reset");
@@ -1917,6 +1922,7 @@ const IndexPRD4 = () => {
           gmGuidanceParts,
           gmTopicsCovered: gmTopicsCoveredRef.current,
           gmSpeechState,
+          characterStateLogged: characterStateRef.current[activeCharacterRef.current] ?? null,
           playedSpeechStateRef,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,
@@ -2489,6 +2495,11 @@ const IndexPRD4 = () => {
           const nextAdvice = speechGuidanceAllowed ? ev.next_turn_guidance?.trim() : "";
           pendingGmGuidanceRef.current = nextAdvice ? { kind: "gm_advice", text: nextAdvice } : null;
           pendingSpeechStateRef.current = speechGuidanceAllowed ? ev.next_speech_state ?? null : null;
+          // Lot D: state applied from the next turn. isCurrentTurn() above drops a late result;
+          // the delta itself was already checked against character and source turn.
+          if (ev.character_key && ev.character_state_after) {
+            characterStateRef.current = { ...characterStateRef.current, [ev.character_key]: ev.character_state_after };
+          }
           if (gmExecuted) {
             pendingEmotionalStateRef.current = ev.memory_after?.relationship.emotionalState
               ?? pendingEmotionalStateRef.current;

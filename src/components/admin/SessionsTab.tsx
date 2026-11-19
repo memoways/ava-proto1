@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical, Download, Loader2 } from "lucide-react";
 import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
+import { CharacterStateHistory } from "@/components/admin/CharacterStateHistory";
+import { describeStateLevels } from "@/services/characterState";
 import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
 import { adminTabPath } from "@/services/adminNavigation";
@@ -94,6 +96,8 @@ interface GmPostTurnEntry {
   speech_guidance?: "on" | "off";
   gm_mode?: import("@/types").GmMode;
   injected?: import("@/types").GmInjectedToCharacter;
+  character_state_used?: import("@/services/characterState").StateLevels | null;
+  character_state_applied?: Partial<Record<import("@/services/characterState").StateAxis, number>> | null;
   character_key?: string;
 }
 
@@ -905,6 +909,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   Game Master post-turn ({selected.gm_post_turn_log.length} évaluations)
                   {" · "}mode GM : {sessionGmModeLabel(selected.gm_post_turn_log)}
                 </p>
+                <CharacterStateHistory log={selected.gm_post_turn_log} />
                 <ScrollArea className="h-48">
                   <div className="space-y-1.5">
                     {selected.gm_post_turn_log.map((evalEntry, i) => (
@@ -959,6 +964,13 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                         <p className="mt-0.5" data-testid="gm-to-character">
                           <span className="font-semibold">GM → personnage :</span> {describeGmToCharacter(evalEntry)}
                         </p>
+                        {evalEntry.character_state_used && (
+                          <p className="mt-0.5 text-muted-foreground" data-testid="character-state-line">
+                            <span className="font-semibold">État joué :</span> {describeStateLevels(evalEntry.character_state_used)}
+                            {evalEntry.character_state_applied && Object.keys(evalEntry.character_state_applied).length > 0
+                              && ` (GM → ${Object.entries(evalEntry.character_state_applied).map(([k, v]) => `${k} ${Number(v) > 0 ? "+" : ""}${v}`).join(", ")} au tour suivant)`}
+                          </p>
+                        )}
                         {Array.isArray(evalEntry.topics_covered) && evalEntry.topics_covered.length > 0 && (
                           <p className="text-muted-foreground/70 mt-0.5">
                             sujets: {evalEntry.topics_covered.join(", ")}

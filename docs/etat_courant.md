@@ -1,5 +1,13 @@
 # Ava — état courant
 
+**Réglages GM lisibles, lot D (19 novembre, code)** : chaque personnage peut recevoir un état à 5 dimensions (0–5) à chaque
+tour, que le GM fait évoluer d'un cran au plus par tour (`character_state_delta`, validé par le code, tardif ignoré, sans
+appel IA ajouté). Off : état initial fixe ; light et full : évolution conservée. Radar éditable dans Réglages
+personnages, mini-radar et courbes dans l'historique des sessions. **À faire** : coller la migration
+`20261119140000_character_state_profile.sql` dans le chat Lovable (colonne `state_profile` + RPC), valider les 5
+dimensions avec Romed, activer le radar d'un personnage en sandbox ; rien n'est actif tant que `state_profile` est
+NULL. Production non publiée. [Plan](plan_reglages_gm_lisibles_gradues.md) · [Cadrage lot E](prompt_reprise_courbe_experience_gm_lot_e.md).
+
 **Réglages GM lisibles, lot B (19 novembre, code)** : les 4 cases « Priorités d'analyse » deviennent des curseurs 0–3
 (`editor.priorityLevels`, sécurité plancher à 1, règle d'arbitrage générée quand les niveaux diffèrent, aperçu sous les
 curseurs) ; versions publiées lues via Lovable : cran 2 partout, aucune migration. **Mesure J3 : effet non démontré**

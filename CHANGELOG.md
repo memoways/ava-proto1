@@ -4,6 +4,29 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles : lot D, état du personnage (radar à 5 dimensions)] — 2026-11-19
+
+- **Radar d'état** : cinq axes de 0 à 5 (Combativité, Initiative, Lucidité, Ouverture, Agitation ; libellés éditables par
+  personnage) transmis au personnage à chaque tour dans « ÉTAT DU PERSONNAGE À CE TOUR », compilé par niveau d'axe
+  (`src/services/characterState.ts`), placé après « PAROLE DU TOUR » dans les compilateurs legacy, compact, rich_v2 et
+  optimized_v3. L'état règle l'attitude, la rugosité reste la forme de la parole ; `emotionalState` → prosodie inchangé.
+- **Évolution par le GM, sans appel IA ajouté** : section « ## ÉTAT DU PERSONNAGE » et champ optionnel
+  `character_state_delta` de la sortie post-tour, validé par le code (personnage et tour source corrects, pas ≤
+  `maxStepPerTurn`, bornes min/max ; résultat tardif ignoré), appliqué au tour suivant. Mode off : état initial fixe ;
+  light et full : évolution conservée. Sans profil (`state_profile` NULL) : aucun bloc, aucune section, comportement
+  strictement inchangé.
+- **Stockage** : colonne `state_profile` jsonb de `character_runtime_profiles` et RPC `get_character_state_profile`
+  (profil figé sur la session). Migration `20261119140000_character_state_profile.sql` **à appliquer par le chat
+  Lovable après fusion** ; avant cela, l'app lit un profil absent (aucun effet) et l'enregistrement d'un radar échoue
+  avec un message clair.
+- **Back-office** : Réglages personnages → radar Recharts éditable (niveau initial, min, max, libellés, « le GM peut
+  faire évoluer l'état », pas maximum) et aperçu du texte envoyé.
+- **Trace** : `character_state_used`, `character_state_after`, `character_state_applied` par tour dans
+  `gm_post_turn_log` (aussi pour un tour en off) ; historique des sessions : mini-radar, courbe par dimension et ligne
+  « État joué » ; export Markdown : ligne « État joué ».
+- Production non publiée, base Caractères Notion non touchée. Dimensions à valider avec Romed avant activation.
+  [Plan](docs/plan_reglages_gm_lisibles_gradues.md) · [cadrage lot E](docs/prompt_reprise_courbe_experience_gm_lot_e.md).
+
 ## [Réglages GM lisibles : lot B, priorités d'analyse en curseurs 0–3] — 2026-11-19
 
 - **Curseurs 0–3** : `editor.priorityLevels` (0 ignoré, 1 léger, 2 normal, 3 prioritaire) remplace la liste de cases
