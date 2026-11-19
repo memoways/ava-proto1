@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Courbe d'expérience du GM : lot E1, moteur de directions] — 2026-11-19
+
+- `src/services/experienceDirection.ts` : moteur pur `resolveExperienceDirection` (cinq directions provisoires :
+  établir, creuser, faire peser, relâcher, conclure). Préconditions relationnelles, jamais de saut en avant, retour
+  libre, « conclure » jamais avant 80 %, suspension sur détresse / hostilité / hors-sujet, directions interdites par
+  fiche, biais d'axes du radar en simple indication. Non branché : aucun prompt, orchestrateur, base ni appel IA modifié.
+  Tests unitaires. Reprise : [lot E2](docs/prompt_reprise_courbe_experience_gm_lot_e2.md).
+
 ## [Réglages GM lisibles : lot E, cadrage de la courbe d'expérience] — 2026-11-19
 
 - Document de cadrage `docs/cadrage_courbe_experience_gm.md` (sans code) : interrupteur courbe ouverte / dirigée,
