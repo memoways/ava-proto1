@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Socle commun des réglages] — 2026-11-19
+
+- Les réglages se résolvent champ par champ : défauts ← production ← sandbox ; un catalogue de voix sandbox partiel
+  hérite des ID de la production. Deux migrations (sandbox Romed/Benoît/Julien ← Ulrich, sans écraser leurs réglages ;
+  catalogue de voix en production, go requis). [Plan](docs/plan_socle_commun_reglages.md).
+
 ## [Prompt K2 : une seule logique] — 2026-11-15
 
 - [Prompt du lot K2](docs/prompt_reprise_fiches_corrigees_lot_k2.md) : ne démarre qu'après les fiches corrigées ; retire

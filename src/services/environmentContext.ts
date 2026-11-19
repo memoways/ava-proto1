@@ -150,18 +150,30 @@ function mergeSetting<T>(defaults: T, value: T): T {
   return value ?? defaults;
 }
 
+export type SettingMerge<T> = (base: T, override: T) => T;
+
+/**
+ * Socle commun: production is the shared base, the requested sandbox overrides it
+ * field by field, and hardcoded defaults sit under both. A sandbox row that only
+ * holds some fields therefore keeps inheriting the others (service IDs, models)
+ * from the shared base instead of hiding them.
+ */
 export function resolveSettingRows<T>(
   rows: ReadonlyArray<{ environment_id: EnvironmentId; value: T }>,
   requestedEnvironment: unknown,
   defaults: T,
+  merge: SettingMerge<T> = mergeSetting,
 ): T {
   const requested = normalizeEnvironment(requestedEnvironment);
-  const selected = rows.find((row) => row.environment_id === requested)
-    ?? rows.find((row) => row.environment_id === "prod");
-  return selected ? mergeSetting(defaults, selected.value) : mergeSetting(defaults, defaults);
+  const shared = rows.find((row) => row.environment_id === "prod");
+  const own = requested === "prod" ? undefined : rows.find((row) => row.environment_id === requested);
+  let resolved = merge(defaults, defaults);
+  if (shared) resolved = merge(resolved, shared.value);
+  if (own) resolved = merge(resolved, own.value);
+  return resolved;
 }
 
-export async function loadEnvironmentSetting<T>(key: string, defaults: T): Promise<T> {
+export async function loadEnvironmentSetting<T>(key: string, defaults: T, merge: SettingMerge<T> = mergeSetting): Promise<T> {
   const requested = activeEnvironment;
   try {
     const { data, error } = await supabase
@@ -172,7 +184,7 @@ export async function loadEnvironmentSetting<T>(key: string, defaults: T): Promi
     if (!error && Array.isArray(data)) {
       const rows = data as Array<{ environment_id: EnvironmentId; value: T }>;
       if (rows.length > 0) {
-        const resolved = resolveSettingRows(rows, requested, defaults);
+        const resolved = resolveSettingRows(rows, requested, defaults, merge);
         writeEnvironmentStorage(key, JSON.stringify(resolved), requested);
         return resolved;
       }
@@ -183,11 +195,11 @@ export async function loadEnvironmentSetting<T>(key: string, defaults: T): Promi
 
   try {
     const stored = readEnvironmentStorage(key, requested);
-    if (stored) return mergeSetting(defaults, JSON.parse(stored) as T);
+    if (stored) return merge(defaults, JSON.parse(stored) as T);
   } catch {
     // Ignore malformed browser values.
   }
-  return mergeSetting(defaults, defaults);
+  return merge(defaults, defaults);
 }
 
 export async function saveEnvironmentSetting<T>(key: string, value: T): Promise<void> {

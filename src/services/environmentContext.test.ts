@@ -88,4 +88,15 @@ describe("environment settings context", () => {
     ], "sandbox-romed", { provider: "default" })).toEqual({ provider: "gradium" });
     expect(resolveSettingRows([], "unknown", { provider: "default" })).toEqual({ provider: "default" });
   });
+
+  it("lets a partial sandbox row inherit the missing fields from the shared prod base", () => {
+    type Value = { provider: string; model?: string; extra?: string };
+    const rows: Array<{ environment_id: "prod" | "sandbox-julien"; value: Value }> = [
+      { environment_id: "prod", value: { provider: "elevenlabs", model: "v3" } },
+      { environment_id: "sandbox-julien", value: { provider: "gradium" } },
+    ];
+    expect(resolveSettingRows<Value>(rows, "sandbox-julien", { provider: "d", model: "d", extra: "d" }))
+      .toEqual({ provider: "gradium", model: "v3", extra: "d" });
+    expect(resolveSettingRows<Value>(rows, "prod", { provider: "d" })).toEqual({ provider: "elevenlabs", model: "v3" });
+  });
 });
