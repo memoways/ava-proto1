@@ -134,6 +134,20 @@
       "when": 1794734327869,
       "tag": "0018_add_ce_que_tu_sais_aujourdhui",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795082382565,
+      "tag": "0019_sync_sandbox_settings_from_ulrich",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795082398200,
+      "tag": "0020_shared_voice_catalogue_in_prod",
+      "breakpoints": true
     }
   ]
 }
