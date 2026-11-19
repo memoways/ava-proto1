@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles et gradués : plan] — 2026-11-19
+
+- **Plan validé** (documentation seule, aucun code) : registre unique des réglages GM avec aperçu de ce que chacun
+  envoie et à qui ; compilation des réglages au runtime (aujourd'hui absents des versions `builtin://`) ; modes GM
+  off / léger / fort et vue par tour de ce que le GM transmet au personnage ; priorités d'analyse en curseurs 0–3 ;
+  état des personnages en radar à 5 dimensions que le GM fait évoluer ; courbe d'expérience renvoyée à un chantier
+  séparé. [Plan](docs/plan_reglages_gm_lisibles_gradues.md) · [reprise lot A](docs/prompt_reprise_reglages_gm_lot_a.md).
+
 ## [Guidage de parole du GM : interrupteur A/B] — 2026-11-19
 
 - **Réglages GM → « Guidage de parole du GM »** (défaut activé, versions existantes inchangées). Désactivé, le personnage

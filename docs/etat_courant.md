@@ -1,5 +1,12 @@
 # Ava — état courant
 
+**Réglages GM lisibles et gradués (19 novembre, plan)** : constat — les priorités d'analyse n'ont aucun effet dans le
+code, la moitié des réglages GM n'agit que par un prompt figé à la sauvegarde (absent sur les versions `builtin://`,
+sandbox-romed et sandbox-benoit), deux réglages sont morts. Plan validé : registre unique et aperçu de chaque réglage
+(A), GM off/léger/fort avec vue « GM → personnage » par tour (C), priorités en curseurs 0–3 (B), radar d'état des
+personnages à 5 dimensions que le GM fait évoluer (D), courbe d'expérience en chantier séparé (E).
+[Plan](plan_reglages_gm_lisibles_gradues.md) · [reprise lot A](prompt_reprise_reglages_gm_lot_a.md).
+
 **Guidage de parole du GM : interrupteur A/B (19 novembre, code)** : Réglages GM → « Guidage de parole du GM » (défaut
 activé). Désactivé, le personnage ne reçoit plus le conseil, l'état de parole proposé ni les sujets abordés ; le GM
 continue (cinématiques, passages, mémoire, fin). Les recadrages des garde-fous tombent avec le conseil (arbitrage
