@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Courbe d'expérience du GM, lot E1 (19 novembre, code non branché)** : moteur pur de directions (`experienceDirection.ts`), option B validée par Ulrich ; catalogue provisoire à valider avec Romed. Rien d'actif. Reprise : [lot E2](prompt_reprise_courbe_experience_gm_lot_e2.md).
+
 **Courbe d'expérience du GM, lot E (19 novembre, cadrage seulement)** : [cadrage](cadrage_courbe_experience_gm.md) ; aucun code ; décisions attendues d'Ulrich (catalogue de directions avec Romed, option B, mode light). Reprise : [lot E1](prompt_reprise_courbe_experience_gm_lot_e1.md).
 
 **Réglages GM lisibles, lot D (19 novembre, code)** : chaque personnage peut recevoir un état à 5 dimensions (0–5) à chaque
