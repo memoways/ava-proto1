@@ -42,7 +42,7 @@ import {
   createInitialRelationshipState,
   normalizeRelationshipState,
 } from "@/services/relationshipEngine";
-import { fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime } from "@/services/experienceOrchestration";
+import { fetchCharacterSpeechRuntime, fetchPinnedDirectorRuntime, normalizeDirectorConfig } from "@/services/experienceOrchestration";
 import { selectSpeechState } from "@/services/speechRugosity";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -62,7 +62,7 @@ import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/e
 import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
 import { buildGmOffEvaluation, resolveCharacterGuidance, resolveGmMode, type GmGuidancePart } from './gmSpeechGuidance';
-import type { GmMode } from "@/types";
+import type { GmMode, PriorityLevels } from "@/types";
 import type { ConversationMessage, ConversationTurnTraceV1, ExperienceDirectorConfig, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 import type { ConversationMemoryV1 } from "@/types/conversationMemory";
 
@@ -141,6 +141,8 @@ export interface PRD4TurnInput {
     establishedFacts?: boolean;
     /** In-memory GM mode (off / light / full) for sessionless replays; never persisted. */
     gmMode?: GmMode;
+    /** In-memory GM analysis priority levels (lot B) merged over the pinned config; never persisted. */
+    priorityLevels?: PriorityLevels;
     /**
      * Sequence replay (judge J3): structured memory rebuilt in memory from the
      * previous GM deltas. Read only when there is no session; never persisted.
@@ -556,7 +558,15 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     const gmStart = performance.now();
     input.onLatencySegment?.({ type: "start", segment: "GM", service: "GM post-turn" });
     try {
-      const directorRuntime = frameRuntime;
+      const directorRuntime = evaluationOverrides?.priorityLevels && frameRuntime.config
+        ? {
+          ...frameRuntime,
+          config: normalizeDirectorConfig({
+            ...frameRuntime.config,
+            editor: { ...frameRuntime.config.editor, priorityLevels: evaluationOverrides.priorityLevels },
+          }),
+        }
+        : frameRuntime;
       return await evaluatePostTurnPRD4({
         handoffContext: input.handoffDelivery && input.turnId ? { turnId: input.turnId,
           openRequest: input.handoffOpenRequest ?? null, delivery: candidate ? null : handoffDelivery ?? null,

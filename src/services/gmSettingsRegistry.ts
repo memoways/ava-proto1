@@ -1,10 +1,12 @@
 import type {
+  PriorityKey,
   ExperienceDirectorConfig,
   ExperienceDirectorEditorConfig,
   ExperienceDirectorGuardrails,
 } from "@/types";
 import { EXPERIENCE_FRAME_POSTURE_TEXT, FORBID_SPONTANEOUS_HANDOFF_TEXT, normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { CHARACTER_TIME_CUE_PHASES, CHARACTER_TIME_CUE_SUFFIX, isCharacterTimeCuesEnabled } from "@/services/characterTimeCues";
+import { PRIORITY_LEVEL_TEXT, priorityLevelsFragment } from "@/services/gmPriorities";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 
 /**
@@ -47,11 +49,12 @@ export const GUIDANCE_LABELS: Record<ExperienceDirectorEditorConfig["guidanceLen
   detailed: "Détaillée : jusqu'à deux phrases, avec intention et contrainte narrative.",
 };
 
-export const PRIORITY_LABELS: Record<ExperienceDirectorEditorConfig["priorities"][number], string> = {
-  narrative_continuity: "continuité narrative et cohérence des faits",
-  player_engagement: "engagement du joueur et qualité de l'échange",
-  safety: "sécurité, modération charitable et limites du personnage",
-  pace: "rythme, progression et clôture naturelle dans le temps disponible",
+/** Level-2 (historical) wording of each priority; kept for existing readers. */
+export const PRIORITY_LABELS: Record<PriorityKey, string> = {
+  narrative_continuity: PRIORITY_LEVEL_TEXT.narrative_continuity[2],
+  player_engagement: PRIORITY_LEVEL_TEXT.player_engagement[2],
+  safety: PRIORITY_LEVEL_TEXT.safety[2],
+  pace: PRIORITY_LEVEL_TEXT.pace[2],
 };
 
 export const DERAIL_LABELS: Record<ExperienceDirectorGuardrails["derailTolerance"], string> = {
@@ -88,8 +91,7 @@ export function openQuestionsFragment(config: ExperienceDirectorConfig): string 
 export const toneFragment = (config: ExperienceDirectorConfig) => `Posture du directeur : ${TONE_LABELS[config.editor.tone]}`;
 export const guidanceLengthFragment = (config: ExperienceDirectorConfig) =>
   `Longueur de next_turn_guidance : ${GUIDANCE_LABELS[config.editor.guidanceLength]}`;
-export const prioritiesFragment = (config: ExperienceDirectorConfig) =>
-  `Priorités à appliquer :\n${config.editor.priorities.map((priority) => `- ${PRIORITY_LABELS[priority]}`).join("\n")}`;
+export const prioritiesFragment = priorityLevelsFragment;
 
 const handoffsActive = (config: ExperienceDirectorConfig) => config.editor.allowHandoffs && config.maximumHandoffsPerSession > 0;
 

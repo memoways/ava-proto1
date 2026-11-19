@@ -13,7 +13,6 @@ import {
   OFF_WORLD_GUIDANCE_RULE,
   openQuestionsFragment,
   opennessFragment,
-  PRIORITY_LABELS,
   prioritiesFragment,
   projectContextFragment,
   TONE_LABELS,
@@ -125,7 +124,3 @@ export const GM_GUIDANCE_OPTIONS = [
   { value: "detailed", label: "Détaillée", description: GUIDANCE_LABELS.detailed },
 ] as const;
 
-export const GM_PRIORITY_OPTIONS = (Object.entries(PRIORITY_LABELS) as Array<[
-  ExperienceDirectorEditorConfig["priorities"][number],
-  string,
-]>).map(([value, label]) => ({ value, label }));

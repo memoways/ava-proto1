@@ -126,7 +126,7 @@ describe("validateDirectorDecision", () => {
       editor: {
         tone: "balanced",
         guidanceLength: "balanced",
-        priorities: ["narrative_continuity"],
+        priorityLevels: { narrative_continuity: 2, player_engagement: 0, safety: 1, pace: 0 },
         allowHandoffs: true,
         allowCinematics: true,
         gmMode: "full",

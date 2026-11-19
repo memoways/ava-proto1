@@ -9,7 +9,8 @@ import type { RuntimeCharacter } from "@/types";
 import { processPRD4Turn } from "@/services/prd4Orchestrator";
 import { isResponseStreamContractVariant, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
 import { GM_MODES } from "@/services/gmSpeechGuidance";
-import type { GmMode } from "@/types";
+import type { GmMode, PriorityKey, PriorityLevels } from "@/types";
+import { PRIORITY_KEYS, normalizePriorityLevels } from "@/services/gmPriorities";
 import { characterEstablishedFacts, neutralizeAwaitedCall, withoutEstablishedFacts } from "@/services/establishedFacts";
 import type { CharacterPrompt } from "@/services/characterPromptService";
 
@@ -71,6 +72,8 @@ export interface EvalTurnExtras {
   establishedFacts?: boolean;
   /** Lot C: GM mode of the replay (off / light / full); absent = as the pinned version plays it. */
   gmMode?: GmMode;
+  /** Lot B: analysis priority levels of the replay (merged over the pinned ones); absent = as pinned. */
+  priorityLevels?: PriorityLevels;
 }
 
 export interface EvalTurnConfig extends EvalLiveSnapshot, EvalTurnExtras {
@@ -201,6 +204,14 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
     if (typeof value.gmMode === "string" && (GM_MODES as readonly string[]).includes(value.gmMode)) overrides.gmMode = value.gmMode as GmMode;
     else errors.push("gmMode doit être off, light ou full");
   }
+  if ("priorityLevels" in value) {
+    const raw = value.priorityLevels;
+    const rawLevels = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    const invalid = !rawLevels || Object.entries(rawLevels).some(([key, level]) =>
+      !PRIORITY_KEYS.includes(key as PriorityKey) || !Number.isInteger(level) || (level as number) < 0 || (level as number) > 3);
+    if (invalid) errors.push("priorityLevels doit être un objet { narrative_continuity, player_engagement, safety, pace } de niveaux entiers 0 à 3");
+    else overrides.priorityLevels = normalizePriorityLevels(rawLevels, undefined);
+  }
   if ("situationSummarySource" in value && typeof value.situationSummarySource === "string" && value.situationSummarySource.trim()) {
     overrides.situationSummarySource = value.situationSummarySource.trim().slice(0, 80);
   }
@@ -233,8 +244,11 @@ type EvalSnapshotWithExtras = EvalLiveSnapshot & EvalTurnExtras;
 function describeOverrides(live: EvalSnapshotWithExtras, snapshot: EvalSnapshotWithExtras): string {
   const changed = (Object.keys(snapshot) as Array<keyof EvalSnapshotWithExtras>)
     .filter((key) => key !== "promptVariant" && key !== "situationSummaries" && key !== "situationSummarySource"
-      && snapshot[key] !== live[key])
+      && key !== "priorityLevels" && snapshot[key] !== live[key])
     .map((key) => `${key}=${String(snapshot[key])}`);
+  if (snapshot.priorityLevels && JSON.stringify(snapshot.priorityLevels) !== JSON.stringify(live.priorityLevels)) {
+    changed.push(`priorités ${PRIORITY_KEYS.map((key) => snapshot.priorityLevels![key]).join("/")}`);
+  }
   const present = snapshot.situationSummaries && Object.keys(snapshot.situationSummaries).length;
   if (present && JSON.stringify(snapshot.situationSummaries) !== JSON.stringify(live.situationSummaries)) {
     changed.push(`PRÉSENT ${snapshot.situationSummarySource ?? "candidat"}`);
@@ -732,6 +746,7 @@ export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: Run
     streamContract: config.streamContract,
     establishedFacts: config.establishedFacts,
     gmMode: config.gmMode,
+    priorityLevels: config.priorityLevels,
     ragTopK,
     ragThreshold: config.ragThreshold,
     ragRetrieveK: Math.max(config.ragRetrieveK, ragTopK),
