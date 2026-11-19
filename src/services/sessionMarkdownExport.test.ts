@@ -15,6 +15,20 @@ describe("session Markdown report", () => {
     expect(md).toContain("**Max :**\n\nJe suis là.");
     expect(md.indexOf("Où est Ava ?")).toBeLessThan(md.indexOf("Je ne sais pas."));
   });
+  it("adds a GM -> character line under each reply: injected text, or why nothing was sent", () => {
+    const data = fixture();
+    (data.session as Record<string, unknown>).gm_post_turn_log = [
+      { turn_index: 1, character_key: "emma", execution_status: "executed", gm_mode: "full",
+        injected: { text: "Laisse-la parler de sa sœur.", speechState: null, topicsCovered: [] } },
+      { turn_index: 2, character_key: "max", execution_status: "skipped", execution_reason: "gm_off", gm_mode: "off",
+        injected: { text: "", speechState: null, topicsCovered: [] } },
+    ];
+    const md = buildSessionMarkdown(data);
+    expect(md).toContain("> **GM → personnage :** Laisse-la parler de sa sœur.");
+    expect(md).toContain("> **GM → personnage :** rien : mode off");
+    expect(md).toContain("Mode GM de la session : fort / off");
+    expect(md).not.toContain("GM post-tour 2");
+  });
   it("reports measured first sound averages and keeps origins separate", () => {
     const data = fixture();
     (data.session.conversation_log as unknown[]).push({ role: "max", pipeline: { latency_origin: "text_submitted", first_sound_status: "failed", total_ms: 20000 } },

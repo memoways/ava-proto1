@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles : lot C, modes GM off / léger / fort] — 2026-11-19
+
+- **Mode du GM** : `editor.gmMode` (`off` | `light` | `full`) remplace `editor.speechGuidance` (`false` → `light`, sinon
+  `full` ; vérifié en lecture via Lovable : seule la v13 « GM désactivé » portait `false`, aucune migration). Fixe pour
+  la session. `off` : aucun appel GM post-tour, donc ni mémoire GM, relation, passage proposé, cinématique ni conseil ;
+  fin au minuteur ; le personnage garde fiche, RAG, historique et cadre ; la règle de procédure de la demande explicite du
+  joueur est conservée (le passage validé par le GM n'existe pas sans GM). `light` : comportement « guidage désactivé »
+  de #203, recadrages des garde-fous non tranchés. `full` : inchangé.
+- **Trace** : chaque tour persiste `gm_mode` et `injected` (texte, état de parole, sujets exacts transmis au personnage)
+  dans `gm_post_turn_log[]` ; un tour en off écrit une entrée `skipped` / `gm_off`.
+- **Historique des sessions et export Markdown** : « GM → personnage » sous chaque réplique (texte ou « rien : mode off /
+  léger »), mode GM de la session en tête.
+- **Juge J3** : `gmMode` (snapshot) remplace la surcharge `gmSpeechGuidance`, qui n'était pas branchée au juge.
+- **Réglages GM** : sélecteur 3 crans avec une phrase par mode, aperçu au registre. Aucun appel IA ajouté ; production
+  non publiée. [Plan](docs/plan_reglages_gm_lisibles_gradues.md) · [reprise lot B](docs/prompt_reprise_reglages_gm_lot_b.md).
+
 ## [Réglages GM lisibles : lot A, transparence et réglages qui agissent] — 2026-11-19
 
 - **Les réglages GM agissent sur toutes les versions** : le bloc « RÉGLAGES ADMINISTRATEUR ACTIFS » est compilé à chaque

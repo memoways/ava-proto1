@@ -33,7 +33,7 @@ import { characterRagTopKForVariant } from "@/services/characterRagTopK";
 import { maxRagFormatOptionsForVariant } from "@/services/maxRagVariant";
 import { fetchSessionSummary, summarizeSessionAsync } from "@/services/sessionMemoryService";
 import { selectOptimizedConversation, selectRecentConversation, selectUnsummarizedConversation } from "@/services/conversationMemory";
-import { fetchConversationMemory } from "@/services/sessionConversationMemory";
+import { fetchConversationMemory, persistPostTurnMemory } from "@/services/sessionConversationMemory";
 import { filterConversationMemoryForCharacter } from "@/services/conversationMemoryV1";
 import { loadCharacterPrompt } from "@/services/characterPromptService";
 import {
@@ -61,7 +61,8 @@ import {
 import { buildExperienceFrame, experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import { canRetryCharacterResponse, characterRecoveryLine, withheldHandoffReply, latestCallTransfer } from './characterConversationContinuity';
 import { validateRecoverySpeech } from './responseIntentStream';
-import { isGmSpeechGuidanceEnabled, resolveCharacterGuidance, type GmGuidancePart } from './gmSpeechGuidance';
+import { buildGmOffEvaluation, resolveCharacterGuidance, resolveGmMode, type GmGuidancePart } from './gmSpeechGuidance';
+import type { GmMode } from "@/types";
 import type { ConversationMessage, ConversationTurnTraceV1, ExperienceDirectorConfig, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 import type { ConversationMemoryV1 } from "@/types/conversationMemory";
 
@@ -138,8 +139,8 @@ export interface PRD4TurnInput {
     streamContract?: ResponseStreamContractVariant;
     /** In-memory lot K1 switch: `false` plays the core and the frame without the established facts; never persisted. */
     establishedFacts?: boolean;
-    /** In-memory GM speech guidance switch for sessionless replays; never persisted. */
-    gmSpeechGuidance?: boolean;
+    /** In-memory GM mode (off / light / full) for sessionless replays; never persisted. */
+    gmMode?: GmMode;
     /**
      * Sequence replay (judge J3): structured memory rebuilt in memory from the
      * previous GM deltas. Read only when there is no session; never persisted.
@@ -189,8 +190,8 @@ export interface PRD4TurnResult {
    * (overlay cinematics are guarded with it before the post-turn GM exists).
    */
   director?: { versionId: string | null; config: ExperienceDirectorConfig | null };
-  /** GM speech guidance switch applied to this turn (pinned orchestration version). */
-  gmSpeechGuidance?: "on" | "off";
+  /** GM mode applied to this turn (pinned orchestration version, or the replay override). */
+  gmMode?: GmMode;
 }
 
 export type PRD4LatencySegmentEvent =
@@ -382,8 +383,10 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   input.signal?.throwIfAborted();
   // Speech guidance switch, read from the version pinned to the session: the
   // GM keeps running, only its advice to the character is withheld.
+  const gmMode: GmMode = evaluationOverrides?.gmMode ?? resolveGmMode(frameRuntime.config);
   const characterGuidance = resolveCharacterGuidance({
-    enabled: evaluationOverrides?.gmSpeechGuidance ?? isGmSpeechGuidanceEnabled(frameRuntime.config),
+    enabled: gmMode === "full",
+    gmMode,
     parts: input.gmGuidanceParts,
     legacyGuidance: input.gmGuidance,
     topicsCovered: input.gmTopicsCovered,
@@ -534,6 +537,19 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       : null;
     (input.postTurnSignal ?? input.signal)?.throwIfAborted();
     if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
+    if (gmMode === "off") {
+      // GM off: no post-turn call. The turn is still logged (mode + what the
+      // character received) so the history can say "nothing: mode off".
+      const skipped: PRD4PostTurnDetailedResult = buildGmOffEvaluation({
+        characterKey: activeCharacter, turnIndex, injected: characterGuidance.injected,
+        orchestrationVersionId: frameRuntime.versionId ?? null, orchestrationConfig: frameRuntime.config ?? null });
+      if (input.sessionId && !candidate) {
+        try { await persistPostTurnMemory(input.sessionId, skipped, null, turnIndex, activeCharacter,
+          ...((input.postTurnSignal ?? input.signal) ? [(input.postTurnSignal ?? input.signal)!] as const : [])); }
+        catch (error) { console.warn("[PRD4] GM-off turn log not persisted:", error); }
+      }
+      return skipped;
+    }
     if (!candidate && input.streamControl && diagnosticTraceEnabled && input.sessionId) {
       void patchQueuedConversationTurnTrace(input.sessionId, turnIndex, ["response", "deliveredResponse"], deliveredResponse).catch(() => {});
     }
@@ -578,6 +594,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         speechStatePlayed: candidate ? null : playedState,
         recentSpeechStates: [playedState, ...recentSpeechStates].slice(0, 2),
         speechSettingsVersion: speechRuntime?.settingsVersion,
+        gmMode,
+        injectedToCharacter: characterGuidance.injected,
       });
     } finally {
       input.onLatencySegment?.({
@@ -744,7 +762,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           guidance: maxInput.gmGuidance?.guidance ?? null,
           topicsCovered: maxInput.gmGuidance?.topicsCovered ?? [],
           source: maxInput.gmGuidance ? "previous_post_turn" : "none",
-          speechGuidance: { mode: characterGuidance.mode, withheld: characterGuidance.withheld },
+          speechGuidance: { mode: characterGuidance.mode, gmMode, withheld: characterGuidance.withheld },
         },
         preTurnPlanner: { status: "not_executed", reason: "disabled_in_prd4_live" },
         validator: { status: "not_executed", reason: "disabled_in_prd4_live" },
@@ -860,7 +878,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     labelPromise,
     traceId,
     director: { versionId: frameRuntime.versionId ?? null, config: frameRuntime.config ?? null },
-    gmSpeechGuidance: characterGuidance.mode,
+    gmMode,
   };
 }
 

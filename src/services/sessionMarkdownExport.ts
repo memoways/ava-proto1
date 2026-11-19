@@ -1,3 +1,4 @@
+import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
 import type { ConversationPipelineTimings } from "@/types";
 import { displayNameForCharacter } from "./characterRegistry";
 import { messageCharacter } from "./sessionCharacters";
@@ -88,7 +89,7 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
     if (row.error_message || row.had_fallback === true || meta.had_fallback === true || /error|fail|critical|timeout|unavailable|blocked/i.test(`${row.status ?? ""} ${row.severity ?? ""} ${row.event_name ?? ""} ${row.event_type ?? ""}`)) incident(`${table} — tour ${text(row.turn_index)} — ${text(row.created_at)}`, row);
   }
   const gm = Array.isArray(session.gm_post_turn_log) ? session.gm_post_turn_log.map(record) : [];
-  for (const entry of gm) if (entry.execution_status && entry.execution_status !== "executed") incident(`GM post-tour ${text(entry.turn_index)}`, entry);
+  for (const entry of gm) if (entry.execution_status && entry.execution_status !== "executed" && entry.execution_status !== "skipped") incident(`GM post-tour ${text(entry.turn_index)}`, entry);
   if (!incidents) lines.push("Aucun incident identifié dans les données disponibles. Cela ne garantit pas l’absence de problème non enregistré.");
   const questionnaire = session.questionnaire_responses;
   if (isConversationalQuestionnaire(questionnaire)) {
@@ -109,12 +110,17 @@ export function buildSessionMarkdown({ session, telemetry, warnings }: SessionEx
     }
   }
   lines.push("", "## Conversation", "");
+  const gmModeLabel = sessionGmModeLabel(gm as never);
+  if (gmModeLabel) lines.push(`Mode GM de la session : ${gmModeLabel}.`, "");
   turn = 0;
   for (const m of messages) {
     if (m.role === "user") { turn++; lines.push(`### Tour ${turn}`, ""); }
     const character = messageCharacter(m as { role?: string; spokenWith?: string });
     const speaker = m.role === "user" ? "Utilisateur" : character ? displayNameForCharacter(character) : `Message ${text(m.role)}`;
     lines.push(`**${speaker} :**`, "", typeof m.content === "string" ? m.content : text(m.content), "");
+    if (m.role !== "user" && character && gm.length) {
+      lines.push(`> **GM → personnage :** ${describeGmToCharacter(findGmEntryForReply(gm as never, turn, character) as never).replace(/\n+/g, " ")}`, "");
+    }
   }
   if (!messages.length) lines.push("Aucun échange enregistré.", "");
   lines.push("## Métadonnées historiques complètes", "", "Les textes sont ceux du journal enregistré, pas une preuve que tout l’audio a été entendu. Les données sensibles de cette session sont incluses : partager ce document uniquement avec les destinataires autorisés.", "");

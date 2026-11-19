@@ -39,7 +39,9 @@ import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { getSessionMinimumClosureSeconds } from "@/config/experienceRuntime";
 import { GM_RUNTIME_OUTPUT_INSTRUCTIONS } from "@/services/gameMasterContract";
 import { GmSettingPreview } from "@/components/GmSettingPreview";
-import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, RuntimeCharacter } from "@/types";
+import type { ExperienceDirectorConfig, ExperienceDirectorEditorConfig, GmMode, RuntimeCharacter } from "@/types";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { GM_MODE_TEXT } from "@/services/gmSettingsRegistry";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
 
@@ -516,19 +518,27 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
                     />
                   </div>
                   <GmSettingPreview id="allowCinematics" config={config} />
-                  <div className="flex items-center justify-between gap-3 rounded border p-3">
+                  <div className="space-y-2 rounded border p-3">
                     <div>
-                      <p className="text-sm font-medium">Guidage de parole du GM <Hint level="secondaire" text="Pour comparer réponses guidées et naturelles. Off ne transmet plus au personnage le conseil du tour suivant, l’état de parole proposé ni les sujets déjà abordés. Le GM continue de tourner : mémoire, relation, cinématiques, passages et fin d’appel restent actifs, et son conseil reste visible dans l’historique des sessions. Les recadrages des garde-fous (hors-sujet, faux statut, dérapage) passent par ce conseil : ils ne sont plus transmis non plus." /></p>
-                      <p className="text-xs text-muted-foreground">Off coupe seulement le conseil au personnage, pas le GM. Fixé par session (version publiée).</p>
+                      <p className="text-sm font-medium">Mode du GM <Hint level="secondaire" text="Pour sentir l’incidence du GM sur les tours. Fort : comportement actuel. Léger : le GM tourne mais son conseil de parole n’est pas transmis au personnage (les recadrages des garde-fous passent par ce conseil : ils ne sont plus transmis non plus). Off : aucun appel GM après les tours. Fixé par session (version publiée)." /></p>
+                      <p className="text-xs text-muted-foreground">Fixé par session (version publiée). Le texte exact transmis au personnage est visible tour par tour dans l’historique des sessions.</p>
                     </div>
-                    <Switch
-                      checked={config.editor.speechGuidance !== false}
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      value={config.editor.gmMode ?? "full"}
                       disabled={selected.status !== "draft"}
-                      onCheckedChange={(checked) => patchEditor({ speechGuidance: checked })}
-                      aria-label="Transmettre le guidage de parole du GM au personnage"
-                    />
+                      onValueChange={(value) => { if (value) patchEditor({ gmMode: value as GmMode }); }}
+                      aria-label="Mode du GM"
+                      className="justify-start"
+                    >
+                      <ToggleGroupItem value="off" aria-label="GM off">Off</ToggleGroupItem>
+                      <ToggleGroupItem value="light" aria-label="GM léger">Léger</ToggleGroupItem>
+                      <ToggleGroupItem value="full" aria-label="GM fort">Fort</ToggleGroupItem>
+                    </ToggleGroup>
+                    <p className="text-xs" data-testid="gm-mode-sentence">{GM_MODE_TEXT[config.editor.gmMode ?? "full"]}</p>
                   </div>
-                  <GmSettingPreview id="speechGuidance" config={config} />
+                  <GmSettingPreview id="gmMode" config={config} />
                   <div className="flex items-center justify-between gap-3 rounded border p-3">
                     <div>
                       <p className="text-sm font-medium">Repères de temps du personnage <Hint level="secondaire" text="Le personnage reçoit à chaque tour le temps écoulé, le numéro du tour et une phase (début, milieu, fin proche) pour adapter son rythme. Off pour tester une conversation sans courbe de temps." /></p>

@@ -15,6 +15,7 @@ import { sessionCharacterLabel, sessionCharacterMetadata, sessionCharacterOption
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical, Download, Loader2 } from "lucide-react";
+import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
 import { Link } from "react-router-dom";
 import { isQuestionLike } from "@/services/ragQuestionCorpus";
 import { adminTabPath } from "@/services/adminNavigation";
@@ -91,6 +92,9 @@ interface GmPostTurnEntry {
   next_turn_guidance?: string;
   topics_covered?: string[];
   speech_guidance?: "on" | "off";
+  gm_mode?: import("@/types").GmMode;
+  injected?: import("@/types").GmInjectedToCharacter;
+  character_key?: string;
 }
 
 const HANDOFF_STAGES: Record<string, string> = {
@@ -899,7 +903,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <div className="mb-3 border rounded p-3 bg-muted/20">
                 <p className="text-xs font-semibold text-muted-foreground mb-2">
                   Game Master post-turn ({selected.gm_post_turn_log.length} évaluations)
-                  {" · "}guidage de parole : {selected.gm_post_turn_log.some((entry) => entry.speech_guidance === "off") ? "désactivé" : "activé"}
+                  {" · "}mode GM : {sessionGmModeLabel(selected.gm_post_turn_log)}
                 </p>
                 <ScrollArea className="h-48">
                   <div className="space-y-1.5">
@@ -949,9 +953,12 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                         {evalEntry.next_turn_guidance && (
                           <p className="text-muted-foreground mt-0.5 italic">
                             → {evalEntry.next_turn_guidance}
-                            {evalEntry.speech_guidance === "off" && " (guidage de parole désactivé : non transmis au personnage)"}
+                            {evalEntry.speech_guidance === "off" && " (mode GM léger : conseil non transmis au personnage)"}
                           </p>
                         )}
+                        <p className="mt-0.5" data-testid="gm-to-character">
+                          <span className="font-semibold">GM → personnage :</span> {describeGmToCharacter(evalEntry)}
+                        </p>
                         {Array.isArray(evalEntry.topics_covered) && evalEntry.topics_covered.length > 0 && (
                           <p className="text-muted-foreground/70 mt-0.5">
                             sujets: {evalEntry.topics_covered.join(", ")}
@@ -995,6 +1002,12 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                               <FlaskConical className="h-3 w-3" />
                               <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
                             </label>
+                          )}
+                          {msg.role !== "user" && causalTurn > 0 && Array.isArray(selected.gm_post_turn_log) && selected.gm_post_turn_log.length > 0 && (
+                            <p className="mt-1 rounded border border-border/60 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground" data-testid="gm-to-character-reply">
+                              <span className="font-semibold">GM → personnage :</span>{" "}
+                              {describeGmToCharacter(findGmEntryForReply(selected.gm_post_turn_log, causalTurn, msg.role))}
+                            </p>
                           )}
                           {msg.role !== "user" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
                             <div className="mt-1">

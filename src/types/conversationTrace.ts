@@ -256,6 +256,8 @@ export interface ConversationTurnTraceV1 {
       /** GM speech guidance switch for this turn; absent from older traces (= on). */
       speechGuidance?: {
         mode: "on" | "off";
+        /** GM mode of the pinned version (off / light / full); absent from older traces. */
+        gmMode?: "off" | "light" | "full";
         withheld: { advice: string | null; speechState: string | null; topicsCovered: number };
       };
     };
