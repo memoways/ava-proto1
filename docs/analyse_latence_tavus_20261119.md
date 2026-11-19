@@ -85,3 +85,9 @@ Branche du lot depuis main à jour, commit, push, PR, CI complète sur PR, fusio
 origin/main et synchro Lovable. Production non publiée.
 
 Reprise : [prompt du lot T1](prompt_reprise_latence_tavus_lot_t1.md).
+
+## Lot T1 livré (code) — mesures à compléter
+
+Flux PCM de la première ligne vers Tavus implémenté (PR du lot T1). Mesure sur une session Tavus sandbox-ulrich après
+synchro Lovable : **à renseigner** (`video_wait_ms` médian, `output_estimated`, tours en repli, span
+`pre_turn_handoff_wait`, écoute d'Ulrich).

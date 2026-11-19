@@ -363,6 +363,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
         signal: turnAbort.signal,
         speechStartTimeoutMs: this.speechStartTimeoutMs,
         label: "Tavus",
+        streamFirstLine: true,
         progress,
         isAlive: () => !this.disposed && this.currentSpeech === speech,
         sendChunk: (pcm, final) => this.sendEchoAudio(pcm, inferenceId, final),

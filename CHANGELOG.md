@@ -4,6 +4,19 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus : lot T1, flux PCM ElevenLabs vers Tavus] — 2026-11-19
+
+- Tavus « voix d'Ava » : la première ligne ElevenLabs est lue en flux (`pcm_24000` via `proxy-tts`, inchangé) et envoyée à
+  Tavus par morceaux de 250 ms dès réception, au lieu d'attendre le blob complet (`elevenLabsPcmStream.ts`,
+  `avatarAudioBridge.ts`, option `streamFirstLine` activée par Tavus seul). Voix, texte, segmentation et réglages inchangés.
+- Repli : échec avant le premier octet → chemin blob actuel ; échec après envoi → comportement actuel (interruption Tavus,
+  repli TTS local) ; abort au barge-in ; échéance sur le premier morceau. Ouverture scriptée (cache), autres moteurs
+  (Gradium…), LemonSlice et Anam inchangés. Lignes suivantes : chemin blob préchargé, lancé dès les premiers octets.
+- Télémétrie : jalons `first_audio_chunk` / `audio_blob_ready` et service TTS `http_stream_pcm` sur ce chemin ; nouveau
+  span client `pre_turn_handoff_wait` (attente de passage avant le tour) pour trancher le retard de ~0,9 s de 2 tours sur 9.
+- Reprise : [lot T2](docs/prompt_reprise_latence_tavus_lot_t2.md). Mesure sandbox-ulrich après synchro Lovable à compléter
+  dans l'[analyse](docs/analyse_latence_tavus_20261119.md).
+
 ## [Latence Tavus : analyse et plan du lot T1] — 2026-11-19
 
 - `docs/analyse_latence_tavus_20261119.md` (sans code) : mesures avant/après des sessions du 19 novembre ; lots GM sans effet

@@ -2,6 +2,11 @@ import { getTTSSettings } from "@/services/settingsService";
 import { generateSpeech } from "@/services/tts";
 import { getActiveProviderId, resolveGradiumSettings } from "@/services/tts/providerSettings";
 import { chunkTextForTTS } from "@/services/tts/textChunking";
+import {
+  ELEVENLABS_PCM_STREAM_RATE,
+  createPcmChunker,
+  openElevenLabsPcmStream,
+} from "@/services/tts/elevenLabsPcmStream";
 import type { TTSProviderId } from "@/services/tts/types";
 import { pcm16BytesToFloat, rawPcmRate, speechToLemonSliceChunks } from "./lemonSliceAudio";
 import type { ResponseOutputTurnContext } from "./types";
@@ -40,6 +45,12 @@ export interface StreamAvatarSpeechOptions {
   onFirstChunk?: () => void;
   isAlive?: () => boolean;
   progress: AvatarAudioProgress;
+  /**
+   * Lot T1: read the first ElevenLabs line as a raw PCM stream and hand chunks over as they
+   * arrive. Needs `sampleRate` 24 000; anything else (other engines, the cached opening, a
+   * failure before the first byte) keeps the blob path.
+   */
+  streamFirstLine?: boolean;
 }
 
 /**
@@ -65,15 +76,28 @@ export async function streamAvatarSpeech(options: StreamAvatarSpeechOptions): Pr
       options.onFirstChunk?.();
     }
   };
+  const streamFirst = canStreamFirstLine(options, providerId);
   // One line ahead: the next segment is synthesized while the current one is sent.
-  let next = prefetchLine(lines, 0, providerId, options);
+  let prefetched = -1;
+  let next: Promise<Int16Array[]> | null = null;
+  const prefetch = (index: number) => {
+    if (index >= lines.length || prefetched >= index) return;
+    prefetched = index;
+    next = prefetchLine(lines, index, providerId, options);
+  };
+  if (!streamFirst) prefetch(0);
   for (let index = 0; index < lines.length; index++) {
+    if (index === 0 && streamFirst) {
+      const streamed = await streamFirstLine(lines, providerId, options, send, assertAlive, () => prefetch(1));
+      if (streamed) continue;
+      prefetch(0); // Nothing reached the provider: the blob path answers instead.
+    }
     const chunks = await withDeadline(
-      abortable(next, signal),
+      abortable(next!, signal),
       avatarTtsDeadline(index, options.speechStartTimeoutMs),
       `Ava TTS did not answer for ${options.label}`,
     );
-    if (index + 1 < lines.length) next = prefetchLine(lines, index + 1, providerId, options);
+    prefetch(index + 1);
     assertAlive();
     const lastLine = index === lines.length - 1;
     for (let chunk = 0; chunk < chunks.length; chunk++) {
@@ -81,6 +105,112 @@ export async function streamAvatarSpeech(options: StreamAvatarSpeechOptions): Pr
     }
     // A silent last line still closes the turn for providers that read `final`.
     if (lastLine && chunks.length === 0 && progress.sentChunks > 0) send(new Int16Array(0), true);
+  }
+}
+
+function canStreamFirstLine(options: StreamAvatarSpeechOptions, providerId: TTSProviderId): boolean {
+  return options.streamFirstLine === true
+    && providerId === "elevenlabs"
+    && options.sampleRate === ELEVENLABS_PCM_STREAM_RATE
+    && !options.context?.cacheOpening;
+}
+
+/**
+ * Streams line 0 chunk by chunk. Resolves true when the whole line was handed over, false when
+ * the stream failed or was unavailable before anything was sent (the caller falls back to the
+ * blob path). After the first send a failure throws like the blob path does; a missing first
+ * chunk by `avatarTtsDeadline` throws too. The last chunk of a one-line turn is held back by
+ * one read so it can carry `final`.
+ */
+async function streamFirstLine(
+  lines: string[],
+  providerId: TTSProviderId,
+  options: StreamAvatarSpeechOptions,
+  send: (pcm: Int16Array, final: boolean) => void,
+  assertAlive: () => void,
+  onFirstBytes: () => void,
+): Promise<boolean> {
+  const { context, signal, sampleRate, chunkMs, progress } = options;
+  const lastLine = lines.length === 1;
+  const local = new AbortController();
+  const onAbort = () => local.abort();
+  if (signal.aborted) local.abort();
+  signal.addEventListener("abort", onAbort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    local.abort();
+  }, avatarTtsDeadline(0, options.speechStartTimeoutMs));
+  const sentBefore = progress.sentChunks;
+  let held: Int16Array | null = null;
+  try {
+    const stream = await openElevenLabsPcmStream(lines[0], {
+      nextText: lines[1],
+      session_id: context?.sessionId,
+      turn_id: context?.turnId,
+      turn_index: context?.turnIndex,
+      attempt_id: context?.attemptId,
+      voiceId: context?.voiceId,
+      providerId,
+      characterOverride: context?.providerId != null,
+      characterKey: context?.characterKey,
+      performance: context?.performance,
+      onVoiceObservation: context?.onVoiceObservation,
+      onServiceObserved: context?.onServiceObserved,
+    }, local.signal);
+    if (!stream) return false;
+    const chunker = createPcmChunker(sampleRate, chunkMs);
+    let firstBytes = true;
+    const emit = (pcm: Int16Array, final: boolean) => {
+      assertAlive();
+      send(pcm, final);
+      clearTimeout(timer);
+    };
+    try {
+      for (;;) {
+        // Raced with the abort so a stalled body never outlives an interruption or the deadline.
+        const read = await abortable(stream.next(), local.signal);
+        if (read.done) break;
+        if (firstBytes) {
+          firstBytes = false;
+          onFirstBytes(); // The next line synthesizes while this one plays.
+        }
+        for (const pcm of chunker.push(read.value as Uint8Array)) {
+          if (!lastLine) emit(pcm, false);
+          else {
+            if (held) emit(held, false);
+            held = pcm;
+          }
+        }
+      }
+    } finally {
+      void stream.return(undefined).catch(() => {});
+    }
+    const tail = chunker.flush();
+    if (tail.length > 0) {
+      if (!lastLine) emit(tail, false);
+      else {
+        if (held) emit(held, false);
+        held = tail;
+      }
+    }
+    if (held) {
+      const last: Int16Array = held;
+      held = null;
+      emit(last, true);
+    } else if (lastLine && progress.sentChunks > sentBefore) {
+      emit(new Int16Array(0), true);
+    }
+    return progress.sentChunks > sentBefore;
+  } catch (error) {
+    if (timedOut && !signal.aborted) throw new Error(`Ava TTS did not answer for ${options.label}`);
+    if (signal.aborted || options.isAlive?.() === false) throw new DOMException("Avatar turn aborted", "AbortError");
+    if (progress.sentChunks > sentBefore) throw error;
+    return false;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", onAbort);
+    local.abort(); // Releases the fetch if the stream stopped early; a no-op once it is done.
   }
 }
 

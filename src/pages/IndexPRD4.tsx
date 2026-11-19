@@ -1759,6 +1759,7 @@ const IndexPRD4 = () => {
       try {
         const sid = sessionIdRef.current;
         if (sid) {
+          const handoffWaitStartedAt = performance.now();
           await handoffWriteRef.current?.catch(() => undefined);
           if (!isCurrentTurn()) return;
           const expected = handoffSnapshotRef.current ?? await readHandoffSnapshot(sid);
@@ -1779,6 +1780,9 @@ const IndexPRD4 = () => {
           });
           handoffWriteRef.current = write;
           turnHandoffSnapshot = await write.finally(() => { if (handoffWriteRef.current === write) handoffWriteRef.current = null; });
+          // Lot T1: some turns started ~0.9 s late; this client span shows whether the wait for the previous write is the cause.
+          telemetry.server({ request_id: `${turnId}:handoff-wait`, clock: 'client_monotonic', client_origin_at: handoffWaitStartedAt,
+            spans: [{ name: 'pre_turn_handoff_wait', start_ms: 0, end_ms: Math.max(0, performance.now() - handoffWaitStartedAt), status: 'ok' }] });
           if (!isCurrentTurn()) return;
           handoffPhaseRef.current = 'revoked';
           if (parseHandoffState(expected.pending_handoff)?.state === 'available' && turnHandoffState.state !== 'available') void appendExperienceEvent({
