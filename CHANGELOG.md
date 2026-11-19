@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages GM lisibles : lot E, cadrage de la courbe d'expérience] — 2026-11-19
+
+- Document de cadrage `docs/cadrage_courbe_experience_gm.md` (sans code) : interrupteur courbe ouverte / dirigée,
+  directions à atteindre (pas des phases chronométrées), articulation avec le radar d'état, la clôture à 80 % et les
+  triggers narratifs, mesure par rejeu J3, lots E1 à E4. Prompt de reprise du lot E1 dans `docs/`.
+
 ## [Réglages GM lisibles : lot D, état du personnage (radar à 5 dimensions)] — 2026-11-19
 
 - **Radar d'état** : cinq axes de 0 à 5 (Combativité, Initiative, Lucidité, Ouverture, Agitation ; libellés éditables par

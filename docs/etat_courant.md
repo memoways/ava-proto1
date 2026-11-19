@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Courbe d'expérience du GM, lot E (19 novembre, cadrage seulement)** : [cadrage](cadrage_courbe_experience_gm.md) ; aucun code ; décisions attendues d'Ulrich (catalogue de directions avec Romed, option B, mode light). Reprise : [lot E1](prompt_reprise_courbe_experience_gm_lot_e1.md).
+
 **Réglages GM lisibles, lot D (19 novembre, code)** : chaque personnage peut recevoir un état à 5 dimensions (0–5) à chaque
 tour, que le GM fait évoluer d'un cran au plus par tour (`character_state_delta`, validé par le code, tardif ignoré, sans
 appel IA ajouté). Off : état initial fixe ; light et full : évolution conservée. Radar éditable dans Réglages
