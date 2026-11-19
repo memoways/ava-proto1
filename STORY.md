@@ -3,7 +3,7 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-01 (sélection vidéos, lot 5 : lecture et mémoire)
+> **Last Updated**: 2026-11-19 (latence Tavus, lot T1)
 
 ---
 

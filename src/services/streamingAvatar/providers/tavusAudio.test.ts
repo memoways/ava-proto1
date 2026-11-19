@@ -14,6 +14,11 @@ vi.mock("../api", () => ({
   endAvatarSession: vi.fn(async () => {}),
 }));
 vi.mock("@/services/tts", () => ({ generateSpeech: fake.generateSpeech }));
+// Lot T1: no PCM stream here (null = unavailable), so these tests keep covering the blob path.
+vi.mock("@/services/tts/elevenLabsPcmStream", async (importActual) => ({
+  ...(await importActual<typeof import("@/services/tts/elevenLabsPcmStream")>()),
+  openElevenLabsPcmStream: vi.fn(async () => null),
+}));
 vi.mock("@/services/settingsService", () => ({ getTTSSettings: () => ({ outputFormat: "pcm_24000" }) }));
 vi.mock("@/services/tts/providerSettings", () => ({ getActiveProviderId: () => "elevenlabs", resolveGradiumSettings: () => ({ outputFormat: "opus" }) }));
 // Lines are cut on "|" so a test controls how many TTS segments a reply has.
