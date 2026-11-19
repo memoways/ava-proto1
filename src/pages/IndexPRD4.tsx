@@ -1,6 +1,6 @@
 import { joinGuidanceParts, type GmGuidancePart } from '@/services/gmSpeechGuidance';
 import { rebuildCharacterStates, type StateLevels } from '@/services/characterState';
-import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
+import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, handoffFinalizationWritesSnapshot, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
@@ -1761,8 +1761,10 @@ const IndexPRD4 = () => {
         if (sid) {
           const handoffWaitStartedAt = performance.now();
           await handoffWriteRef.current?.catch(() => undefined);
+          const handoffPriorWriteEndedAt = performance.now();
           if (!isCurrentTurn()) return;
           const expected = handoffSnapshotRef.current ?? await readHandoffSnapshot(sid);
+          const handoffReadEndedAt = performance.now();
           if (!isCurrentTurn()) return;
           if (expected.active_character !== turnCharacter || !expected.orchestration_version_id) throw new HandoffConflictError();
           turnHandoffState = advanceHandoffTurn(expected.pending_handoff, { sessionId: sid,
@@ -1780,9 +1782,16 @@ const IndexPRD4 = () => {
           });
           handoffWriteRef.current = write;
           turnHandoffSnapshot = await write.finally(() => { if (handoffWriteRef.current === write) handoffWriteRef.current = null; });
-          // Lot T1: some turns started ~0.9 s late; this client span shows whether the wait for the previous write is the cause.
+          // Lots T1/T2: total wait plus its three parts (previous write still pending, snapshot read, own write).
+          // Measured on c293829f: the slow turns waited for the previous GM post-turn (see analyse_latence_tavus_20261119.md).
+          const handoffWaitEndedAt = performance.now();
+          const handoffSpan = (name: string, from: number, to: number) => ({ name, start_ms: Math.max(0, from - handoffWaitStartedAt),
+            end_ms: Math.max(0, to - handoffWaitStartedAt), status: 'ok' as const });
           telemetry.server({ request_id: `${turnId}:handoff-wait`, clock: 'client_monotonic', client_origin_at: handoffWaitStartedAt,
-            spans: [{ name: 'pre_turn_handoff_wait', start_ms: 0, end_ms: Math.max(0, performance.now() - handoffWaitStartedAt), status: 'ok' }] });
+            spans: [handoffSpan('pre_turn_handoff_wait', handoffWaitStartedAt, handoffWaitEndedAt),
+              handoffSpan('pre_turn_handoff_prior_write', handoffWaitStartedAt, handoffPriorWriteEndedAt),
+              handoffSpan('pre_turn_handoff_read', handoffPriorWriteEndedAt, handoffReadEndedAt),
+              handoffSpan('pre_turn_handoff_own_write', handoffReadEndedAt, handoffWaitEndedAt)] });
           if (!isCurrentTurn()) return;
           handoffPhaseRef.current = 'revoked';
           if (parseHandoffState(expected.pending_handoff)?.state === 'available' && turnHandoffState.state !== 'available') void appendExperienceEvent({
@@ -1968,9 +1977,24 @@ const IndexPRD4 = () => {
 
         // Finalize only the prepared request, using the ACTUAL complete receipt and the same GM evaluation.
         handoffFinalizationScheduled = true;
+        // Lot T2: only a turn where a passage may be in play makes the next turn wait for the GM post-turn and its write.
+        const finalizeWaitsForNextTurn = handoffFinalizationWritesSnapshot(turnHandoffState, handoffUserText, result.maxResponse, turnCharacter)
+          || Boolean(preparedState);
         const finalizeHandoff = result.postTurnPromise.then(async ev => {
           if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return handoffSnapshotRef.current!;
           if (turnHandoffState.state === 'available') return handoffSnapshotRef.current!;
+          // Lot T2: no passage in play (state 'none', no open request): nothing to validate or write. The next turn does not
+          // wait for this GM post-turn; the transcript is persisted by the receipt and by the next turn's own write.
+          if (!finalizeWaitsForNextTurn) {
+            if (owningSessionId && ev.action?.type === 'handoff') {
+              const idle = finalizeCharacterHandoff(turnHandoffState, ev, handoffUserText, responseReceipt, false);
+              void appendExperienceEvent({ sessionId: owningSessionId, eventKey: `handoff-final:${turnId}`,
+                eventType: 'handoff_blocked', turnId, turnIndex, character: turnCharacter,
+                payload: { stage: 'delivery', requestId: idle.state.requestId, offerId: idle.state.revision,
+                  targetCharacter: idle.state.offer?.targetCharacter, blockedReason: idle.validation.reason } });
+            }
+            return handoffSnapshotRef.current!;
+          }
           // A consent the GM validated on the heard receipt, spoken without an output
           // hold, gets the same readiness/director guards instead of being dropped.
           if (!preparedState && responseReceipt?.status === 'completed' && responseReceipt.delivered === responseReceipt.generated
@@ -2028,8 +2052,10 @@ const IndexPRD4 = () => {
           }
           return handoffSnapshotRef.current!;
         });
-        handoffWriteRef.current = finalizeHandoff;
-        void finalizeHandoff.finally(() => { if (handoffWriteRef.current === finalizeHandoff) handoffWriteRef.current = null; }).catch(() => {});
+        if (finalizeWaitsForNextTurn) {
+          handoffWriteRef.current = finalizeHandoff;
+          void finalizeHandoff.finally(() => { if (handoffWriteRef.current === finalizeHandoff) handoffWriteRef.current = null; }).catch(() => {});
+        }
 
         const ttsStart = streamTtsStartedAt ?? performance.now();
         const responseReadyMs = Math.max(0, Math.round(performance.now() - inputReadyAt));

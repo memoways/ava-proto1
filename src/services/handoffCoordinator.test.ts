@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@/types';
-import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation, withoutTransferOffer } from './handoffCoordinator';
+import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation, withoutTransferOffer, handoffFinalizationWritesSnapshot } from './handoffCoordinator';
 import { advanceHandoffTurn, assessHandoffTurn, restoreHandoffOffer } from './characterHandoffState';
 import { validInput } from './characterHandoff.fixtures';
 
@@ -91,5 +91,28 @@ describe('F1 request lifetime and delivered exchanges', () => {
     expect(withdrawsHandoff('Je ne veux pas parler à Emma.')).toBe(true);
     expect(withdrawsHandoff("Je ne veux plus l’appeler.")).toBe(true);
     expect(withdrawsHandoff('Finalement continuons notre discussion.')).toBe(true);
+  });
+});
+
+describe('T2 handoff finalisation write', () => {
+  const base = { sessionId: 's', sourceCharacter: 'max' as const, orchestrationVersionId: 'v1', turnId: 's:1', turnIndex: 1 };
+  const writes = (userText: string, reply: string) =>
+    handoffFinalizationWritesSnapshot(advanceHandoffTurn(null, base, userText), userText, reply, 'max');
+  it('writes nothing, so the next turn does not wait, when no passage is plausible', () => {
+    expect(writes('On parle de l\u2019hôtel.', 'Je ne sais plus, c\u2019était la nuit.')).toBe(false);
+    expect(handoffFinalizationWritesSnapshot(null, '', '', 'max')).toBe(false);
+    const idle = advanceHandoffTurn(null, base, 'Bonjour.');
+    expect(handoffFinalizationWritesSnapshot({ ...idle, state: 'available' }, 'Merci', 'Oui.', 'max')).toBe(false);
+  });
+  it('keeps the wait while a request is open or an offer is prepared', () => {
+    const asked = advanceHandoffTurn(null, base, 'Je voudrais parler à Emma.');
+    expect(asked.state).toBe('awaiting_character');
+    expect(handoffFinalizationWritesSnapshot(asked, 'Oui.', 'Oui.', 'max')).toBe(true);
+    expect(handoffFinalizationWritesSnapshot({ ...asked, state: 'prepared' }, 'Oui.', 'Oui.', 'max')).toBe(true);
+  });
+  it('keeps the wait when the other character is named or the reply reads as a transfer', () => {
+    expect(writes('Est-ce que je peux discuter avec Emma ?', 'Peut-être.')).toBe(true);
+    expect(writes('Oui.', 'Emma va peut-être répondre.')).toBe(true);
+    expect(writes('D\u2019accord.', 'Je te la passe.')).toBe(true);
   });
 });

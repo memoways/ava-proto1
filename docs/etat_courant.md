@@ -1,5 +1,11 @@
 # Ava — état courant
 
+**Latence Max en vidéo Tavus, lot T2 (19 novembre, code)** : le retard de 1,3–1,6 s de 2 tours sur 9 venait de l'attente du
+GM post-tour du tour précédent ; hors passage plausible, le tour suivant ne l'attend plus. Spans d'attente découpés ;
+interruptions (≈ 1,3 s après la décision, aussi hors Tavus) non corrigées, décision d'Ulrich ; LLM streamé évalué sans code.
+**À faire** : session sandbox-ulrich pour mesurer après T2 ; recette passage Max → Emma. [Analyse](analyse_latence_tavus_20261119.md) ·
+[évaluation LLM streamé](evaluation_llm_streame_vers_tts.md) · [reprise lot T3](prompt_reprise_latence_tavus_lot_t3.md).
+
 **Latence Max en vidéo Tavus, lot T1 (19 novembre, code)** : la première ligne ElevenLabs part vers Tavus au fil de l'eau
 (PCM 24 kHz, morceaux de 250 ms) ; repli sur le blob si le flux échoue avant le premier octet ; seul Tavus est concerné.
 Nouveau span `pre_turn_handoff_wait`. **Mesuré** (sandbox-ulrich) : `video_wait_ms` médian 1,0 s, `output_estimated` 3,9 s, aucun repli ; reste l'attente de passage (1,3–1,6 s sur 2 tours de 7) et l'écoute d'Ulrich. [Analyse](analyse_latence_tavus_20261119.md) ·

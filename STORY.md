@@ -3,9 +3,18 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-19 (latence Tavus, lot T1)
+> **Last Updated**: 2026-11-19 (latence Tavus, lot T2)
 
 ---
+
+## Latence Tavus, lot T2 — l'attente du GM précédent (19 novembre 2026)
+
+Après T1, deux tours sur neuf restaient lents (5,2 et 5,6 s au lieu de 3,7). Le recoupement des heures de fin du GM
+post-tour et du démarrage du pipeline a montré que le tour suivant attendait la fin du GM du tour d'avant (2 à 4 s) pour
+une écriture inutile quand aucun passage de personnage n'est en jeu. Cette attente est levée hors passage plausible ;
+l'attente est conservée dès que l'autre personnage est nommé ou que la réponse ressemble à un transfert, car le GM peut
+valider un passage sans demande détectée par la regex. Les coupures de tours à ≈ 1,3 s sont une affaire de fin d'énoncé
+STT, pas de Tavus ; le LLM streamé est évalué mais pas lancé. Mesure après correction à faire en sandbox.
 
 ## Sélection vidéos, lot 5 — les personnages se souviennent de ce qu'on a vu (1er novembre 2026)
 

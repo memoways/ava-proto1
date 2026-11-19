@@ -100,3 +100,51 @@ Cibles atteintes (< 1,2 s et < 4,5 s en médiane). Deux tours sur sept restent �
 `pre_turn_handoff_wait` dure 1,3 s (tour 7) et 1,6 s (tour 3), contre ~0,1 s pour les autres. Cause du retard de
 ~0,9 s confirmée : l'attente du passage avant le tour. Écoute d'Ulrich (lèvres, coupures) : à confirmer par lui.
 Suite : lot T2.
+
+## Lot T2 (19 novembre) : attente de passage, interruptions, LLM streamé
+
+### Mesure T1 complétée (session `c293829f…`, 9 tours, 7 complétés, aucun repli TTS local)
+
+`pre_turn_handoff_wait` sur les 9 tours (ms) : 93, 98, **1615**, 116, 101, 110, **1296**, 89, 111 ; médiane 110 ms.
+Les deux tours lents sont ceux de `output_estimated` 5,2 et 5,6 s ; les sept autres sont à 3,65–3,93 s. Écoute d'Ulrich
+(lèvres, coupures) : non faite par l'agent, à confirmer par Ulrich.
+
+### Cause du retard de 1,3–1,6 s : établie
+
+Le tour suivant attend `handoffWriteRef`, qui pointe sur la finalisation du passage du tour précédent ; celle-ci attend le
+GM post-tour (gemini-2.5-flash, 2,2–4,1 s après la fin du tour) puis écrit. Recoupement `llm_usage` (heure de fin des
+appels `prd4_gm_post_turn`) et spans `character_*` : au tour 3, le GM du tour 2 finit à 21:45:38,4 (persisté 38,6) et
+le pipeline du tour 3 démarre à ≈ 38,9 ; au tour 7, le GM du tour 6 finit à 21:47:04,07 (persisté 04,2) et le pipeline
+démarre à ≈ 04,4. Aux sept autres tours, le GM précédent était fini avant la décision (wait ≈ 0,1 s = l'écriture propre
+du tour). Quand Ulrich enchaîne vite, il paie donc le reste du GM du tour d'avant. Cette attente ne sert à rien quand aucun passage de personnage n'est plausible : la finalisation n'écrit alors qu'une
+révision neuve d'un état `none`. Attention : le GM peut valider un passage sur le tour courant sans demande ouverte (la
+preuve de consentement exige le nom de la cible dans une citation du joueur ou de la réponse) ; le raccourci ci-dessous
+garde donc l'attente dès que l'autre personnage est nommé ou que la réponse ressemble à un transfert.
+
+### Correction
+
+- `handoffFinalizationWritesSnapshot(state, texte joueur, réponse, personnage)` (`handoffCoordinator.ts`) : vrai pour une
+  demande ouverte ou une offre préparée, ou si l'autre personnage est nommé (joueur ou réponse) ou si la réponse lit comme
+  un transfert ou un consentement ; faux sinon et pour une offre déjà `available`.
+- `IndexPRD4.tsx` : sans passage plausible, la finalisation ne s'enregistre plus dans `handoffWriteRef` et n'écrit plus ; l'événement
+  `handoff_blocked` d'un `action: handoff` du GM sans demande reste journalisé. Le transcript est persisté par le reçu de
+  livraison et par l'écriture du tour suivant. Tour avec passage plausible : comportement inchangé (attente conservée). Limite : un passage que le
+  GM validerait sans que ni le joueur ni la réponse ne nomme l'autre personnage ne peut pas passer la validation de preuve.
+- Span découpé (nouveaux noms autorisés) : `pre_turn_handoff_prior_write`, `pre_turn_handoff_read`,
+  `pre_turn_handoff_own_write`, en plus du total `pre_turn_handoff_wait`.
+- **Non mesuré après correction** : il faut une session sandbox-ulrich Tavus (Ulrich) ; attendu : `pre_turn_handoff_wait`
+  ≈ 0,1 s à tous les tours hors passage, donc plus de tour à 5,2–5,6 s.
+
+### Interruptions répétées : cause probable, non corrigée
+
+Sessions du 19 novembre, tours interrompus : 2/10, 4/6, 1/14, 6/19, 2/8 (Anam, TTS et Tavus) ; `c25ce8ce` 7/11 ;
+`c293829f` 2/9. Les coupures **avant l'appel LLM** tombent toutes à 1,28–1,52 s après la décision (1311, 1317, 1280,
+1518 ms ; 1332 sur `c293829f`), sans premier octet audio, sans `acoustic_candidate` ni `interruption_confirmed` : ni Tavus
+ni le détecteur d'interruption acoustique n'interviennent. Signature d'un tour re-décidé quand le joueur reprend la parole
+après une pause (mains libres, STT Deepgram : silence 900 ms, `utteranceEndMs` 1500). Ce n'est pas propre à Tavus ; le
+pic de `c25ce8ce` coïncide avec l'attente vidéo de 2,2 s, la session `c293829f` (attente 1,0 s) revient au niveau Anam.
+Aucune correction : régler la fin d'énoncé est un compromis latence / coupure à décider par Ulrich.
+
+### LLM streamé
+
+Note séparée : [évaluation](evaluation_llm_streame_vers_tts.md). Aucun code.
