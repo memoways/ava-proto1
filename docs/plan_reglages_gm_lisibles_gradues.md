@@ -1,7 +1,19 @@
 # Réglages du GM : lisibles, gradués, comparables — et état des personnages
 
-Plan validé par Ulrich le 19 novembre 2026. Aucun code livré par ce document. Lot suivant :
-[prompt de reprise lot A](prompt_reprise_reglages_gm_lot_a.md).
+Plan validé par Ulrich le 19 novembre 2026. Lot A livré le 19 novembre (voir « État des lots »). Lot suivant :
+[prompt de reprise lot C](prompt_reprise_reglages_gm_lot_c.md).
+
+## État des lots
+
+- **A — livré (19 novembre)** : registre `src/services/gmSettingsRegistry.ts` (24 entrées, dont « Repères de temps du
+  personnage ») ; bloc compilé au runtime par `resolveDirectorSystemPrompt` (`src/agents/gameMasterPRD4.ts`), qui retire
+  tout bloc figé (`stripCompiledSettingsBlock`) ; aperçus et « Voir ce que reçoit le GM » ; nettoyage. Écarts au plan :
+  la température passe par une nouvelle clé `LLM_GM_TEMPERATURE` (l'ancienne valait 0.3 partout sans jamais s'appliquer :
+  la brancher aurait changé le GM) ; la v7 publiée reçoit la formulation actuelle de la ligne Cinématiques et la règle
+  hors-monde (tout le reste identique, test de non-régression). Constat Lovable du 19 novembre : `builtin://` en
+  sandbox-romed v4 et sandbox-benoit v5 (config sans éditeur, 1 passage max) ; prod v8, sandbox-julien v9 et
+  sandbox-ulrich v13 portaient le bloc figé.
+- **C — à faire** : [prompt de reprise](prompt_reprise_reglages_gm_lot_c.md). Puis B, D, E.
 
 ## Contexte
 

@@ -170,6 +170,8 @@ export interface ConversationTurnTraceV1 {
       sessionDurationSeconds: number;
       turnIndex: number;
     };
+    /** Lot A — time cues sent to the character this turn; absent from older traces (= sent). */
+    characterTimeCues?: boolean;
     gmGuidance: string | null;
     gmTopicsCovered: string[];
     /** État de parole proposé par le GM pour ce tour (validé contre la fiche). */

@@ -1,5 +1,12 @@
 # Ava — état courant
 
+**Réglages GM lisibles, lot A (19 novembre, code)** : les réglages GM agissent désormais sur toutes les versions,
+`builtin://` compris (sandbox-romed et sandbox-benoit recevaient zéro réglage) : bloc compilé à chaque tour depuis la
+config épinglée, sans double bloc. Registre unique des 24 réglages ; aperçu « ➜ envoyé au GM / au personnage / appliqué
+par le code » sous chacun et bouton « Voir ce que reçoit le GM ». Interrupteur « Repères de temps du personnage » (défaut
+activé). Température GM réglable (`LLM_GM_TEMPERATURE`, défaut 0.2 inchangé). À écouter en sandbox Romed/Benoît (le GM y
+reçoit maintenant posture et garde-fous) ; production non publiée. [Reprise lot C](prompt_reprise_reglages_gm_lot_c.md).
+
 **Réglages GM lisibles et gradués (19 novembre, plan)** : constat — les priorités d'analyse n'ont aucun effet dans le
 code, la moitié des réglages GM n'agit que par un prompt figé à la sauvegarde (absent sur les versions `builtin://`,
 sandbox-romed et sandbox-benoit), deux réglages sont morts. Plan validé : registre unique et aperçu de chaque réglage

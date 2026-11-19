@@ -385,6 +385,16 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     expect(gmFrame).toBe(characterFrame);
   });
 
+  it.each([[undefined, true], [false, false]] as const)("lot A — character time cues %s → sent %s", async (characterTimeCues, sent) => {
+    vi.mocked(fetchPinnedDirectorRuntime).mockResolvedValueOnce({ versionId: "gm-v1", versionNumber: 1, prompt: "DIRECTOR",
+      config: { editor: characterTimeCues === undefined ? {} : { characterTimeCues } } as never });
+    const result = await processPRD4Turn({ sessionId: "session-time-cues", conversationHistory: [], userMessage: "Bonjour",
+      userRole: null, timeElapsedSeconds: 120 });
+    await result.postTurnPromise;
+    const maxInput = vi.mocked(simulateMaxResponse).mock.calls[0][0];
+    expect(Boolean(maxInput.temporalContext)).toBe(sent);
+  });
+
   it("keeps a 36th turn bounded and refreshes only unsummarized memory", async () => {
     const history = makeConversation(35);
     const result = await processPRD4Turn({

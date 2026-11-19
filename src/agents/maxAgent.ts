@@ -1,4 +1,5 @@
 import { WATCHED_VIDEOS_SECTION_TITLE } from "@/services/watchedVideoMemory";
+import { CHARACTER_TIME_CUE_PHASES, CHARACTER_TIME_CUE_SUFFIX, CHARACTER_TIME_CUE_THRESHOLDS } from "@/services/characterTimeCues";
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
@@ -160,15 +161,15 @@ export function buildTemporalContextBlock(ctx: MaxTemporalContext): string {
   const elapsedMinutes = Math.floor(Math.max(0, ctx.timeElapsedSeconds) / 60);
   const duration = Math.max(1, ctx.sessionDurationSeconds);
   const progress = Math.min(1, Math.max(0, ctx.timeElapsedSeconds / duration));
-  const phase = progress < 0.25
-    ? "début : installe la relation sans rejouer une ouverture déjà passée"
-    : progress < 0.75
-      ? "milieu : approfondis selon la confiance acquise"
-      : "fin proche : va à l'essentiel et prépare une sortie naturelle";
+  const phase = progress < CHARACTER_TIME_CUE_THRESHOLDS.middle
+    ? CHARACTER_TIME_CUE_PHASES.start
+    : progress < CHARACTER_TIME_CUE_THRESHOLDS.end
+      ? CHARACTER_TIME_CUE_PHASES.middle
+      : CHARACTER_TIME_CUE_PHASES.end;
   const elapsedLabel = elapsedMinutes < 1
     ? "moins d'une minute"
     : `environ ${elapsedMinutes} minute${elapsedMinutes > 1 ? "s" : ""}`;
-  return `Repère interne : ${elapsedLabel}, tour ${ctx.turnIndex}, ${phase}. Adapte seulement ton rythme ; ne cite jamais ces repères.`;
+  return `Repère interne : ${elapsedLabel}, tour ${ctx.turnIndex}, ${phase}. ${CHARACTER_TIME_CUE_SUFFIX}`;
 }
 
 /**

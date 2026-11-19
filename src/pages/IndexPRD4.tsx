@@ -184,7 +184,7 @@ import {
 import { withLegacyCallMarker, callTime, currentCall, newCall, sourceCallId, freshCallState, closedCallHistory,
   TECHNICAL_RESUME_SECONDS, savePendingCallClose, readPendingCallClose, clearPendingCallClose, canApplyPendingClose } from '@/services/callCycle';
 import { resolveResumeTimerWindow } from "@/services/resumeTimer";
-import { fetchPinnedDirectorRuntime, getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
+import { DEFAULT_DIRECTOR_CONFIG, fetchPinnedDirectorRuntime, getCharacterRuntimeReadiness, type CharacterRuntimeReadiness } from "@/services/experienceOrchestration";
 import {
   guardCharacterResponse,
   responseClaimsForeignIdentity,
@@ -2127,10 +2127,10 @@ const IndexPRD4 = () => {
             handoffCount: handoffCountRef.current,
             handoffPending: Boolean(handoffOfferRef.current),
             lastHandoffTurn: lastHandoffUserTurn(conversationRef.current),
-            handoffsEnabled: directorConfig?.editor.allowHandoffs ?? true,
-            minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? 4,
-            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? 1,
-            minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? 2,
+            handoffsEnabled: directorConfig?.editor.allowHandoffs ?? DEFAULT_DIRECTOR_CONFIG.editor.allowHandoffs,
+            minimumHandoffTurn: directorConfig?.minimumHandoffTurn ?? DEFAULT_DIRECTOR_CONFIG.minimumHandoffTurn,
+            maximumHandoffsPerSession: directorConfig?.maximumHandoffsPerSession ?? DEFAULT_DIRECTOR_CONFIG.maximumHandoffsPerSession,
+            minimumTurnsBetweenHandoffs: directorConfig?.minimumTurnsBetweenHandoffs ?? DEFAULT_DIRECTOR_CONFIG.minimumTurnsBetweenHandoffs,
             targetReady: proposalProfile?.enabled === true && proposalProfile.ready === true
               && Boolean(proposalTarget && directorConfig?.activeCharacters.includes(proposalTarget)),
             playedVideoIds: triggeredVideoIdsRef.current,

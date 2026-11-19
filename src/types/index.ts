@@ -343,10 +343,7 @@ export interface QuestionnaireData {
 }
 
 export interface Settings {
-  TRUST_THRESHOLD: number;
   TIMEOUT_SECONDS: number;
-  MAX_INSULT_TOLERANCE: number;
-  MIN_QUESTIONS_BEFORE_GATE: number;
   LLM_MODEL: string;
   TTS_VOICE_ID: string;
   RAG_TOP_K: number;
@@ -456,6 +453,11 @@ export interface ExperienceDirectorEditorConfig {
    * without stopping the GM. Absent = true (historical behaviour).
    */
   speechGuidance: boolean;
+  /**
+   * Time cues in the character prompt (elapsed time, turn, start/middle/end
+   * phase). `false` removes them. Absent = true (historical behaviour).
+   */
+  characterTimeCues: boolean;
   customInstructions: string;
   handoffRules: HandoffTopicRule[];
   /** Enjeux, promesse et règles méta du projet, rédigés dans l'app (remplace la fiche Notion GM). */
@@ -491,7 +493,6 @@ export interface ExperienceDirectorConfig {
   minimumHandoffTurn: number;
   maximumHandoffsPerSession: number;
   minimumTurnsBetweenHandoffs: number;
-  handoffTarget: "either";
   directorTimeoutMs: number;
   editor: ExperienceDirectorEditorConfig;
   frame?: ExperienceFrameConfig;

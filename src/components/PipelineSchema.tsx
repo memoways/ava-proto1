@@ -108,7 +108,6 @@ const GLOSSARY: Array<{ term: string; def: string }> = [
   { term: "Lovable AI Gateway", def: "Passerelle LLM utilisée hors OpenRouter pour les tâches courtes : query rewrite + résumé de session." },
   { term: "Brief de tour", def: "Objet produit uniquement par le banc d'essai GM pré-tour ; non exécuté dans le PRD4 live." },
   { term: "Validateur", def: "Contrôle disponible dans le simulateur ; non exécuté dans le PRD4 live." },
-  { term: "trust", def: "Score de confiance 0→TRUST_THRESHOLD. Déclenche le gate quand atteint." },
   { term: "Trigger vidéo", def: "Événement narratif Gumlet déclenché par le GM (famille, secret, disparition)." },
   { term: "Fallback", def: "Réponse de prudence si la régénération échoue après MAX_VALIDATION_RETRIES." },
 ];

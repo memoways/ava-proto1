@@ -1,6 +1,6 @@
 import { withTimeout } from '@/services/asyncUtils';
 import { candidateEvidence, HANDOFF_DEPENDENCY_TIMEOUT_MS, recoverHandoffAssessment, RECOVERED_HANDOFF_GUIDANCE, RECOVERED_HANDOFF_REASON } from '@/services/handoffCoordinator';
-import { CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
+import { buildExperienceDirectorPrompt, CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS } from '@/services/gameMasterPromptBuilder';
 import { GM_MIN_MAX_TOKENS, GM_RUNTIME_OUTPUT_INSTRUCTIONS, REQUIRED_GM_JSON_FIELDS } from '@/services/gameMasterContract';
 import { formatVideoCandidateLine } from '@/services/videoCandidateLine';
 import { describeUnreadableGmOutput, extractGmJson } from '@/agents/gmJsonOutput';
@@ -73,6 +73,11 @@ export interface PRD4PostTurnInput {
   promptVersionOverride?: string | null;
   orchestrationVersionId?: string | null;
   orchestrationConfig?: ExperienceDirectorConfig | null;
+  /**
+   * `false` sends the stored or code prompt without the settings block compiled
+   * from `orchestrationConfig` (admin comparison baseline). Default: compiled.
+   */
+  compileSettingsBlock?: boolean;
   currentCharacter: RuntimeCharacter;
   characterContext?: CharacterExecutionContext;
   relationshipPolicy?: CharacterRelationshipPolicy;
@@ -499,6 +504,25 @@ function isCompleteGMJson(value: unknown): value is Partial<PRD4PostTurnEvaluati
   return REQUIRED_GM_JSON_FIELDS.every((field) => Object.prototype.hasOwnProperty.call(record, field));
 }
 
+/** Historical GM temperature, kept when the LLM tab setting is absent. */
+export const DEFAULT_GM_TEMPERATURE = 0.2;
+
+/**
+ * System prompt actually sent to the GM. The settings block is compiled at
+ * runtime from the pinned config, whatever the stored prompt: a `builtin://`
+ * version gets the code prompt plus its settings, a stored prompt has its
+ * frozen block replaced (never doubled). Without a config the stored or code
+ * prompt is kept as is.
+ */
+export function resolveDirectorSystemPrompt(
+  storedPrompt: string | null | undefined,
+  config: ExperienceDirectorConfig | null | undefined,
+): string {
+  const stored = storedPrompt?.trim();
+  const base = stored && !stored.startsWith("builtin://") ? stored : EXPERIENCE_DIRECTOR_SYSTEM_PROMPT;
+  return config ? buildExperienceDirectorPrompt(base, config) : base;
+}
+
 /**
  * Évalue le tour qui vient de se jouer. Toujours résout (jamais throw).
  */
@@ -523,10 +547,8 @@ export async function evaluatePostTurnPRD4(
   });
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
-  const promptOverride = input.systemPromptOverride?.trim();
-  const effectiveSystemPrompt = promptOverride && !promptOverride.startsWith("builtin://")
-    ? promptOverride
-    : EXPERIENCE_DIRECTOR_SYSTEM_PROMPT;
+  const effectiveSystemPrompt = resolveDirectorSystemPrompt(input.systemPromptOverride,
+    input.compileSettingsBlock === false ? null : input.orchestrationConfig);
   const messages: TraceMessage[] = [
     { role: "system", content: input.handoffContext
       ? `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}${input.handoffContext.candidateText !== undefined ? '\nMODE CANDIDAT : analyse le texte généré avant diffusion. Les références speech_N portent sur ce candidat, pas sur une parole entendue. La preuve sera revalidée avec le reçu réel ; aucune autorisation de transfert ni mémoire avant cette livraison.' : ''}`
@@ -547,7 +569,7 @@ export async function evaluatePostTurnPRD4(
       messages,
       {
         model,
-        temperature: 0.2,
+        temperature: llm.LLM_GM_TEMPERATURE ?? DEFAULT_GM_TEMPERATURE,
         // Le réglage GM historique (souvent 180, puis 950) ne suffit pas à
         // l'évaluation + memory_delta. Ce plancher évite un JSON tronqué sans
         // ajouter d'appel LLM.

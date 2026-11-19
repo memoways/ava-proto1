@@ -79,7 +79,6 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
   minimumHandoffTurn: 4,
   maximumHandoffsPerSession: 8,
   minimumTurnsBetweenHandoffs: 2,
-  handoffTarget: "either",
   directorTimeoutMs: 12_000,
   editor: {
     tone: "balanced",
@@ -88,6 +87,7 @@ export const DEFAULT_DIRECTOR_CONFIG: ExperienceDirectorConfig = {
     allowHandoffs: true,
     allowCinematics: true,
     speechGuidance: true,
+    characterTimeCues: true,
     customInstructions: "",
     handoffRules: [],
     projectContext: DEFAULT_PROJECT_CONTEXT,
@@ -140,22 +140,24 @@ export function normalizeDirectorConfig(value: Partial<ExperienceDirectorConfig>
     || priority === "pace"
   );
   const rawMaxHandoffs = Number(value?.maximumHandoffsPerSession);
+  // Older versions stored a never-read handoffTarget: drop it on read.
+  const { handoffTarget: _legacyHandoffTarget, ...rest } = (value ?? {}) as Partial<ExperienceDirectorConfig> & { handoffTarget?: unknown };
   return {
     ...DEFAULT_DIRECTOR_CONFIG,
-    ...value,
+    ...rest,
     minimumHandoffTurn: Math.min(20, Math.max(1, Math.round(Number(value?.minimumHandoffTurn) || DEFAULT_DIRECTOR_CONFIG.minimumHandoffTurn))),
     maximumHandoffsPerSession: Number.isFinite(rawMaxHandoffs)
       ? Math.min(20, Math.max(0, Math.round(rawMaxHandoffs)))
       : DEFAULT_DIRECTOR_CONFIG.maximumHandoffsPerSession,
     minimumTurnsBetweenHandoffs: Math.min(10, Math.max(1, Math.round(Number(value?.minimumTurnsBetweenHandoffs) || DEFAULT_DIRECTOR_CONFIG.minimumTurnsBetweenHandoffs))),
     directorTimeoutMs: Math.min(30_000, Math.max(3_000, Math.round(Number(value?.directorTimeoutMs) || DEFAULT_DIRECTOR_CONFIG.directorTimeoutMs))),
-    handoffTarget: "either",
     editor: {
       ...DEFAULT_DIRECTOR_CONFIG.editor,
       ...editor,
       priorities: priorities?.length ? priorities : DEFAULT_DIRECTOR_CONFIG.editor.priorities,
       // Only an explicit false turns the guidance off; older versions keep it.
       speechGuidance: editor?.speechGuidance !== false,
+      characterTimeCues: editor?.characterTimeCues !== false,
       customInstructions: editor?.customInstructions?.trim() ?? "",
       handoffRules: sanitizeHandoffRules(editor?.handoffRules ?? DEFAULT_DIRECTOR_CONFIG.editor.handoffRules),
       projectContext: typeof editor?.projectContext === "string"
