@@ -4,6 +4,20 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus : lot T2, attente de passage sortie du chemin critique] — 2026-11-19
+
+- Cause du retard de 1,3–1,6 s de certains tours établie (session `c293829f…`, `llm_usage` recoupé) : le tour suivant
+  attendait la finalisation du passage du tour précédent, donc la fin de son GM post-tour (2,2–4,1 s).
+- `handoffFinalizationWritesSnapshot` (`handoffCoordinator.ts`) : hors passage plausible (aucune demande ouverte, l'autre
+  personnage n'est nommé ni par le joueur ni par la réponse, pas de formule de transfert), la finalisation n'écrit plus et
+  n'est plus attendue par le tour suivant ; passage plausible ou offre préparée : comportement inchangé. Événement
+  `handoff_blocked` d'un `action: handoff` du GM conservé.
+- Télémétrie : le span `pre_turn_handoff_wait` est découpé en `pre_turn_handoff_prior_write`, `pre_turn_handoff_read`,
+  `pre_turn_handoff_own_write`.
+- Interruptions : coupures avant LLM toutes à ≈ 1,3 s après la décision, avec ou sans Tavus (fin d'énoncé STT) ; aucune
+  correction, décision d'Ulrich. LLM streamé : [note d'évaluation](docs/evaluation_llm_streame_vers_tts.md), sans code.
+- Non mesuré après correction (session sandbox à faire). Reprise : [lot T3](docs/prompt_reprise_latence_tavus_lot_t3.md).
+
 ## [Latence Tavus : lot T1, flux PCM ElevenLabs vers Tavus] — 2026-11-19
 
 - Tavus « voix d'Ava » : la première ligne ElevenLabs est lue en flux (`pcm_24000` via `proxy-tts`, inchangé) et envoyée à

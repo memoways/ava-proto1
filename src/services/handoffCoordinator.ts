@@ -174,6 +174,22 @@ export async function prepareCharacterHandoff(input: PreparationInput) {
   return { state: prepared, portraitUrl: profile?.portraitUrl ?? null, target };
 }
 
+/**
+ * Lot T2: can the post-turn finalisation write the handoff snapshot for this turn?
+ * Yes while a request is open or an offer is prepared, and also when the other character is named by the player or in
+ * the reply, or the reply reads as a transfer or consent: the GM may validate a passage on the current turn without a
+ * request the regex caught (a consent needs the target named in a quote). Otherwise it writes nothing and the next turn
+ * does not need to wait for the previous GM post-turn (2 to 4 s). An offer already `available` is never rewritten.
+ */
+export function handoffFinalizationWritesSnapshot(state: HandoffState | null, userText: string, reply: string,
+  source: RuntimeCharacter): boolean {
+  if (!state || state.state === 'available') return false;
+  if (state.state !== 'none') return true;
+  const target = otherCharacter(source);
+  const named = new RegExp(`\\b${target}\\b`, 'i');
+  return named.test(userText) || named.test(reply) || needsHandoffPreparation(reply) || hasCharacterHandoffConsent(reply, target);
+}
+
 export function finalizeCharacterHandoff(state: HandoffState, evaluation: PRD4PostTurnEvaluation,
   userText: string, receipt: ResponseDeliveryReceipt | undefined, prepared: boolean) {
   const assessed = assessHandoffTurn(state, { currentCharacter: state.sourceCharacter, turnId: state.turnId,
