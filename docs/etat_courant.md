@@ -1,5 +1,9 @@
 # Ava — état courant
 
+**Latence Tavus, lot T3 (20 novembre, code)** : `query-rag` lit le profil RAG en parallèle du quota (≈ −56 ms médian attendu,
+à mesurer) ; le rerank (208 ms) ne se parallélise pas, son retrait attend décision et rejeu de qualité. Reprise :
+[lot T4](prompt_reprise_latence_tavus_lot_t4.md).
+
 **Latence Max en vidéo Tavus, lot T2 (19 novembre, code)** : le retard de 1,3–1,6 s de 2 tours sur 9 venait de l'attente du
 GM post-tour du tour précédent ; hors passage plausible, le tour suivant ne l'attend plus. Spans d'attente découpés ;
 interruptions (≈ 1,3 s après la décision, aussi hors Tavus) non corrigées, décision d'Ulrich ; LLM streamé évalué sans code.
