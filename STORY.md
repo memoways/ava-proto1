@@ -14,7 +14,7 @@ post-tour et du démarrage du pipeline a montré que le tour suivant attendait l
 une écriture inutile quand aucun passage de personnage n'est en jeu. Cette attente est levée hors passage plausible ;
 l'attente est conservée dès que l'autre personnage est nommé ou que la réponse ressemble à un transfert, car le GM peut
 valider un passage sans demande détectée par la regex. Les coupures de tours à ≈ 1,3 s sont une affaire de fin d'énoncé
-STT, pas de Tavus ; le LLM streamé est évalué mais pas lancé. Mesure après correction à faire en sandbox.
+STT, pas de Tavus ; le LLM streamé est évalué mais pas lancé. Mesuré le 20 novembre : plus aucun tour en retard, passage Max → Emma validé ; Max reste ≈ 0,6 s derrière Emma à cause de l'attente vidéo Tavus.
 
 ## Sélection vidéos, lot 5 — les personnages se souviennent de ce qu'on a vu (1er novembre 2026)
 

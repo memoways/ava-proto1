@@ -3,7 +3,7 @@
 **Latence Max en vidéo Tavus, lot T2 (19 novembre, code)** : le retard de 1,3–1,6 s de 2 tours sur 9 venait de l'attente du
 GM post-tour du tour précédent ; hors passage plausible, le tour suivant ne l'attend plus. Spans d'attente découpés ;
 interruptions (≈ 1,3 s après la décision, aussi hors Tavus) non corrigées, décision d'Ulrich ; LLM streamé évalué sans code.
-**À faire** : session sandbox-ulrich pour mesurer après T2 ; recette passage Max → Emma. [Analyse](analyse_latence_tavus_20261119.md) ·
+**Mesuré le 20 novembre** (20 tours) : attente de passage ≤ 0,17 s à tous les tours, passage Max → Emma validé ; Max audible ≈ 4,1 s (Emma ≈ 3,5 s : écart = attente vidéo Tavus ≈ 1,0 s). Leviers restants chiffrés dans l'analyse. [Analyse](analyse_latence_tavus_20261119.md) ·
 [évaluation LLM streamé](evaluation_llm_streame_vers_tts.md) · [reprise lot T3](prompt_reprise_latence_tavus_lot_t3.md).
 
 **Latence Max en vidéo Tavus, lot T1 (19 novembre, code)** : la première ligne ElevenLabs part vers Tavus au fil de l'eau
