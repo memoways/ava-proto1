@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Questionnaire conversationnel, lisibilité (20 novembre, code)** : relance en premier, zone de réponse agrandie, consentement/email/« Valider et envoyer » avant le récapitulatif ; questionnaire non rallongé. Recette sur appareils ciblés à faire (non vérifié hors jsdom).
+
 **Latence Tavus, lot T3 (20 novembre, code)** : `query-rag` lit le profil RAG en parallèle du quota (≈ −56 ms médian attendu,
 à mesurer) ; le rerank (208 ms) ne se parallélise pas, son retrait attend décision et rejeu de qualité. Reprise :
 [lot T4](prompt_reprise_latence_tavus_lot_t4.md).

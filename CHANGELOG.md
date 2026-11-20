@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Questionnaire conversationnel : lisibilité (relance, réponse, envoi)] — 2026-11-20
+
+- Relance affichée en premier dans un encadré, question initiale et réponse précédente repliées (« Revoir ma question et ma réponse »).
+- Zone de réponse plus grande (200 px, grandit avec le texte dicté, défilement interne au-delà de 60 % de l'écran).
+- Revue finale : consentement, email facultatif et « Valider et envoyer » avant le récapitulatif ; indication quand le consentement manque.
+- Inchangé : 5 questions, édition, consentement obligatoire, email facultatif, données enregistrées. **Non vérifié sur appareil réel** (tests jsdom seulement) : recette mobile à faire.
+
 ## [Latence Tavus : lot T3, contexte RAG, lecture du profil en parallèle du quota] — 2026-11-20
 
 - Mesure (session `d39b9221…`, médianes serveur `query-rag`) : quota 56 ms, profil 63 ms, embedding 214 ms, vector 63 ms,
