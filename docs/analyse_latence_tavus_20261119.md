@@ -148,3 +148,29 @@ Aucune correction : régler la fin d'énoncé est un compromis latence / coupure
 ### LLM streamé
 
 Note séparée : [évaluation](evaluation_llm_streame_vers_tts.md). Aucun code.
+
+### Mesure après T2 (session `d39b9221…`, 20 novembre, 20 tours : 12 Max puis 8 Emma, passage Max → Emma réussi)
+
+- **Attente de passage corrigée** : `pre_turn_handoff_wait` entre 0,07 et 0,17 s aux 20 tours (médiane ≈ 0,09 s), `prior_write`
+  ≈ 0 ms partout (max 62 ms). Plus aucun tour à 1,3–1,6 s. Écoute d'Ulrich : le passage Max → Emma s'est très bien fait.
+- **Max audible (`output_estimated`, tours complétés)** : Max 3,85–4,18 s (médiane ≈ 4,1 s) ; Emma 2,75–3,90 s (médiane ≈ 3,5 s,
+  sans attente vidéo, `output ≈ premier octet + 0,35 s`). Ulrich ressent bien Emma plus réactive : l'écart médian de ≈ 0,6 s (jusqu'à ≈ 1 s selon les tours) est
+  l'attente vidéo Tavus (`video_wait_ms` 0,88–1,13 s, médiane ≈ 1,04 s).
+- **Exceptions** : tour 1 (ouverture, 5,3 s) et tour 10 (6,4 s) : le tour 10 est la demande de passage vers Emma, dont la
+  sortie est volontairement retenue jusqu'à la validation du GM (`tts_text_sent` 5,3 s pour une réponse LLM à 2,5 s) ; à ne pas
+  toucher (garde de passage).
+- **Interruptions** : 7 tours sur 20, mêmes signatures qu'avant : annulation 1,10–1,32 s après la décision (5 tours) et 2,1–2,2 s
+  (2 tours), tous après la préparation du contexte (≈ 1,0 s), donc le joueur reprend la parole pendant l'appel LLM. Ce n'est pas Tavus.
+
+### Où reste la latence (Max, médianes, depuis la décision de tour)
+
+| Étape | Durée | Levier possible | Gain estimé |
+|---|---|---|---|
+| Transcript final → contexte prêt | ≈ 1,0 s (dont RAG 0,6–0,7 s : embedding 0,2 + vector 0,05 + rerank 0,2–0,26) | rerank en parallèle ou retiré, embedding sur le partiel | 0,2–0,3 s (qualité de retrieval à rejouer) |
+| Appel LLM complet (`upstream_headers`, `http_batch`) | 1,8–2,1 s | LLM streamé, première phrase seulement | 0,5–0,9 s (estimé) |
+| Premier octet audio ElevenLabs (flux PCM) | ≈ 0,35 s | rien d'évident | – |
+| Attente vidéo Tavus (blob → lèvres) | ≈ 1,0 s | taille et cadence des premiers morceaux, pré-roll Tavus : à expérimenter | inconnu, seul levier propre à Tavus |
+| Fin d'énoncé STT (avant la décision, **non comptée** par l'origine « décision de tour ») | silence 0,9 s + attente de fin | réglage `utteranceEndMs` | compromis avec les coupures |
+
+La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
+est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.

@@ -16,7 +16,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
   `pre_turn_handoff_own_write`.
 - Interruptions : coupures avant LLM toutes à ≈ 1,3 s après la décision, avec ou sans Tavus (fin d'énoncé STT) ; aucune
   correction, décision d'Ulrich. LLM streamé : [note d'évaluation](docs/evaluation_llm_streame_vers_tts.md), sans code.
-- Non mesuré après correction (session sandbox à faire). Reprise : [lot T3](docs/prompt_reprise_latence_tavus_lot_t3.md).
+- Mesuré le 20 novembre (`d39b9221…`, 20 tours) : `pre_turn_handoff_wait` ≤ 0,17 s partout, passage Max → Emma validé ; leviers restants dans l'analyse. Reprise : [lot T3](docs/prompt_reprise_latence_tavus_lot_t3.md).
 
 ## [Latence Tavus : lot T1, flux PCM ElevenLabs vers Tavus] — 2026-11-19
 
