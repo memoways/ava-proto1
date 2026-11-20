@@ -172,5 +172,21 @@ Note séparée : [évaluation](evaluation_llm_streame_vers_tts.md). Aucun code.
 | Attente vidéo Tavus (blob → lèvres) | ≈ 1,0 s | taille et cadence des premiers morceaux, pré-roll Tavus : à expérimenter | inconnu, seul levier propre à Tavus |
 | Fin d'énoncé STT (avant la décision, **non comptée** par l'origine « décision de tour ») | silence 0,9 s + attente de fin | réglage `utteranceEndMs` | compromis avec les coupures |
 
+### Lot T3 mesuré (20 novembre, session `2b984ce8…`, sandbox-ulrich, 12 tours)
+
+Le correctif de `query-rag` (profil lu en parallèle du quota) n'était pas actif après la synchro GitHub : Lovable n'avait pas
+redéployé la fonction (session sandbox-benoit `eb0448ed…` encore séquentielle). Redéploiement demandé à Lovable (21:29 UTC), puis mesure :
+
+| Médiane (ms) | Avant T3 (`d39b9221…` / `eb0448ed…`) | Après T3 (`2b984ce8…`) |
+|---|---|---|
+| `rag_profile`, début de span | 51 (séquentiel) | **0** (chevauche `control_quota`) |
+| `character_rag` côté client | 735 / 753 | 690 (n = 9, p90 1 177) |
+| embedding | 214 | 217 |
+| rerank | 208 / 204 | 206 |
+
+Le chevauchement est confirmé. La baisse de `character_rag` (≈ 45–60 ms) correspond au gain attendu, mais reste dans le bruit :
+9 tours, et le p90 de l'embedding (660 ms) vient de Voyage, pas de T3. Gain non établi statistiquement, comportement validé.
+Restent embedding (≈ 215 ms) et rerank (≈ 205 ms) : voir [reprise T4](prompt_reprise_latence_tavus_lot_t4.md).
+
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
