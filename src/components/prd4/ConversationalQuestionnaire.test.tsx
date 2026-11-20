@@ -179,4 +179,25 @@ describe("ConversationalQuestionnaire", () => {
     expect(screen.getByTestId("questionnaire-step").className).toContain("grid-cols-2");
     expect(container.querySelector('[data-docked="true"]')).toBeNull();
   });
+
+  it("shows the follow-up as the prominent question, with the earlier answer one tap away", async () => {
+    render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={vi.fn().mockResolvedValue("Qu'est-ce qui accrochait ?")} onSave={vi.fn()} />);
+    answer("Ma première réponse");
+    const box = await screen.findByTestId("questionnaire-follow-up");
+    expect(box).toHaveTextContent("Qu'est-ce qui accrochait ?");
+    expect(screen.getByText("Revoir ma question et ma réponse").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("puts consent, optional email and the send button before the answers summary", async () => {
+    render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={vi.fn().mockResolvedValue(null)} onSave={vi.fn()} />);
+    for (let i = 0; i < 5; i += 1) {
+      answer(`Réponse ${i + 1}`);
+      fireEvent.click(await screen.findByRole("button", { name: "Note 3 sur 5" }));
+      fireEvent.click(screen.getByRole("button", { name: i === 4 ? "Terminer" : "Question suivante" }));
+    }
+    const panel = screen.getByTestId("review-send-panel");
+    const firstCard = screen.getByTestId("review-fluidity");
+    expect(panel.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Valider et envoyer" })).toBeDisabled();
+  });
 });

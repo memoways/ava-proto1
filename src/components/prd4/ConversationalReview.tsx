@@ -201,26 +201,12 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
       <header className="space-y-1">
         <h2 className="font-serif text-xl text-foreground">Ta synthèse</h2>
         <p className="text-sm text-muted-foreground">
-          Relis et corrige si besoin. Rien n'est envoyé avant « Valider et envoyer ».
+          Rien n'est envoyé avant « Valider et envoyer » ci-dessous. Relis et corrige ensuite si besoin.
         </p>
       </header>
 
-      <ConversationalRadar values={radarValues} title="Tes notes par dimension" compact={phone} />
-
-      <div className="space-y-4">
-        {CONVERSATIONAL_DIMENSIONS.map((key) => (
-          <DimensionCard
-            key={key}
-            dimensionKey={key}
-            dimension={review.dimensions[key]}
-            onEdit={(field, text) => setReview((current) => editDimensionText(current, key, field, text))}
-            onScore={(score) => setReview((current) => changeScore(current, key, score))}
-            folded={phone}
-          />
-        ))}
-      </div>
-
-      <div className="space-y-3 border-t border-border pt-4">
+      <div className="space-y-3 rounded-md border border-primary/50 bg-primary/5 p-4" data-testid="review-send-panel">
+        <p className="text-sm font-medium text-foreground">Pour envoyer tes réponses : accepte la conservation, puis « Valider et envoyer ».</p>
         <label className={cn("flex items-start gap-3 text-sm text-foreground", touchLabel)}>
           <input
             type="checkbox"
@@ -281,6 +267,23 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
           {submitting ? "Envoi…" : "Valider et envoyer"}
         </button>
       </QuestionnaireActionBar>
+      {!review.consent && <p className="text-xs text-muted-foreground">Le bouton s'active quand tu as accepté la conservation de la transcription.</p>}
+
+      <ConversationalRadar values={radarValues} title="Tes notes par dimension" compact={phone} />
+
+      <div className="space-y-4">
+        {CONVERSATIONAL_DIMENSIONS.map((key) => (
+          <DimensionCard
+            key={key}
+            dimensionKey={key}
+            dimension={review.dimensions[key]}
+            onEdit={(field, text) => setReview((current) => editDimensionText(current, key, field, text))}
+            onScore={(score) => setReview((current) => changeScore(current, key, score))}
+            folded={phone}
+          />
+        ))}
+      </div>
+
     </section>
   );
 }

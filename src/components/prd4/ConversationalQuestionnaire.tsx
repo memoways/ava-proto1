@@ -51,7 +51,7 @@ interface Props {
 }
 
 const fieldClass =
-  "min-h-[120px] w-full rounded-md border border-border bg-secondary px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none";
+  "min-h-[200px] max-h-[60svh] w-full resize-y overflow-y-auto rounded-md border border-border bg-secondary px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none";
 const primaryButton =
   "min-h-11 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50";
 const secondaryButton =
@@ -94,6 +94,16 @@ function VoiceAnswerField({
   const listening = dictation.status === "listening" || dictation.status === "finalizing";
   const shown = partial ? `${value.trim() ? `${value.trim()} ` : ""}${partial}` : value;
 
+  // The field grows with the dictated text (up to 60% of the screen, then it
+  // scrolls inside itself), so reading it never fights with the page scroll.
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = fieldRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    if (el.scrollHeight) el.style.height = `${el.scrollHeight + 2}px`;
+  }, [shown]);
+
   const busy = dictation.status !== "idle";
   useEffect(() => { onListeningChange?.(busy); }, [busy, onListeningChange]);
 
@@ -123,12 +133,13 @@ function VoiceAnswerField({
     <div className="space-y-2">
       <label htmlFor={id} className="sr-only">{label}</label>
       <textarea
+        ref={fieldRef}
         id={id}
         value={shown}
         readOnly={listening}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? "Réponds à la voix ou écris ici…"}
-        className={minRows ? fieldClass : `${fieldClass} min-h-[64px]`}
+        className={minRows ? fieldClass : `${fieldClass} !min-h-[96px]`}
         aria-live={listening ? "polite" : undefined}
       />
       {listening && <p className="text-xs text-muted-foreground">Je t'écoute — le texte s'affiche au fil de ta parole.</p>}
@@ -288,19 +299,34 @@ const ConversationalQuestionnaire = ({ questions, sessionContext, requestFollowU
     </>
   );
 
-  // Question and what was already said (kept visible during the follow-up and the score).
-  const context = (
-    <div className="space-y-4">
-      <h2 className="font-serif text-xl leading-snug text-foreground tablet:text-2xl">{dimension.question}</h2>
-      {state.step !== "answer" && dimension.answer && (
-        <blockquote className="border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground">{dimension.answer}</blockquote>
-      )}
-      {(state.step === "follow_up" || state.step === "score") && dimension.follow_up && (
-        <p className="text-base font-medium text-foreground">{dimension.follow_up.question}</p>
+  // Follow-up first and prominent; the original question and what was already
+  // said stay one tap away underneath, never above the new question.
+  const hasFollowUp = (state.step === "follow_up" || state.step === "score") && !!dimension.follow_up;
+  const previous = (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">{dimension.question}</p>
+      {dimension.answer && (
+        <blockquote className="max-h-40 overflow-y-auto border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground">{dimension.answer}</blockquote>
       )}
       {state.step === "score" && dimension.follow_up?.answer && (
-        <blockquote className="border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground">{dimension.follow_up.answer}</blockquote>
+        <blockquote className="max-h-40 overflow-y-auto border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground">{dimension.follow_up.answer}</blockquote>
       )}
+    </div>
+  );
+  const context = hasFollowUp ? (
+    <div className="space-y-4">
+      <div className="space-y-1 rounded-md border border-primary bg-primary/10 p-4" data-testid="questionnaire-follow-up">
+        <p className="text-xs font-mono uppercase tracking-[0.2em] text-primary">Une précision ?</p>
+        <h2 className="font-serif text-xl leading-snug text-foreground tablet:text-2xl">{dimension.follow_up!.question}</h2>
+      </div>
+      <details className="rounded-md border border-border p-3">
+        <summary className="min-h-6 cursor-pointer text-sm text-muted-foreground">Revoir ma question et ma réponse</summary>
+        <div className="mt-3">{previous}</div>
+      </details>
+    </div>
+  ) : (
+    <div className="space-y-4">
+      <h2 className="font-serif text-xl leading-snug text-foreground tablet:text-2xl">{dimension.question}</h2>
     </div>
   );
 
