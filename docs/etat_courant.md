@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Fin d'expérience (20 novembre, code)** : écran « La communication se coupe » supprimé, fin → questionnaire direct, introduction (5 minutes, réponse vocale) sur la première question.
+
 **Questionnaire conversationnel, lisibilité (20 novembre, code)** : relance en premier, zone de réponse agrandie, consentement/email/« Valider et envoyer » avant le récapitulatif ; questionnaire non rallongé. Recette sur appareils ciblés à faire (non vérifié hors jsdom).
 
 **Latence Tavus, lot T3 (20 novembre, code)** : `query-rag` lit le profil RAG en parallèle du quota (≈ −56 ms médian attendu,

@@ -2851,7 +2851,7 @@ test('F2 : recharge active consomme le budget, expiration technique reste distin
   fakes.changeSessionRow({ conversation_log: log });
   await page.reload();
   await page.getByRole('button', { name: /Reprendre/ }).click();
-  await expect(page.getByText('La communication se coupe.', { exact: true })).toBeVisible();
+  await expect(page.getByText("Ton retour sur l'expérience")).toBeVisible();
   await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('timeout_configured_duration');
 });
 
@@ -2884,7 +2884,7 @@ test('F2 : expiration technique sur grille ferme l’expérience sans dépenser 
   await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
   const before = (fakes.getSessionRow().conversation_log as Array<{callClose?:{remainingSeconds:number}}>)[0].callClose!.remainingSeconds;
   await page.clock.fastForward(4 * 60 * 60 * 1000 + 1000);
-  await expect(page.getByText('La communication se coupe.', {exact:true})).toBeVisible();
+  await expect(page.getByText("Ton retour sur l'expérience")).toBeVisible();
   await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('resume_expired');
   expect(fakes.getSessionRow().duration_seconds).toBe(930 - before);
 });
