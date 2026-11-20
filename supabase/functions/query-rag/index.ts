@@ -110,6 +110,13 @@ async function rerankVoyage(
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   const spans = createMonotonicSpans();
+  // The active-profile read is independent of the quota check (both ~60 ms), so
+  // start it now and let them overlap. A denied request simply discards it.
+  const activeProfileRead = spans.run("rag_profile", async () => createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  ).from("rag_index_state").select("active_profile").eq("id", true).maybeSingle());
+  activeProfileRead.catch(() => undefined);
   const denied = await spans.run("control_quota", () => enforceGameRequest(req, "query-rag", corsHeaders), (response) => response !== null);
   if (denied) return denied;
 
@@ -152,11 +159,7 @@ serve(async (req) => {
       ? `${userQuery}\n\nContexte récent: ${body.recent_context}`
       : userQuery;
 
-    const { data: indexState, error: indexStateError } = await spans.run("rag_profile", () => supabase
-      .from("rag_index_state")
-      .select("active_profile")
-      .eq("id", true)
-      .maybeSingle());
+    const { data: indexState, error: indexStateError } = await activeProfileRead;
     if (indexStateError) {
       throw new Error(`Active RAG profile unavailable: ${indexStateError.message}`);
     }

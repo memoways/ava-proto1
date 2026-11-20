@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus : lot T3, contexte RAG, lecture du profil en parallèle du quota] — 2026-11-20
+
+- Mesure (session `d39b9221…`, médianes serveur `query-rag`) : quota 56 ms, profil 63 ms, embedding 214 ms, vector 63 ms,
+  rerank 208 ms ; `character_rag` côté client 735 ms. Le rerank ne peut pas tourner « en parallèle » : il classe les
+  candidats du vector search, donc dépend de leur résultat.
+- `query-rag` : la lecture de `rag_index_state` démarre en même temps que `control_quota` (indépendantes) ; une requête
+  refusée écarte le résultat. Gain attendu ≈ 56 ms médian, aucun effet sur la qualité de retrieval. À mesurer après synchro.
+- Non fait, en attente de décision : rerank retiré ou conditionnel (≈ 0,2 s, qualité à rejouer), embedding sur le partiel
+  (≈ 0,2 s, plus lourd). Voir [reprise T4](docs/prompt_reprise_latence_tavus_lot_t4.md).
+
 ## [Latence Tavus : lot T2, attente de passage sortie du chemin critique] — 2026-11-19
 
 - Cause du retard de 1,3–1,6 s de certains tours établie (session `c293829f…`, `llm_usage` recoupé) : le tour suivant
