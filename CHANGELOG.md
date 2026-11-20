@@ -11,6 +11,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Revue finale : consentement, email facultatif et « Valider et envoyer » avant le récapitulatif ; indication quand le consentement manque.
 - Inchangé : 5 questions, édition, consentement obligatoire, email facultatif, données enregistrées. **Non vérifié sur appareil réel** (tests jsdom seulement) : recette mobile à faire.
 
+## [Latence Tavus : lot T3 mesuré] — 2026-11-20
+
+- La fonction `query-rag` n'avait pas été redéployée par la synchro GitHub (spans encore séquentiels sur sandbox-benoit) ; redéploiement
+  par le chat Lovable à 21:29 UTC. Sur sandbox-ulrich (`2b984ce8…`, 12 tours) `rag_profile` démarre à 0 ms et chevauche `control_quota`.
+- `character_rag` médian 690 ms (n = 9) contre 735/753 ms avant : cohérent avec ≈ −56 ms attendus, mais non significatif. Détail dans
+  l'[analyse de latence](docs/analyse_latence_tavus_20261119.md). À retenir : une fusion ne déploie pas les edge functions, le vérifier par la télémétrie.
+
 ## [Latence Tavus : lot T3, contexte RAG, lecture du profil en parallèle du quota] — 2026-11-20
 
 - Mesure (session `d39b9221…`, médianes serveur `query-rag`) : quota 56 ms, profil 63 ms, embedding 214 ms, vector 63 ms,

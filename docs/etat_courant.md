@@ -2,8 +2,7 @@
 
 **Questionnaire conversationnel, lisibilité (20 novembre, code)** : relance en premier, zone de réponse agrandie, consentement/email/« Valider et envoyer » avant le récapitulatif ; questionnaire non rallongé. Recette sur appareils ciblés à faire (non vérifié hors jsdom).
 
-**Latence Tavus, lot T3 (20 novembre, code)** : `query-rag` lit le profil RAG en parallèle du quota (≈ −56 ms médian attendu,
-à mesurer) ; le rerank (208 ms) ne se parallélise pas, son retrait attend décision et rejeu de qualité. Reprise :
+**Latence Tavus, lot T3 (20 novembre, code)** : `query-rag` lit le profil RAG en parallèle du quota (chevauchement mesuré le 20 novembre, déployé via le chat Lovable ; `character_rag` 690 ms contre 735/753, gain ≈ −56 ms non significatif) ; le rerank (208 ms) ne se parallélise pas, son retrait attend décision et rejeu de qualité. Reprise :
 [lot T4](prompt_reprise_latence_tavus_lot_t4.md).
 
 **Latence Max en vidéo Tavus, lot T2 (19 novembre, code)** : le retard de 1,3–1,6 s de 2 tours sur 9 venait de l'attente du
