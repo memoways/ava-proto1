@@ -15,7 +15,7 @@ sauf aux tours 3 et 7 (1,6 s et 1,3 s), qui attendaient la fin du GM précédent
 (`voice_turn_events`, `metadata_json->server`, `llm_usage` pour l'heure de fin du GM).
 
 **Mise à jour 20 novembre : T2 mesuré** (session `d39b9221…`, 20 tours) : `pre_turn_handoff_wait` ≤ 0,17 s aux 20 tours, passage
-Max → Emma validé à l'écoute, Max audible ≈ 4,1 s contre ≈ 3,5 s pour Emma (écart = attente vidéo ≈ 1,0 s). Les points 1 et 2
+Max → Emma validé à l'écoute, Max audible ≈ 4,1 s contre ≈ 3,5 s pour Emma (Emma n'a pas l'attente vidéo ≈ 1,0 s). Les points 1 et 2
 ci-dessous sont faits ; il reste les leviers du tableau « Où reste la latence » de l'analyse : choisir avec Ulrich entre
 (a) contexte (rerank en parallèle, rejouer la qualité de retrieval), (b) prototype LLM streamé, (c) expérience sur les premiers
 morceaux Tavus (taille, cadence), (d) réglage de fin d'énoncé STT.

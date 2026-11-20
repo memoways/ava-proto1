@@ -154,7 +154,7 @@ Note séparée : [évaluation](evaluation_llm_streame_vers_tts.md). Aucun code.
 - **Attente de passage corrigée** : `pre_turn_handoff_wait` entre 0,07 et 0,17 s aux 20 tours (médiane ≈ 0,09 s), `prior_write`
   ≈ 0 ms partout (max 62 ms). Plus aucun tour à 1,3–1,6 s. Écoute d'Ulrich : le passage Max → Emma s'est très bien fait.
 - **Max audible (`output_estimated`, tours complétés)** : Max 3,85–4,18 s (médiane ≈ 4,1 s) ; Emma 2,75–3,90 s (médiane ≈ 3,5 s,
-  sans attente vidéo, `output ≈ premier octet + 0,35 s`). Ulrich ressent bien Emma plus réactive : l'écart de ≈ 0,9–1,0 s est
+  sans attente vidéo, `output ≈ premier octet + 0,35 s`). Ulrich ressent bien Emma plus réactive : l'écart médian de ≈ 0,6 s (jusqu'à ≈ 1 s selon les tours) est
   l'attente vidéo Tavus (`video_wait_ms` 0,88–1,13 s, médiane ≈ 1,04 s).
 - **Exceptions** : tour 1 (ouverture, 5,3 s) et tour 10 (6,4 s) : le tour 10 est la demande de passage vers Emma, dont la
   sortie est volontairement retenue jusqu'à la validation du GM (`tts_text_sent` 5,3 s pour une réponse LLM à 2,5 s) ; à ne pas
