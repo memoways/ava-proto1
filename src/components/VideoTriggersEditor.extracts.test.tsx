@@ -102,6 +102,16 @@ describe("VideoTriggersEditor sections", () => {
     await waitFor(() => expect(screen.getByText("Voix 1 : Bonjour.")).toBeTruthy());
   });
 
+  it("keeps Notion sync folded until the toggle is opened", async () => {
+    render(<VideoTriggersEditor />);
+    await waitFor(() => expect(screen.getByText("Rêve lumineux")).toBeTruthy());
+    const toggle = screen.getByTestId("notion-video-sync-toggle");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("button", { name: "Synchroniser avec Notion" })).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("button", { name: "Synchroniser avec Notion" })).toBeTruthy();
+  });
+
   it("shows no transcription panel in the cinematics section", async () => {
     render(<VideoTriggersEditor />);
     await waitFor(() => expect(screen.getByText("Rêve lumineux")).toBeTruthy());
