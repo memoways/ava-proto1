@@ -28,8 +28,9 @@ import {
   videoTriggerDefaults,
   type VideoTriggerSettings,
 } from "@/services/settingsService";
-import { supabase } from "@/integrations/supabase/client";
 import { AVA_NOTION_DATABASES } from "@/services/ragService";
+import { adminTabPath } from "@/services/adminNavigation";
+import { loadPlayCounts, playCountLabel, type PlayCount } from "@/services/videoDecisionLog";
 import { getCachedSession } from "@/services/gameAuth";
 import {
   appendVideoSyncRun,
@@ -49,14 +50,6 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
 const TYPE_OPTIONS = ["intro", "interlude", "mid_conversation"];
 const TRANSITION_OPTIONS = ["fade_black", "glitch", "screen_share"];
-
-interface CinematicEventRow {
-  id: string;
-  event_type: string;
-  created_at: string;
-  payload: { videoId?: string; reason?: string; blockedReason?: string } | null;
-}
-
 
 function MetaField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -454,7 +447,9 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
   const [newTheme, setNewTheme] = useState("");
-  const [history, setHistory] = useState<CinematicEventRow[]>([]);
+  const [playCounts, setPlayCounts] = useState<PlayCount[]>([]);
+  const [playsUnreadable, setPlaysUnreadable] = useState(false);
+  const [sortByPlays, setSortByPlays] = useState(true);
   const [describingId, setDescribingId] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [reanalyze, setReanalyze] = useState(false);
@@ -477,13 +472,15 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
 
   useEffect(() => { fetchTriggers(); }, [fetchTriggers]);
   useEffect(() => {
-    void supabase
-      .from("experience_events" as never)
-      .select("id, event_type, created_at, payload")
-      .in("event_type", ["cinematic_recommended", "cinematic_played", "cinematic_skipped", "cinematic_blocked"])
-      .order("created_at", { ascending: false })
-      .limit(40)
-      .then(({ data }) => setHistory((data ?? []) as unknown as CinematicEventRow[]));
+    let cancelled = false;
+    loadPlayCounts()
+      .then((result) => {
+        if (cancelled) return;
+        setPlayCounts(result.counts);
+        setPlaysUnreadable(result.zeroRows || Boolean(result.error));
+      })
+      .catch(() => { if (!cancelled) setPlaysUnreadable(true); });
+    return () => { cancelled = true; };
   }, []);
 
   function startEdit(t: VideoTriggerRow) {
@@ -558,6 +555,10 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
 
   // Film extracts and AI cinematics are managed in separate sections of the back-office.
   const visibleTriggers = triggers.filter((t) => (t.nature === "extract") === isExtracts);
+  const playById = new Map(playCounts.map((count) => [count.videoId, count]));
+  const shownTriggers = sortByPlays
+    ? [...visibleTriggers].sort((a, b) => (playById.get(b.id)?.plays ?? 0) - (playById.get(a.id)?.plays ?? 0))
+    : visibleTriggers;
   const toDescribe = selectVideosToDescribe(visibleTriggers, { reanalyze });
 
   async function describeMissing() {
@@ -651,9 +652,19 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
               : "Source éditoriale : Notion · média : Gumlet. Le GM recommande ; le moteur vérifie disponibilité, rythme et doublons avant lecture après la voix."}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchTriggers}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={sortByPlays ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSortByPlays((current) => !current)}
+            data-testid="video-sort-plays"
+          >
+            {sortByPlays ? "Les plus jouées" : "Ordre du catalogue"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchTriggers}>
+            <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border rounded p-3 bg-muted/5">
@@ -704,7 +715,8 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
         </p>
       )}
 
-      {visibleTriggers.map((t) => {
+      <p className="text-xs text-muted-foreground">Lectures des 30 derniers jours.</p>
+      {shownTriggers.map((t) => {
         const isEditing = editingId === t.id;
 
         if (isEditing) {
@@ -828,7 +840,17 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
             <div className="min-w-0 flex-1 space-y-4">
               {/* Identity and actions. */}
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h4 className="font-mono text-base font-semibold leading-tight">{t.title}</h4>
+                <div className="min-w-0">
+                  <h4 className="font-mono text-base font-semibold leading-tight">{t.title}</h4>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" data-testid="video-play-count">{playCountLabel(playById.get(t.id), playsUnreadable)}</Badge>
+                    {!playsUnreadable && playById.get(t.id) && (
+                      <span className="text-xs text-muted-foreground">
+                        dernière lecture {new Date(playById.get(t.id)!.lastPlayedAt).toLocaleString("fr-FR", { dateStyle: "medium" })}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
                     variant="outline"
@@ -907,14 +929,12 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
         );
       })}
     </section>
-    <section className="border rounded-lg p-4 space-y-3">
-      <div><h3 className="font-semibold text-base">Historique des décisions</h3><p className="text-xs text-muted-foreground">Recommandations, lectures, passages et blocages déterministes issus du journal append-only.</p></div>
-      {history.length === 0 ? <p className="text-sm text-muted-foreground">Aucun événement enregistré, ou migration Lovable en attente.</p> : history.map((event) => (
-        <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs">
-          <span><Badge variant="outline">{event.event_type}</Badge> {event.payload?.videoId ?? "vidéo inconnue"}</span>
-          <span className="text-muted-foreground">{event.payload?.blockedReason || event.payload?.reason || "—"} · {new Date(event.created_at).toLocaleString("fr-FR")}</span>
-        </div>
-      ))}
+    <section className="border rounded-lg p-4 space-y-1">
+      <h3 className="font-semibold text-base">Décisions</h3>
+      <p className="text-sm text-muted-foreground">
+        Pourquoi une vidéo a été choisie ou écartée :{" "}
+        <a className="underline" href={adminTabPath("video-decisions")}>ouvrir l'onglet Décisions vidéo</a>.
+      </p>
     </section>
     </div>
   );

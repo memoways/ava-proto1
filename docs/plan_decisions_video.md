@@ -36,6 +36,8 @@ Décisions d'Ulrich (21 novembre) :
 
 ## Lot 1 — Outil « Décisions vidéo » (lecture seule, sans changement de jeu)
 
+**Livré.** Onglet Admin › Expérience › Décisions vidéo, journal enrichi sur les trois chemins, compteur de lectures. Les événements antérieurs s'affichent sans les nouveaux champs. La relecture sandbox des sessions du 19 au 21 novembre reste à faire dans l'onglet. Suite : [lot 2](prompt_reprise_decisions_video_lot_2.md).
+
 ### 1a. Journal enrichi (payload jsonb, sans migration)
 Dans `src/pages/IndexPRD4.tsx`, compléter les payloads `cinematic_recommended` et `cinematic_blocked`. Cela
 concerne le chemin overlay (≈ l. 2360-2465), le chemin extraits (≈ l. 2470-2580) et le chemin GM interrupt

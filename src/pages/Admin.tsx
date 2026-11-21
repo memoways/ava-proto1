@@ -21,6 +21,7 @@ import GameMasterSettingsTab from "@/components/GameMasterSettingsTab";
 import CharacterRuntimeSettingsTab from "@/components/CharacterRuntimeSettingsTab";
 import CharacterEditorTab from "@/components/CharacterEditorTab";
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
+import VideoDecisionsTab from "@/components/VideoDecisionsTab";
 import RAGLabTab from "@/components/RAGLabTab";
 import EvalJudgeTab from "@/components/admin/EvalJudgeTab";
 import PipelineTraceTab from "@/components/PipelineTraceTab";
@@ -649,6 +650,10 @@ export default function Admin() {
 
           <TabsContent value="extracts">
             {activeTab === "extracts" && <VideoTriggersEditor scope="extracts" />}
+          </TabsContent>
+
+          <TabsContent value="video-decisions">
+            {activeTab === "video-decisions" && <VideoDecisionsTab />}
           </TabsContent>
 
 

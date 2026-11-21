@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo, lot 1 : onglet de lecture et compteur de lectures] — 2026-11-21
+
+- **Journal** (`cinematic_recommended` et `cinematic_blocked`, payload seulement) : `mechanism` (`overlay`, `extract`, `game_master`), candidates `[{ id, title }]` dans l'ordre envoyé au sélecteur (16 au plus, titres à 80 car.) plus `candidateCount`, vidéos écartées par motif, extraits de réplique (300) et de question (200), `linkDetail` quand le lien est trop faible. Aucun changement de sélection, de garde ou de prompt.
+- **Onglet Admin › Expérience › Décisions vidéo** : filtres 7 ou 30 jours, mécanisme et session ; vues par session (dépliant), par thèmes (Sankey SVG sans dépendance) et synthèse (part jouée ou écartée, confiance, liens). Les événements anciens, sans ces champs, restent lisibles. Une lecture qui renvoie zéro ligne est signalée comme telle.
+- **Cartes vidéo** : badge « N lectures · M sessions » et dernière lecture sur 30 jours, « jamais jouée », tri « les plus jouées ». Les deux sections « Historique des décisions » (Cinématiques et Extraits) sont remplacées par un lien vers l'onglet.
+- **Non vérifié ici** : relecture sandbox des 20 choix overlay du 19 au 21 novembre et de la tête de liste « Max, Emma et Leo suspendus ». Rien en production. Suite : [lot 2](docs/prompt_reprise_decisions_video_lot_2.md).
+
 ## [Décisions vidéo : diagnostic et plan] — 2026-11-21
 
 - **Plan seul, aucun code** : diagnostic chiffré de la sélection des cinématiques et extraits (confiance figée, liens lâches, rotation déséquilibrée, personnages à l'écran, vocabulaire de thèmes) et découpage en trois lots : outil « Décisions vidéo » avec vue par session, Sankey par thèmes et compteur de lectures ; vocabulaire commun évolutif (Thèmes, Émotion, Enjeu, À l'écran) ; corrections de sélection mesurées. [Plan](docs/plan_decisions_video.md) · [reprise lot 1](docs/prompt_reprise_decisions_video_lot_1.md).

@@ -32,10 +32,22 @@ vi.mock("@/services/videoSyncHistory", async (importOriginal) => ({
   loadVideoSyncHistory: vi.fn(async () => []),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => ({ select: () => ({ in: () => ({ order: () => ({ limit: async () => ({ data: [] }) }) }) }) }),
-  },
+  supabase: { from: () => ({ select: () => ({}) }) },
 }));
+vi.mock("@/services/videoDecisionLog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/videoDecisionLog")>();
+  return {
+    ...actual,
+    loadPlayCounts: vi.fn(async () => ({
+      counts: [
+        { videoId: "e1", title: "Procès-verbal", plays: 4, sessions: 2, lastPlayedAt: "2026-11-21T08:00:00.000Z" },
+        { videoId: "c1", title: "Rêve lumineux", plays: 1, sessions: 1, lastPlayedAt: "2026-11-20T08:00:00.000Z" },
+      ],
+      zeroRows: false,
+      error: null,
+    })),
+  };
+});
 vi.mock("@/components/CinematicPreview", () => ({ default: () => null }));
 
 import VideoTriggersEditor from "@/components/VideoTriggersEditor";
@@ -52,6 +64,15 @@ describe("VideoTriggersEditor sections", () => {
     expect(statuses).toEqual(expect.arrayContaining(["Parlé · transcription à vérifier", "Sans dialogue", "Dialogue non renseigné"]));
     expect(screen.getByText("MAX : Signez ici.")).toBeTruthy();
     expect(await screen.findByTestId("extract-rules")).toBeTruthy();
+    expect(screen.getAllByTestId("video-play-count").map((el) => el.textContent)).toEqual([
+      "4 lectures · 2 sessions",
+      "jamais jouée",
+      "jamais jouée",
+      "jamais jouée",
+    ]);
+    expect(screen.getByText(/dernière lecture/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "ouvrir l'onglet Décisions vidéo" }).getAttribute("href")).toBe("/admin/experience/decisions-video");
+    expect(screen.queryByText("Historique des décisions")).toBeNull();
   });
 
   it("keeps extracts out of the cinematics section", async () => {
