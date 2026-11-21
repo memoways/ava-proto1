@@ -1563,6 +1563,33 @@ export type Database = {
         }
         Relationships: []
       }
+      video_label_vocabulary: {
+        Row: {
+          emotions: string[]
+          id: string
+          on_screen: string[]
+          stakes: string[]
+          themes: string[]
+          updated_at: string
+        }
+        Insert: {
+          emotions?: string[]
+          id?: string
+          on_screen?: string[]
+          stakes?: string[]
+          themes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          emotions?: string[]
+          id?: string
+          on_screen?: string[]
+          stakes?: string[]
+          themes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       video_triggers: {
         Row: {
           ai_description: string | null
@@ -1572,13 +1599,16 @@ export type Database = {
           description: string | null
           dialogue: string | null
           duration_seconds: number | null
+          emotions: string[]
           gameplay_step_id: string | null
           id: string
           nature: string | null
           notion_id: string | null
+          on_screen: string[]
           placeholder_text: string | null
           post_video_context: string | null
           priority: number | null
+          stakes: string[]
           themes: string[] | null
           title: string
           transcription: string | null
@@ -1596,13 +1626,16 @@ export type Database = {
           description?: string | null
           dialogue?: string | null
           duration_seconds?: number | null
+          emotions?: string[]
           gameplay_step_id?: string | null
           id?: string
           nature?: string | null
           notion_id?: string | null
+          on_screen?: string[]
           placeholder_text?: string | null
           post_video_context?: string | null
           priority?: number | null
+          stakes?: string[]
           themes?: string[] | null
           title: string
           transcription?: string | null
@@ -1620,13 +1653,16 @@ export type Database = {
           description?: string | null
           dialogue?: string | null
           duration_seconds?: number | null
+          emotions?: string[]
           gameplay_step_id?: string | null
           id?: string
           nature?: string | null
           notion_id?: string | null
+          on_screen?: string[]
           placeholder_text?: string | null
           post_video_context?: string | null
           priority?: number | null
+          stakes?: string[]
           themes?: string[] | null
           title?: string
           transcription?: string | null
