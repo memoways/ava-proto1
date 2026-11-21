@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo : diagnostic et plan] — 2026-11-21
+
+- **Plan seul, aucun code** : diagnostic chiffré de la sélection des cinématiques et extraits (confiance figée, liens lâches, rotation déséquilibrée, personnages à l'écran, vocabulaire de thèmes) et découpage en trois lots : outil « Décisions vidéo » avec vue par session, Sankey par thèmes et compteur de lectures ; vocabulaire commun évolutif (Thèmes, Émotion, Enjeu, À l'écran) ; corrections de sélection mesurées. [Plan](docs/plan_decisions_video.md) · [reprise lot 1](docs/prompt_reprise_decisions_video_lot_1.md).
+
 ## [Extraits du film, lot 3 : rejeu de la sélection et correctif de troncature] — 2026-11-21
 
 - **Données** : Romed a vérifié et coché « Transcription vérifiée » ; en base, « couteau » et « mauvaise conscience » sont parlés, « mort Peter » est silencieux, tous vérifiés : les 3 extraits sont sélectionnables dès que la bascule est activée (inactive par défaut, rien en production).
