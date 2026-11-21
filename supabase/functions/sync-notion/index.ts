@@ -29,6 +29,20 @@ import {
   mapVideoDialogue,
   mapVideoTranscription,
 } from "../_shared/videoMetadata.ts";
+import {
+  EMOTION_PROPERTY_NAMES,
+  exportVideoVocabulary,
+  isMissingVideoLabelColumnError,
+  isMissingVocabularyStoreError,
+  multiSelectNames,
+  ON_SCREEN_PROPERTY_NAMES,
+  propertyByNames,
+  STAKE_PROPERTY_NAMES,
+  THEME_PROPERTY_NAMES,
+  type NotionMultiSelectSchema,
+  type NotionMultiSelectValue,
+  type VideoLabelLists,
+} from "../_shared/videoVocabulary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,6 +89,9 @@ interface VideoSyncResult {
   transcription?: string | null;
   dialogue?: string | null;
   transcription_verified?: boolean;
+  emotions?: string[];
+  stakes?: string[];
+  on_screen?: string[];
 }
 
 interface CharacterSyncResult {
@@ -142,6 +159,12 @@ function extractCheckbox(prop?: NotionProperty): boolean {
 }
 function extractUrl(prop?: NotionProperty): string | null {
   return prop?.url || null;
+}
+
+function readVideoLabels(props: Record<string, NotionProperty>, names: readonly string[]): string[] {
+  const found = propertyByNames(props as Record<string, NotionMultiSelectValue>, names);
+  if (!found.present) return [];
+  return multiSelectNames(found.value);
 }
 
 // ---- Property name mapping (Notion → DB column) ----
@@ -370,6 +393,16 @@ serve(async (req) => {
     const perVideo: VideoSyncResult[] = [];
     let videoMetadataColumnsAvailable = true;
     let extractColumnsAvailable = true;
+    let labelColumnsAvailable = true;
+    let vocabularySynced = false;
+    let vocabulary: VideoLabelLists = { themes: [], emotions: [], stakes: [], on_screen: [] };
+    const vocabularyPages = {
+      themes: [] as string[][],
+      emotions: [] as string[][],
+      stakes: [] as string[][],
+      on_screen: [] as string[][],
+    };
+    let videoSchema: Record<string, NotionMultiSelectSchema> | null = null;
     const videoSyncErrors: Array<{ title: string; error: string }> = [];
     const videoSkippedDetails: Array<{ title: string; reason: string }> = [];
     if (videosDbId) {
@@ -389,6 +422,17 @@ serve(async (req) => {
         videoPages = await fetchNotionDatabase(videosDbId);
       }
       const seenNotionIds: string[] = [];
+      try {
+        const res = await fetch(`${NOTION_API_URL}/databases/${videosDbId}`, {
+          headers: { Authorization: `Bearer ${NOTION_API_KEY}`, 'Notion-Version': '2022-06-28' },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const schema = await res.json();
+        videoSchema = schema?.properties ?? null;
+      } catch (schemaError) {
+        console.warn('[sync-notion] video schema unavailable, vocabulary falls back to page values:', schemaError);
+        videoSchema = null;
+      }
 
       for (const page of videoPages) {
         const props = page.properties;
@@ -403,7 +447,7 @@ serve(async (req) => {
         const context = extractRichText(props['Contexte']);
         const description = extractRichText(props['Description']);
         const priority = extractNumber(props['Priorité']) ?? extractNumber(props['Priorite']) ?? 1;
-        const themes = extractMultiSelect(props['Thèmes']) || extractMultiSelect(props['Themes']);
+        const themes = readVideoLabels(props, THEME_PROPERTY_NAMES);
         const type = extractSelect(props['Type']) || 'interlude';
         const transition = extractSelect(props['Style de transition']) || 'fade_black';
         const videoUrl = extractUrl(props['URL Gumlet']) || extractUrl(props['URL']);
@@ -416,6 +460,15 @@ serve(async (req) => {
           dialogue: mapVideoDialogue(extractSelect(props['Dialogue'])),
           transcription_verified: extractCheckbox(props['Transcription vérifiée']),
         };
+        // Absent or cleared multi-selects are written as [] so a deletion reaches the database.
+        const emotions = readVideoLabels(props, EMOTION_PROPERTY_NAMES);
+        const stakes = readVideoLabels(props, STAKE_PROPERTY_NAMES);
+        const onScreen = readVideoLabels(props, ON_SCREEN_PROPERTY_NAMES);
+        vocabularyPages.themes.push(themes);
+        vocabularyPages.emotions.push(emotions);
+        vocabularyPages.stakes.push(stakes);
+        vocabularyPages.on_screen.push(onScreen);
+        const labelFields = { emotions, stakes, on_screen: onScreen };
 
         const record = {
           notion_id: page.id,
@@ -431,31 +484,29 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         };
         const metadata = { nature, characters, ai_description: aiDescription };
-        let { error: vErr } = videoMetadataColumnsAvailable
-          ? await supabase
-            .from('video_triggers')
-            .upsert(
-              { ...record, ...metadata, ...(extractColumnsAvailable ? extractFields : {}) },
-              { onConflict: 'notion_id' },
-            )
-          : { error: null };
-        if (videoMetadataColumnsAvailable && extractColumnsAvailable && isMissingExtractColumnError(vErr)) {
+        const videoPayload = () => ({
+          ...record,
+          ...(videoMetadataColumnsAvailable ? metadata : {}),
+          ...(extractColumnsAvailable ? extractFields : {}),
+          ...(labelColumnsAvailable ? labelFields : {}),
+        });
+        let { error: vErr } = await supabase.from('video_triggers').upsert(videoPayload(), { onConflict: 'notion_id' });
+        if (labelColumnsAvailable && isMissingVideoLabelColumnError(vErr)) {
+          console.warn('[sync-notion] label columns missing, syncing without them:', vErr?.message);
+          labelColumnsAvailable = false;
+          ({ error: vErr } = await supabase.from('video_triggers').upsert(videoPayload(), { onConflict: 'notion_id' }));
+        }
+        if (extractColumnsAvailable && isMissingExtractColumnError(vErr)) {
           // Transcription migration not applied yet: keep the selection metadata.
           console.warn('[sync-notion] extract columns missing, syncing without them:', vErr?.message);
           extractColumnsAvailable = false;
-          ({ error: vErr } = await supabase
-            .from('video_triggers')
-            .upsert({ ...record, ...metadata }, { onConflict: 'notion_id' }));
+          ({ error: vErr } = await supabase.from('video_triggers').upsert(videoPayload(), { onConflict: 'notion_id' }));
         }
-        if (!videoMetadataColumnsAvailable || isMissingVideoMetadataColumnError(vErr)) {
+        if (videoMetadataColumnsAvailable && isMissingVideoMetadataColumnError(vErr)) {
           // Additive migration not applied yet: keep syncing the legacy columns.
-          if (videoMetadataColumnsAvailable) {
-            console.warn('[sync-notion] video metadata columns missing, syncing without them:', vErr?.message);
-            videoMetadataColumnsAvailable = false;
-          }
-          ({ error: vErr } = await supabase
-            .from('video_triggers')
-            .upsert(record, { onConflict: 'notion_id' }));
+          console.warn('[sync-notion] video metadata columns missing, syncing without them:', vErr?.message);
+          videoMetadataColumnsAvailable = false;
+          ({ error: vErr } = await supabase.from('video_triggers').upsert(videoPayload(), { onConflict: 'notion_id' }));
         }
         if (vErr) {
           console.error(`[sync-notion] video upsert error for ${title}:`, vErr);
@@ -464,7 +515,23 @@ serve(async (req) => {
         }
         seenNotionIds.push(page.id);
         videosSynced++;
-        perVideo.push({ title, themes, priority, type, nature, characters, has_url: !!videoUrl, ...extractFields });
+        perVideo.push({
+          title, themes, priority, type, nature, characters, has_url: !!videoUrl, ...extractFields,
+          emotions, stakes, on_screen: onScreen,
+        });
+      }
+
+      vocabulary = exportVideoVocabulary(videoSchema, vocabularyPages);
+      const { error: vocabularyError } = await supabase
+        .from('video_label_vocabulary')
+        .upsert({ id: 'current', ...vocabulary, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      if (vocabularyError && isMissingVocabularyStoreError(vocabularyError)) {
+        console.warn('[sync-notion] vocabulary table missing, videos stay synced:', vocabularyError.message);
+      } else if (vocabularyError) {
+        console.warn('[sync-notion] vocabulary snapshot not written:', vocabularyError.message);
+        videoSyncErrors.push({ title: '(vocabulaire)', error: vocabularyError.message });
+      } else {
+        vocabularySynced = true;
       }
 
       // Prune rows whose Notion page disappeared or is no longer "En ligne"
@@ -843,6 +910,9 @@ serve(async (req) => {
       per_video: perVideo,
       video_metadata_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable,
       video_extract_columns_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable && extractColumnsAvailable,
+      video_label_columns_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable && labelColumnsAvailable,
+      video_vocabulary_synced: vocabularySynced,
+      video_vocabulary: vocabulary,
       wiped_all: wipedAll,
       in_place_profile_refresh: inPlaceProfileRefresh,
       total_embeddings_in_db: totalEmb || 0,

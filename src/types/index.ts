@@ -143,6 +143,9 @@ export interface PRD4TurnLabels {
   themes: string[];
   topics: string[];
   intentions: string[];
+  /** Closed lists from the video vocabulary. Absent on logs written before lot 2. */
+  emotions?: string[];
+  stakes?: string[];
 }
 
 export interface ConversationPipelineTimings {

@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (décisions vidéo, lot 1)
+> **Last Updated**: 2026-11-21 (décisions vidéo, lot 2)
 
 ---
+
+## Décisions vidéo, lot 2 — le même vocabulaire, encore pas la sélection (21 novembre 2026)
+
+Les thèmes du Game Master (« famille », « amour ») et ceux des vidéos (« Contamination », « patricarcat ») ne se parlaient pas. Le lot leur donne une seule liste, celle de Notion, que l'on peut allonger ou raccourcir sans toucher au code. Émotion, enjeu et « qui est à l'écran » s'ajoutent à côté. Qui peut parler pendant la vidéo reste le champ d'avant. Une étiquette que le Game Master invente quand même est gardée et marquée « hors liste » : c'est ainsi qu'on voit s'il manque un mot. La sélection, elle, ne change pas encore. Romed valide les mots. Ulrich colle la migration, puis on resynchronise.
 
 ## Décisions vidéo, lot 1 — voir pourquoi, avant de corriger (21 novembre 2026)
 

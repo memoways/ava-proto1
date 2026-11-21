@@ -162,6 +162,13 @@
       "when": 1795270630370,
       "tag": "0022_video_triggers_extract_transcription",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795305000000,
+      "tag": "0023_video_triggers_label_vocabulary",
+      "breakpoints": true
     }
   ]
 }

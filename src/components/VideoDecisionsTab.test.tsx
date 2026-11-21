@@ -30,6 +30,8 @@ const report: VideoDecisionReport = {
         linkDetail: null,
         themes: ["famille"],
         topics: ["Ava"],
+        emotions: [],
+        stakes: [],
         degraded: false,
       },
       {
@@ -55,6 +57,8 @@ const report: VideoDecisionReport = {
         linkDetail: null,
         themes: ["peur"],
         topics: [],
+        emotions: ["angoisse"],
+        stakes: [],
         degraded: true,
       },
     ],
@@ -68,6 +72,11 @@ const report: VideoDecisionReport = {
   error: null,
   catalogUnreadable: false,
   themesUnreadable: false,
+  vocabulary: { themes: ["famille", "pandémie"], emotions: ["peur"], stakes: ["protéger"], on_screen: ["Max"] },
+  vocabularyZeroRows: false,
+  vocabularyUnavailable: false,
+  vocabularyError: null,
+  labelDimensions: { emotion: true, stake: true },
 };
 
 const loadVideoDecisions = vi.fn(async () => report);
@@ -108,6 +117,24 @@ describe("VideoDecisionsTab", () => {
     expect(screen.getByText("Confiance")).toBeTruthy();
     expect(screen.getByText("1 jouée · 1 écartée sur 2")).toBeTruthy();
     expect(screen.getByText("zz_custom_reason")).toBeTruthy();
+  });
+
+  it("marks a label outside the current list and can switch the Sankey dimension", async () => {
+    render(<VideoDecisionsTab />);
+    expect((await screen.findAllByTestId("label-outside")).length).toBeGreaterThan(0);
+    const themesTab = screen.getByRole("tab", { name: "Par thèmes" });
+    fireEvent.mouseDown(themesTab);
+    fireEvent.click(themesTab);
+    expect(screen.getByRole("button", { name: "Émotion" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Émotion" }));
+    expect(screen.getByRole("button", { name: "Évolution des émotions" })).toBeTruthy();
+  });
+
+  it("says when the vocabulary read returned zero rows", async () => {
+    loadVideoDecisions.mockResolvedValue({ ...report, vocabulary: null, vocabularyZeroRows: true, labelDimensions: { emotion: false, stake: false } });
+    render(<VideoDecisionsTab />);
+    expect(await screen.findByTestId("video-vocabulary-zero-rows")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Émotion" })).toBeNull();
   });
 
   it("says when the read returned zero rows", async () => {

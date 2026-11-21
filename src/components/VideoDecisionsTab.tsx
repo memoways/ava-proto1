@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isOutsideList, type VideoLabelLists } from "@/services/videoLabelVocabulary";
 import {
   criteriaSummary,
   filterSessions,
   loadVideoDecisions,
   themeFlows,
   type DecisionSession,
+  type LabelDimension,
   type DecisionTurn,
   type FlowLink,
   type MechanismFilter,
@@ -143,7 +145,17 @@ function Sankey({ links }: { links: FlowLink[] }) {
   );
 }
 
-function TurnRow({ turn }: { turn: DecisionTurn }) {
+function LabelMark({ label, list }: { label: string; list: readonly string[] | null | undefined }) {
+  const outside = Boolean(list && isOutsideList(label, list));
+  return (
+    <span className="text-xs text-primary">
+      {label}
+      {outside && <span className="text-amber-700 dark:text-amber-300" data-testid="label-outside">hors liste</span>}
+    </span>
+  );
+}
+
+function TurnRow({ turn, vocabulary }: { turn: DecisionTurn; vocabulary: VideoLabelLists | null }) {
   return (
     <Collapsible className="border-t py-2" data-testid="video-decision-turn">
       <CollapsibleTrigger className="flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 text-left text-sm">
@@ -153,7 +165,9 @@ function TurnRow({ turn }: { turn: DecisionTurn }) {
         <Badge variant={turn.outcome === "played" ? "default" : "secondary"}>
           {turn.outcome === "played" ? turn.videoTitle ?? "vidéo jouée" : turn.reasonLabel}
         </Badge>
-        {turn.themes.map((theme) => <span key={theme} className="text-xs text-primary">{theme}</span>)}
+        {turn.themes.map((theme) => <LabelMark key={`t-${theme}`} label={theme} list={vocabulary?.themes} />)}
+        {(turn.emotions ?? []).map((emotion) => <LabelMark key={`e-${emotion}`} label={emotion} list={vocabulary?.emotions} />)}
+        {(turn.stakes ?? []).map((stake) => <LabelMark key={`s-${stake}`} label={stake} list={vocabulary?.stakes} />)}
         {turn.quote && <span className="text-muted-foreground">{turn.quote}</span>}
         {turn.degraded && <span className="text-xs text-muted-foreground">journal partiel</span>}
       </CollapsibleTrigger>
@@ -179,7 +193,7 @@ function TurnRow({ turn }: { turn: DecisionTurn }) {
   );
 }
 
-function SessionList({ sessions }: { sessions: DecisionSession[] }) {
+function SessionList({ sessions, vocabulary }: { sessions: DecisionSession[]; vocabulary: VideoLabelLists | null }) {
   if (sessions.length === 0) return <p className="text-sm text-muted-foreground">Aucune décision pour ces filtres.</p>;
   return (
     <div className="space-y-4">
@@ -188,7 +202,7 @@ function SessionList({ sessions }: { sessions: DecisionSession[] }) {
           <h3 className="text-sm font-semibold">
             Session {shortSession(session.sessionId)} · {formatWhen(session.startedAt)} · {session.turns.length} décision{session.turns.length > 1 ? "s" : ""}
           </h3>
-          {session.turns.map((turn) => <TurnRow key={turn.key} turn={turn} />)}
+          {session.turns.map((turn) => <TurnRow key={turn.key} turn={turn} vocabulary={vocabulary} />)}
         </section>
       ))}
     </div>
@@ -200,6 +214,7 @@ export default function VideoDecisionsTab() {
   const [mechanism, setMechanism] = useState<MechanismFilter>("all");
   const [sessionId, setSessionId] = useState("all");
   const [flow, setFlow] = useState<"videos" | "themes">("videos");
+  const [dimension, setDimension] = useState<LabelDimension>("themes");
   const [report, setReport] = useState<VideoDecisionReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<string | null>(null);
@@ -220,7 +235,14 @@ export default function VideoDecisionsTab() {
     [report, mechanism, sessionId],
   );
   const turns = sessions.flatMap((session) => session.turns);
-  const flows = themeFlows(sessions);
+  const dimensions = report?.labelDimensions ?? { emotion: false, stake: false };
+  const activeDimension: LabelDimension = dimension === "emotions" && !dimensions.emotion
+    ? "themes"
+    : dimension === "stakes" && !dimensions.stake
+      ? "themes"
+      : dimension;
+  const dimensionWord = activeDimension === "emotions" ? "émotions" : activeDimension === "stakes" ? "enjeux" : "thèmes";
+  const flows = themeFlows(sessions, { dimension: activeDimension, vocabulary: report?.vocabulary ?? null });
   const criteria = criteriaSummary(turns);
 
   return (
@@ -265,6 +287,12 @@ export default function VideoDecisionsTab() {
       )}
       {report?.catalogUnreadable && <p className="text-sm text-amber-700 dark:text-amber-300">Les titres de vidéos n'ont pas pu être lus : les identifiants sont affichés tels quels.</p>}
       {report?.themesUnreadable && <p className="text-sm text-amber-700 dark:text-amber-300">Les thèmes du Game Master n'ont pas pu être lus pour ces sessions.</p>}
+      {report?.vocabularyZeroRows && (
+        <p className="text-sm text-amber-700 dark:text-amber-300" data-testid="video-vocabulary-zero-rows">
+          Le vocabulaire n'a renvoyé aucune ligne. Une lecture bloquée par les règles d'accès ressemble à ça : ce n'est pas une liste vide.
+        </p>
+      )}
+      {report?.vocabularyError && <p role="alert" className="text-sm text-destructive">{report.vocabularyError}</p>}
       {report?.truncated && <p className="text-sm text-muted-foreground">Journal tronqué aux 5 000 événements les plus anciens de la période.</p>}
 
       <Tabs defaultValue="sessions">
@@ -274,12 +302,23 @@ export default function VideoDecisionsTab() {
           <TabsTrigger value="criteria">Synthèse</TabsTrigger>
         </TabsList>
         <TabsContent value="sessions" className="mt-3">
-          <SessionList sessions={sessions} />
+          <SessionList sessions={sessions} vocabulary={report?.vocabulary ?? null} />
         </TabsContent>
         <TabsContent value="themes" className="mt-3 space-y-3">
+          {(dimensions.emotion || dimensions.stake) && (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant={activeDimension === "themes" ? "default" : "outline"} onClick={() => setDimension("themes")}>Thèmes</Button>
+              {dimensions.emotion && <Button size="sm" variant={activeDimension === "emotions" ? "default" : "outline"} onClick={() => setDimension("emotions")}>Émotion</Button>}
+              {dimensions.stake && <Button size="sm" variant={activeDimension === "stakes" ? "default" : "outline"} onClick={() => setDimension("stakes")}>Enjeu</Button>}
+            </div>
+          )}
           <div className="flex gap-2">
-            <Button size="sm" variant={flow === "videos" ? "default" : "outline"} onClick={() => setFlow("videos")}>Thèmes → vidéos</Button>
-            <Button size="sm" variant={flow === "themes" ? "default" : "outline"} onClick={() => setFlow("themes")}>Évolution des thèmes</Button>
+            <Button size="sm" variant={flow === "videos" ? "default" : "outline"} onClick={() => setFlow("videos")}>
+              {activeDimension === "themes" ? "Thèmes → vidéos" : `${dimensionWord[0].toUpperCase()}${dimensionWord.slice(1)} → vidéos`}
+            </Button>
+            <Button size="sm" variant={flow === "themes" ? "default" : "outline"} onClick={() => setFlow("themes")}>
+              {activeDimension === "themes" ? "Évolution des thèmes" : `Évolution des ${dimensionWord}`}
+            </Button>
           </div>
           <Sankey links={flow === "videos" ? flows.toVideos : flows.evolution} />
         </TabsContent>
