@@ -255,6 +255,58 @@ describe('P1 format within the selected output budget', () => {
     const batch = await simulateMaxResponse({ ...input, speechStateHistory: [] }, { characterContext: contexts[character] });
     expect(batch.response).toBe('Je vous écoute.');
   });
+  describe('lot T8: a streamed answer with an unusable private header is salvaged locally', () => {
+    const stream = async (wire: string, complete: 'stop' | 'length' | null, character: 'max' | 'emma' = 'max') => {
+      vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet(character) as never);
+      vi.mocked(streamLLM).mockImplementationOnce(async (_messages, onChunk, options) => {
+        onChunk(wire.slice(0, 10), false); onChunk(wire.slice(10), false);
+        if (complete) options?.onStreamComplete?.(complete);
+        return wire;
+      });
+      const spoken: string[] = [];
+      const parser = new ResponseIntentParser(contexts[character], () => {}, text => spoken.push(text));
+      const run = simulateMaxResponse(input, { characterContext: contexts[character], onSpeechToken: t => parser.push(t),
+        finishSpeech: normal => parser.finish(normal) });
+      return { run, spoken };
+    };
+    it.each(['max', 'emma'] as const)('keeps a header-less answer for %s without a second LLM call', async character => {
+      const { run, spoken } = await stream('Je reste inquiet pour Ava. Je ne sais pas quoi faire.', 'stop', character);
+      const result = await run;
+      expect(result.response).toBe('Je reste inquiet pour Ava. Je ne sais pas quoi faire.');
+      expect(result.speechRecovery).toBe('local_salvage');
+      expect(result.responseIntent).toBeNull();
+      expect(spoken).toEqual([]); // nothing was spoken before the salvage
+      expect(streamLLM).toHaveBeenCalledTimes(1);
+      expect(callLLMWithUsage).not.toHaveBeenCalled();
+    });
+    it('keeps the speech of an answer whose header JSON is malformed', async () => {
+      const { run, spoken } = await stream('{"goal":"Écouter" ' + SPEECH_BOUNDARY + 'Non. Pas maintenant.', 'stop');
+      const result = await run;
+      expect(result.response).toBe('Non. Pas maintenant.');
+      expect(result.speechRecovery).toBe('local_salvage');
+      expect(spoken).toEqual([]);
+    });
+    it('does not salvage an incomplete stream', async () => {
+      const { run } = await stream('Je reste inquiet pour Ava.', 'length');
+      await expect(run).rejects.toThrow(/response intent/i);
+    });
+    it('does not salvage a bare JSON header with no speech', async () => {
+      const { run } = await stream('{"goal":"Écouter","points":[]}', 'stop');
+      await expect(run).rejects.toThrow(/response intent/i);
+    });
+    it('refuses a salvaged answer that the recovery guards block', async () => {
+      const { run } = await stream('Je suis Emma, et je vous écoute attentivement.', 'stop', 'max');
+      await expect(run).rejects.toThrow();
+    });
+    it('does not change a well-formed streamed answer', async () => {
+      const wire = JSON.stringify({ goal: 'Écouter', points: [] }) + SPEECH_BOUNDARY + 'Je vous écoute.';
+      const { run, spoken } = await stream(wire, 'stop');
+      const result = await run;
+      expect(result.response).toBe('Je vous écoute.');
+      expect(result.speechRecovery).toBeUndefined();
+      expect(spoken).toEqual(['Je vous écoute.']);
+    });
+  });
   it.each(['length', 'error', 'content_filter'])('rejects %s batch even with punctuated speech, also during recovery', async finishReason => {
     vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet('max') as never);
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ content: 'Je vous écoute.', finishReason, usage: null,

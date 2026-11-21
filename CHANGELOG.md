@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus, lot T8 : salvage locale en mode flux] — 2026-11-21
+
+- Mesure de T7 (session sandbox-ulrich `7a1f15a4…`, 7 tours, réglage actif) : −0,4 à −0,65 s sur la première phrase, mais 2 tours sur 7 relancent l'appel LLM (`character_retry_intent`, +1,5 s), contre 0 sur 61 tours en lot.
+- Cause : le modèle oublie ou abîme l'en-tête d'intent dans 26 % des tours (45 sur 170 en 7 jours). Le lot les rattrape localement (G1, `character_local_salvage`, 0 s) ; le mode flux n'avait pas cette salvage et relançait un second appel complet.
+- `maxAgent` garde le flux brut et rattrape en fin de réponse, comme en lot, quand l'en-tête manque ou est invalide (réponse complète seulement, mêmes gardes de reprise) ; `prd4Orchestrator` livre ce texte d'un bloc (`onRecovered`). Aucune phrase n'est dite avant l'échec d'en-tête. Concerne aussi le mode progressif Gradium. Aucun réglage GM, aucune migration.
+
 ## [Latence Tavus, lot T7 : première phrase parlée pendant la génération (prototype)] — 2026-11-21
 
 - Nouveau réglage Tavus `streamedLlm` (admin avatar, **désactivé par défaut**) : avec la voix d'Ava, la première phrase sûre part au TTS dès que le LLM l'a écrite, au lieu d'attendre la réponse entière. Estimation non mesurée : −0,5 à −0,9 s sur Max audible ; à mesurer sur sandbox-ulrich (≥ 10 tours) avant tout engagement.

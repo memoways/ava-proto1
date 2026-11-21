@@ -247,3 +247,20 @@ Implémentation : réglage Tavus `streamedLlm` (faux par défaut) ; `IndexPRD4` 
 `renderTextStream` (Tavus, voix d'Ava) lit le flux de lignes : première ligne en PCM streamé (T1), lignes suivantes en blob une ligne d'avance, chunk final vide à la fin.
 Retenue de passage (`heldOutput`) et phrase déjà dite non remplaçable : une substitution tardive est ignorée, le texte dit reste.
 **Mesure à faire** (sandbox-ulrich, ≥ 10 tours, réglage activé puis désactivé) : `tts_text_sent`, Max audible, taux de salvage et de coupure ; critère de l'évaluation : gain médian > 0,5 s sans phrase retirée.
+
+
+### Lot T8 : mesure de T7 et salvage locale en flux (21 novembre)
+
+Session sandbox-ulrich `7a1f15a4…` (08:46–08:49 UTC, 7 tours Max, `streamedLlm` actif, pas de série désactivée dans la session ; comparaison aux sessions Tavus des 19 et 20 novembre).
+
+| | T7 (7 tours) | Avant T7 |
+|---|---|---|
+| texte au TTS après contexte prêt (médiane) | ≈ 1,47 s (5 tours en flux) | 1,85 à 2,12 s |
+| texte au TTS avant la fin du LLM | 0,42 à 0,66 s | non |
+| Max audible, tours propres (1, 6, 7) | 3,6 / 3,3 / 3,4 s | ≈ 3,9 à 4,1 s |
+| Max audible, médiane de la session | 5,1 s | 3,9 à 4,6 s |
+| relances `character_retry_intent` | 2 sur 7 | 0 sur 61 |
+
+Cause des relances : en lot, 45 tours sur 170 (7 jours) sont rattrapés par `character_local_salvage` (en-tête privé absent ou invalide) sans appel supplémentaire ; en flux la salvage était désactivée (`!opts?.onSpeechToken`), d'où un second appel complet (≈ 1,5 s).
+Correctif : `maxAgent` garde le flux brut, avale l'erreur d'en-tête (levée avant toute phrase émise) et rattrape à la fin, sur arrêt normal seulement, avec `salvageBatchSpeech` et `validateRecoverySpeech` (mêmes gardes que le lot) ; `prd4Orchestrator` livre le texte d'un bloc via `onRecovered`. Ces tours n'ont pas de gain de première phrase (≈ 1 sur 4) mais plus de relance. Vaut aussi pour Gradium.
+**Remesure** (Ulrich, sandbox-ulrich) : ≥ 10 tours réglage actif puis ≥ 10 désactivé ; attendu 0 relance d'intent et gain médian de Max audible ; critère de l'évaluation : > 0,5 s sans phrase retirée.
