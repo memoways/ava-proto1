@@ -292,9 +292,22 @@ export interface FlowLink {
   examples: string[];
 }
 
+export interface FlowColumn {
+  label: string;
+  nodes: { name: string; count: number }[];
+}
+
+/** One column per played video, in session order. `steps[i]` links column i to column i+1. */
+export interface ThemeEvolution {
+  columns: FlowColumn[];
+  steps: FlowLink[][];
+}
+
+export const EMPTY_EVOLUTION: ThemeEvolution = { columns: [], steps: [] };
+
 export interface ThemeFlows {
   toVideos: FlowLink[];
-  evolution: FlowLink[];
+  evolution: ThemeEvolution;
 }
 
 export interface CriteriaSummary {
@@ -639,12 +652,18 @@ export function playCounts(events: readonly DecisionEventRow[], catalog: readonl
     .sort((a, b) => b.plays - a.plays || a.title.localeCompare(b.title, "fr"));
 }
 
-function addFlow(map: Map<string, FlowLink>, source: string, target: string, example: string | null) {
+function addFlow(map: Map<string, FlowLink>, source: string, target: string, amount: number, example: string | null) {
   const key = `${source}\u0000${target}`;
   const current = map.get(key) ?? { source, target, count: 0, examples: [] };
-  current.count += 1;
+  current.count += amount;
   if (example && current.examples.length < 2 && !current.examples.includes(example)) current.examples.push(example);
   map.set(key, current);
+}
+
+function flowNodes(map: Map<string, number>): { name: string; count: number }[] {
+  return [...map.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "fr"));
 }
 
 const DIMENSION_EMPTY: Record<LabelDimension, string> = {
@@ -675,27 +694,45 @@ export function themeFlows(
       : options?.vocabulary?.themes;
   const empty = DIMENSION_EMPTY[dimension];
   const toVideos = new Map<string, FlowLink>();
-  const evolution = new Map<string, FlowLink>();
+  const columnNodes: Map<string, number>[] = [];
+  const stepMaps: Map<string, FlowLink>[] = [];
+  const labelsOf = (turn: DecisionTurn) => {
+    const labels = dimensionLabels(turn, dimension);
+    return (labels.length ? labels : [empty]).map((label) => label === empty ? empty : flowSource(label, list));
+  };
   for (const session of sessions) {
-    const turns = [...session.turns].sort((a, b) => (a.turnIndex ?? 0) - (b.turnIndex ?? 0));
-    turns.forEach((turn, index) => {
-      const labels = dimensionLabels(turn, dimension);
-      const sources = (labels.length ? labels : [empty]).map((label) => label === empty ? empty : flowSource(label, list));
+    const turns = [...session.turns].sort((a, b) => (a.turnIndex ?? 0) - (b.turnIndex ?? 0) || a.createdAt.localeCompare(b.createdAt));
+    const played = turns.filter((turn) => turn.outcome === "played");
+    played.forEach((turn, index) => {
+      const sources = labelsOf(turn);
+      while (columnNodes.length <= index) columnNodes.push(new Map());
+      for (const source of sources) columnNodes[index].set(source, (columnNodes[index].get(source) ?? 0) + 1);
+      const next = played[index + 1];
+      if (!next) return;
+      const nextLabels = labelsOf(next);
+      const share = 1 / nextLabels.length;
+      while (stepMaps.length <= index) stepMaps.push(new Map());
+      for (const source of sources) {
+        for (const target of nextLabels) addFlow(stepMaps[index], source, target, share, null);
+      }
+    });
+    for (const turn of turns) {
+      const sources = labelsOf(turn);
       const target = turn.outcome === "played"
         ? (turn.videoTitle ?? "vidéo")
         : `aucune vidéo (${turn.reasonLabel})`;
-      for (const source of sources) addFlow(toVideos, source, target, turn.quote);
-      const next = turns[index + 1];
-      if (!next || turn.turnIndex == null || next.turnIndex == null || next.turnIndex <= turn.turnIndex) return;
-      const nextLabels = dimensionLabels(next, dimension);
-      const nextSources = (nextLabels.length ? nextLabels : [empty]).map((label) => label === empty ? empty : flowSource(label, list));
-      for (const source of sources) {
-        for (const later of nextSources) addFlow(evolution, source, later, null);
-      }
-    });
+      for (const source of sources) addFlow(toVideos, source, target, 1, turn.quote);
+    }
   }
   const sortLinks = (map: Map<string, FlowLink>) => [...map.values()].sort((a, b) => b.count - a.count || a.source.localeCompare(b.source, "fr"));
-  return { toVideos: sortLinks(toVideos), evolution: sortLinks(evolution) };
+  const steps = columnNodes.slice(0, Math.max(0, columnNodes.length - 1)).map((_, index) => sortLinks(stepMaps[index] ?? new Map()));
+  return {
+    toVideos: sortLinks(toVideos),
+    evolution: {
+      columns: columnNodes.map((nodes, index) => ({ label: `Vidéo ${index + 1}`, nodes: flowNodes(nodes) })),
+      steps,
+    },
+  };
 }
 
 const CONFIDENCE_BUCKETS: { label: string; test: (value: number) => boolean }[] = [
@@ -835,7 +872,7 @@ function emptyReport(partial: Partial<VideoDecisionReport>): VideoDecisionReport
     sessions: [],
     turns: [],
     playCounts: [],
-    themeFlows: { toVideos: [], evolution: [] },
+    themeFlows: { toVideos: [], evolution: EMPTY_EVOLUTION },
     criteria: criteriaSummary([]),
     zeroRows: false,
     truncated: false,
