@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus, lot T4 : contrôle de T3 et options contexte] — 2026-11-21
+
+- Contrôle de non-régression RAG après T3 (0 erreur, passages moyens 5,85 → 6,00, `character_rag` médian 740 → 690 ms) documenté dans l'analyse.
+- Options chiffrées pour le levier contexte restant (rerank conditionnel ≈ −0,2 s, embedding sur transcript partiel ≈ −0,2 s) ; aucun code ni réglage modifié, décision d'Ulrich attendue.
+
 ## [Fin d'expérience : suppression de l'écran « La communication se coupe »] — 2026-11-20
 
 - L'écran intermédiaire (`EndSessionScreen`) est supprimé : la fin de l'expérience mène directement au questionnaire (ou au merci si le questionnaire est désactivé). La phase `end_session` reste interne et transitoire.
