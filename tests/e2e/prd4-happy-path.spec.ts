@@ -746,7 +746,7 @@ async function installNetworkFakes(
       }
       if (payload.stream) {
         const response = maxTurnCount === options.malformedCharacterStreamAt
-          ? 'PRIVATE_BROKEN_HEADER ' + content
+          ? '{"goal":"PRIVATE_BROKEN_HEADER" \n<speech>\n' + content
           : JSON.stringify({goal:'PRIVATE_INTENT_CANARY',points:['Point privé']}) + '\n<speech>\n' + content;
         const chunks = [response.slice(0, 12),response.slice(12, 45),response.slice(45)];
         return route.fulfill({ status:200,contentType:'text/event-stream',body:chunks.map(text =>
@@ -2107,7 +2107,8 @@ test('lot 2 : reprise recharge seulement une offre prouvée, sans sonnerie autom
 });
 
 for (const character of ['Max', 'Emma'] as const) {
-  test(`continuité : ${character} reçoit le même texte après un format privé invalide`, async ({ page }) => {
+  // Lot T8: an unusable private header is salvaged locally (as in batch), with no second LLM call.
+  test(`continuité : ${character} garde le même texte, sans second appel, après un format privé invalide`, async ({ page }) => {
     const text = 'Je suis ici pour vous écouter, que voulez-vous me dire ?';
     const fakes = await installNetworkFakes(page, [text], { incrementalOutput: true, ttsSuccess: true,
       characterOpenings: true, malformedCharacterStreamAt: 1, maxResponse: 'Laissez-moi un moment pour vous répondre.' });
@@ -2115,10 +2116,11 @@ for (const character of ['Max', 'Emma'] as const) {
     await page.getByRole('button', { name: "Démarrer l'enregistrement" }).click();
     await expect(page.getByText(text, { exact: false })).toBeVisible();
     await page.getByRole('button', { name: "Arrêter l'enregistrement" }).click();
-    await expect.poll(fakes.getMaxTurnCount).toBe(2);
+    await expect.poll(fakes.getMaxTurnCount).toBe(1);
     expect(fakes.getCharacterCalls().every(call => call.includes(text))).toBe(true);
     await expect.poll(() => fakes.getVoiceEvents().some(event => event.status === 'completed'), { timeout: 15_000 }).toBe(true);
     await expect.poll(fakes.getGmPostTurnCount).toBe(1);
+    expect(fakes.getMaxTurnCount()).toBe(1);
     const spoken = await page.evaluate(() => (window as Window & { __e2eGradiumTexts?: string[] }).__e2eGradiumTexts ?? []);
     expect(spoken.join(' ')).toContain('Laissez-moi un moment pour vous répondre.');
     expect(spoken.join(' ')).not.toMatch(/PRIVATE_|ligne accroche/);
