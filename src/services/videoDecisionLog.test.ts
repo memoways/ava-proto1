@@ -212,13 +212,46 @@ describe("themeFlows and criteria", () => {
     }),
   ], catalog, gmLogs);
 
-  it("links a GM theme to the video or to the skip, and the next turn's theme", () => {
+  it("follows themes from one played video to the next, and stops when the session does", () => {
+    const played = (sessionId: string, turnIndex: number, videoId: string) => [
+      event({ session_id: sessionId, turn_index: turnIndex, turn_id: `${sessionId}-${turnIndex}`, event_type: "cinematic_recommended", payload: { videoId, mechanism: "overlay" } }),
+      event({ session_id: sessionId, turn_index: turnIndex, turn_id: `${sessionId}-${turnIndex}`, event_type: "cinematic_played", payload: { videoId } }),
+    ];
+    const logs = new Map<string, unknown>([
+      ["session-long", [
+        { turn_index: 1, labels: { themes: ["famille"] } },
+        { turn_index: 2, labels: { themes: ["secrets"] } },
+        { turn_index: 3, labels: { themes: ["deuil"] } },
+      ]],
+      ["session-short", [
+        { turn_index: 1, labels: { themes: ["famille"] } },
+        { turn_index: 2, labels: { themes: ["secrets"] } },
+      ]],
+    ]);
+    const chain = groupBySession([
+      ...played("session-long", 1, "v-suspendus"),
+      ...played("session-long", 2, "v-brouillard"),
+      ...played("session-long", 3, "v-extrait"),
+      ...played("session-short", 1, "v-suspendus"),
+      ...played("session-short", 2, "v-brouillard"),
+    ], catalog, logs);
+    const evolution = themeFlows(chain).evolution;
+    expect(evolution.columns.map((column) => column.label)).toEqual(["Vidéo 1", "Vidéo 2", "Vidéo 3"]);
+    expect(evolution.steps[0]).toEqual([expect.objectContaining({ source: "famille", target: "secrets", count: 2 })]);
+    expect(evolution.steps[1]).toEqual([expect.objectContaining({ source: "secrets", target: "deuil", count: 1 })]);
+    expect(evolution.columns[1].nodes.find((node) => node.name === "secrets")?.count).toBe(2);
+    expect(evolution.columns[2].nodes).toEqual([{ name: "deuil", count: 1 }]);
+  });
+
+  it("links a GM theme to the video or to the skip, and keeps a skipped turn out of the played-video steps", () => {
     const flows = themeFlows(sessions);
     expect(flows.toVideos).toEqual(expect.arrayContaining([
       expect.objectContaining({ source: "famille", target: "Max, Emma et Leo suspendus, tension", count: 1 }),
       expect.objectContaining({ source: "peur", target: expect.stringContaining("aucune vidéo"), count: 1 }),
     ]));
-    expect(flows.evolution).toEqual([expect.objectContaining({ source: "famille", target: "peur", count: 1 })]);
+    expect(flows.evolution.columns.map((column) => column.label)).toEqual(["Vidéo 1"]);
+    expect(flows.evolution.columns[0].nodes).toEqual([{ name: "famille", count: 1 }]);
+    expect(flows.evolution.steps).toEqual([]);
   });
 
   it("switches dimension and marks a label outside the exported list", () => {

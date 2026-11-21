@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo : flux à l'échelle des chiffres, évolution par vidéo jouée] — 2026-11-21
+
+- **Thèmes → vidéos** : chaque flux est une bande dont l'épaisseur est sa part du thème, et l'ensemble des bandes occupe toute la hauteur de la barre. Un flux de 6 à côté d'un flux de 140 se voit. Les chiffres ne sont plus écrits sur les bandes : ils apparaissent au survol.
+- **Évolution** : une colonne par vidéo jouée, dans l'ordre de la session (Vidéo 1, Vidéo 2, …). Le flux relie les thèmes d'une vidéo à ceux de la suivante. Une session qui s'arrête laisse une bande courte, « pas de vidéo suivante ». Même règle d'épaisseur et de survol.
+- **Inchangé** : la sélection en jeu. Rien en production.
+
 ## [Décisions vidéo : titres de session, comptes et cinématique / extrait] — 2026-11-21
 
 - **Par session** : chaque session est fermée par défaut. Le titre est celui de Données session (nom saisi, sinon personne, date, personnages et longueur). À côté : le nombre de vidéos jouées et, s'il y en a, les décisions écartées. Le détail du tour est inchangé une fois ouvert.

@@ -66,7 +66,7 @@ const report: VideoDecisionReport = {
   }],
   turns: [],
   playCounts: [{ videoId: "v1", title: "Max, Emma et Leo suspendus, tension", plays: 17, sessions: 17, lastPlayedAt: "2026-11-21T08:00:00.000Z" }],
-  themeFlows: { toVideos: [], evolution: [] },
+  themeFlows: { toVideos: [], evolution: { columns: [], steps: [] } },
   criteria: { turns: 0, played: 0, skipped: 0, byReason: [], confidence: [], linkDetails: [] },
   zeroRows: false,
   truncated: false,

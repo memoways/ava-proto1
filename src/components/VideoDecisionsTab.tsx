@@ -14,10 +14,11 @@ import {
   type DecisionSession,
   type LabelDimension,
   type DecisionTurn,
-  type FlowLink,
   type MechanismFilter,
+  type ThemeEvolution,
   type VideoDecisionReport,
 } from "@/services/videoDecisionLog";
+import { bandPath, layoutSankey, videoFlowColumns, type SankeyBandLayout } from "@/services/videoDecisionSankey";
 
 function percent(count: number, total: number): number {
   return total > 0 ? Math.round((count / total) * 100) : 0;
@@ -60,171 +61,158 @@ function Bar({ label, count, total }: { label: string; count: number; total: num
 }
 
 type SankeyHover =
-  | { kind: "link"; link: FlowLink }
-  | { kind: "node"; side: "in" | "out"; name: string };
+  | { kind: "band"; band: SankeyBandLayout }
+  | { kind: "node"; column: number; name: string };
+
+function formatFlowCount(count: number): string {
+  const rounded = Math.round(count * 10) / 10;
+  if (Math.abs(rounded - Math.round(rounded)) < 0.05) return String(Math.round(rounded));
+  return rounded.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
 
 function nodeCaption(name: string, count: number, total: number): string {
-  const suffix = ` · ${count} · ${percent(count, total)} %`;
+  const suffix = ` · ${formatFlowCount(count)} · ${percent(count, total)} %`;
   const room = Math.max(10, 42 - suffix.length);
   const short = name.length > room ? `${name.slice(0, room - 1)}…` : name;
   return `${short}${suffix}`;
 }
 
-function Sankey({ links }: { links: FlowLink[] }) {
+function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean }) {
   const [hover, setHover] = useState<SankeyHover | null>(null);
-  const layout = useMemo(() => {
-    const sourceWeight = new Map<string, number>();
-    const targetWeight = new Map<string, number>();
-    for (const link of links) {
-      sourceWeight.set(link.source, (sourceWeight.get(link.source) ?? 0) + link.count);
-      targetWeight.set(link.target, (targetWeight.get(link.target) ?? 0) + link.count);
-    }
-    const byWeight = (weights: Map<string, number>) =>
-      [...weights.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr")).map(([name]) => name);
-    const sourceOrder = byWeight(sourceWeight);
-    const targetOrder = byWeight(targetWeight);
-    const total = [...sourceWeight.values()].reduce((sum, count) => sum + count, 0);
-    const width = 980;
-    const row = 32;
-    const height = Math.max(180, Math.max(sourceOrder.length, targetOrder.length, 1) * row + 16);
-    const place = (names: string[], weights: Map<string, number>) => {
-      const sum = names.reduce((count, name) => count + (weights.get(name) ?? 0), 0) || 1;
-      const gap = 8;
-      const inner = height - 16 - gap * Math.max(0, names.length - 1);
-      let y = 8;
-      return names.map((name) => {
-        const count = weights.get(name) ?? 0;
-        const h = Math.max(16, (inner * count) / sum);
-        const node = { name, y, h, count };
-        y += h + gap;
-        return node;
-      });
-    };
-    return {
-      width,
-      height,
-      total,
-      maxLink: Math.max(1, ...links.map((link) => link.count)),
-      left: place(sourceOrder, sourceWeight),
-      right: place(targetOrder, targetWeight),
-      sourceWeight,
-      targetWeight,
-    };
-  }, [links]);
+  const layout = useMemo(() => layoutSankey(flow), [flow]);
+  const columnTotal = (column: number) => layout.columns[column]?.nodes.reduce((sum, node) => sum + node.count, 0) ?? 0;
 
-  if (links.length === 0) {
-    return <p className="text-sm text-muted-foreground">Pas assez de thèmes GM sur cette période pour tracer un flux.</p>;
+  if (flow.columns.length === 0) {
+    return <p className="text-sm text-muted-foreground">{evolution ? "Aucune vidéo jouée sur cette période, donc pas d'évolution." : "Pas assez de thèmes GM sur cette période pour tracer un flux."}</p>;
   }
 
-  const leftX = 300;
-  const rightX = layout.width - 320;
-  const nodeOf = (nodes: { name: string; y: number; h: number; count: number }[], name: string) => nodes.find((node) => node.name === name);
-  const emphasized = (link: FlowLink) => {
+  const emphasized = (band: SankeyBandLayout) => {
     if (!hover) return true;
-    if (hover.kind === "link") return hover.link === link;
-    return hover.side === "in" ? link.source === hover.name : link.target === hover.name;
+    if (hover.kind === "band") return hover.band.key === band.key;
+    return hover.column === band.column && hover.name === band.source
+      || hover.column === band.column + 1 && hover.name === band.target;
   };
-  const sources = layout.left.map((node) => ({
+  const firstColumn = layout.columns[0];
+  const sources = (firstColumn?.nodes ?? []).map((node) => ({
     ...node,
-    share: percent(node.count, layout.total),
-    destinations: links
-      .filter((link) => link.source === node.name)
-      .sort((a, b) => b.count - a.count || a.target.localeCompare(b.target, "fr")),
+    share: percent(node.count, columnTotal(0)),
+    destinations: layout.bands
+      .filter((band) => band.column === 0 && band.source === node.name)
+      .sort((a, b) => b.count - a.count || (a.target ?? "").localeCompare(b.target ?? "", "fr")),
   }));
 
-  let caption = "Le nombre à gauche est la part du thème, à droite celle de la vidéo, sur le lien celle du chemin. Survolez pour voir vers quoi part le pourcentage.";
-  if (hover?.kind === "link") {
-    const link = hover.link;
-    const from = layout.sourceWeight.get(link.source) ?? link.count;
-    const to = layout.targetWeight.get(link.target) ?? link.count;
-    caption = `${link.source} → ${link.target} · ${link.count} sur le chemin · ${percent(link.count, from)} % de ${link.source} · ${percent(link.count, to)} % de la cible · ${percent(link.count, layout.total)} % de l'ensemble${link.examples[0] ? ` · ${link.examples[0]}` : ""}`;
-  } else if (hover?.kind === "node" && hover.side === "in") {
-    const node = sources.find((entry) => entry.name === hover.name);
-    const parts = (node?.destinations ?? []).map((link) => `${link.target} ${link.count} (${percent(link.count, node?.count ?? link.count)} %)`);
-    caption = `${hover.name} · ${node?.count ?? 0} décisions · ${node?.share ?? 0} % de l'ensemble · vers ${parts.join(" · ") || "—"}`;
+  let caption = evolution
+    ? "Chaque colonne est une vidéo jouée, dans l'ordre de la session. L'épaisseur suit le chiffre. Survolez un flux pour voir le nombre."
+    : "L'épaisseur des flux suit le chiffre, sur toute la hauteur de la barre. Survolez un flux pour voir le nombre.";
+  if (evolution && flow.columns.length === 1) {
+    caption = "Une seule vidéo jouée dans ces sessions. L'évolution apparaît dès qu'une session en joue une deuxième. Survolez un thème pour le détail.";
+  }
+  if (hover?.kind === "band") {
+    const band = hover.band;
+    const from = layout.columns[band.column]?.nodes.find((node) => node.name === band.source)?.count ?? band.count;
+    if (band.target == null) {
+      caption = `${band.source} · ${formatFlowCount(band.count)} · ${percent(band.count, from)} % · pas de vidéo suivante`;
+    } else {
+      const to = layout.columns[band.column + 1]?.nodes.find((node) => node.name === band.target)?.count ?? band.count;
+      const example = band.target ? flow.steps[band.column]?.find((link) => link.source === band.source && link.target === band.target)?.examples[0] : undefined;
+      caption = `${band.source} → ${band.target} · ${formatFlowCount(band.count)} · ${percent(band.count, from)} % de ${band.source} · ${percent(band.count, to)} % de ${band.target}${example ? ` · ${example}` : ""}`;
+    }
   } else if (hover?.kind === "node") {
-    const incoming = links
-      .filter((link) => link.target === hover.name)
+    const node = layout.columns[hover.column]?.nodes.find((entry) => entry.name === hover.name);
+    const leaving = layout.bands
+      .filter((band) => band.column === hover.column && band.source === hover.name)
       .sort((a, b) => b.count - a.count);
-    const count = layout.targetWeight.get(hover.name) ?? 0;
-    const parts = incoming.map((link) => `${link.source} ${link.count} (${percent(link.count, count)} %)`);
-    caption = `${hover.name} · ${count} décisions · ${percent(count, layout.total)} % de l'ensemble · depuis ${parts.join(" · ") || "—"}`;
+    const arriving = layout.bands
+      .filter((band) => band.column === hover.column - 1 && band.target === hover.name)
+      .sort((a, b) => b.count - a.count);
+    const parts = (leaving.length ? leaving : arriving).map((band) => {
+      const label = leaving.length ? (band.target ?? "pas de vidéo suivante") : band.source;
+      return `${label} ${formatFlowCount(band.count)} (${percent(band.count, node?.count ?? band.count)} %)`;
+    });
+    caption = `${hover.name} · ${formatFlowCount(node?.count ?? 0)} · ${percent(node?.count ?? 0, columnTotal(hover.column))} % · ${leaving.length ? "vers" : "depuis"} ${parts.join(" · ") || "—"}`;
   }
 
   return (
     <div className="space-y-3" data-testid="video-decision-sankey">
-      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="w-full text-foreground" role="img" aria-label="Flux des thèmes, avec le nombre et le pourcentage de chaque thème, de chaque vidéo et de chaque lien">
-        {links.map((link) => {
-          const source = nodeOf(layout.left, link.source);
-          const target = nodeOf(layout.right, link.target);
-          if (!source || !target) return null;
-          const y1 = source.y + source.h / 2;
-          const y2 = target.y + target.h / 2;
-          const midX = (leftX + rightX) / 2;
-          const path = `M ${leftX} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${rightX} ${y2}`;
-          const active = emphasized(link);
-          return (
-            <g key={`${link.source}-${link.target}`} onMouseEnter={() => setHover({ kind: "link", link })} onMouseLeave={() => setHover(null)}>
+      <div className="overflow-x-auto">
+        <svg
+          width={layout.width}
+          height={layout.height}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          className="text-foreground"
+          role="img"
+          aria-label={evolution ? "Évolution des thèmes d'une vidéo jouée à la suivante" : "Flux des thèmes vers les vidéos"}
+        >
+          {layout.bands.map((band) => {
+            const active = emphasized(band);
+            const title = band.target == null
+              ? `${band.source} : ${formatFlowCount(band.count)}, pas de vidéo suivante`
+              : `${band.source} → ${band.target} : ${formatFlowCount(band.count)}`;
+            return (
               <path
-                d={path}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={Math.max(2, (link.count / layout.maxLink) * 18)}
-                strokeOpacity={active ? 0.7 : 0.12}
-                className="text-primary"
+                key={band.key}
+                d={bandPath(band)}
+                data-testid="sankey-band"
+                fill="currentColor"
+                fillOpacity={active ? 0.72 : hover ? 0.12 : 0.5}
+                className={band.target == null ? "text-muted-foreground" : "text-primary"}
+                onMouseEnter={() => setHover({ kind: "band", band })}
+                onMouseLeave={() => setHover(null)}
               >
-                <title>{`${link.source} → ${link.target} : ${link.count}`}</title>
+                <title>{title}</title>
               </path>
-              <text
-                x={midX}
-                y={(y1 + y2) / 2}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-foreground text-[10px]"
-                opacity={active ? 1 : 0.35}
-              >
-                {link.count}
-              </text>
-            </g>
-          );
-        })}
-        {layout.left.map((node) => (
-          <g key={`l-${node.name}`} onMouseEnter={() => setHover({ kind: "node", side: "in", name: node.name })} onMouseLeave={() => setHover(null)}>
-            <rect x={leftX - 8} y={node.y} width={8} height={node.h} className="fill-primary" />
-            <text x={leftX - 14} y={node.y + node.h / 2} textAnchor="end" dominantBaseline="middle" className="fill-foreground text-[11px]">
-              {nodeCaption(node.name, node.count, layout.total)}
-            </text>
-          </g>
-        ))}
-        {layout.right.map((node) => (
-          <g key={`r-${node.name}`} onMouseEnter={() => setHover({ kind: "node", side: "out", name: node.name })} onMouseLeave={() => setHover(null)}>
-            <rect x={rightX} y={node.y} width={8} height={node.h} className="fill-primary" />
-            <text x={rightX + 14} y={node.y + node.h / 2} dominantBaseline="middle" className="fill-foreground text-[11px]">
-              {nodeCaption(node.name, node.count, layout.total)}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <p className="min-h-6 text-sm text-muted-foreground" data-testid="sankey-hover">{caption}</p>
-      <div className="space-y-1">
-        {sources.map((source) => (
-          <Collapsible key={source.name} className="rounded-md border">
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm [&[data-state=open]>svg]:rotate-90">
-              <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
-              <span className="font-medium">{source.name}</span>
-              <span className="tabular-nums text-muted-foreground">{source.count} · {source.share} %</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-1 px-9 pb-2 text-sm text-muted-foreground">
-              {source.destinations.map((link) => (
-                <p key={link.target}>
-                  {link.target} · {link.count} · {percent(link.count, source.count)} % de {source.name}
-                  {" · "}{percent(link.count, layout.total)} % de l'ensemble
-                </p>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
+            );
+          })}
+          {layout.columns.map((column) => {
+            const total = column.nodes.reduce((sum, node) => sum + node.count, 0);
+            return (
+              <g key={column.label}>
+                <text x={column.x} y={16} textAnchor="middle" className="fill-muted-foreground text-[11px]">{column.label}</text>
+                {column.nodes.map((node) => {
+                  const last = node.column === layout.columns.length - 1 && layout.columns.length > 1;
+                  return (
+                    <g key={`${column.label}-${node.name}`} onMouseEnter={() => setHover({ kind: "node", column: node.column, name: node.name })} onMouseLeave={() => setHover(null)}>
+                      <rect x={node.x} y={node.y} width={10} height={Math.max(node.h, 1)} className="fill-primary" />
+                      <text
+                        x={last ? node.x + 16 : node.x - 8}
+                        y={node.y + node.h / 2}
+                        textAnchor={last ? "start" : "end"}
+                        dominantBaseline="middle"
+                        className="fill-foreground stroke-background text-[11px]"
+                        strokeWidth={3}
+                        style={{ paintOrder: "stroke" }}
+                      >
+                        {nodeCaption(node.name, node.count, total)}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
       </div>
+      <p className="min-h-6 text-sm text-muted-foreground" data-testid="sankey-hover">{caption}</p>
+      {!evolution && (
+        <div className="space-y-1">
+          {sources.map((source) => (
+            <Collapsible key={source.name} className="rounded-md border">
+              <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm [&[data-state=open]>svg]:rotate-90">
+                <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
+                <span className="font-medium">{source.name}</span>
+                <span className="tabular-nums text-muted-foreground">{formatFlowCount(source.count)} · {source.share} %</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-1 px-9 pb-2 text-sm text-muted-foreground">
+                {source.destinations.map((band) => (
+                  <p key={band.key}>
+                    {band.target ?? "pas de vidéo suivante"} · {formatFlowCount(band.count)} · {percent(band.count, source.count)} % de {source.name}
+                  </p>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -417,7 +405,16 @@ export default function VideoDecisionsTab() {
               {activeDimension === "themes" ? "Évolution des thèmes" : `Évolution des ${dimensionWord}`}
             </Button>
           </div>
-          <Sankey links={flow === "videos" ? flows.toVideos : flows.evolution} />
+          <Sankey
+            evolution={flow === "themes"}
+            flow={flow === "videos"
+              ? videoFlowColumns(
+                flows.toVideos,
+                activeDimension === "emotions" ? "Émotions" : activeDimension === "stakes" ? "Enjeux" : "Thèmes",
+                "Vidéos",
+              )
+              : flows.evolution}
+          />
         </TabsContent>
         <TabsContent value="criteria" className="mt-3 space-y-4">
           <p className="text-sm">
