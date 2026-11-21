@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo : plus de blocs blancs dans l'évolution] — 2026-11-21
+
+- **Évolution des thèmes** : une session qui s'arrête ne dessine plus de bloc blanc à côté de la barre. Seul le flux vers la vidéo suivante reste. La barre du thème garde sa hauteur.
+- **Inchangé** : la sélection en jeu. Rien en production.
+
 ## [Nouvelles de Gamiways : inscription depuis le questionnaire] — 2026-11-21
 
 - **Questionnaire** : la case « tenu·e au courant » nomme maintenant la newsletter (Nouvelles de Gamiways, dont AVA), l'email de confirmation et le désabonnement. Elle reste décochée et inactive sans email valide.
