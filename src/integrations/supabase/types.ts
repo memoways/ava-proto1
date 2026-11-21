@@ -1570,6 +1570,7 @@ export type Database = {
           context: string | null
           created_at: string | null
           description: string | null
+          dialogue: string | null
           duration_seconds: number | null
           gameplay_step_id: string | null
           id: string
@@ -1580,6 +1581,8 @@ export type Database = {
           priority: number | null
           themes: string[] | null
           title: string
+          transcription: string | null
+          transcription_verified: boolean
           transition_style: string | null
           type: string
           updated_at: string | null
@@ -1591,6 +1594,7 @@ export type Database = {
           context?: string | null
           created_at?: string | null
           description?: string | null
+          dialogue?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string
@@ -1601,6 +1605,8 @@ export type Database = {
           priority?: number | null
           themes?: string[] | null
           title: string
+          transcription?: string | null
+          transcription_verified?: boolean
           transition_style?: string | null
           type: string
           updated_at?: string | null
@@ -1612,6 +1618,7 @@ export type Database = {
           context?: string | null
           created_at?: string | null
           description?: string | null
+          dialogue?: string | null
           duration_seconds?: number | null
           gameplay_step_id?: string | null
           id?: string
@@ -1622,6 +1629,8 @@ export type Database = {
           priority?: number | null
           themes?: string[] | null
           title?: string
+          transcription?: string | null
+          transcription_verified?: boolean
           transition_style?: string | null
           type?: string
           updated_at?: string | null
