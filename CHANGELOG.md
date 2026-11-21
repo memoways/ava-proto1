@@ -11,6 +11,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Cause 2 : si Deepgram n'accusait pas le `Finalize` dans les 1,5 s, les derniers mots du tour déjà envoyé arrivaient ensuite dans le tampon du tour suivant. Ils sont maintenant ignorés jusqu'à l'accusé tardif (fenêtre 1,5 s) : un tour ne reprend plus jamais un reste du précédent. Délai de réponse inchangé (aucune attente ajoutée).
 - Non traité : Gradium garde ses propres gardes (`flush_id`, `start_s`). À recetter sur appareils : parler longtemps avec pauses, vérifier l'absence de coupure et de mot reporté.
 
+## [Juge, fiches et direction de jeu : état des lieux et plan en rounds] — 2026-11-21
+
+- Documentation seule, aucun code ni réglage : état des lieux des tâches Notion du juge, des fiches retouchées par Romed le 19 novembre et des réglages personnages (radar 5 axes, états de parole, modes GM).
+- Conflits relevés entre la fiche Notion et le back-office, répartition Notion / app / GM, et plan en rounds de test séparés (factualité, hiérarchie des consignes, évolution de l'état, direction de jeu, crédibilité) : `docs/plan_juge_direction_rounds.md`, prompt du lot F : `docs/prompt_reprise_juge_lot_f.md`.
+
 ## [Latence Tavus, lot T9 : décomposition de l'attente vidéo (analyse, lot arrêté)] — 2026-11-21
 
 - Analyse seule, aucun code ni réglage : sur 31 tours Tavus, `video_wait_ms` médian ≈ 0,90 s = ≈ 0,34 s jusqu'aux premiers octets ElevenLabs + ≈ 0,56 s jusqu'aux lèvres ; surcoût propre à Tavus ≈ 0,2 s par rapport au TTS seul.

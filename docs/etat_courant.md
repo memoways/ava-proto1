@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Juge, fiches et direction de jeu : état des lieux (21 novembre, plan, aucun code)** : fiches Max/Emma retouchées par Romed le 19 novembre (plus de « tu attends l'appel »), mais pas de champ « Ce que tu sais aujourd'hui » et un futur restant (« sera contaminée ») ; six couches disent au personnage comment être sans hiérarchie (cadre, directive GM, parole du tour, radar, fiche, RAG) ; conflits : 5 états de parole (fiche) et 5 axes du radar (app) en parallèle, radar lucidité/initiative/ouverture hauts qui poussent vers l'analyse, références intellectuelles et format dans la fiche ; juge à note unique mêlant faits et style. Répartition retenue : Notion = vérité et réalité émotionnelle, app = direction de jeu, GM = évolution dans les bornes. Rounds séparés : F factualité → H hiérarchie sans contradiction → D2 état qui évolue → J4 direction → J5 crédibilité/style. [Plan](plan_juge_direction_rounds.md) · [reprise lot F](prompt_reprise_juge_lot_f.md).
+
 **Fin d'expérience (20 novembre, code)** : écran « La communication se coupe » supprimé, fin → questionnaire direct, introduction (5 minutes, réponse vocale) sur la première question.
 
 **Questionnaire conversationnel, lisibilité (20 novembre, code)** : relance en premier, zone de réponse agrandie, consentement/email/« Valider et envoyer » avant le récapitulatif ; questionnaire non rallongé. Recette sur appareils ciblés à faire (non vérifié hors jsdom).
