@@ -5,6 +5,7 @@ import type { VideoDecisionReport } from "@/services/videoDecisionLog";
 const report: VideoDecisionReport = {
   sessions: [{
     sessionId: "session-a",
+    title: "Ulrich · 20.11.26, 11:00 · Max · échange moyen (8 tours)",
     startedAt: "2026-11-20T10:00:00.000Z",
     turns: [
       {
@@ -96,19 +97,29 @@ describe("VideoDecisionsTab", () => {
 
   it("renders the three views, the quote and an unknown reason", async () => {
     render(<VideoDecisionsTab />);
+    const session = await screen.findByRole("button", { name: /Ulrich · 20.11.26/ });
+    expect(session.textContent).toContain("1 vidéo jouée");
+    expect(screen.queryByText("Tour 3")).toBeNull();
+    expect(screen.queryByText("session-a")).toBeNull();
+    fireEvent.click(session);
     expect(await screen.findByText("Max, Emma et Leo suspendus, tension")).toBeTruthy();
+    expect(screen.getAllByText("Cinématique").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Superposition")).toBeNull();
+    expect(screen.queryByText("Game Master")).toBeNull();
     expect(screen.getByText("zz_custom_reason")).toBeTruthy();
     expect(screen.getByText("« depuis le chalet » ↔ devant le chalet")).toBeTruthy();
     fireEvent.click(screen.getByText("Tour 3"));
     expect(await screen.findByText(/On est devant le chalet/)).toBeTruthy();
+    expect(screen.getByText(/Cinématique montrée pendant que le personnage parle/)).toBeTruthy();
     expect(screen.getByText(/Écartées · espacement trop court/)).toBeTruthy();
 
     const themesTab = screen.getByRole("tab", { name: "Par thèmes" });
     fireEvent.mouseDown(themesTab);
     fireEvent.click(themesTab);
     expect(screen.getByTestId("video-decision-sankey")).toBeTruthy();
+    expect(screen.getByText(/famille · 1 · 50 %/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Évolution des thèmes" }));
-    expect(screen.getByText(/Survolez un flux/)).toBeTruthy();
+    expect(screen.getByText(/Survolez/)).toBeTruthy();
 
     const criteriaTab = screen.getByRole("tab", { name: "Synthèse" });
     fireEvent.mouseDown(criteriaTab);
@@ -121,6 +132,7 @@ describe("VideoDecisionsTab", () => {
 
   it("marks a label outside the current list and can switch the Sankey dimension", async () => {
     render(<VideoDecisionsTab />);
+    fireEvent.click(await screen.findByRole("button", { name: /Ulrich · 20.11.26/ }));
     expect((await screen.findAllByTestId("label-outside")).length).toBeGreaterThan(0);
     const themesTab = screen.getByRole("tab", { name: "Par thèmes" });
     fireEvent.mouseDown(themesTab);

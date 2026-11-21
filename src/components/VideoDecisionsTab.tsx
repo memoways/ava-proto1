@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -18,17 +19,21 @@ import {
   type VideoDecisionReport,
 } from "@/services/videoDecisionLog";
 
-const MECHANISM_LABEL: Record<DecisionTurn["mechanism"], string> = {
-  overlay: "Superposition",
-  extract: "Extrait",
-  game_master: "Game Master",
-  unknown: "Ancien journal",
-};
+function percent(count: number, total: number): number {
+  return total > 0 ? Math.round((count / total) * 100) : 0;
+}
 
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+function mechanismLabel(mechanism: DecisionTurn["mechanism"]): string {
+  if (mechanism === "extract") return "Extrait";
+  if (mechanism === "unknown") return "Ancien journal";
+  return "Cinématique";
+}
+
+function mechanismNote(mechanism: DecisionTurn["mechanism"]): string | null {
+  if (mechanism === "overlay") return "Cinématique montrée pendant que le personnage parle.";
+  if (mechanism === "game_master") return "Cinématique qui coupe la conversation.";
+  if (mechanism === "extract") return "Extrait du film.";
+  return null;
 }
 
 function characterLabel(character: string | null): string {
@@ -37,8 +42,8 @@ function characterLabel(character: string | null): string {
   return character ?? "—";
 }
 
-function shortSession(id: string): string {
-  return id.length > 8 ? id.slice(0, 8) : id;
+function videoCountLabel(played: number): string {
+  return `${played} vidéo${played > 1 ? "s" : ""} jouée${played > 1 ? "s" : ""}`;
 }
 
 function Bar({ label, count, total }: { label: string; count: number; total: number }) {
@@ -54,93 +59,172 @@ function Bar({ label, count, total }: { label: string; count: number; total: num
   );
 }
 
+type SankeyHover =
+  | { kind: "link"; link: FlowLink }
+  | { kind: "node"; side: "in" | "out"; name: string };
+
+function nodeCaption(name: string, count: number, total: number): string {
+  const suffix = ` · ${count} · ${percent(count, total)} %`;
+  const room = Math.max(10, 42 - suffix.length);
+  const short = name.length > room ? `${name.slice(0, room - 1)}…` : name;
+  return `${short}${suffix}`;
+}
+
 function Sankey({ links }: { links: FlowLink[] }) {
-  const [hover, setHover] = useState<FlowLink | null>(null);
+  const [hover, setHover] = useState<SankeyHover | null>(null);
   const layout = useMemo(() => {
-    const sourceOrder: string[] = [];
-    const targetOrder: string[] = [];
     const sourceWeight = new Map<string, number>();
     const targetWeight = new Map<string, number>();
     for (const link of links) {
-      if (!sourceOrder.includes(link.source)) sourceOrder.push(link.source);
-      if (!targetOrder.includes(link.target)) targetOrder.push(link.target);
       sourceWeight.set(link.source, (sourceWeight.get(link.source) ?? 0) + link.count);
       targetWeight.set(link.target, (targetWeight.get(link.target) ?? 0) + link.count);
     }
-    const width = 760;
-    const row = 28;
-    const height = Math.max(160, Math.max(sourceOrder.length, targetOrder.length, 1) * row + 16);
+    const byWeight = (weights: Map<string, number>) =>
+      [...weights.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr")).map(([name]) => name);
+    const sourceOrder = byWeight(sourceWeight);
+    const targetOrder = byWeight(targetWeight);
+    const total = [...sourceWeight.values()].reduce((sum, count) => sum + count, 0);
+    const width = 980;
+    const row = 32;
+    const height = Math.max(180, Math.max(sourceOrder.length, targetOrder.length, 1) * row + 16);
     const place = (names: string[], weights: Map<string, number>) => {
-      const sum = names.reduce((total, name) => total + (weights.get(name) ?? 0), 0) || 1;
-      const gap = 6;
+      const sum = names.reduce((count, name) => count + (weights.get(name) ?? 0), 0) || 1;
+      const gap = 8;
       const inner = height - 16 - gap * Math.max(0, names.length - 1);
       let y = 8;
       return names.map((name) => {
-        const h = Math.max(10, (inner * (weights.get(name) ?? 0)) / sum);
-        const node = { name, y, h };
+        const count = weights.get(name) ?? 0;
+        const h = Math.max(16, (inner * count) / sum);
+        const node = { name, y, h, count };
         y += h + gap;
         return node;
       });
     };
-    return { width, height, left: place(sourceOrder, sourceWeight), right: place(targetOrder, targetWeight) };
+    return {
+      width,
+      height,
+      total,
+      maxLink: Math.max(1, ...links.map((link) => link.count)),
+      left: place(sourceOrder, sourceWeight),
+      right: place(targetOrder, targetWeight),
+      sourceWeight,
+      targetWeight,
+    };
   }, [links]);
 
   if (links.length === 0) {
     return <p className="text-sm text-muted-foreground">Pas assez de thèmes GM sur cette période pour tracer un flux.</p>;
   }
 
-  const leftX = 168;
-  const rightX = layout.width - 188;
-  const nodeOf = (nodes: { name: string; y: number; h: number }[], name: string) => nodes.find((node) => node.name === name);
+  const leftX = 300;
+  const rightX = layout.width - 320;
+  const nodeOf = (nodes: { name: string; y: number; h: number; count: number }[], name: string) => nodes.find((node) => node.name === name);
+  const emphasized = (link: FlowLink) => {
+    if (!hover) return true;
+    if (hover.kind === "link") return hover.link === link;
+    return hover.side === "in" ? link.source === hover.name : link.target === hover.name;
+  };
+  const sources = layout.left.map((node) => ({
+    ...node,
+    share: percent(node.count, layout.total),
+    destinations: links
+      .filter((link) => link.source === node.name)
+      .sort((a, b) => b.count - a.count || a.target.localeCompare(b.target, "fr")),
+  }));
+
+  let caption = "Le nombre à gauche est la part du thème, à droite celle de la vidéo, sur le lien celle du chemin. Survolez pour voir vers quoi part le pourcentage.";
+  if (hover?.kind === "link") {
+    const link = hover.link;
+    const from = layout.sourceWeight.get(link.source) ?? link.count;
+    const to = layout.targetWeight.get(link.target) ?? link.count;
+    caption = `${link.source} → ${link.target} · ${link.count} sur le chemin · ${percent(link.count, from)} % de ${link.source} · ${percent(link.count, to)} % de la cible · ${percent(link.count, layout.total)} % de l'ensemble${link.examples[0] ? ` · ${link.examples[0]}` : ""}`;
+  } else if (hover?.kind === "node" && hover.side === "in") {
+    const node = sources.find((entry) => entry.name === hover.name);
+    const parts = (node?.destinations ?? []).map((link) => `${link.target} ${link.count} (${percent(link.count, node?.count ?? link.count)} %)`);
+    caption = `${hover.name} · ${node?.count ?? 0} décisions · ${node?.share ?? 0} % de l'ensemble · vers ${parts.join(" · ") || "—"}`;
+  } else if (hover?.kind === "node") {
+    const incoming = links
+      .filter((link) => link.target === hover.name)
+      .sort((a, b) => b.count - a.count);
+    const count = layout.targetWeight.get(hover.name) ?? 0;
+    const parts = incoming.map((link) => `${link.source} ${link.count} (${percent(link.count, count)} %)`);
+    caption = `${hover.name} · ${count} décisions · ${percent(count, layout.total)} % de l'ensemble · depuis ${parts.join(" · ") || "—"}`;
+  }
 
   return (
-    <div className="space-y-2" data-testid="video-decision-sankey">
-      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="w-full text-foreground" role="img" aria-label="Flux des thèmes">
+    <div className="space-y-3" data-testid="video-decision-sankey">
+      <svg viewBox={`0 0 ${layout.width} ${layout.height}`} className="w-full text-foreground" role="img" aria-label="Flux des thèmes, avec le nombre et le pourcentage de chaque thème, de chaque vidéo et de chaque lien">
         {links.map((link) => {
           const source = nodeOf(layout.left, link.source);
           const target = nodeOf(layout.right, link.target);
           if (!source || !target) return null;
           const y1 = source.y + source.h / 2;
           const y2 = target.y + target.h / 2;
-          const path = `M ${leftX} ${y1} C ${(leftX + rightX) / 2} ${y1}, ${(leftX + rightX) / 2} ${y2}, ${rightX} ${y2}`;
+          const midX = (leftX + rightX) / 2;
+          const path = `M ${leftX} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${rightX} ${y2}`;
+          const active = emphasized(link);
           return (
-            <path
-              key={`${link.source}-${link.target}`}
-              d={path}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={Math.max(2, Math.min(18, 2 + link.count))}
-              strokeOpacity={hover && hover !== link ? 0.15 : 0.55}
-              className="text-primary"
-              onMouseEnter={() => setHover(link)}
-              onMouseLeave={() => setHover(null)}
-            >
-              <title>{`${link.source} → ${link.target} : ${link.count}`}</title>
-            </path>
+            <g key={`${link.source}-${link.target}`} onMouseEnter={() => setHover({ kind: "link", link })} onMouseLeave={() => setHover(null)}>
+              <path
+                d={path}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={Math.max(2, (link.count / layout.maxLink) * 18)}
+                strokeOpacity={active ? 0.7 : 0.12}
+                className="text-primary"
+              >
+                <title>{`${link.source} → ${link.target} : ${link.count}`}</title>
+              </path>
+              <text
+                x={midX}
+                y={(y1 + y2) / 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-foreground text-[10px]"
+                opacity={active ? 1 : 0.35}
+              >
+                {link.count}
+              </text>
+            </g>
           );
         })}
         {layout.left.map((node) => (
-          <g key={`l-${node.name}`}>
+          <g key={`l-${node.name}`} onMouseEnter={() => setHover({ kind: "node", side: "in", name: node.name })} onMouseLeave={() => setHover(null)}>
             <rect x={leftX - 8} y={node.y} width={8} height={node.h} className="fill-primary" />
             <text x={leftX - 14} y={node.y + node.h / 2} textAnchor="end" dominantBaseline="middle" className="fill-foreground text-[11px]">
-              {node.name.length > 28 ? `${node.name.slice(0, 27)}…` : node.name}
+              {nodeCaption(node.name, node.count, layout.total)}
             </text>
           </g>
         ))}
         {layout.right.map((node) => (
-          <g key={`r-${node.name}`}>
+          <g key={`r-${node.name}`} onMouseEnter={() => setHover({ kind: "node", side: "out", name: node.name })} onMouseLeave={() => setHover(null)}>
             <rect x={rightX} y={node.y} width={8} height={node.h} className="fill-primary" />
             <text x={rightX + 14} y={node.y + node.h / 2} dominantBaseline="middle" className="fill-foreground text-[11px]">
-              {node.name.length > 32 ? `${node.name.slice(0, 31)}…` : node.name}
+              {nodeCaption(node.name, node.count, layout.total)}
             </text>
           </g>
         ))}
       </svg>
-      <p className="min-h-6 text-sm text-muted-foreground" data-testid="sankey-hover">
-        {hover
-          ? `${hover.source} → ${hover.target} · ${hover.count}${hover.examples[0] ? ` · ${hover.examples[0]}` : ""}`
-          : "Survolez un flux pour voir le nombre."}
-      </p>
+      <p className="min-h-6 text-sm text-muted-foreground" data-testid="sankey-hover">{caption}</p>
+      <div className="space-y-1">
+        {sources.map((source) => (
+          <Collapsible key={source.name} className="rounded-md border">
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm [&[data-state=open]>svg]:rotate-90">
+              <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
+              <span className="font-medium">{source.name}</span>
+              <span className="tabular-nums text-muted-foreground">{source.count} · {source.share} %</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-1 px-9 pb-2 text-sm text-muted-foreground">
+              {source.destinations.map((link) => (
+                <p key={link.target}>
+                  {link.target} · {link.count} · {percent(link.count, source.count)} % de {source.name}
+                  {" · "}{percent(link.count, layout.total)} % de l'ensemble
+                </p>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </div>
     </div>
   );
 }
@@ -161,7 +245,7 @@ function TurnRow({ turn, vocabulary }: { turn: DecisionTurn; vocabulary: VideoLa
       <CollapsibleTrigger className="flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 text-left text-sm">
         <span className="font-medium">Tour {turn.turnIndex ?? "—"}</span>
         <span className="text-muted-foreground">{characterLabel(turn.character)}</span>
-        <Badge variant="outline">{MECHANISM_LABEL[turn.mechanism]}</Badge>
+        <Badge variant="outline">{mechanismLabel(turn.mechanism)}</Badge>
         <Badge variant={turn.outcome === "played" ? "default" : "secondary"}>
           {turn.outcome === "played" ? turn.videoTitle ?? "vidéo jouée" : turn.reasonLabel}
         </Badge>
@@ -172,6 +256,7 @@ function TurnRow({ turn, vocabulary }: { turn: DecisionTurn; vocabulary: VideoLa
         {turn.degraded && <span className="text-xs text-muted-foreground">journal partiel</span>}
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-2 pl-1 text-xs text-muted-foreground">
+        {mechanismNote(turn.mechanism) && <p>{mechanismNote(turn.mechanism)}</p>}
         {turn.outcome === "played" && <p>Vidéo : {turn.videoTitle}{turn.confidence != null ? ` · confiance ${turn.confidence}` : ""}</p>}
         {turn.quote && <p data-testid="video-decision-quote">{turn.quote}</p>}
         {turn.replyExcerpt && <p>Réplique : « {turn.replyExcerpt} »</p>}
@@ -196,15 +281,28 @@ function TurnRow({ turn, vocabulary }: { turn: DecisionTurn; vocabulary: VideoLa
 function SessionList({ sessions, vocabulary }: { sessions: DecisionSession[]; vocabulary: VideoLabelLists | null }) {
   if (sessions.length === 0) return <p className="text-sm text-muted-foreground">Aucune décision pour ces filtres.</p>;
   return (
-    <div className="space-y-4">
-      {sessions.map((session) => (
-        <section key={session.sessionId} className="rounded-lg border bg-card p-3">
-          <h3 className="text-sm font-semibold">
-            Session {shortSession(session.sessionId)} · {formatWhen(session.startedAt)} · {session.turns.length} décision{session.turns.length > 1 ? "s" : ""}
-          </h3>
-          {session.turns.map((turn) => <TurnRow key={turn.key} turn={turn} vocabulary={vocabulary} />)}
-        </section>
-      ))}
+    <div className="space-y-2">
+      {sessions.map((session) => {
+        const played = session.turns.filter((turn) => turn.outcome === "played").length;
+        const skipped = session.turns.length - played;
+        return (
+          <Collapsible key={session.sessionId} className="rounded-lg border bg-card" data-testid="video-decision-session">
+            <CollapsibleTrigger className="flex w-full items-start gap-2 p-3 text-left [&[data-state=open]>svg]:rotate-90">
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 transition-transform" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">{session.title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {videoCountLabel(played)}
+                  {skipped > 0 ? ` · ${skipped} écartée${skipped > 1 ? "s" : ""}` : ""}
+                </span>
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3">
+              {session.turns.map((turn) => <TurnRow key={turn.key} turn={turn} vocabulary={vocabulary} />)}
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
     </div>
   );
 }
@@ -258,19 +356,18 @@ export default function VideoDecisionsTab() {
         <Select value={mechanism} onValueChange={(value) => setMechanism(value as MechanismFilter)}>
           <SelectTrigger className="w-44" aria-label="Mécanisme"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les mécanismes</SelectItem>
-            <SelectItem value="overlay">Superposition</SelectItem>
-            <SelectItem value="game_master">Game Master</SelectItem>
+            <SelectItem value="all">Toutes</SelectItem>
+            <SelectItem value="cinematic">Cinématiques</SelectItem>
             <SelectItem value="extract">Extraits</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sessionId} onValueChange={setSessionId}>
-          <SelectTrigger className="w-52" aria-label="Session"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[min(40rem,100%)]" aria-label="Session"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes les sessions</SelectItem>
             {(report?.sessions ?? []).map((session) => (
               <SelectItem key={session.sessionId} value={session.sessionId}>
-                {shortSession(session.sessionId)} · {formatWhen(session.startedAt)}
+                {session.title}
               </SelectItem>
             ))}
           </SelectContent>
@@ -330,8 +427,13 @@ export default function VideoDecisionsTab() {
           </p>
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Par motif</h3>
-            <Bar label="jouée" count={criteria.played} total={criteria.turns} />
-            {criteria.byReason.map((entry) => <Bar key={entry.reason} label={entry.label} count={entry.count} total={criteria.turns} />)}
+            {[
+              { key: "played", label: "jouée", count: criteria.played },
+              ...criteria.byReason.map((entry) => ({ key: entry.reason, label: entry.label, count: entry.count })),
+            ]
+              .filter((entry) => entry.count > 0)
+              .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "fr"))
+              .map((entry) => <Bar key={entry.key} label={entry.label} count={entry.count} total={criteria.turns} />)}
           </div>
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Confiance</h3>

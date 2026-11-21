@@ -6,6 +6,7 @@
  * Older events, written before these fields existed, still render.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { autoSessionTitle } from "@/components/admin/sessionTitle";
 import { isMissingVideoLabelColumnError } from "../../supabase/functions/_shared/videoVocabulary";
 import {
   interpretVocabularyRead,
@@ -29,7 +30,8 @@ export const CINEMATIC_EVENT_TYPES = [
 ] as const;
 
 export type VideoMechanism = "overlay" | "extract" | "game_master";
-export type MechanismFilter = "all" | VideoMechanism;
+/** `cinematic` groups overlay and interrupt cinematics. Extracts stay separate: an extract can also be overlaid. */
+export type MechanismFilter = "all" | "cinematic" | "extract";
 
 /** French labels for every blocked reason the three decision paths already emit. */
 export const BLOCKED_REASON_LABELS: Record<string, string> = {
@@ -220,8 +222,59 @@ export interface DecisionTurn {
 
 export interface DecisionSession {
   sessionId: string;
+  /** Same human title as Admin › Données session (`name`, or person · date · characters · length). */
+  title: string;
   startedAt: string;
   turns: DecisionTurn[];
+}
+
+/** Session columns needed to rebuild the human title. `gm_post_turn_log` stays for the theme join. */
+export interface SessionDecisionRow {
+  id: string;
+  gm_post_turn_log: unknown;
+  name?: string | null;
+  environment_id?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+  duration_seconds?: number | null;
+  game_over_reason?: string | null;
+  conversation_log?: unknown;
+  tester_label?: string | null;
+  test_invitation_id?: string | null;
+  personnage_appele?: string | null;
+  active_character?: string | null;
+}
+
+function sessionDateLabel(iso: string): string {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return "date inconnue";
+  return date.toLocaleString("fr-CH", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function conversationMessages(value: unknown): Array<{ role?: string; spokenWith?: string; content?: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is { role?: string; spokenWith?: string; content?: string } => Boolean(item) && typeof item === "object");
+}
+
+/** Human session title. A custom name wins. Without a session row, the date stands in — never the id. */
+export function decisionSessionTitle(row: SessionDecisionRow | undefined, startedAt: string): string {
+  const named = row?.name?.trim();
+  if (named) return named;
+  if (row?.environment_id) {
+    return autoSessionTitle({
+      environment_id: row.environment_id,
+      started_at: row.started_at ?? (startedAt || null),
+      duration_seconds: row.duration_seconds ?? null,
+      game_over_reason: row.game_over_reason ?? null,
+      ended_at: row.ended_at ?? null,
+      conversation_log: conversationMessages(row.conversation_log),
+      test_invitation_id: row.test_invitation_id ?? null,
+      tester_label: row.tester_label ?? null,
+      personnage_appele: row.personnage_appele ?? null,
+      active_character: row.active_character ?? null,
+    });
+  }
+  return `Session · ${sessionDateLabel(row?.started_at || startedAt)}`;
 }
 
 export interface PlayCount {
@@ -550,11 +603,15 @@ export function groupBySession(
   }
 
   return [...sessions.entries()]
-    .map(([sessionId, turns]) => ({
-      sessionId,
-      startedAt: turns.map((turn) => turn.createdAt).sort()[0] ?? "",
-      turns: turns.sort((a, b) => (a.turnIndex ?? 0) - (b.turnIndex ?? 0) || a.createdAt.localeCompare(b.createdAt)),
-    }))
+    .map(([sessionId, turns]) => {
+      const startedAt = turns.map((turn) => turn.createdAt).sort()[0] ?? "";
+      return {
+        sessionId,
+        title: decisionSessionTitle(undefined, startedAt),
+        startedAt,
+        turns: turns.sort((a, b) => (a.turnIndex ?? 0) - (b.turnIndex ?? 0) || a.createdAt.localeCompare(b.createdAt)),
+      };
+    })
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
@@ -677,11 +734,19 @@ export function criteriaSummary(turns: readonly DecisionTurn[]): CriteriaSummary
     byReason: [...reasons.entries()]
       .map(([reason, count]) => ({ reason, label: reasonLabel(reason), count }))
       .sort((a, b) => b.count - a.count),
-    confidence: [...confidence.entries()].map(([label, count]) => ({ label, count })),
+    confidence: [...confidence.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "fr")),
     linkDetails: [...details.entries()]
       .map(([detail, count]) => ({ detail, label: detail === "quoted_link" ? "lien cité" : reasonLabel(detail), count }))
       .sort((a, b) => b.count - a.count),
   };
+}
+
+function matchesMechanism(mechanism: DecisionTurn["mechanism"], filter: MechanismFilter | undefined): boolean {
+  if (!filter || filter === "all") return true;
+  if (filter === "extract") return mechanism === "extract";
+  return mechanism !== "extract";
 }
 
 export function filterSessions(sessions: readonly DecisionSession[], filter: { mechanism?: MechanismFilter; sessionId?: string | null }): DecisionSession[] {
@@ -689,7 +754,7 @@ export function filterSessions(sessions: readonly DecisionSession[], filter: { m
     .filter((session) => !filter.sessionId || session.sessionId === filter.sessionId)
     .map((session) => ({
       ...session,
-      turns: session.turns.filter((turn) => !filter.mechanism || filter.mechanism === "all" || turn.mechanism === filter.mechanism),
+      turns: session.turns.filter((turn) => matchesMechanism(turn.mechanism, filter.mechanism)),
     }))
     .filter((session) => session.turns.length > 0);
 }
@@ -713,7 +778,7 @@ interface EventQuery {
 export interface DecisionReader {
   events(sinceIso: string, sessionId: string | null, from: number, to: number): Promise<QueryResult<DecisionEventRow>>;
   videos(): Promise<QueryResult<VideoCatalogEntry>>;
-  sessionLogs(ids: string[]): Promise<QueryResult<{ id: string; gm_post_turn_log: unknown }>>;
+  sessionLogs(ids: string[]): Promise<QueryResult<SessionDecisionRow>>;
   vocabulary?(): Promise<VocabularyLoad>;
 }
 
@@ -755,9 +820,12 @@ export function supabaseDecisionReader(client: typeof supabase = supabase): Deci
       }
     },
     sessionLogs(ids) {
-      return (client.from("sessions" as never) as unknown as { select: (columns: string) => { in: (column: string, values: string[]) => Promise<QueryResult<{ id: string; gm_post_turn_log: unknown }>> } })
-        .select("id, gm_post_turn_log")
-        .in("id", ids);
+      const query = (columns: string) =>
+        (client.from("sessions" as never) as unknown as { select: (columns: string) => { in: (column: string, values: string[]) => Promise<QueryResult<SessionDecisionRow>> } })
+          .select(columns)
+          .in("id", ids);
+      return query("id, gm_post_turn_log, name, environment_id, started_at, ended_at, duration_seconds, game_over_reason, conversation_log, tester_label, test_invitation_id, personnage_appele, active_character")
+        .then((result) => (result.error ? query("id, gm_post_turn_log") : result));
     },
   };
 }
@@ -824,6 +892,7 @@ export async function loadVideoDecisions(options: {
   }));
   const sessionIds = [...new Set(events.map((event) => event.session_id))];
   const logs = new Map<string, unknown>();
+  const metas = new Map<string, SessionDecisionRow>();
   let themesUnreadable = false;
   for (let index = 0; index < sessionIds.length; index += 100) {
     const slice = sessionIds.slice(index, index + 100);
@@ -832,9 +901,15 @@ export async function loadVideoDecisions(options: {
       themesUnreadable = true;
       break;
     }
-    for (const row of page.data ?? []) logs.set(row.id, row.gm_post_turn_log);
+    for (const row of page.data ?? []) {
+      logs.set(row.id, row.gm_post_turn_log);
+      metas.set(row.id, row);
+    }
   }
-  const sessions = groupBySession(events, catalog, logs);
+  const sessions = groupBySession(events, catalog, logs).map((session) => ({
+    ...session,
+    title: decisionSessionTitle(metas.get(session.sessionId), session.startedAt),
+  }));
   const turns = sessions.flatMap((session) => session.turns);
   const vocabularyLoad: VocabularyLoad = reader.vocabulary
     ? await reader.vocabulary()

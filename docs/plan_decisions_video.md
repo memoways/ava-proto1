@@ -72,9 +72,12 @@ Cinématiques et Extraits. Les deux sections « Historique des décisions » act
 (l. 909-918, et la requête l. 479-487) sont remplacées par un lien vers l'onglet.
 
 En-tête : filtres période (7 ou 30 jours), mécanisme (tous, cinématiques, extraits) et session.
+La lecture du 21 novembre soir aligne l'onglet là-dessus : sessions repliées, titre humain de Données session,
+nombre de vidéos jouées, comptes et pourcentages sur le Sankey, synthèse triée du plus grand pourcentage
+au plus petit. Cinématique regroupe la lecture pendant la réplique et l'interruption. Extrait reste à part.
 
 Trois vues, avec seulement l'information nécessaire :
-1. **Par session** : une ligne par tour où une vidéo était envisageable. On y voit le tour, le personnage, les
+1. **Par session** : une session repliée, avec son titre et le nombre de vidéos jouées. Ouverte, une ligne par tour où une vidéo était envisageable. On y voit le tour, le personnage, les
    thèmes GM, puis l'issue :
    - vidéo jouée, avec la vidéo et la citation « réplique ↔ vidéo » ;
    - aucune vidéo, avec le motif en clair (« espacement : 2 tours depuis la dernière », « lien trop faible :
