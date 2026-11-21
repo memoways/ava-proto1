@@ -3,7 +3,18 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (latence Tavus, lot T7)
+> **Last Updated**: 2026-11-21 (latence Tavus, lot T8)
+
+---
+
+## Latence Tavus, lot T8 — pourquoi le flux relançait le LLM (21 novembre 2026)
+
+La première mesure de T7 (7 tours) montrait le gain attendu sur les tours propres (≈ −0,5 s) mais deux relances d'intent. Cause :
+le modèle oublie l'en-tête privé dans un tour sur quatre ; le lot le rattrape localement sans coût, le flux ne le faisait pas et
+relançait un appel complet. La même salvage vaut maintenant en flux, sur réponse complète seulement et avec les mêmes gardes ;
+ces tours sont dits d'un bloc, sans gain de première phrase mais sans relance. Réglage toujours désactivé par défaut ;
+la remesure décidera.
+[Analyse](docs/analyse_latence_tavus_20261119.md).
 
 ---
 

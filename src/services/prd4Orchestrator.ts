@@ -506,7 +506,11 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       if (!maxResult.response.trim()) throw new Error('Empty response speech');
       span("character_attempt", attemptStart);
       if (maxResult.promptBuildLatencyMs !== undefined) span("character_prompt_build", attemptStart, attemptStart + maxResult.promptBuildLatencyMs);
-      if (maxResult.speechRecovery === 'local_salvage') span("character_local_salvage", performance.now());
+      if (maxResult.speechRecovery === 'local_salvage') {
+        span("character_local_salvage", performance.now());
+        // Lot T8: a streamed answer salvaged locally was never parsed into phrases; deliver it whole.
+        input.streamControl?.onRecovered(maxResult.response);
+      }
     } catch (error) {
       span("character_attempt", attemptStart, performance.now(), "failed");
       const retryMs = Math.floor(responseDeadlineAt - performance.now());

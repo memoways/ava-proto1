@@ -342,6 +342,7 @@ export async function simulateMaxResponse(
     timeoutMs: opts?.timeoutMs ?? null,
   };
   let result: Awaited<ReturnType<typeof callLLMWithUsage>>;
+  let streamSalvaged = false;
   try {
     const options = {
       model,
@@ -360,10 +361,33 @@ export async function simulateMaxResponse(
     if (opts?.onSpeechToken) {
       const started = performance.now();
       let normalCompletion = false;
-      const content = await streamLLM(messages, (text, done) => { if (!done) opts.onSpeechToken?.(text); }, {
+      // Lot T8: the whole stream is kept. A private header that is missing or malformed
+      // is raised before any phrase was emitted, so it is salvaged at the end exactly like
+      // a batch answer (G1) instead of costing a second full LLM call.
+      let rawStream = '';
+      let headerFailed = false;
+      const content = await streamLLM(messages, (text, done) => {
+        if (done) return;
+        rawStream += text;
+        if (headerFailed) return;
+        try { opts.onSpeechToken?.(text); }
+        catch (error) {
+          if (!isPrivateHeaderError(error)) throw error;
+          headerFailed = true;
+        }
+      }, {
         ...options, onStreamComplete: reason => { normalCompletion = reason === 'stop'; },
       });
-      result = { content: opts.finishSpeech?.(normalCompletion) ?? content, usage: null, generationId: null, model, latencyMs: performance.now() - started, diagnosticTrace: null };
+      let streamed: string;
+      try { streamed = opts.finishSpeech?.(normalCompletion) ?? content; }
+      catch (error) {
+        const salvage = normalCompletion && isPrivateHeaderError(error) && opts.characterContext
+          ? salvageBatchSpeech(rawStream) : null;
+        if (salvage === null || !opts.characterContext) throw error;
+        streamed = validateRecoverySpeech(salvage, opts.characterContext, true);
+        streamSalvaged = true;
+      }
+      result = { content: streamed, usage: null, generationId: null, model, latencyMs: performance.now() - started, diagnosticTrace: null };
     } else result = await callLLMWithUsage(messages, options);
   } catch (error) {
     if (!opts?.diagnosticTrace) throw error;
@@ -384,7 +408,7 @@ export async function simulateMaxResponse(
   if (result.finishReason && result.finishReason !== 'stop') throw new Error(`LLM response incomplete (${result.finishReason})`);
   let response = result.content;
   let responseIntent: ResponseIntent | null = null;
-  let speechRecovery: SimulateMaxResult['speechRecovery'];
+  let speechRecovery: SimulateMaxResult['speechRecovery'] = streamSalvaged ? 'local_salvage' : undefined;
   let gravityRemoved = 0;
   if (privateProtocol && !opts?.onSpeechToken && opts?.characterContext) {
     const parser = new ResponseIntentParser(opts.characterContext, intent => { responseIntent = intent; }, () => {});
@@ -424,6 +448,11 @@ export async function simulateMaxResponse(
     promptBuildLatencyMs,
     requestedSettings,
   };
+}
+
+/** A private header that is absent, malformed or oversized: recoverable locally once the answer is complete. */
+function isPrivateHeaderError(error: unknown): boolean {
+  return /response intent/i.test(error instanceof Error ? error.message : '');
 }
 
 /** Speech part of a complete batch answer whose private header is unusable. */

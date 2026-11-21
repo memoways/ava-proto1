@@ -760,6 +760,23 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     await Promise.all([result.labelPromise, result.postTurnPromise]);
   });
 
+  it('lot T8: delivers a locally salvaged streamed answer whole, without a second generation or a reset', async () => {
+    const speech = 'Je préfère prendre mon temps.';
+    vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
+      opts?.onSpeechToken?.('PRIVATE_MALFORMED_HEADER');
+      return { response: speech, speechRecovery: 'local_salvage', systemPrompt: 'system' };
+    });
+    const events: Array<{ type: string; text?: string }> = [];
+    const result = await streamPRD4Turn({ sessionId: 'session-soak', conversationHistory: [],
+      userMessage: 'Que savez-vous ?', userRole: null, timeElapsedSeconds: 60, characterContext: MAX_CONTEXT },
+    event => events.push(event), Promise.resolve(speech));
+    expect(simulateMaxResponse).toHaveBeenCalledOnce();
+    expect(events.filter(event => event.type === 'segment').map(event => event.text)).toEqual([speech]);
+    expect(events.some(event => event.type === 'reset')).toBe(false);
+    expect(result.maxResponse).toBe(speech);
+    await Promise.all([result.labelPromise, result.postTurnPromise]);
+  });
+
   it('never retries after a safe phrase has already been submitted', async () => {
     vi.mocked(simulateMaxResponse).mockImplementationOnce(async (_input, opts) => {
       opts?.onSpeechToken?.('{"goal":"Écouter","points":[]}\n<speech>\nBonjour. ');
