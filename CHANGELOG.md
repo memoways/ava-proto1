@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Admin vidéo : sync Notion repliée, règles plus denses] — 2026-11-21
+
+- **Synchronisation Notion** (Cinématiques et Extraits) : le bloc est fermé. Une ligne donne la date et le nombre de vidéos en ligne. L'ouvrir retrouve le bouton, les compteurs et les 3 derniers syncs.
+- **Règles** : extraits et déclenchement tiennent sur moins de hauteur. Les précisions longues restent au survol des champs. Les réglages eux-mêmes sont inchangés.
+- **Inchangé** : la sélection en jeu. Rien en production.
+
 ## [Décisions vidéo : plus de blocs blancs dans l'évolution] — 2026-11-21
 
 - **Évolution des thèmes** : une session qui s'arrête ne dessine plus de bloc blanc à côté de la barre. Seul le flux vers la vidéo suivante reste. La barre du thème garde sa hauteur.

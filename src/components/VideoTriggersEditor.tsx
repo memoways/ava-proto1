@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cinematicPresentationFrom, type CinematicPresentation } from "@/services/cinematicTransition";
 import { toast } from "sonner";
-import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic } from "lucide-react";
+import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   listVideoTriggers,
   updateVideoTriggerOnNotion,
@@ -83,6 +84,42 @@ function TranscriptStatusBadge({ video }: { video: VideoTriggerRow }) {
   return <Badge variant={ok ? "outline" : "destructive"} data-testid="extract-transcript-status">{label}</Badge>;
 }
 
+function CompactNumber({
+  id,
+  label,
+  hint,
+  value,
+  min = 0,
+  max,
+  disabled,
+  onChange,
+}: {
+  id?: string;
+  label: string;
+  hint?: string;
+  value: number;
+  min?: number;
+  max?: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label htmlFor={id} className="min-w-0" title={hint}>
+      <span className="block truncate text-[11px] font-medium leading-tight text-muted-foreground">{label}</span>
+      <Input
+        id={id}
+        type="number"
+        min={min}
+        max={max}
+        disabled={disabled}
+        value={value}
+        className="mt-0.5 h-8"
+        onChange={(e) => onChange(Math.min(max ?? Number.POSITIVE_INFINITY, Math.max(min, Number(e.target.value) || 0)))}
+      />
+    </label>
+  );
+}
+
 function ExtractRulesPanel() {
   const [settings, setSettings] = useState<ExtractSettings>(extractDefaults);
   const [loading, setLoading] = useState(true);
@@ -109,48 +146,40 @@ function ExtractRulesPanel() {
   if (loading) return null;
 
   return (
-    <section className="border rounded-lg p-4 space-y-3 bg-muted/5" data-testid="extract-rules">
-      <div className="flex items-center gap-2">
-        <SettingsIcon className="h-4 w-4 text-primary" />
-        <h3 className="font-semibold text-base">Règles des extraits</h3>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Propres aux extraits du film (parcours « film pas vu »), distincts des cinématiques d'ambiance : leurs réglages
-        ne modifient pas ceux des cinématiques. <strong>Activer les extraits est la bascule unique</strong> : les extraits quittent alors le pool des
-        cinématiques et sont choisis par leur propre sélection (parlé : après la réplique, avec son propre son ;
-        silencieux : superposé à la voix). Seuls les extraits silencieux ou parlés avec transcription vérifiée sont
-        proposés ; parcours « film pas vu » uniquement. Inactif par défaut.</p>
-      <label className="flex items-center gap-2 text-sm">
-        <Switch checked={settings.ENABLED} onCheckedChange={(ENABLED) => update({ ENABLED })} />
-        Activer les extraits
-      </label>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Tours avant le 1er extrait</label>
-          <Input type="number" min={0} value={settings.MIN_TURNS_BEFORE_FIRST}
-            onChange={(e) => update({ MIN_TURNS_BEFORE_FIRST: Math.max(0, Number(e.target.value) || 0) })} />
+    <section className="rounded-lg border bg-muted/5 px-3 py-2" data-testid="extract-rules">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex items-center gap-2">
+          <SettingsIcon className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Règles des extraits</h3>
         </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Tours entre deux extraits</label>
-          <Input type="number" min={0} value={settings.MIN_TURNS_BETWEEN}
-            onChange={(e) => update({ MIN_TURNS_BETWEEN: Math.max(0, Number(e.target.value) || 0) })} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Maximum par session (0 = illimité)</label>
-          <Input type="number" min={0} value={settings.MAX_PER_SESSION}
-            onChange={(e) => update({ MAX_PER_SESSION: Math.max(0, Number(e.target.value) || 0) })} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={settings.ENABLED} onCheckedChange={(ENABLED) => update({ ENABLED })} />
+            Activer les extraits
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={settings.REQUIRE_VERIFIED_TRANSCRIPT}
+              onCheckedChange={(REQUIRE_VERIFIED_TRANSCRIPT) => update({ REQUIRE_VERIFIED_TRANSCRIPT })} />
+            Exiger une transcription vérifiée
+          </label>
         </div>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <Switch checked={settings.REQUIRE_VERIFIED_TRANSCRIPT}
-          onCheckedChange={(REQUIRE_VERIFIED_TRANSCRIPT) => update({ REQUIRE_VERIFIED_TRANSCRIPT })} />
-        Extrait parlé : exiger une transcription vérifiée
-      </label>
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" size="sm" disabled={saving} onClick={() => { setSettings(resetExtractSettings()); toast.success("Réglages réinitialisés"); }}>Réinitialiser</Button>
-        <Button size="sm" onClick={save} disabled={saving}>
-          <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
-        </Button>
+      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+        Parcours « film pas vu », distinct des cinématiques. La bascule retire les extraits de leur pool : parlé après la réplique (son propre), silencieux superposé. Seuls les silencieux, ou les parlés à transcription vérifiée, sont proposés. Inactif par défaut.
+      </p>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+        <CompactNumber label="Tours avant le 1er" hint="Tours avant le premier extrait." value={settings.MIN_TURNS_BEFORE_FIRST}
+          onChange={(MIN_TURNS_BEFORE_FIRST) => update({ MIN_TURNS_BEFORE_FIRST })} />
+        <CompactNumber label="Tours entre deux" hint="Tours entre deux extraits." value={settings.MIN_TURNS_BETWEEN}
+          onChange={(MIN_TURNS_BETWEEN) => update({ MIN_TURNS_BETWEEN })} />
+        <CompactNumber label="Max / session (0 = illimité)" value={settings.MAX_PER_SESSION}
+          onChange={(MAX_PER_SESSION) => update({ MAX_PER_SESSION })} />
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" disabled={saving} onClick={() => { setSettings(resetExtractSettings()); toast.success("Réglages réinitialisés"); }}>Réinitialiser</Button>
+          <Button size="sm" onClick={save} disabled={saving}>
+            <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
+          </Button>
+        </div>
       </div>
     </section>
   );
@@ -194,40 +223,41 @@ function VideoTriggerRulesPanel() {
 
   if (loading) return null;
 
-  return (
-    <section className="border rounded-lg p-4 space-y-3 bg-muted/5">
-      <div className="flex items-center gap-2">
-        <SettingsIcon className="h-4 w-4 text-primary" />
-        <h3 className="font-semibold text-base">Règles de déclenchement</h3>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Gouvernent <em>quand</em> une cinématique peut se déclencher pendant une session, indépendamment du matching thématique.
-      </p>
+  const presentation = cinematicPresentationFrom(settings.PRESENTATION);
+  const overlay = presentation === "overlay";
 
-      <fieldset className="border rounded p-3 space-y-2" data-testid="cinematic-presentation">
-        <legend className="px-1 text-sm font-medium">Intégration dans la conversation</legend>
-        <RadioGroup
-          value={cinematicPresentationFrom(settings.PRESENTATION)}
+  return (
+    <section className="rounded-lg border bg-muted/5 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <SettingsIcon className="h-4 w-4 shrink-0 text-primary" />
+          <h3 className="text-sm font-semibold">Règles de déclenchement</h3>
+          <span className="hidden text-[11px] text-muted-foreground sm:inline">Quand une cinématique part, hors matching thématique.</span>
+        </div>
+        <label className="flex items-center gap-2 text-sm" title="Désactiver pour bloquer toutes les vidéos en jeu.">
+          <Switch checked={settings.ENABLED} onCheckedChange={(ENABLED) => update({ ENABLED })} />
+          Cinématiques actives
+        </label>
+      </div>
+
+      <fieldset className="mt-2 border-0 p-0" data-testid="cinematic-presentation" aria-label="Intégration dans la conversation">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <RadioGroup
+          value={presentation}
           onValueChange={(value) => update({ PRESENTATION: cinematicPresentationFrom(value) as CinematicPresentation })}
-          className="grid gap-2 md:grid-cols-2"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1"
         >
-          <label htmlFor="cinematic-presentation-interrupt" className="flex cursor-pointer items-start gap-2 rounded border p-3">
-            <RadioGroupItem id="cinematic-presentation-interrupt" value="interrupt" className="mt-0.5" />
-            <span>
-              <span className="block text-sm font-medium">Interrompre la conversation</span>
-              <span className="block text-xs text-muted-foreground">Après la réponse, fondu au noir, la vidéo seule, puis retour au personnage. Comportement actuel.</span>
-            </span>
+          <label htmlFor="cinematic-presentation-interrupt" className="flex cursor-pointer items-center gap-1.5 text-sm" title="Après la réponse, fondu au noir, la vidéo seule, puis retour au personnage.">
+            <RadioGroupItem id="cinematic-presentation-interrupt" value="interrupt" />
+            Interrompre
           </label>
-          <label htmlFor="cinematic-presentation-overlay" className="flex cursor-pointer items-start gap-2 rounded border p-3">
-            <RadioGroupItem id="cinematic-presentation-overlay" value="overlay" className="mt-0.5" />
-            <span>
-              <span className="block text-sm font-medium">Superposer à la réponse</span>
-              <span className="block text-xs text-muted-foreground">La vidéo remplace l'image du personnage pendant la réponse qui l'a motivée, son atténué. Sans vidéo prête à temps, la réponse reste normale.</span>
-            </span>
+          <label htmlFor="cinematic-presentation-overlay" className="flex cursor-pointer items-center gap-1.5 text-sm" title="La vidéo remplace l'image du personnage pendant la réponse qui l'a motivée, son atténué. Sans vidéo prête à temps, la réponse reste normale.">
+            <RadioGroupItem id="cinematic-presentation-overlay" value="overlay" />
+            Superposer à la réponse
           </label>
-        </RadioGroup>
-        <div className="max-w-xs">
-          <label htmlFor="cinematic-overlay-gain" className="text-xs font-medium text-muted-foreground">Son de la vidéo sous la voix (dB)</label>
+          </RadioGroup>
+          <label htmlFor="cinematic-overlay-gain" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Superposition seulement. −15 dB = valeur d'essai. Sur iPhone/iPad, le volume ne se règle pas : la vidéo y reste muette.">
+          Son sous la voix (dB)
           <Input
             id="cinematic-overlay-gain"
             type="number"
@@ -235,80 +265,48 @@ function VideoTriggerRulesPanel() {
             min={-60}
             step={1}
             value={settings.OVERLAY_VIDEO_GAIN_DB}
-            disabled={cinematicPresentationFrom(settings.PRESENTATION) !== "overlay"}
+            disabled={!overlay}
+            className="h-8 w-16"
             onChange={(e) => update({ OVERLAY_VIDEO_GAIN_DB: Math.min(0, Math.max(-60, Number(e.target.value) || 0)) })}
           />
-          <p className="text-[10px] text-muted-foreground mt-1">Superposition seulement. −15 dB = valeur d'essai, à valider à l'écoute. Sur iPhone/iPad, le volume ne se règle pas : la vidéo y reste muette.</p>
+          </label>
+          <span className="text-[11px] text-muted-foreground">Fréquence commune aux deux modes.</span>
         </div>
-        <p className="text-[10px] text-muted-foreground">Les règles de fréquence ci-dessous s'appliquent aux deux modes.</p>
       </fieldset>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="flex items-center justify-between border rounded p-3 col-span-2 md:col-span-1">
-          <div>
-            <div className="text-sm font-medium">Cinématiques actives</div>
-            <div className="text-xs text-muted-foreground">Désactiver pour bloquer toutes les vidéos en jeu.</div>
-          </div>
-          <Switch checked={settings.ENABLED} onCheckedChange={(v) => update({ ENABLED: v })} />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Tours utilisateur avant la 1re vidéo</label>
-          <Input
-            type="number"
-            min={0}
-            value={settings.MIN_TURNS_BEFORE_FIRST}
-            onChange={(e) => update({ MIN_TURNS_BEFORE_FIRST: Math.max(0, Number(e.target.value) || 0) })}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Ex: 3 = aucune vidéo avant le 3e tour de parole.</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Tours min. entre 2 vidéos</label>
-          <Input
-            type="number"
-            min={0}
-            value={settings.MIN_TURNS_BETWEEN}
-            onChange={(e) => update({ MIN_TURNS_BETWEEN: Math.max(0, Number(e.target.value) || 0) })}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Délai de respiration entre cinématiques.</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Max. de vidéos / session</label>
-          <Input
-            type="number"
-            min={0}
-            value={settings.MAX_PER_SESSION}
-            onChange={(e) => update({ MAX_PER_SESSION: Math.max(0, Number(e.target.value) || 0) })}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">0 = illimité.</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Labels min. requis</label>
-          <Input
-            type="number"
-            min={0}
-            value={settings.MIN_LABELS_REQUIRED}
-            onChange={(e) => update({ MIN_LABELS_REQUIRED: Math.max(0, Number(e.target.value) || 0) })}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Nombre min. de thèmes/sujets/intentions extraits du tour.</p>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Extraits avant une vidéo transformée</label>
-          <Input
-            type="number"
-            min={0}
-            value={settings.MIN_EXTRACTS_BEFORE_CINEMATIC}
-            onChange={(e) => update({ MIN_EXTRACTS_BEFORE_CINEMATIC: Math.max(0, Number(e.target.value) || 0) })}
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">Parcours « film pas vu » : extraits du film montrés avant d'autoriser une vidéo transformée. Sans effet quand les extraits sont activés (onglet Extraits) : ils ont alors leur propre sélection.</p>
-        </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+        <CompactNumber
+          label="Tours avant la 1re"
+          hint="Ex. 3 = aucune vidéo avant le 3e tour de parole."
+          value={settings.MIN_TURNS_BEFORE_FIRST}
+          onChange={(MIN_TURNS_BEFORE_FIRST) => update({ MIN_TURNS_BEFORE_FIRST })}
+        />
+        <CompactNumber
+          label="Tours min. entre 2"
+          hint="Délai de respiration entre cinématiques."
+          value={settings.MIN_TURNS_BETWEEN}
+          onChange={(MIN_TURNS_BETWEEN) => update({ MIN_TURNS_BETWEEN })}
+        />
+        <CompactNumber
+          label="Max / session (0 = ∞)"
+          hint="0 = illimité."
+          value={settings.MAX_PER_SESSION}
+          onChange={(MAX_PER_SESSION) => update({ MAX_PER_SESSION })}
+        />
+        <CompactNumber
+          label="Labels min. requis"
+          hint="Nombre min. de thèmes, sujets ou intentions extraits du tour."
+          value={settings.MIN_LABELS_REQUIRED}
+          onChange={(MIN_LABELS_REQUIRED) => update({ MIN_LABELS_REQUIRED })}
+        />
+        <CompactNumber
+          label="Extraits avant transformée"
+          hint="Parcours « film pas vu » : extraits montrés avant une vidéo transformée. Sans effet quand les extraits sont activés (onglet Extraits)."
+          value={settings.MIN_EXTRACTS_BEFORE_CINEMATIC}
+          onChange={(MIN_EXTRACTS_BEFORE_CINEMATIC) => update({ MIN_EXTRACTS_BEFORE_CINEMATIC })}
+        />
       </div>
-
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="mt-2 flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={reset} disabled={saving}>Réinitialiser</Button>
         <Button size="sm" onClick={save} disabled={saving}>
           <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
@@ -370,70 +368,77 @@ function NotionVideoSyncPanel({ onSynced }: { onSynced: () => Promise<void> | vo
   const last = history[0];
 
   return (
-    <section className="border rounded-lg p-4 space-y-3 bg-muted/5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-base">Synchronisation Notion</h3>
-          <p className="text-xs text-muted-foreground">
-            Importe la base « 🎬 Vidéos AVA ». Seules les vidéos dont l'<strong>État</strong> est
-            {" "}<em>En ligne</em> sont publiées dans l'application ; les autres sont retirées.
+    <Collapsible className="rounded-lg border bg-muted/5" data-testid="notion-video-sync">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left [&[data-state=open]>svg]:rotate-90" data-testid="notion-video-sync-toggle">
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+        <span className="text-sm font-semibold">Synchronisation Notion</span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
+          {last
+            ? `${new Date(last.at).toLocaleString("fr-FR")} · ${last.synced} en ligne`
+            : "Aucun sync dans cet environnement"}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2 border-t px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="max-w-3xl text-[11px] leading-snug text-muted-foreground">
+            Importe la base « 🎬 Vidéos AVA ». Seules les vidéos dont l'<strong>État</strong> est <em>En ligne</em> sont publiées ; les autres sont retirées.
           </p>
+          <Button size="sm" onClick={runSync} disabled={syncing}>
+            <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Synchronisation…" : "Synchroniser avec Notion"}
+          </Button>
         </div>
-        <Button size="sm" onClick={runSync} disabled={syncing}>
-          <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Synchronisation…" : "Synchroniser avec Notion"}
-        </Button>
-      </div>
 
-      {last ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div className="border rounded p-2">
-            <div className="text-[10px] uppercase text-muted-foreground">Dernier sync</div>
-            <div>{new Date(last.at).toLocaleString("fr-FR")}</div>
-          </div>
-          <div className="border rounded p-2">
-            <div className="text-[10px] uppercase text-muted-foreground">Vidéos en ligne</div>
-            <div>{last.synced}</div>
-          </div>
-          <div className="border rounded p-2">
-            <div className="text-[10px] uppercase text-muted-foreground">Ignorées (État ≠ En ligne)</div>
-            <div>{last.skipped}</div>
-          </div>
-          <div className="border rounded p-2">
-            <div className="text-[10px] uppercase text-muted-foreground">Média absent</div>
-            <div>{last.missingMedia}</div>
-          </div>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">Aucun sync enregistré dans cet environnement.</p>
-      )}
-
-      {history.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs font-medium text-muted-foreground">3 derniers syncs</div>
-          {history.map((run) => (
-            <div key={run.at} className="border-t pt-2 text-xs space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{new Date(run.at).toLocaleString("fr-FR")}</Badge>
-                <span>{run.synced} en ligne · {run.skipped} ignorée(s) · {Math.round(run.latencyMs / 100) / 10}s</span>
-              </div>
-              {run.added.length > 0 && (
-                <p className="text-muted-foreground">+ Ajoutées : {run.added.join(", ")}</p>
-              )}
-              {run.removed.length > 0 && (
-                <p className="text-muted-foreground">− Retirées : {run.removed.join(", ")}</p>
-              )}
-              {run.added.length === 0 && run.removed.length === 0 && (
-                <p className="text-muted-foreground/70 italic">Aucun changement de catalogue</p>
-              )}
-              {run.errors.length > 0 && (
-                <p className="text-destructive">Erreurs : {run.errors.join(" · ")}</p>
-              )}
+        {last ? (
+          <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+            <div className="rounded border px-2 py-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Dernier sync</div>
+              <div>{new Date(last.at).toLocaleString("fr-FR")}</div>
             </div>
-          ))}
-        </div>
-      )}
-    </section>
+            <div className="rounded border px-2 py-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Vidéos en ligne</div>
+              <div>{last.synced}</div>
+            </div>
+            <div className="rounded border px-2 py-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Ignorées (État ≠ En ligne)</div>
+              <div>{last.skipped}</div>
+            </div>
+            <div className="rounded border px-2 py-1">
+              <div className="text-[10px] uppercase text-muted-foreground">Média absent</div>
+              <div>{last.missingMedia}</div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Aucun sync enregistré dans cet environnement.</p>
+        )}
+
+        {history.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">3 derniers syncs</div>
+            {history.map((run) => (
+              <div key={run.at} className="space-y-0.5 border-t pt-1 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{new Date(run.at).toLocaleString("fr-FR")}</Badge>
+                  <span>{run.synced} en ligne · {run.skipped} ignorée(s) · {Math.round(run.latencyMs / 100) / 10}s</span>
+                </div>
+                {run.added.length > 0 && (
+                  <p className="text-muted-foreground">+ Ajoutées : {run.added.join(", ")}</p>
+                )}
+                {run.removed.length > 0 && (
+                  <p className="text-muted-foreground">− Retirées : {run.removed.join(", ")}</p>
+                )}
+                {run.added.length === 0 && run.removed.length === 0 && (
+                  <p className="italic text-muted-foreground/70">Aucun changement de catalogue</p>
+                )}
+                {run.errors.length > 0 && (
+                  <p className="text-destructive">Erreurs : {run.errors.join(" · ")}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
