@@ -16,6 +16,17 @@ Date : 2026-11-21. Tâche Notion : [Intégrer les extraits du film AVA dans le p
 | Statut | `extractTranscriptStatus` : `silent`, `spoken_verified`, `spoken_unverified`, `spoken_missing`, `unknown`. Seuls `silent` et `spoken_verified` sont fiables ; `unknown` n'est jamais silencieux |
 | Back-office | onglet Extraits (`VideoTriggersEditor scope="extracts"`), cinématiques sans extraits, réglages `ava_extract_settings` inactifs |
 
+## Lot 1b — transcription IA sur demande (à faire, indépendant du lot 2, à faire en premier)
+
+Chaîne d'édition voulue par Ulrich (21 novembre) : **ajouter la vidéo dans Notion → la labelliser (Nature, Personnages, Dialogue, thèmes) → générer depuis l'application la « Description IA » et la « Transcription »**, puis relecture humaine (« Transcription vérifiée »). Même principe que la description IA existante (`describe-video`, Gemini, écrit une seule propriété Notion et la recopie dans Supabase).
+
+- **Périmètre strict** : uniquement les extraits (`nature = extract`) dont « Dialogue » = Parlé. Jamais un extrait silencieux, un dialogue non renseigné ni une cinématique transformée.
+- **Écriture** : seulement la propriété Notion « Transcription » (puis miroir `video_triggers.transcription`). Jamais « Description », « Description IA », « Dialogue » ni « Transcription vérifiée ». Une transcription générée reste **non vérifiée** ; une transcription déjà cochée « vérifiée » n'est jamais écrasée sans réanalyse explicite (et la case est alors décochée).
+- **Point technique à traiter** : la rendition d'analyse actuelle est **sans son** (`pickAnalysisVariant`, MP4 vidéo seul). La transcription exige une rendition avec piste audio (ou l'audio extrait), dans la limite de taille Gemini (`MAX_VIDEO_BYTES`) ; à défaut, échec explicite, pas de transcription inventée.
+- **Contenu** : paroles réellement dites, locuteurs identifiés lorsque possible (sinon « Voix 1 »…), passages inaudibles signalés, aucune interprétation ni complétion ; aucune parole détectée → rien d'écrit, l'extrait est signalé (« aucune parole détectée »).
+- **Back-office** : dans l'onglet Extraits, bouton « Transcrire » par extrait parlé et « Transcrire les extraits parlés sans transcription (N) », case « Retranscrire les transcriptions existantes non vérifiées » ; progression, erreurs par vidéo ; texte visible avec son statut ; admin seulement.
+- Prompt : [prompt_reprise_extraits_film_lot_transcription_ia.md](prompt_reprise_extraits_film_lot_transcription_ia.md).
+
 ## Lot 2 — sélection, lecture, bascule du pool (à faire)
 
 1. **Bascule atomique du pool** : retirer les extraits de `selectEligibleVideos` / du GM cinématique et de `MIN_EXTRACTS_BEFORE_CINEMATIC` **au moment** où la sélection d'extraits est active ; garder la compatibilité de ce réglage (sa signification ne change pas silencieusement : le documenter).
