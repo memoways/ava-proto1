@@ -647,6 +647,10 @@ export default function Admin() {
             <VideoTriggersEditor />
           </TabsContent>
 
+          <TabsContent value="extracts">
+            {activeTab === "extracts" && <VideoTriggersEditor scope="extracts" />}
+          </TabsContent>
+
 
 
 

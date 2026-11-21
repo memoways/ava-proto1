@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_CHARACTERS,
+  extractTranscriptStatus,
+  isExtractTranscriptReliable,
+  isMissingExtractColumnError,
+  mapVideoDialogue,
+  mapVideoTranscription,
   isMissingVideoMetadataColumnError,
   mapVideoCharacters,
   mapVideoNature,
@@ -57,5 +62,54 @@ describe("missing metadata column detection", () => {
     expect(isMissingVideoMetadataColumnError({ code: "23505", message: "duplicate key" })).toBe(false);
     expect(isMissingVideoMetadataColumnError({ code: "PGRST204", message: "Could not find the 'title' column" })).toBe(false);
     expect(isMissingVideoMetadataColumnError(null)).toBe(false);
+  });
+});
+
+describe("extract Dialogue and Transcription mapping", () => {
+  it("maps the Notion Dialogue select, tolerating case and accents", () => {
+    expect(mapVideoDialogue("Parlé")).toBe("spoken");
+    expect(mapVideoDialogue(" parle ")).toBe("spoken");
+    expect(mapVideoDialogue("Silencieux")).toBe("silent");
+  });
+
+  it("leaves an empty or unknown Dialogue unset instead of guessing silent", () => {
+    expect(mapVideoDialogue(null)).toBeNull();
+    expect(mapVideoDialogue("")).toBeNull();
+    expect(mapVideoDialogue("Musique")).toBeNull();
+  });
+
+  it("writes an absent or cleared transcription as null and keeps the text otherwise", () => {
+    expect(mapVideoTranscription(undefined)).toBeNull();
+    expect(mapVideoTranscription("   \n ")).toBeNull();
+    expect(mapVideoTranscription("  MAX : Il faut partir.  ")).toBe("MAX : Il faut partir.");
+  });
+
+  it("recognises a missing transcription migration only for its own columns", () => {
+    expect(isMissingExtractColumnError({ code: "PGRST204", message: "Could not find the 'transcription' column" })).toBe(true);
+    expect(isMissingExtractColumnError({ code: "42703", message: 'column "dialogue" does not exist' })).toBe(true);
+    expect(isMissingExtractColumnError({ code: "PGRST204", message: "Could not find the 'nature' column" })).toBe(false);
+    expect(isMissingExtractColumnError(null)).toBe(false);
+  });
+});
+
+describe("extract transcript reliability", () => {
+  it("is reliable for a silent extract", () => {
+    expect(extractTranscriptStatus({ dialogue: "silent" })).toBe("silent");
+    expect(isExtractTranscriptReliable({ dialogue: "silent" })).toBe(true);
+  });
+
+  it("is reliable for a spoken extract only with a verified transcription", () => {
+    const base = { dialogue: "spoken" as const, transcription: "MAX : Il faut partir." };
+    expect(extractTranscriptStatus({ ...base, transcription_verified: true })).toBe("spoken_verified");
+    expect(extractTranscriptStatus({ ...base, transcription_verified: false })).toBe("spoken_unverified");
+    expect(extractTranscriptStatus({ dialogue: "spoken", transcription: " ", transcription_verified: true })).toBe("spoken_missing");
+    expect(isExtractTranscriptReliable({ ...base, transcription_verified: false })).toBe(false);
+    expect(isExtractTranscriptReliable({ dialogue: "spoken", transcription_verified: true })).toBe(false);
+  });
+
+  it("never treats an unfilled Dialogue as silent", () => {
+    expect(extractTranscriptStatus({})).toBe("unknown");
+    expect(extractTranscriptStatus({ dialogue: null, transcription_verified: true })).toBe("unknown");
+    expect(isExtractTranscriptReliable({})).toBe(false);
   });
 });

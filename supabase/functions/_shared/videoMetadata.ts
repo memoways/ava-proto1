@@ -48,3 +48,64 @@ export function isMissingVideoMetadataColumnError(
   const message = error.message ?? "";
   return VIDEO_METADATA_COLUMNS.some((column) => message.includes(column));
 }
+
+// ---- Film extracts: transcription and dialogue (extracts lot 1) ----
+
+export type VideoDialogue = "spoken" | "silent";
+
+/** Notion select « Dialogue » → column. Empty or unknown → null (not filled in). */
+export function mapVideoDialogue(value: string | null | undefined): VideoDialogue | null {
+  const label = normalizeLabel(value ?? "");
+  if (label === "parle" || label === "spoken") return "spoken";
+  if (label === "silencieux" || label === "silent") return "silent";
+  return null;
+}
+
+/** Notion « Transcription »: trimmed; absent or cleared → null so a deletion reaches the database. */
+export function mapVideoTranscription(value: string | null | undefined): string | null {
+  const text = (value ?? "").trim();
+  return text ? text : null;
+}
+
+export const EXTRACT_METADATA_COLUMNS = ["transcription", "dialogue", "transcription_verified"] as const;
+
+/** True when a write failed only because the transcription migration is not applied yet. */
+export function isMissingExtractColumnError(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!error || (error.code !== "PGRST204" && error.code !== "42703")) return false;
+  const message = error.message ?? "";
+  return EXTRACT_METADATA_COLUMNS.some((column) => message.includes(column));
+}
+
+export type ExtractTranscriptStatus =
+  /** No dialogue: can be layered over the character's voice. */
+  | "silent"
+  /** Spoken, transcription present and checked by a human: usable. */
+  | "spoken_verified"
+  /** Spoken, transcription present but not checked: not a reliable basis. */
+  | "spoken_unverified"
+  /** Spoken, no transcription. */
+  | "spoken_missing"
+  /** Dialogue not filled in: treated as unreliable, never as silent. */
+  | "unknown";
+
+export interface ExtractTranscriptFields {
+  dialogue?: VideoDialogue | string | null;
+  transcription?: string | null;
+  transcription_verified?: boolean | null;
+}
+
+export function extractTranscriptStatus(video: ExtractTranscriptFields): ExtractTranscriptStatus {
+  const dialogue = mapVideoDialogue(video.dialogue);
+  if (dialogue === "silent") return "silent";
+  if (dialogue !== "spoken") return "unknown";
+  if (!mapVideoTranscription(video.transcription)) return "spoken_missing";
+  return video.transcription_verified === true ? "spoken_verified" : "spoken_unverified";
+}
+
+/** A spoken extract is usable for selection only with a verified transcription. */
+export function isExtractTranscriptReliable(video: ExtractTranscriptFields): boolean {
+  const status = extractTranscriptStatus(video);
+  return status === "silent" || status === "spoken_verified";
+}

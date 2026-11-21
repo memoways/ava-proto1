@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Extraits du film, lot 1 : transcription, dialogue et section « Extraits »] — 2026-11-21
+
+- **Notion « 🎬 Vidéos AVA »** : trois propriétés créées (aucune donnée saisie) : « Transcription » (texte : ce qui est dit, distinct de « Description »), « Dialogue » (Parlé / Silencieux) et « Transcription vérifiée » (case cochée par un humain). Un extrait parlé sans transcription vérifiée n'est pas une base fiable ; un dialogue non renseigné n'est jamais traité comme silencieux (`extractTranscriptStatus`).
+- **Synchronisation Notion → Supabase** (`sync-notion`) : lit les trois propriétés ; une valeur absente ou effacée est écrite `null` / `false` (jamais conservée périmée) ; « Description » et « Description IA » ne sont pas touchées. Migration additive `20261121150000_video_triggers_extract_transcription.sql` (colonnes `transcription`, `dialogue`, `transcription_verified`) **à coller dans le chat Lovable** ; tant qu'elle n'est pas appliquée, la synchro retombe sur les colonnes de sélection existantes sans erreur (`video_extract_columns_synced` faux dans la réponse).
+- **Back-office** : nouvel onglet Admin › Expérience › **Extraits** (même présentation que les cinématiques : vignette, lecture, détails, métadonnées, + statut de transcription et transcription). Les extraits (Nature = « Extrait du film ») n'apparaissent plus dans l'onglet Cinématiques. Réglages propres (`ava_extract_settings` : activation, tours avant le premier, entre deux, maximum par session, transcription vérifiée exigée), **inactifs par défaut et sans effet en jeu** : la sélection et la lecture arrivent au lot 2.
+- **Inchangé en jeu** : le parcours « film pas vu » continue d'utiliser les extraits comme cinématiques (`selectEligibleVideos`, `MIN_EXTRACTS_BEFORE_CINEMATIC`) jusqu'au lot 2, qui les en retirera au moment où la nouvelle mécanique devient active (bascule en une fois, pour ne pas laisser le parcours sans vidéo). Aucune production, aucune publication.
+- Tâche : [Intégrer les extraits du film AVA dans le parcours « film pas vu »](https://app.notion.com/p/10162322e59583bbb825816717ee18ca) ; plan [docs/plan_extraits_film_pas_vu.md](docs/plan_extraits_film_pas_vu.md).
+
 ## [Faits établis : champ Notion créé, budget signalé] — 2026-11-21
 
 - Le champ « Ce que tu sais aujourd'hui » est créé dans la base Caractères AVA (propriété texte, **vide** : Romed le remplit ; aucun contenu de fiche modifié). La synchronisation le lisait déjà (`sync-notion`, propriété optionnelle, colonne `ce_que_tu_sais_aujourdhui` existante) : resynchro `fields_only` de sandbox-ulrich vérifiée sans erreur ni avertissement avec le champ vide. Aucun changement d'Edge Function.
