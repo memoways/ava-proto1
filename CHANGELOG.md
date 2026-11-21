@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Juge, lot F : round 1 factualité, une seule logique pour la fiche] — 2026-11-21
+
+- **Une seule logique, la fiche** : les fiches retouchées par Romed le 19 novembre ne disent plus « tu attends l'appel » ; `neutralizeAwaitedCall` / `sheetAtCallTime` sont supprimés (compilateur, souvenirs RAG, repère canon du juge) avec leurs tests. Un garde-fou signale une fiche fautive (`findAwaitedCallSentences` : test sur la copie `speechSandbox20261121.json` et avertissement de `npm run eval:judge:sheets`, qui accepte maintenant `--resync` pour la resynchro `fields_only` du sandbox) sans jamais la réécrire. Le champ « Ce que tu sais aujourd'hui », quand il est rempli, est la seule source des faits établis.
+- `CALL_PRESENT_INVARIANT` devient `ExperienceFrameConfig.callPresentText` (défaut = texte précédent, rien ne change en jeu ; textarea dans Admin › Expérience › Orchestration, publication par Ulrich). Types Supabase : transtypage de `loadCharacterPrompt` retiré.
+- **Mode factualité du juge** : `npm run eval:judge:sequences -- --focus factuality` (canon, interdits, invention, prémisse fausse corrigée ; incertitude crédible non pénalisée ; style exclu ; pas de juge de séquence ; une configuration). Rapport par fait et bruit de mesure ; `npm run eval:judge:merge-factuality` fusionne des runs interrompus. Corpus `docs/eval/sequences_factuality_f.json` (J3 v2 + `max-F`, `emma-F`, champ `falsePremise`). Équivalent admin non fait.
+- Mesure sandbox (65 tours, bruit 1,37 pt) : Max 5,6/10, Emma 6,2/10 ; Max nie que son père ait envoyé Mona au camp (3/3 : le paragraphe des faits, 1 399 car., dépasse le budget de 1 200 et la coupe retire la phrase) ; Emma accepte les prémisses sur la contamination et le fusil. Rapport : `docs/eval/juge_factualite_lot_f_20261121.md`. Juge de factualité non calibré ; écarts de fiche transmis à Romed par la tâche Notion. Aucune production.
+
 ## [STT : phrases coupées et mots reportés au tour suivant] — 2026-11-21
 
 - Symptôme (capture d'Ulrich) : tours qui se terminent en plein milieu, mots manquants dans la transcription retrouvés au début de la phrase suivante, personnage qui ne reçoit pas tout.

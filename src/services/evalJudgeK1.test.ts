@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sheets from "@/agents/__fixtures__/speechSandbox20261109.json";
+import sheets from "@/agents/__fixtures__/speechSandbox20261121.json";
 import {
   UNREADABLE_JUDGE_RATIONALE,
   buildJudgeCanonReference,
@@ -40,7 +40,7 @@ describe("judge canon reference (lot K1)", () => {
 
   it("gives the judge the established facts, the identity and the interdicts", () => {
     expect(canon).toContain("### Faits établis au moment de l'appel");
-    expect(canon).toContain("Emma a été contaminée hier");
+    expect(canon).toContain("Emma a donc été contaminée hier");
     expect(canon).toContain("Les tiens : Mona, ton aînée");
     expect(canon).toContain("### Identité");
     expect(canon).toContain("### Ce que le personnage ne fait jamais");
@@ -49,7 +49,8 @@ describe("judge canon reference (lot K1)", () => {
   });
 
   it("no longer tells the judge that the character awaits the call", () => {
-    expect(max.situation_summary).toContain("Il attend l'appel");
+    // Lot F: the sheet itself says the call is in progress; the reference is not rewritten.
+    expect(max.situation_summary).not.toMatch(/attends? (l['’]|un )appel/);
     expect(canon).not.toMatch(/attends? (l['’]|un )appel|appel que tu attends\b/);
     expect(canon).toContain("il n'attend plus cet appel");
   });

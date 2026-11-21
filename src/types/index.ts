@@ -520,6 +520,11 @@ export interface ExperienceFrameConfig {
   posture: "reserved" | "open";
   postureNotes: string;
   forbidSpontaneousHandoff: boolean;
+  /**
+   * Lot F: règle d'expérience (pas un fait de personnage) « l'appel attendu a lieu maintenant »,
+   * envoyée au personnage et au GM même quand le cadre est désactivé. Vide = rien n'est envoyé.
+   */
+  callPresentText: string;
 }
 
 export interface ExperienceDirectorConfig {

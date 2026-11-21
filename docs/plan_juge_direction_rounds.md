@@ -1,6 +1,6 @@
 # Plan — juge, fiches et direction de jeu : état des lieux et rounds de test
 
-Date : 21 novembre 2026. Lot 0 (documentaire). Prochain lot : [F — factualité](prompt_reprise_juge_lot_f.md).
+Date : 21 novembre 2026. Lot 0 (documentaire) livré ; **lot F (factualité) livré le 21 novembre** (voir « Lot F — résultat » ci-dessous). Prochain lot : [H — une seule hiérarchie](prompt_reprise_juge_lot_h.md).
 
 ## Contexte
 
@@ -69,7 +69,7 @@ Six couches disent au personnage *comment être*, sans hiérarchie écrite entre
 - Mise à jour de la tâche Notion du juge (section « État des lieux 21 nov. ») et lien dans `docs/etat_courant.md`.
 - Prompt de reprise du lot F.
 
-### Lot F — Round 1 : factualité seule (reprend K2, adapté)
+### Lot F — Round 1 : factualité seule (reprend K2, adapté) — LIVRÉ le 21 novembre 2026
 - Resynchro `fields_only` sandbox-ulrich ; `npm run eval:judge:sheets` ; mise à jour de `docs/eval/faits_canon_k1.json`.
 - Retirer `neutralizeAwaitedCall` / `sheetAtCallTime` si la copie de test ne contient plus « attends l'appel » ;
   remplacer par un test qui **signale** une fiche fautive ; déplacer `CALL_PRESENT_INVARIANT` dans
@@ -107,6 +107,15 @@ Six couches disent au personnage *comment être*, sans hiérarchie écrite entre
 - Grille « crédible / pas méta / pas intello / oral » calibrée par Romed sur des répliques réelles de Max jugées
   « off » ; intention artistique lue depuis un texte éditable de l'app, pas codée en dur.
 - Boucle avec Romed : propositions d'écriture issues des pires tours (il écrit dans Notion, jamais un agent).
+
+### Lot F — résultat (21 novembre 2026)
+Rapport : `docs/eval/juge_factualite_lot_f_20261121.md`. Livré : copie de fiches `speechSandbox20261121.json` ; liste de
+faits `faits_canon_k1.json` réécrite sur les fiches retouchées ; `neutralizeAwaitedCall` / `sheetAtCallTime` supprimés
+(garde-fou `findAwaitedCallSentences` : test + avertissement de `eval:judge:sheets`, qui sait aussi `--resync`) ;
+`CALL_PRESENT_INVARIANT` devenu `ExperienceFrameConfig.callPresentText` (défaut = texte précédent) ; option
+`eval:judge:sequences --focus factuality` (note séparée, style exclu, rapport par fait) ; corpus
+`docs/eval/sequences_factuality_f.json` (J3 v2 + `max-F`, `emma-F`). Équivalent admin du mode factualité : non fait (hors
+« simple »). Calibrage : en attente des dix réponses notées par Romed.
 
 ## Ordre et dépendances
 Lot 0 → F (en attendant les retours Romed/Benoît 23–24 nov.) → H → D2 → J4 → J5. Chaque round ne démarre que si le

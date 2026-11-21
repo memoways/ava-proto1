@@ -11,7 +11,7 @@ import { isResponseStreamContractVariant, type ResponseStreamContractVariant } f
 import { GM_MODES } from "@/services/gmSpeechGuidance";
 import type { GmMode, PriorityKey, PriorityLevels } from "@/types";
 import { PRIORITY_KEYS, normalizePriorityLevels } from "@/services/gmPriorities";
-import { characterEstablishedFacts, neutralizeAwaitedCall, withoutEstablishedFacts } from "@/services/establishedFacts";
+import { characterEstablishedFacts, withoutEstablishedFacts } from "@/services/establishedFacts";
 import type { CharacterPrompt } from "@/services/characterPromptService";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
@@ -488,8 +488,7 @@ type JudgeCanonFields = Partial<Pick<CharacterPrompt,
 
 /**
  * Read-only canon excerpt from the synced character sheet, for the judge only.
- * Lot K1: read at call time (the awaited call is taking place) and widened to
- * the established facts, the identity and the character's own interdicts,
+ * Lot K1: widened to the established facts, the identity and the character's own interdicts,
  * where contamination, family ties and chronology are written.
  */
 export function buildJudgeCanonReference(fields: JudgeCanonFields | null): string {
@@ -500,12 +499,12 @@ export function buildJudgeCanonReference(fields: JudgeCanonFields | null): strin
     ...fields,
   } as CharacterPrompt;
   const facts = characterEstablishedFacts(sheet)?.content ?? "";
-  const identity = neutralizeAwaitedCall(facts ? withoutEstablishedFacts(sheet).identite_fondamentale : sheet.identite_fondamentale);
+  const identity = facts ? withoutEstablishedFacts(sheet).identite_fondamentale : sheet.identite_fondamentale;
   const parts = [
     "Au moment de l'appel, l'appel attendu a lieu : le personnage parle avec la personne qui devait appeler ; il n'attend plus cet appel.",
-    fields.situation_summary?.trim() ? `### Situation présente\n${clip(neutralizeAwaitedCall(fields.situation_summary), CANON_FIELD_CHARS)}` : "",
+    fields.situation_summary?.trim() ? `### Situation présente\n${clip(fields.situation_summary, CANON_FIELD_CHARS)}` : "",
     facts ? `### Faits établis au moment de l'appel\n${facts}` : "",
-    fields.timeline?.trim() ? `### Timeline (périodes, Mona, puis les derniers jours en entier)\n${neutralizeAwaitedCall(judgeTimelineExcerpt(fields.timeline))}` : "",
+    fields.timeline?.trim() ? `### Timeline (périodes, Mona, puis les derniers jours en entier)\n${judgeTimelineExcerpt(fields.timeline)}` : "",
     identity.trim() ? `### Identité\n${clip(identity, CANON_IDENTITY_CHARS)}` : "",
     fields.ce_que_tu_ne_fais_jamais?.trim() ? `### Ce que le personnage ne fait jamais\n${clip(fields.ce_que_tu_ne_fais_jamais, CANON_INTERDICTS_CHARS)}` : "",
     fields.maniere_de_parler?.trim() ? `### Manière de parler\n${clip(fields.maniere_de_parler, 900)}` : "",

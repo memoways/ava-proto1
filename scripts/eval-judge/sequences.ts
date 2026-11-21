@@ -49,7 +49,8 @@ async function main(): Promise<void> {
     log(HEADLESS_SEQUENCE_USAGE);
     return;
   }
-  if (!options.candidate) errors.push("--candidate est obligatoire");
+  const factualityFocus = options.focus === "factuality";
+  if (!options.candidate && !factualityFocus) errors.push("--candidate est obligatoire");
   if (errors.length) fail(`${errors.join("\n  ")}\n\n${HEADLESS_SEQUENCE_USAGE}`);
 
   loadLocalEnvFile(path.resolve(process.cwd(), ".env.eval.local"));
@@ -109,10 +110,11 @@ async function main(): Promise<void> {
   const compare = runner.buildCompareConfigs(
     liveSnapshot,
     { variant: options.reference ?? liveSnapshot.promptVariant, snapshotJson: readSnapshot(options.referenceJson) },
-    { variant: options.candidate!, snapshotJson: readSnapshot(options.candidateJson) },
+    { variant: options.candidate ?? options.reference ?? liveSnapshot.promptVariant, snapshotJson: readSnapshot(options.candidateJson) },
   );
   if (compare.errors.length) fail(`Instantané invalide : ${compare.errors.join(" ; ")}`);
-  const configs = compare.configs;
+  // Factuality focus: one configuration (the reference), no candidate to compare.
+  const configs = factualityFocus ? compare.configs.slice(0, 1) : compare.configs;
   const repeats = options.repeats!;
   const judgeModel = options.judgeModel!;
 
@@ -184,6 +186,7 @@ async function main(): Promise<void> {
           repeatIndex,
           deps,
           turnWeights: weights,
+          focus: options.focus,
           signal: controller.signal,
           onTurn: (turn) => log(`     tour ${turn.turnIndex} · ${turn.score === null ? "—" : turn.score.toFixed(2)}/10 · GM ${turn.gmStatus}${turn.gmGuidanceIn ? " · conseil reçu" : ""}${turn.error ? ` · ⚠ ${turn.error}` : ""}`),
         });
@@ -218,7 +221,13 @@ async function main(): Promise<void> {
   }
 
   const comparison = sequenceModule.compareSequenceRuns(results, sequences);
-  const markdown = reportModule.formatSequenceReportMarkdown({
+  const factualityReport = factualityFocus
+    ? (await import("@/services/evalJudgeFactualityReport")).formatFactualityReportMarkdown({
+      runId, environment: resolved.environment, corpusFile: path.relative(process.cwd(), corpusPath), judgeModel, repeats,
+      configLabel: configs[0].label, sequences, results, capUsd, actualUsd: actual ? actual.usd : null, outcome, generatedAt: new Date().toISOString(),
+    })
+    : null;
+  const markdown = factualityReport ?? reportModule.formatSequenceReportMarkdown({
     runId,
     environment: resolved.environment,
     corpusFile: path.relative(process.cwd(), corpusPath),
