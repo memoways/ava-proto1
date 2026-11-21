@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus, lot T9 : décomposition de l'attente vidéo (analyse, lot arrêté)] — 2026-11-21
+
+- Analyse seule, aucun code ni réglage : sur 31 tours Tavus, `video_wait_ms` médian ≈ 0,90 s = ≈ 0,34 s jusqu'aux premiers octets ElevenLabs + ≈ 0,56 s jusqu'aux lèvres ; surcoût propre à Tavus ≈ 0,2 s par rapport au TTS seul.
+- Seul essai envisagé (premier chunk de 100 ms, gain attendu 0,05 à 0,15 s) non réalisé : décision d'Ulrich (21 novembre) d'arrêter le lot.
+
 ## [Latence Tavus, lot T8 : salvage locale en mode flux] — 2026-11-21
 
 - Mesure de T7 (session sandbox-ulrich `7a1f15a4…`, 7 tours, réglage actif) : −0,4 à −0,65 s sur la première phrase, mais 2 tours sur 7 relancent l'appel LLM (`character_retry_intent`, +1,5 s), contre 0 sur 61 tours en lot.
