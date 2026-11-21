@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [STT : phrases coupées et mots reportés au tour suivant] — 2026-11-21
+
+- Symptôme (capture d'Ulrich) : tours qui se terminent en plein milieu, mots manquants dans la transcription retrouvés au début de la phrase suivante, personnage qui ne reçoit pas tout.
+- Cause 1 : en mains libres (stratégie « texte », par défaut), la fin de parole n'était décidée que sur le silence du texte reconnu ; un retard du fournisseur en pleine phrase coupait le tour. Le détecteur de voix local tourne désormais toujours en mains libres et retient la fin de tour tant que le joueur parle (plafond 4 s) ; en mode texte il ne sert qu'à cette garde et sa perte n'arrête pas l'appel.
+- Cause 2 : si Deepgram n'accusait pas le `Finalize` dans les 1,5 s, les derniers mots du tour déjà envoyé arrivaient ensuite dans le tampon du tour suivant. Ils sont maintenant ignorés jusqu'à l'accusé tardif (fenêtre 1,5 s) : un tour ne reprend plus jamais un reste du précédent. Délai de réponse inchangé (aucune attente ajoutée).
+- Non traité : Gradium garde ses propres gardes (`flush_id`, `start_s`). À recetter sur appareils : parler longtemps avec pauses, vérifier l'absence de coupure et de mot reporté.
+
 ## [Latence Tavus, lot T8 : salvage locale en mode flux] — 2026-11-21
 
 - Mesure de T7 (session sandbox-ulrich `7a1f15a4…`, 7 tours, réglage actif) : −0,4 à −0,65 s sur la première phrase, mais 2 tours sur 7 relancent l'appel LLM (`character_retry_intent`, +1,5 s), contre 0 sur 61 tours en lot.

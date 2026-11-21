@@ -4,7 +4,7 @@ import { recordAudioLatency } from "./latencyTelemetry";
 import { createTimeoutSignal, withTimeout } from "./asyncUtils";
 import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
 import { authenticatedFunctionFetch } from "./gameAuth";
-import { combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
+import { STALE_TAIL_WINDOW_MS, classifyAfterAbandonedFlush, combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
 import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
 import { getDictionaryTerms } from "./stt/dictionary";
 import { getSTTProviderSettings } from "./stt/providerSettings";
@@ -140,6 +140,8 @@ export class DeepgramSTT {
   private fullTranscript = "";
   private latestInterimTranscript = "";
   private finalizeAcknowledgedAt = Number.NEGATIVE_INFINITY;
+  /** Until this time, results are the late tail of a turn already sent: dropped, never carried over. */
+  private staleTailUntil = 0;
   private flushPromise: Promise<void> | null = null;
   /** Timestamp (performance.now()) du dernier mot reçu — sert à mesurer la latence STT après silence. */
   private lastSpeechAt = 0;
@@ -240,6 +242,12 @@ export class DeepgramSTT {
     // provider omits the acknowledgement, retain the full bounded grace period.
     await waitForCondition(() => this.finalizeAcknowledgedAt >= finalizeSentAt || generation !== this.generation, 1500);
     if (generation !== this.generation) return;
+    // No acknowledgement: the provider may still deliver this turn's last words.
+    // Mark them stale so they cannot be prefixed to the next turn.
+    if (this.finalizeAcknowledgedAt < finalizeSentAt && this.ws?.readyState === WebSocket.OPEN) {
+      this.staleTailUntil = performance.now() + STALE_TAIL_WINDOW_MS;
+      debugLogger.log({ service: "stt", level: "warn", direction: "in", label: "STT flush not acknowledged: late tail will be dropped" });
+    }
 
     const finalText = combineTranscriptParts(this.fullTranscript, this.latestInterimTranscript);
     this.fullTranscript = "";
@@ -349,6 +357,13 @@ export class DeepgramSTT {
 
       const data = JSON.parse(event.data);
       if (data.type === 'Results') {
+        const stale = classifyAfterAbandonedFlush(this.staleTailUntil, performance.now(), { fromFinalize: data.from_finalize === true });
+        if (stale === "acknowledge") {
+          this.staleTailUntil = 0;
+          this.fullTranscript = ""; this.latestInterimTranscript = "";
+          return;
+        }
+        if (stale === "drop") return;
         if (data.from_finalize && !this.flushPromise) return;
         if (data.from_finalize) {
           this.finalizeAcknowledgedAt = performance.now();
