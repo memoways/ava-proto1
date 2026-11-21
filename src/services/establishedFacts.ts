@@ -81,6 +81,27 @@ export function characterEstablishedFacts(prompt: CharacterPrompt): EstablishedF
   return { content, source: "extracted" };
 }
 
+export interface EstablishedFactsBudget {
+  source: "field" | "paragraph" | "none";
+  /** Characters the sheet holds for the facts (the field, or the identity paragraph). */
+  sourceChars: number;
+  max: number;
+  /** True when the end of the source does not reach the character (cut at the last full sentence). */
+  overBudget: boolean;
+  cutChars: number;
+}
+
+/** What the facts block keeps of the sheet: reported by `eval:judge:sheets` so an over-long source is seen, not silent. */
+export function establishedFactsBudget(prompt: CharacterPrompt): EstablishedFactsBudget {
+  const field = prompt.ce_que_tu_sais_aujourdhui?.trim() ?? "";
+  const paragraph = field ? "" : establishedFactsSourceParagraph(prompt) ?? "";
+  const source = field ? "field" : paragraph ? "paragraph" : "none";
+  const sourceChars = (field || paragraph).length;
+  // The ties line and the chronology sentence are added by the extraction: only the source text counts here.
+  const keptSource = source === "none" ? 0 : Math.min(sourceChars, capAtSentence(field || paragraph, ESTABLISHED_FACTS_MAX_CHARS - (source === "paragraph" ? kinshipFromTimeline(prompt.timeline).join(" ; ").length : 0)).length);
+  return { source, sourceChars, max: ESTABLISHED_FACTS_MAX_CHARS, overBudget: sourceChars > keptSource && sourceChars > 0, cutChars: Math.max(0, sourceChars - keptSource) };
+}
+
 /** Avoid paying twice for the extracted paragraph; the saved sheet is never rewritten. */
 export function withoutEstablishedFacts(prompt: CharacterPrompt): CharacterPrompt {
   if (prompt.ce_que_tu_sais_aujourdhui?.trim()) return prompt;

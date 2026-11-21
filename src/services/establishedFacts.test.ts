@@ -10,6 +10,7 @@ import {
   ESTABLISHED_FACTS_TITLE,
   ESTABLISHED_FACTS_USAGE_LINE,
   characterEstablishedFacts,
+  establishedFactsBudget,
   findAwaitedCallSentences,
   kinshipFromTimeline,
   withoutEstablishedFacts,
@@ -97,6 +98,25 @@ describe("the sheet is the only logic: no rewrite of « tu attends l'appel » (l
     // A filled field with no complete sentence in budget yields nothing, never the paragraph.
     expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: "x".repeat(1_300) })).toBeNull();
     expect(withoutEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field }).identite_fondamentale).toContain("Ce qui est vrai aujourd'hui");
+  });
+});
+
+describe("budget of the facts source (lot F follow-up)", () => {
+  it("signale le paragraphe de l'identité trop long (Max 1 399 car. pour 1 200)", () => {
+    const budget = establishedFactsBudget(sheet("Max"));
+    expect(budget).toMatchObject({ source: "paragraph", sourceChars: 1399, max: 1200, overBudget: true });
+    expect(budget.cutChars).toBeGreaterThan(100);
+  });
+
+  it("un champ court rempli tient sans coupe, et devient la seule source", () => {
+    const field = "Mona est au camp : ton père l'y a envoyée. Léo a pris le fusil chez Papi, à la demande de ton père.";
+    expect(establishedFactsBudget({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toEqual({ source: "field", sourceChars: field.length, max: 1200, overBudget: false, cutChars: 0 });
+  });
+
+  it("un champ trop long est signalé aussi ; sans source, aucun fait protégé", () => {
+    const long = `${"Une phrase établie. ".repeat(80)}`.trim();
+    expect(establishedFactsBudget({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: long }).overBudget).toBe(true);
+    expect(establishedFactsBudget({ ...sheet("Max"), identite_fondamentale: "Tu es Max." }).source).toBe("none");
   });
 });
 
