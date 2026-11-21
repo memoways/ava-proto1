@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo : compteur de vidéos à droite, sans alerte vocabulaire] — 2026-11-21
+
+- **Par session** : le nombre de vidéos jouées est en grand, à droite du titre. Les décisions écartées restent à côté, en plus petit.
+- **Retiré de l'onglet** : la phrase « Le vocabulaire n'a renvoyé aucune ligne… ». Elle ne changeait rien à la lecture des sessions. Sans liste d'émotion ou d'enjeu, ces vues restent simplement absentes.
+- **Inchangé** : la sélection en jeu. Rien en production.
+
 ## [Décisions vidéo : flux à l'échelle des chiffres, évolution par vidéo jouée] — 2026-11-21
 
 - **Thèmes → vidéos** : chaque flux est une bande dont l'épaisseur est sa part du thème, et l'ensemble des bandes occupe toute la hauteur de la barre. Un flux de 6 à côté d'un flux de 140 se voit. Les chiffres ne sont plus écrits sur les bandes : ils apparaissent au survol.

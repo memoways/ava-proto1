@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Décisions vidéo, liste (21 novembre, code)** : le nombre de vidéos jouées est en grand à droite de chaque session. L'alerte « vocabulaire aucune ligne » n'est plus affichée. Rien en production.
+
 **Décisions vidéo, flux (21 novembre, code, sélection inchangée)** : les bandes du Sankey ont l'épaisseur de leur chiffre et remplissent la barre. Les nombres de flux sont au survol. L'évolution a une colonne par vidéo jouée, dans l'ordre de la session. Rien en production.
 
 **Décisions vidéo, lecture (21 novembre, code, sélection inchangée)** : l'onglet ferme chaque session par défaut et affiche le titre de Données session (personne, date, personnages) avec le nombre de vidéos jouées. Le filtre distingue cinématique et extrait. Le Sankey montre le nombre et le pourcentage de chaque thème, de chaque vidéo et de chaque lien. La synthèse est triée du plus grand pourcentage au plus petit. Rien en production.
