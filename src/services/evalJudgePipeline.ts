@@ -13,6 +13,7 @@ import type { GmMode, PriorityKey, PriorityLevels } from "@/types";
 import { PRIORITY_KEYS, normalizePriorityLevels } from "@/services/gmPriorities";
 import { characterEstablishedFacts, withoutEstablishedFacts } from "@/services/establishedFacts";
 import type { CharacterPrompt } from "@/services/characterPromptService";
+import type { RadarTextVariant } from "@/services/characterState";
 
 export const EVAL_FEATURE_KEY = "llm_as_judge";
 export const EVAL_REPEATS = 3;
@@ -70,6 +71,12 @@ export interface EvalTurnExtras {
   streamContract?: ResponseStreamContractVariant;
   /** Lot K1: `false` plays the core and the frame without the established facts (reference side). */
   establishedFacts?: boolean;
+  /** Lot H: `false` plays without the « références intellectuelles » field (tone measurement, in memory). */
+  intellectualReferences?: boolean;
+  /** Lot H: `false` plays without the written instruction hierarchy (before/after measurement, in memory). */
+  instructionHierarchy?: boolean;
+  /** Lot H: radar attitude wording of the replay (`lived` = new texts); absent = as the profile says. */
+  radarTexts?: RadarTextVariant;
   /** Lot C: GM mode of the replay (off / light / full); absent = as the pinned version plays it. */
   gmMode?: GmMode;
   /** Lot B: analysis priority levels of the replay (merged over the pinned ones); absent = as pinned. */
@@ -199,6 +206,18 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
   if ("establishedFacts" in value) {
     if (typeof value.establishedFacts === "boolean") overrides.establishedFacts = value.establishedFacts;
     else errors.push("establishedFacts doit être true ou false");
+  }
+  if ("intellectualReferences" in value) {
+    if (typeof value.intellectualReferences === "boolean") overrides.intellectualReferences = value.intellectualReferences;
+    else errors.push("intellectualReferences doit être true ou false");
+  }
+  if ("instructionHierarchy" in value) {
+    if (typeof value.instructionHierarchy === "boolean") overrides.instructionHierarchy = value.instructionHierarchy;
+    else errors.push("instructionHierarchy doit être true ou false");
+  }
+  if ("radarTexts" in value) {
+    if (value.radarTexts === "legacy" || value.radarTexts === "lived") overrides.radarTexts = value.radarTexts;
+    else errors.push("radarTexts doit être legacy ou lived");
   }
   if ("gmMode" in value) {
     if (typeof value.gmMode === "string" && (GM_MODES as readonly string[]).includes(value.gmMode)) overrides.gmMode = value.gmMode as GmMode;
@@ -744,6 +763,9 @@ export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: Run
     situationSummary: characterKey ? config.situationSummaries?.[characterKey] : undefined,
     streamContract: config.streamContract,
     establishedFacts: config.establishedFacts,
+    intellectualReferences: config.intellectualReferences,
+    instructionHierarchy: config.instructionHierarchy,
+    radarTexts: config.radarTexts,
     gmMode: config.gmMode,
     priorityLevels: config.priorityLevels,
     ragTopK,

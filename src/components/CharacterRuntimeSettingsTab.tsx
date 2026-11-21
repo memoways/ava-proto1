@@ -16,6 +16,7 @@ import type { TTSProviderId } from '@/services/tts/types';
 import { EffectiveVoiceBlock, useVoiceProfiles } from '@/components/admin/EffectiveVoiceSummary';
 import { DEVICE_CLASSES } from '@/services/deviceClass';
 import { CharacterStateEditor } from "@/components/admin/CharacterStateEditor";
+import { CharacterReceivedPreview } from "@/components/admin/CharacterReceivedPreview";
 import { serializeStateProfile, normalizeStateProfile } from "@/services/characterState";
 import {
   fetchCharacterAutoReadiness,
@@ -306,6 +307,12 @@ export default function CharacterRuntimeSettingsTab() {
                   characterName={profile.display_name}
                   value={profile.state_profile}
                   onChange={(next) => patchProfile(profile.id, { state_profile: next })}
+                />
+
+                <CharacterReceivedPreview
+                  characterId={autoReadiness[profile.display_name]?.characterId}
+                  characterName={profile.display_name}
+                  stateProfile={profile.state_profile}
                 />
 
                 <div className="space-y-2 rounded bg-muted/40 p-3">

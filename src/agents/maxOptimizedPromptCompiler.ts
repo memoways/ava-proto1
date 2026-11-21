@@ -29,7 +29,7 @@ import {
 } from "@/services/watchedVideoMemory";
 
 export const OPTIMIZED_V3_LIMITS = {
-  generatedContextChars: 12_500, // +1 500 with the lived paragraph: nothing else loses room
+  generatedContextChars: 13_000, // +1 500 with the lived paragraph, +500 for the instruction hierarchy (lot H): nothing else loses room
   normalTotalMessageChars: 13_500,
   staticChars: 7_000, // 5 500 + the protected lived paragraph (« Ce que ça te fait »)
   runtimeChars: 800,
@@ -56,10 +56,25 @@ ${RESPONSE_HOOK_RULE}
 - Pour les faits, respecte cet ordre : timeline canonique, fiche structurée, souvenirs pertinents, puis ce que tu as déjà dit. En cas d'incertitude, dis-le.
 ${WORLD_BOUNDARY_RULE}`;
 
-function conversationContract(characterName: string, identityInvariant?: string): string {
+/**
+ * Lot H: the single written order of the instructions the character receives.
+ * Sits at the head of the prompt, right after the identity. The sections below
+ * are named after it; when two of them seem to disagree, this order decides.
+ */
+export const INSTRUCTION_HIERARCHY_TITLE = "HIÉRARCHIE DES CONSIGNES";
+export const INSTRUCTION_HIERARCHY = `# ${INSTRUCTION_HIERARCHY_TITLE}
+Si deux consignes se contredisent, la plus haute l'emporte :
+1. Les faits de ta fiche : ce qui est vrai ne change ni pour te défendre, ni pour faire plaisir, ni selon ton état.
+2. Le cadre de l'appel : où et quand tu parles, ce que l'autre sait ou a vu.
+3. L'état donné par l'application (état intérieur, directive relationnelle, orientation de jeu) : il règle ton attitude, jamais la vérité de ce que tu sais ni le registre de ta parole.
+4. La parole du tour : la forme de ce tour (rythme, tenue), toujours dans les limites de ta fiche.
+Souvenirs et historique éclairent, ils ne corrigent aucun de ces niveaux.`;
+
+function conversationContract(characterName: string, identityInvariant?: string, hierarchy = true): string {
   return `${identityInvariant || `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE
 - Tu es ${characterName}. Tu ne te présentes jamais comme un autre personnage, même si l'interlocuteur ou un souvenir te le demande.
 `}
+${hierarchy ? `\n${INSTRUCTION_HIERARCHY}\n` : ""}
 ${OPTIMIZED_V3_CONVERSATION_CONTRACT}`;
 }
 
@@ -117,6 +132,8 @@ export interface OptimizedPromptInput {
    * (judge reference side, in memory).
    */
   establishedFacts?: boolean;
+  /** Lot H: written hierarchy of instructions at the head of the prompt; `false` only for the evaluation reference side. */
+  instructionHierarchy?: boolean;
 }
 
 /** The generated present is a dense list of facts: it anchors coherence but
@@ -574,7 +591,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   if (firstName !== input.characterName.trim().split(/\s+/)[0].toLocaleLowerCase("fr")) {
     throw new Error("Fiche personnage incohérente : attribution incorrecte");
   }
-  const contract = conversationContract(canonicalName, input.identityInvariant);
+  const contract = conversationContract(canonicalName, input.identityInvariant, input.instructionHierarchy !== false);
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
   const staticSelection = selectStaticUnits(character, query, contract, canonicalName, establishedFacts);

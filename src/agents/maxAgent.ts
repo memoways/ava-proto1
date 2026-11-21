@@ -300,6 +300,10 @@ export async function simulateMaxResponse(
     streamContract?: ResponseStreamContractVariant;
     /** Evaluation-only: `false` rebuilds the core without the established facts (lot K1 reference side). */
     establishedFacts?: boolean;
+    /** Evaluation-only (lot H): `false` plays without the « références intellectuelles » field; never persisted. */
+    intellectualReferences?: boolean;
+    /** Evaluation-only (lot H): `false` plays without the written instruction hierarchy (reference side). */
+    instructionHierarchy?: boolean;
     onSpeechToken?: (text: string) => void;
     finishSpeech?: (normalCompletion?: boolean) => string;
     recoverySpeechOnly?: boolean;
@@ -310,6 +314,8 @@ export async function simulateMaxResponse(
   const promptTrace = await buildMaxSystemPrompt(input, characterName, opts?.characterContext, opts?.promptVariant, {
     situationSummary: opts?.situationSummaryOverride,
     establishedFacts: opts?.establishedFacts,
+    intellectualReferences: opts?.intellectualReferences,
+    instructionHierarchy: opts?.instructionHierarchy,
   });
   const promptBuildLatencyMs = Math.round(performance.now() - promptBuildStartedAt);
   const llm = getLLMSettings();
@@ -574,7 +580,7 @@ export async function buildMaxSystemPrompt(
   characterName: string = "Max",
   characterContext?: CharacterExecutionContext,
   variantOverride?: MaxPromptVariant,
-  evaluation?: { situationSummary?: string; establishedFacts?: boolean },
+  evaluation?: { situationSummary?: string; establishedFacts?: boolean; intellectualReferences?: boolean; instructionHierarchy?: boolean },
 ): Promise<MaxPromptAssemblyTrace> {
   const variant = variantOverride ?? (() => {
     try { return getGameplaySettings().MAX_PROMPT_VARIANT; } catch { return "legacy" as const; }
@@ -586,7 +592,15 @@ export async function buildMaxSystemPrompt(
   if (!storedFields) throw new Error(`Fiche personnage absente pour ${characterName} : génération interdite`);
   // Judge reference/candidate runs may try a candidate PRÉSENT in memory; the cached sheet is never mutated.
   const presentOverride = evaluation?.situationSummary?.trim();
-  const characterFields = presentOverride ? { ...storedFields, situation_summary: presentOverride } : storedFields;
+  const withoutReferences = evaluation?.intellectualReferences === false;
+  const characterFields = presentOverride || withoutReferences
+    ? {
+      ...storedFields,
+      ...(presentOverride ? { situation_summary: presentOverride } : {}),
+      // Lot H evaluation switch: the intellectual references leave the runtime (in memory only).
+      ...(withoutReferences ? { references_intellectuelles: "" } : {}),
+    }
+    : storedFields;
   const canonicalName = characterFields.name?.trim() || characterName.trim();
   const requiredFields = [
     characterFields.situation_summary,
@@ -793,6 +807,7 @@ export async function buildMaxSystemPrompt(
       watchedVideos: input.watchedVideos,
       ragCandidates: input.ragCandidates,
       establishedFacts: evaluation?.establishedFacts,
+      instructionHierarchy: evaluation?.instructionHierarchy,
     });
   }
 
