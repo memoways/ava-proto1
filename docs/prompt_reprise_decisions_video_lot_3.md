@@ -28,7 +28,8 @@ vocabulaire commun. Il n'a pas changé les gardes, le lien concret ni l'ordre de
   chaque vidéo et chaque lien affichent leur nombre et leur pourcentage, et la synthèse est triée
   du plus grand pourcentage au plus petit. Les flux sont des bandes à l'échelle du chiffre, sur toute
   la hauteur de la barre ; le nombre d'un flux n'est visible qu'au survol. L'évolution a une colonne
-  par vidéo jouée, dans l'ordre de la session. Ne pas réintroduire « Superposition » ni « Game Master »
+  par vidéo jouée, dans l'ordre de la session. Une session qui s'arrête ne dessine pas de bloc :
+  seul le flux vers la vidéo suivante est tracé. Ne pas réintroduire « Superposition » ni « Game Master »
   comme filtres : le filtre est Cinématiques / Extraits. Les sessions utilisent le titre de
   Données session et sont fermées par défaut.
 - `characters` = qui peut parler. `on_screen` = qui est visible. La sélection ne lit pas encore

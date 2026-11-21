@@ -18,8 +18,8 @@ export interface SankeyNodeLayout {
 export interface SankeyBandLayout {
   key: string;
   source: string;
-  /** Null when the session has no next played video. The band stops beside the source. */
-  target: string | null;
+  /** Always a node in the next column. A session that stops is not drawn. */
+  target: string;
   count: number;
   column: number;
   x0: number;
@@ -70,8 +70,8 @@ function placeColumn(column: FlowColumn, index: number, x: number, inner: number
 }
 
 /**
- * Bands leave each source stacked across its whole height, in proportion to the counts.
- * A session that stops keeps the remaining height as a short band that does not reach the next column.
+ * Bands leave each source stacked in proportion to the counts that reach the next column.
+ * A session that stops leaves that height empty: no filler block beside the bar.
  */
 export function layoutSankey(flow: ThemeEvolution): SankeyLayout {
   if (flow.columns.length === 0) return { width: 0, height: 0, columns: [], bands: [] };
@@ -105,7 +105,6 @@ export function layoutSankey(flow: ThemeEvolution): SankeyLayout {
         .filter((link) => link.source === node.name && nodeAt(index + 1, link.target))
         .sort((a, b) => (targetSlots.get(`${a.source}\0${a.target}`)?.y ?? 0) - (targetSlots.get(`${b.source}\0${b.target}`)?.y ?? 0));
       let y = node.y;
-      let used = 0;
       for (const link of outgoing) {
         const sourceH = node.count > 0 ? node.h * (link.count / node.count) : 0;
         const slot = targetSlots.get(`${link.source}\0${link.target}`);
@@ -122,26 +121,8 @@ export function layoutSankey(flow: ThemeEvolution): SankeyLayout {
           sourceH,
           targetY: slot?.y ?? y,
           targetH: slot?.h ?? sourceH,
-          });
-        y += sourceH;
-        used += link.count;
-      }
-      const rest = node.count - used;
-      if (rest > 0.001) {
-        const sourceH = node.h * (rest / node.count);
-        bands.push({
-          key: `${index}:${node.name}:end`,
-          source: node.name,
-          target: null,
-          count: rest,
-          column: index,
-          x0: node.x + NODE_W,
-          x1: node.x + NODE_W + 42,
-          sourceY: y,
-          sourceH,
-          targetY: y,
-          targetH: sourceH,
         });
+        y += sourceH;
       }
     }
   }

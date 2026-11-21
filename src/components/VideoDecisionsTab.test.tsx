@@ -130,6 +130,34 @@ describe("VideoDecisionsTab", () => {
     expect(screen.getByText("zz_custom_reason")).toBeTruthy();
   });
 
+  it("does not draw a white block when a session stops before the next video", async () => {
+    const played = report.sessions[0].turns[0];
+    loadVideoDecisions.mockResolvedValue({
+      ...report,
+      sessions: [
+        report.sessions[0],
+        {
+          ...report.sessions[0],
+          sessionId: "session-b",
+          title: "Nina · 21.11.26, 12:00 · Emma · échange court (2 tours)",
+          turns: [
+            { ...played, key: "played-b1", sessionId: "session-b", turnId: "b1", themes: ["famille"] },
+            { ...played, key: "played-b2", sessionId: "session-b", turnId: "b2", turnIndex: 5, themes: ["secrets"], createdAt: "2026-11-21T12:05:00.000Z" },
+          ],
+        },
+      ],
+    });
+    render(<VideoDecisionsTab />);
+    const themesTab = await screen.findByRole("tab", { name: "Par thèmes" });
+    fireEvent.mouseDown(themesTab);
+    fireEvent.click(themesTab);
+    fireEvent.click(screen.getByRole("button", { name: "Évolution des thèmes" }));
+    const titles = screen.getAllByTestId("sankey-band").map((band) => band.querySelector("title")?.textContent ?? "");
+    expect(titles.length).toBeGreaterThan(0);
+    expect(titles.some((title) => title.includes("pas de vidéo suivante"))).toBe(false);
+    expect(screen.getByTestId("video-decision-sankey").querySelector("path.text-muted-foreground")).toBeNull();
+  });
+
   it("marks a label outside the current list and can switch the Sankey dimension", async () => {
     render(<VideoDecisionsTab />);
     fireEvent.click(await screen.findByRole("button", { name: /Ulrich · 20.11.26/ }));

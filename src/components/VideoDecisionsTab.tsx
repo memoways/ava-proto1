@@ -98,7 +98,7 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
     share: percent(node.count, columnTotal(0)),
     destinations: layout.bands
       .filter((band) => band.column === 0 && band.source === node.name)
-      .sort((a, b) => b.count - a.count || (a.target ?? "").localeCompare(b.target ?? "", "fr")),
+      .sort((a, b) => b.count - a.count || a.target.localeCompare(b.target, "fr")),
   }));
 
   let caption = evolution
@@ -110,13 +110,9 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
   if (hover?.kind === "band") {
     const band = hover.band;
     const from = layout.columns[band.column]?.nodes.find((node) => node.name === band.source)?.count ?? band.count;
-    if (band.target == null) {
-      caption = `${band.source} · ${formatFlowCount(band.count)} · ${percent(band.count, from)} % · pas de vidéo suivante`;
-    } else {
-      const to = layout.columns[band.column + 1]?.nodes.find((node) => node.name === band.target)?.count ?? band.count;
-      const example = band.target ? flow.steps[band.column]?.find((link) => link.source === band.source && link.target === band.target)?.examples[0] : undefined;
-      caption = `${band.source} → ${band.target} · ${formatFlowCount(band.count)} · ${percent(band.count, from)} % de ${band.source} · ${percent(band.count, to)} % de ${band.target}${example ? ` · ${example}` : ""}`;
-    }
+    const to = layout.columns[band.column + 1]?.nodes.find((node) => node.name === band.target)?.count ?? band.count;
+    const example = flow.steps[band.column]?.find((link) => link.source === band.source && link.target === band.target)?.examples[0];
+    caption = `${band.source} → ${band.target} · ${formatFlowCount(band.count)} · ${percent(band.count, from)} % de ${band.source} · ${percent(band.count, to)} % de ${band.target}${example ? ` · ${example}` : ""}`;
   } else if (hover?.kind === "node") {
     const node = layout.columns[hover.column]?.nodes.find((entry) => entry.name === hover.name);
     const leaving = layout.bands
@@ -126,7 +122,7 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
       .filter((band) => band.column === hover.column - 1 && band.target === hover.name)
       .sort((a, b) => b.count - a.count);
     const parts = (leaving.length ? leaving : arriving).map((band) => {
-      const label = leaving.length ? (band.target ?? "pas de vidéo suivante") : band.source;
+      const label = leaving.length ? band.target : band.source;
       return `${label} ${formatFlowCount(band.count)} (${percent(band.count, node?.count ?? band.count)} %)`;
     });
     caption = `${hover.name} · ${formatFlowCount(node?.count ?? 0)} · ${percent(node?.count ?? 0, columnTotal(hover.column))} % · ${leaving.length ? "vers" : "depuis"} ${parts.join(" · ") || "—"}`;
@@ -145,9 +141,7 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
         >
           {layout.bands.map((band) => {
             const active = emphasized(band);
-            const title = band.target == null
-              ? `${band.source} : ${formatFlowCount(band.count)}, pas de vidéo suivante`
-              : `${band.source} → ${band.target} : ${formatFlowCount(band.count)}`;
+            const title = `${band.source} → ${band.target} : ${formatFlowCount(band.count)}`;
             return (
               <path
                 key={band.key}
@@ -155,7 +149,7 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
                 data-testid="sankey-band"
                 fill="currentColor"
                 fillOpacity={active ? 0.72 : hover ? 0.12 : 0.5}
-                className={band.target == null ? "text-muted-foreground" : "text-primary"}
+                className="text-primary"
                 onMouseEnter={() => setHover({ kind: "band", band })}
                 onMouseLeave={() => setHover(null)}
               >
@@ -205,7 +199,7 @@ function Sankey({ flow, evolution }: { flow: ThemeEvolution; evolution: boolean 
               <CollapsibleContent className="space-y-1 px-9 pb-2 text-sm text-muted-foreground">
                 {source.destinations.map((band) => (
                   <p key={band.key}>
-                    {band.target ?? "pas de vidéo suivante"} · {formatFlowCount(band.count)} · {percent(band.count, source.count)} % de {source.name}
+                    {band.target} · {formatFlowCount(band.count)} · {percent(band.count, source.count)} % de {source.name}
                   </p>
                 ))}
               </CollapsibleContent>

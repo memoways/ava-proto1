@@ -7,7 +7,7 @@ function link(source: string, target: string, count: number): FlowLink {
 }
 
 describe("layoutSankey", () => {
-  it("makes every outgoing band, including a session that stops, fill the source bar", () => {
+  it("leaves the stopped part of a session empty instead of a filler block", () => {
     const layout = layoutSankey({
       columns: [
         { label: "Vidéo 1", nodes: [{ name: "famille", count: 146 }] },
@@ -17,8 +17,9 @@ describe("layoutSankey", () => {
     });
     const source = layout.columns[0].nodes[0];
     const leaving = layout.bands.filter((band) => band.source === "famille");
-    expect(leaving.some((band) => band.target == null && band.count === 59)).toBe(true);
-    expect(leaving.reduce((sum, band) => sum + band.sourceH, 0)).toBeCloseTo(source.h, 4);
+    expect(leaving.every((band) => band.target != null)).toBe(true);
+    expect(leaving.reduce((sum, band) => sum + band.count, 0)).toBe(87);
+    expect(leaving.reduce((sum, band) => sum + band.sourceH, 0)).toBeCloseTo(source.h * (87 / 146), 4);
     const secrets = layout.columns[1].nodes.find((node) => node.name === "secrets");
     const intoSecrets = layout.bands.filter((band) => band.target === "secrets");
     expect(intoSecrets.reduce((sum, band) => sum + band.targetH, 0)).toBeCloseTo(secrets?.h ?? 0, 4);
