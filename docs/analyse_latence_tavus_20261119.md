@@ -264,3 +264,20 @@ Session sandbox-ulrich `7a1f15a4…` (08:46–08:49 UTC, 7 tours Max, `streamedL
 Cause des relances : en lot, 45 tours sur 170 (7 jours) sont rattrapés par `character_local_salvage` (en-tête privé absent ou invalide) sans appel supplémentaire ; en flux la salvage était désactivée (`!opts?.onSpeechToken`), d'où un second appel complet (≈ 1,5 s).
 Correctif : `maxAgent` garde le flux brut, avale l'erreur d'en-tête (levée avant toute phrase émise) et rattrape à la fin, sur arrêt normal seulement, avec `salvageBatchSpeech` et `validateRecoverySpeech` (mêmes gardes que le lot) ; `prd4Orchestrator` livre le texte d'un bloc via `onRecovered`. Ces tours n'ont pas de gain de première phrase (≈ 1 sur 4) mais plus de relance. Vaut aussi pour Gradium.
 **Remesure** (Ulrich, sandbox-ulrich) : ≥ 10 tours réglage actif puis ≥ 10 désactivé ; attendu 0 relance d'intent et gain médian de Max audible ; critère de l'évaluation : > 0,5 s sans phrase retirée.
+
+
+### Lot T9 : décomposition de l'attente vidéo Tavus (21 novembre, analyse, aucun code, lot arrêté)
+
+Source : `voice_turn_events` (Lovable Cloud, lecture seule), événements `voice_turn_gm` des 19 à 21 novembre portant `durations.video_wait_ms`, 31 tours Tavus voix d'Ava (sessions `2b984ce8`, `d39b9221`, `c293829f`, `eb0448ed`, `6a7f2c48`, `7a1f15a4`, `dc5901c7`). Pour les 9 tours de `2b984ce8` (flux T1, sans `streamedLlm`) :
+
+| Étape | Médiane |
+|---|---|
+| `tts_text_sent` → `first_audio_chunk` (ouverture du flux, premiers octets ElevenLabs ; émis dans `elevenLabsPcmStream.ts`, avant le chunker) | ≈ 0,34 s (0,31 à 0,40) |
+| `first_audio_chunk` → `output_estimated` (chunk de 250 ms, envoi Echo, aller-retour Tavus, pré-roll, premier mouvement de lèvres) | ≈ 0,56 s (0,52 à 0,68) |
+| Total = `video_wait_ms` | ≈ 0,90 s (0,84 à 1,00) |
+
+Sur l'ensemble des 31 tours, `video_wait_ms` va de 0,81 à 1,20 s. En TTS seul (Emma, lot T2), la sortie suit les premiers octets de ≈ 0,35 s : le surcoût propre à Tavus est ≈ 0,2 s, et c'est le plafond du gain côté client.
+
+Essais listés : (1) premier chunk de 100 ms puis 250 ms, réglage désactivé par défaut : gain 0,05 à 0,15 s (déduit), risque d'audio insuffisant au début de ligne (lèvres saccadées, `stopped_speaking` en milieu de ligne), réversible ; (2) cadence d'envoi plus rapide : gain quasi nul ; (3) pré-roll ou silence initial : ajoute du délai ; (4) réglages de la conversation Tavus : aucun réglage de pré-roll dans le code, non mesurable côté client.
+
+**Décision d'Ulrich (21 novembre) : on arrête, aucun essai codé.** L'attente vidéo est presque incompressible côté Ava. Rien n'est modifié (T7 `streamedLlm` faux par défaut, T8 inchangé). Reste à Ulrich : la mesure de T7 (≥ 10 tours réglage actif puis désactivé).
