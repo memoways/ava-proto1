@@ -7,7 +7,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ## [Latence Tavus, lot T6 : evalJudge avec et sans rerank] — 2026-11-21
 
 - Run `evalJudge` (126 tours, 0 erreur, 3,03 $) : note pondérée 4,54 avec rerank contre 4,58 sans, bruit ± 0,63 : le retrait du rerank ne change rien de mesurable ; signal faible `canon_timeline` −0,16.
-- Aucun code ni réglage modifié (`RAG_RERANK_ENABLED` reste vrai) ; décision d'Ulrich attendue sur un retrait limité à la voix (≈ −0,2 s).
+- Aucun code ni réglage modifié (`RAG_RERANK_ENABLED` reste vrai). Décision d'Ulrich (21 novembre) : le rerank est conservé.
 
 ## [Latence Tavus, lot T5 : rejeu du rerank conditionnel] — 2026-11-21
 

@@ -1,14 +1,14 @@
-# Prompt de reprise — Latence Tavus, lot T7 (retrait du rerank en voix, après accord d'Ulrich)
+# Prompt de reprise — Latence Tavus, lot T7 (leviers contexte restants, rerank conservé)
 
-À copier dans un nouveau chat Ava. Contexte : [analyse](analyse_latence_tavus_20261119.md) (lots T5 et T6).
+À copier dans un nouveau chat Ava. Contexte : [analyse](analyse_latence_tavus_20261119.md) (lots T3 à T6).
 
 ---
 
-Objectif : si Ulrich a décidé de retirer le rerank pour la voix (≈ −0,2 s sur `character_rag`), le faire sans toucher au laboratoire RAG ni aux autres plateformes. Sans accord explicite d'Ulrich dans la demande : ne rien changer, rappeler la décision attendue.
+Objectif : choisir avec Ulrich le prochain levier de latence, le rerank étant conservé (décision d'Ulrich du 21 novembre : aucun retrait). Ne rien changer sans son accord explicite dans la demande.
 
-État vérifié (21 novembre) : T3 sans régression RAG ; rejeu T5 : le rerank change fortement le top 5 (recouvrement 2,4/5) ; `evalJudge` T6 (run `82195f92-b9b3-4874-a641-719a62c5a673`) : 4,54 avec rerank contre 4,58 sans, bruit ± 0,63, `canon_timeline` −0,16. `RAG_RERANK_ENABLED` vrai dans `src/config/settings.json` et réglable côté admin (`admin_settings`) ; `query-rag` accepte `rerank: false` par requête.
+État vérifié (21 novembre) : T3 sans régression RAG (`character_rag` 740 → 690 ms) ; T5 : le rerank change fortement le top 5 ; T6 : `evalJudge` 4,54 avec contre 4,58 sans (bruit ± 0,63), rerank conservé. Leviers restants (médianes Max audible ≈ 4,1 s) : `retrieve_k` 15 → 10 (rerank un peu plus court, qualité à rejouer par `eval:rerank-replay` puis `evalJudge`), embedding sur transcript partiel (≈ 0,2 s, lourd), LLM streamé (0,5–0,9 s estimés, voir `evaluation_llm_streame_vers_tts.md`), attente vidéo Tavus (≈ 1,0 s, seul levier propre à Tavus).
 
-Périmètre : 1. un réglage dédié à la voix (par exemple `RAG_RERANK_VOICE`, défaut inchangé tant qu'Ulrich n'a pas activé) lu par l'orchestrateur de voix pour envoyer `rerank: false`, sans changer le laboratoire RAG ni l'évaluateur ; 2. après activation en sandbox-ulrich, une session Tavus d'au moins 10 tours : médiane et p90 de `character_rag` avant (≈ 690 ms) et après, et vérification que `rerank_used` est faux ; 3. nouvelle passe `evalJudge` seulement si un doute de qualité apparaît à l'écoute.
+Périmètre : proposer à Ulrich, chiffres à l'appui, un seul de ces leviers ; le réaliser seulement après son accord, avec rejeu qualité avant tout changement de réglage RAG et mesure sandbox-ulrich d'au moins 10 tours.
 
 Limites : aucun réglage GM, aucune migration, production non publiée, base Caractères Notion en lecture seule, Gami DigiDouble exclu, pas de régression sur Anam, LemonSlice, Gradium ni sur le mode TTS seul. Les identifiants d'`.env.eval.local` ne sont pas utilisés par l'agent (Ulrich lance les commandes `eval:*`).
 Validations : lint, typecheck, `test:regression`, tests de garde, CI `regression-gates` verte sur le HEAD exact.

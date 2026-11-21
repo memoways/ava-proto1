@@ -234,7 +234,7 @@ Même prompt (`optimized_v3`), même modèle (`openai/gpt-5.6-luna`, T = 1,4), s
 
 6 questions en hausse, 6 en baisse (|Δ| ≥ 0,3). Verdict du juge : le retrait du rerank **ne change rien de mesurable** à la qualité des réponses. Seul signal faible : `canon_timeline` −0,16 (dans le bruit), à surveiller si le retrait est décidé.
 Limites : corpus de 21 questions et 2 personnages, juge bruité ; le rejeu T5 montre que le top 5 change fortement mais que, pour les réponses finales, l'effet n'est pas détectable.
-Gain attendu du retrait : ≈ 0,2 s médian sur `character_rag` (rerank 206 ms), environ 5 % de la latence totale de Max audible. **Aucun réglage modifié** (`RAG_RERANK_ENABLED` reste vrai) ; décision d'Ulrich.
+Gain attendu du retrait : ≈ 0,2 s médian sur `character_rag` (rerank 206 ms), environ 5 % de la latence totale de Max audible. **Aucun réglage modifié** (`RAG_RERANK_ENABLED` reste vrai). **Décision d'Ulrich (21 novembre) : garder le rerank** ; restent `retrieve_k` 15 → 10, l'embedding sur transcript partiel et le LLM streamé.
 
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
