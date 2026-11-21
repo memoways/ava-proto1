@@ -103,6 +103,21 @@ describe("provenance of each layer", () => {
     expect(byKey.speech_state.rank).toBe(4);
     expect(byKey.character_state.included).toBe(true);
   });
+
+  it("keeps archived traces readable and exposes an unregistered future layer without hiding its budget state", () => {
+    expect(describeCharacterPromptLayers({})).toEqual([]);
+
+    expect(describeCharacterPromptLayers({ budget: {
+      sections: [{
+        key: "future_layer", title: "Couche ajoutée plus tard", chars: 0, originalChars: 24,
+        included: false, truncated: true, omissionReason: "budget",
+      }],
+    } } as Parameters<typeof describeCharacterPromptLayers>[0])).toEqual([{
+      key: "future_layer", title: "Couche ajoutée plus tard", label: "Couche ajoutée plus tard",
+      source: "Source non référencée", rank: 5, included: false, chars: 0, originalChars: 24,
+      truncated: true, omissionReason: "budget",
+    }]);
+  });
 });
 
 describe("evaluation switches (memory only)", () => {
