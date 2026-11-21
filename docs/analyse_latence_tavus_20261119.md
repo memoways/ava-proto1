@@ -221,5 +221,20 @@ Conclusion : un rerank conditionnel sur le cosinus dégraderait ou changerait la
 Le rejeu mesure la divergence, pas la qualité : savoir si le rerank améliore réellement les réponses demande `evalJudge` avec et sans rerank. **Rien n'est modifié** (`RAG_RERANK_ENABLED` reste vrai).
 Pistes restantes : `evalJudge` avec/sans rerank (décide du retrait pur), `retrieve_k` 15 → 10 (rerank moins long, qualité à rejouer), embedding sur transcript partiel (lot lourd), LLM streamé.
 
+### Lot T6 : evalJudge avec et sans rerank (21 novembre, run `82195f92…`, sandbox-ulrich, aucun changement de code)
+
+Même prompt (`optimized_v3`), même modèle (`openai/gpt-5.6-luna`, T = 1,4), seule différence `ragRerank` vrai (référence) / faux (candidat) ; 21 questions × 2 configurations × 3 passages = 126 tours, 0 erreur, juge `anthropic/claude-sonnet-5.5`, 3,03 $ mesurés.
+
+| | Avec rerank | Sans rerank | Δ |
+|---|---:|---:|---:|
+| Note pondérée /10 | 4,54 | 4,58 | +0,03 (bruit entre passages ± 0,63) |
+| Max / Emma | 4,48 / 4,62 | 4,61 / 4,54 | +0,13 / −0,09 |
+| Canon et timeline (/5) | 2,24 | 2,08 | −0,16 |
+| Interdits respectés / ton (/5) | 2,14 / 2,29 | 2,33 / 2,44 | +0,19 / +0,15 |
+
+6 questions en hausse, 6 en baisse (|Δ| ≥ 0,3). Verdict du juge : le retrait du rerank **ne change rien de mesurable** à la qualité des réponses. Seul signal faible : `canon_timeline` −0,16 (dans le bruit), à surveiller si le retrait est décidé.
+Limites : corpus de 21 questions et 2 personnages, juge bruité ; le rejeu T5 montre que le top 5 change fortement mais que, pour les réponses finales, l'effet n'est pas détectable.
+Gain attendu du retrait : ≈ 0,2 s médian sur `character_rag` (rerank 206 ms), environ 5 % de la latence totale de Max audible. **Aucun réglage modifié** (`RAG_RERANK_ENABLED` reste vrai) ; décision d'Ulrich.
+
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
