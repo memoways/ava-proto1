@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Nouvelles de Gamiways : inscription depuis le questionnaire] — 2026-11-21
+
+- **Questionnaire** : la case « tenu·e au courant » nomme maintenant la newsletter (Nouvelles de Gamiways, dont AVA), l'email de confirmation et le désabonnement. Elle reste décochée et inactive sans email valide.
+- **Envoi** : `src/services/newsletterSubscribe.ts` transmet la demande à Memoways (`topic=gamiways`, `source=ava-questionnaire`, sans identifiants), sans bloquer l'enregistrement. Réglage Admin « Nouvelles de Gamiways », **inactif par défaut** (`ava_newsletter_settings`).
+- **Remerciements et confidentialité** : rappel de confirmer par email ; paragraphe Memoways, Plunk et désinscription dans `Privacy`.
+- **Inchangé** : la case « feedback détaillé » et la synchronisation Notion du questionnaire. Les anciens opt-ins ne sont pas importés. Rien en production.
+
 ## [Décisions vidéo : compteur de vidéos à droite, sans alerte vocabulaire] — 2026-11-21
 
 - **Par session** : le nombre de vidéos jouées est en grand, à droite du titre. Les décisions écartées restent à côté, en plus petit.

@@ -2,6 +2,7 @@
  * PRD4 §14.2 — Nouveau questionnaire (10 questions + email/opt-ins).
  */
 import { useState } from "react";
+import { GAMIWAYS_NEWS_CONSENT_FR } from "@/services/newsletterSubscribe";
 import type { QuestionnairePRD4Answers } from "@/types";
 
 interface Props {
@@ -201,7 +202,7 @@ const QuestionnaireScreenPRD4 = ({ teaserSeen, onSubmit, onSkip, submitting }: P
               onChange={(e) => update("opt_in_updates", e.target.checked)}
               className="mt-0.5 accent-primary"
             />
-            Je souhaite être tenu·e au courant du projet.
+            {GAMIWAYS_NEWS_CONSENT_FR}
           </label>
           <label className="flex items-start gap-2 text-xs text-muted-foreground">
             <input

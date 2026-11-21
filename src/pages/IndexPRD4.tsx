@@ -139,6 +139,7 @@ import ConversationalQuestionnaire from "@/components/prd4/ConversationalQuestio
 import { baseDimensionQuestions, buildSessionContext } from "@/services/conversationalQuestionnaire";
 import { requestQuestionnaireFollowUp } from "@/services/conversationalFollowUpClient";
 import ThanksScreen from "@/components/ThanksScreen";
+import { requestGamiwaysNews } from "@/services/newsletterSubscribe";
 import GumletVideoPlayer, { type GumletVideoPlayerHandle } from "@/components/GumletVideoPlayer";
 import {
   saveConversationalQuestionnaire,
@@ -448,6 +449,14 @@ const IndexPRD4 = () => {
   const handoffAttemptIdRef = useRef<string | null>(null);
   const [approvedCallingTarget, setApprovedCallingTarget] = useState<RuntimeCharacter | null>(null);
   const [submittingQuestionnaire, setSubmittingQuestionnaire] = useState(false);
+  /** A Gamiways news request reached Memoways: the thanks screen asks to confirm by email. */
+  const [newsletterRequested, setNewsletterRequested] = useState(false);
+  const requestNews = useCallback((email: string | undefined, optIn: boolean) => {
+    void requestGamiwaysNews({ email, optIn }).then((result) => {
+      if (result === "requested") setNewsletterRequested(true);
+      if (result !== "skipped") trackEvent("newsletter_gamiways_request", { result });
+    });
+  }, []);
   const [activeVideo, setActiveVideo] = useState<VideoTriggerRow | null>(null);
   const activeVideoRef = useRef(activeVideo);
   activeVideoRef.current = activeVideo;
@@ -3927,6 +3936,7 @@ const IndexPRD4 = () => {
           await savePRD4Questionnaire(sessionIdRef.current, data);
           void syncPRD4QuestionnaireToNotion(sessionIdRef.current, data);
         }
+        requestNews(answers.contact_email, answers.opt_in_updates);
         trackEvent("prd4_questionnaire_submitted", {
           session_id: sessionIdRef.current,
           turn_count: data.technical.turn_count,
@@ -3951,6 +3961,7 @@ const IndexPRD4 = () => {
       state.teaserSkipped,
       state.userPosture,
       state.userRoleProfile,
+      requestNews,
     ],
   );
 
@@ -3992,6 +4003,7 @@ const IndexPRD4 = () => {
           const result = await saveConversationalQuestionnaire(sessionIdRef.current, data);
           if (result.saved) void syncConversationalQuestionnaireToNotion(sessionIdRef.current, data);
         }
+        requestNews(data.consent.contact_email, data.consent.opt_in_updates);
         trackEvent("conversational_questionnaire_submitted", {
           session_id: sessionIdRef.current,
           rated: Object.values(data.dimensions).filter((d) => d.score !== null).length,
@@ -4007,13 +4019,14 @@ const IndexPRD4 = () => {
         setPhase("thanks");
       }
     },
-    [setPhase],
+    [setPhase, requestNews],
   );
 
   const handleRestart = useCallback(() => {
     cleanupAudio();
     reset();
     setTechnicalExpiresAt(null); setCallSaveIssue(null);
+    setNewsletterRequested(false);
     gridSelectionLockRef.current = false; gridCallRef.current = false;
     closeWriteRef.current = null; openingCommitRef.current = null;
     introductionReviewRef.current = false;
@@ -4240,7 +4253,7 @@ const IndexPRD4 = () => {
       );
       break;
     case "thanks":
-      screen = <ThanksScreen onRestart={handleRestart} />;
+      screen = <ThanksScreen onRestart={handleRestart} newsletterRequested={newsletterRequested} />;
       break;
     default:
       break;

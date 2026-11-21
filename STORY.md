@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (décisions vidéo, lot 2)
+> **Last Updated**: 2026-11-21 (Nouvelles de Gamiways)
 
 ---
+
+## Nouvelles de Gamiways — rester au courant, chez Memoways (21 novembre 2026)
+
+Ulrich veut que les testeurs qui le souhaitent soient tenus au courant d'AVA. Il ne voulait ni base de contacts dans Gamilab, ni copie dans Mesh sans distinction. Ils ont retenu un troisième sujet de newsletter, « Nouvelles de Gamiways », dans la mécanique Memoways existante (double opt-in, Mesh, Plunk), comme Boussole. AVA ne garde aucune liste : la case du questionnaire transmet seulement la demande, et la personne confirme elle-même. La source `ava-questionnaire` permettra plus tard d'écrire aux seuls testeurs AVA. Le site Gamiways et la future landing AVA utiliseront le même point d'entrée.
 
 ## Décisions vidéo, lot 2 — le même vocabulaire, encore pas la sélection (21 novembre 2026)
 

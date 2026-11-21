@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { NewsletterSettingsPanel } from "@/components/admin/NewsletterSettingsPanel";
 import {
   getGameplaySettings,
   loadGameplaySettingsFromDB,
@@ -193,6 +194,8 @@ export default function GameMasterConfigTab() {
           />
         </div>
       </section>
+
+      <NewsletterSettingsPanel />
 
       <section className="space-y-4 rounded-lg border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

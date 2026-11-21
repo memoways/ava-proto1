@@ -53,7 +53,7 @@ describe("ConversationalQuestionnaire", () => {
     expect(save).toBeEnabled();
 
     // Opt-ins need an email; an invalid email blocks the send.
-    const updates = screen.getByRole("checkbox", { name: /tenu·e au courant/ });
+    const updates = screen.getByRole("checkbox", { name: /Nouvelles de Gamiways/ });
     expect(updates).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Ton email (facultatif)"), { target: { value: "pas-un-email" } });
     expect(save).toBeDisabled();
