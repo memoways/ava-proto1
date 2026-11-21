@@ -47,3 +47,16 @@ Chaîne d'édition voulue par Ulrich (21 novembre) : **ajouter la vidéo dans No
 | Journal | `cinematic_recommended` / `cinematic_blocked` avec `mechanism: "extract"`, motifs `extract_*`. |
 
 **Limites connues** : un extrait parlé décidé pendant la réplique bloque l'entrée du joueur (pas d'interruption) jusqu'à son retour, comme une cinématique annoncée. Aucun extrait n'est utilisable aujourd'hui en base : les 3 extraits (« mort Peter », « couteau », « mauvaise conscience ») n'ont ni Dialogue ni transcription (Romed). Pas de recette humaine faite.
+
+### Lot 2 — ce qui est livré
+
+| Élément | Choix |
+|---|---|
+| Bascule | `ExtractSettings.ENABLED` : seule bascule. Actif → `selectEligibleVideos(extractsSeparate)` retire les extraits du pool des cinématiques (GM, garde du directeur, superposition) et `MIN_EXTRACTS_BEFORE_CINEMATIC` n'a plus d'effet (sa signification est inchangée tant que la bascule est inactive ; l'éditeur le dit). |
+| Candidats | `extractSelection.ts` : parcours `unseen` seulement, extrait avec média, personnage, jamais montré, statut fiable (`silent` ou `spoken_verified` ; `spoken_unverified` seulement si « exiger une transcription vérifiée » est décoché ; `unknown` jamais). Fréquence propre (tours avant le premier, entre deux, maximum). |
+| Sélection | un appel borné (modèle GM, sans réflexion, ≤ 5 s, selon la parole restante) dès que le texte de la réplique existe ; ligne candidate « montre » (description) / « dit » (transcription) ; extraits déjà montrés listés ; lien concret exigé (la question du joueur compte) et champ `complement` (ce que l'extrait apporte de plus) obligatoire. |
+| Lecture | parlé → machine `interrupt` : attend la fin de la réplique puis joue avec son propre son (aucune double parole) ; silencieux → machine `overlay`, superposé à la voix. Décision tardive, autre tour/personnage, vidéo déjà en cours, déjà montré → abandon (`extractDecisionBlockedReason`), aucune attente ajoutée. |
+| Reprise | `buildExtractPostVideoContext` : question initiale, ce qui était montré, ce qui était dit (jamais si interrompu) ; `watchedVideos` garde un extrait de la parole entendue. Erreur de média → rien n'est mémorisé ni annoncé. |
+| Journal | `cinematic_recommended` / `cinematic_blocked` avec `mechanism: "extract"`, motifs `extract_*`. |
+
+**Limites connues** : un extrait parlé décidé pendant la réplique bloque l'entrée du joueur (pas d'interruption) jusqu'à son retour, comme une cinématique annoncée. Les 3 extraits en base (« mort Peter », « couteau », « mauvaise conscience ») n'ont ni Dialogue ni transcription (Romed) : aucun n'est utilisable. Pas de recette humaine faite.
