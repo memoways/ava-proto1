@@ -66,6 +66,16 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Nouvelles de Gamiways (facultatif)</h2>
+          <p>
+            Si tu laisses ton email et coches la case correspondante, Memoways t’envoie un email de confirmation. Tu ne
+            reçois les Nouvelles de Gamiways (AVA et nos autres expériences conversationnelles) qu’après avoir confirmé.
+            Memoways gère cette liste et l’envoi avec Plunk. Chaque email contient un lien pour te désinscrire. Cette
+            inscription est indépendante de tes réponses au questionnaire.
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-xl font-semibold">Durée et droits</h2>
           <p>
             Les données des campagnes de test ont une durée de conservation cible de 30 jours. La purge automatique et

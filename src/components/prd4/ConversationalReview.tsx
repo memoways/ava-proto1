@@ -11,6 +11,7 @@
  * tap opens the editor), « Valider et envoyer » docked at the bottom.
  */
 import { useMemo, useState } from "react";
+import { GAMIWAYS_NEWS_CONSENT_FR } from "@/services/newsletterSubscribe";
 import type {
   ConversationalDimensionKey,
   ConversationalScore,
@@ -242,7 +243,7 @@ export default function ConversationalReview({ dimensions, sessionContext, onSav
               onChange={(e) => setReview((current) => ({ ...current, optInUpdates: e.target.checked }))}
               className="mt-1 h-5 w-5 accent-primary"
             />
-            Je souhaite être tenu·e au courant du projet.
+            {GAMIWAYS_NEWS_CONSENT_FR}
           </label>
           <label className={cn("flex items-start gap-3 text-sm", hasEmail ? "text-foreground" : "text-muted-foreground", touchLabel)}>
             <input

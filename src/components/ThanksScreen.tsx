@@ -1,4 +1,10 @@
-const ThanksScreen = ({ onRestart }: { onRestart: () => void }) => {
+const ThanksScreen = ({
+  onRestart,
+  newsletterRequested = false,
+}: {
+  onRestart: () => void;
+  newsletterRequested?: boolean;
+}) => {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background animate-fade-in">
       <div className="cinema-gradient absolute inset-0 pointer-events-none" />
@@ -14,6 +20,12 @@ const ThanksScreen = ({ onRestart }: { onRestart: () => void }) => {
           Merci d'avoir participé à ce prototype. Vos retours nous sont précieux pour
           construire la suite de l'expérience "Où est Ava ?".
         </p>
+        {newsletterRequested && (
+          <p className="text-sm text-foreground" role="status" data-testid="newsletter-confirm-hint">
+            Pour recevoir les Nouvelles de Gamiways, confirme ton inscription dans l'email que tu vas
+            recevoir de Memoways.
+          </p>
+        )}
         <button
           onClick={onRestart}
           className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors"

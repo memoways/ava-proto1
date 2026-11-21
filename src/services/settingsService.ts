@@ -736,6 +736,45 @@ export async function saveVideoTriggerSettingsToDB(settings: VideoTriggerSetting
   await saveToDB(VIDEO_TRIGGER_STORAGE_KEY, settings);
 }
 
+// ===== Newsletter « Nouvelles de Gamiways » (managed by Memoways: Mesh + Plunk) =====
+
+export interface NewsletterSettings {
+  /**
+   * Si true, un participant qui coche « tenu·e au courant » reçoit l'email de confirmation des
+   * Nouvelles de Gamiways (double opt-in chez Memoways). Inactif par défaut tant que le sujet
+   * n'est pas ouvert côté memoways.com.
+   */
+  ENABLED: boolean;
+  /** Point d'entrée public Memoways ; jamais de secret ici. */
+  SUBSCRIBE_URL: string;
+}
+
+const NEWSLETTER_STORAGE_KEY = "ava_newsletter_settings";
+
+export const newsletterDefaults: NewsletterSettings = {
+  ENABLED: false,
+  SUBSCRIBE_URL: "https://memoways.com/api/newsletter/subscribe",
+};
+
+/** Only an HTTPS URL is used; anything else falls back to the Memoways endpoint. */
+export function normalizeNewsletterSettings(value: Partial<NewsletterSettings> | null | undefined): NewsletterSettings {
+  let url = newsletterDefaults.SUBSCRIBE_URL;
+  try {
+    if (value?.SUBSCRIBE_URL && new URL(value.SUBSCRIBE_URL).protocol === "https:") url = value.SUBSCRIBE_URL;
+  } catch {
+    /* keep default */
+  }
+  return { ENABLED: value?.ENABLED === true, SUBSCRIBE_URL: url };
+}
+
+export async function loadNewsletterSettingsFromDB(): Promise<NewsletterSettings> {
+  return normalizeNewsletterSettings(await loadFromDB(NEWSLETTER_STORAGE_KEY, newsletterDefaults));
+}
+
+export async function saveNewsletterSettingsToDB(settings: NewsletterSettings): Promise<void> {
+  await saveToDB(NEWSLETTER_STORAGE_KEY, normalizeNewsletterSettings(settings));
+}
+
 // ===== Film extract settings (extracts lot 1: stored and editable, read by the selection in lot 2) =====
 
 export interface ExtractSettings {

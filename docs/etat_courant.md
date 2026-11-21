@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Nouvelles de Gamiways (21 novembre, code, inactif)** : dans les deux questionnaires, la case « tenu·e au courant » devient « Je souhaite recevoir les Nouvelles de Gamiways (dont AVA) par email… ». Quand elle est cochée et que le réglage Admin › Game Master › « Nouvelles de Gamiways » est actif, AVA envoie la demande à `memoways.com/api/newsletter/subscribe` (`topic=gamiways`, `source=ava-questionnaire`). La personne reçoit l'email de confirmation de Memoways. Elle est abonnée dans Mesh et Plunk seulement après avoir confirmé. L'écran de remerciement le lui rappelle. Un échec ne bloque jamais le questionnaire. Les anciens opt-ins restent dans Gamilab, sans email. **À activer** après l'ouverture du sujet Gamiways sur memoways.com (migration, recette, `NEWSLETTER_GAMIWAYS_ENABLED=1`). Un aperçu Lovable n'est accepté que si son origine est ajoutée à `NEWSLETTER_GAMIWAYS_EXTRA_ORIGINS`. Site : [memoways-website-2026#897](https://github.com/memoways/memoways-website-2026/pull/897). Rien en production.
+
 **Décisions vidéo, liste (21 novembre, code)** : le nombre de vidéos jouées est en grand à droite de chaque session. L'alerte « vocabulaire aucune ligne » n'est plus affichée. Rien en production.
 
 **Décisions vidéo, flux (21 novembre, code, sélection inchangée)** : les bandes du Sankey ont l'épaisseur de leur chiffre et remplissent la barre. Les nombres de flux sont au survol. L'évolution a une colonne par vidéo jouée, dans l'ordre de la session. Rien en production.
