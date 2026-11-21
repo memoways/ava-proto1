@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus, lot T7 : première phrase parlée pendant la génération (prototype)] — 2026-11-21
+
+- Nouveau réglage Tavus `streamedLlm` (admin avatar, **désactivé par défaut**) : avec la voix d'Ava, la première phrase sûre part au TTS dès que le LLM l'a écrite, au lieu d'attendre la réponse entière. Estimation non mesurée : −0,5 à −0,9 s sur Max audible ; à mesurer sur sandbox-ulrich (≥ 10 tours) avant tout engagement.
+- `streamAvatarSpeechFromFeed` et `createAvatarLineFeed` (pont audio), `renderTextStream` et `canStreamText` (Tavus), branchement dans `IndexPRD4` via `streamPRD4Turn` (même LLM en flux et mêmes gardes que le mode progressif Gradium). Réponse entière toujours validée comme avant pour la suite ; le passage de personnage retenu (`heldOutput`) reste en lot.
+- Anam, LemonSlice, Gradium, voix PAL de Tavus et TTS seul : chemin inchangé. Aucun réglage GM, aucune migration.
+
 ## [Latence Tavus, lot T6 : evalJudge avec et sans rerank] — 2026-11-21
 
 - Run `evalJudge` (126 tours, 0 erreur, 3,03 $) : note pondérée 4,54 avec rerank contre 4,58 sans, bruit ± 0,63 : le retrait du rerank ne change rien de mesurable ; signal faible `canon_timeline` −0,16.

@@ -4,6 +4,7 @@ import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, 
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
+import { createAvatarLineFeed, type AvatarLineFeed } from "@/services/streamingAvatar/avatarAudioBridge";
 import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
@@ -27,7 +28,7 @@ import { getActiveProviderId } from "@/services/tts/providerSettings";
 import { advanceHandoffTurn, parseHandoffState, restoreHandoffOffer, revokeHandoff, type HandoffState } from '@/services/characterHandoffState';
 import { readHandoffSnapshot, writeHandoffSnapshot, revalidateHandoffCall, HandoffConflictError, type HandoffSnapshot } from '@/services/sessionHandoff';
 import type { ResponseDeliveryReceipt } from "@/services/responseDelivery";
-import { processPRD4Turn, streamPRD4Turn } from "@/services/prd4Orchestrator";
+import { processPRD4Turn, streamPRD4Turn, type PRD4StreamEvent } from "@/services/prd4Orchestrator";
 import {
   createPRD4Session,
   endPRD4Session,
@@ -729,6 +730,8 @@ const IndexPRD4 = () => {
       onVoiceObservation?: VoiceObserver;
       onServiceObserved?: (value: ServiceObservation) => void;
       onAvatarCue?: (value: AvatarCueObservation) => void;
+      /** Lot T7: the reply is still generated; `text` is then its first phrase (voice and face intent only). */
+      feed?: AvatarLineFeed;
     } = {},
   ): Promise<ResponseOutputResult> => {
     context.signal?.throwIfAborted();
@@ -740,7 +743,8 @@ const IndexPRD4 = () => {
       if (context.signal?.aborted || endedRef.current || callGenerationRef.current !== generation) { await output.dispose(); throw new DOMException('Call closed', 'AbortError'); }
       responseOutputRef.current = output;
     }
-    if (output.mode === "streaming_avatar" && context.turnId) {
+    const streamedFeed = output.mode === "streaming_avatar" && output.renderTextStream ? context.feed : undefined;
+    if (output.mode === "streaming_avatar" && context.turnId && !streamedFeed) {
       expectedAvatarTextRef.current.set(context.turnId, text);
     }
     const characterKey = context.characterKey ?? activeCharacterRef.current;
@@ -788,7 +792,8 @@ const IndexPRD4 = () => {
     try {
       if (output.mode === "tts") setAudioState("max_speaking");
       const result = output.mode === "streaming_avatar"
-        ? await renderWithVideoLatency(output, text, turnContext, value => { videoLatency = value; })
+        ? await renderWithVideoLatency(output, text, turnContext, value => { videoLatency = value; },
+          streamedFeed ? turn => output.renderTextStream!(streamedFeed, turn) : undefined)
         : await output.renderText(text, turnContext);
       return videoLatency ? { ...result, videoLatency } : result;
     } catch (error) {
@@ -826,10 +831,22 @@ const IndexPRD4 = () => {
       }
       const started = error instanceof AvatarRenderError && error.started;
       const message = error instanceof Error ? error.message : String(error);
+      // Lot T7: a generation failure is not an avatar failure; the turn's own error handling answers it.
+      if (streamedFeed?.failure() != null) {
+        return { status: "failed", provider: output.provider, videoLatency, firstPlaybackStartMs: 0, playbackTotalMs: 0,
+          generatedSegments: 1, playedSegments: 0, failedSegments: 1, started,
+          error: error instanceof Error ? error : new Error(message) };
+      }
       const fallback = await activateTTSFallback(message);
       if (!started) {
         setAudioState("max_speaking");
-        const result = await fallback.renderText(text, turnContext);
+        const fullText = streamedFeed ? await streamedFeed.completed().catch(() => null) : text;
+        if (fullText === null) {
+          return { status: "failed", provider: output.provider, videoLatency, firstPlaybackStartMs: 0, playbackTotalMs: 0,
+            generatedSegments: 1, playedSegments: 0, failedSegments: 1, started: false,
+            error: error instanceof Error ? error : new Error(message) };
+        }
+        const result = await fallback.renderText(fullText, turnContext);
         return { ...result, videoLatency: videoLatency ? { ...videoLatency, fallbackUsed: true } : undefined };
       }
       return {
@@ -1874,6 +1891,54 @@ const IndexPRD4 = () => {
           });
           streamedVoiceRef.current = streamedVoice;
         }
+        // Lot T7 (prototype): Tavus with Ava's audio speaks the first safe phrase while the LLM is still
+        // answering. Never with an open passage request (output stays held), never for another provider.
+        let avatarPlaybackAt: number | null = null;
+        let latePlaybackStart: (() => void) | null = null;
+        let avatarStream: {
+          delivery: Promise<string>; render: Promise<ResponseOutputResult> | null; onEvent: (event: PRD4StreamEvent) => void;
+        } | null = null;
+        const streamingOutput = responseOutputRef.current;
+        if (!streamedVoice && !heldOutput && streamingOutput?.mode === 'streaming_avatar' && streamingOutput.canStreamText?.() === true) {
+          const feed = createAvatarLineFeed();
+          let responseIntent: { parole?: string | null } | null = null;
+          let dropping = false;
+          let resolveAvatarDelivery!: (text: string) => void, rejectAvatarDelivery!: (error: unknown) => void;
+          const avatarDelivery = new Promise<string>((resolve, reject) => { resolveAvatarDelivery = resolve; rejectAvatarDelivery = reject; });
+          avatarDelivery.catch(() => {});
+          const sink = { delivery: avatarDelivery, render: null as Promise<ResponseOutputResult> | null,
+            onEvent(event: PRD4StreamEvent) {
+              if (event.type === 'intent') responseIntent = event.intent;
+              else if (event.type === 'reset') { if (feed.pushed > 0) dropping = true; }
+              else if (event.type === 'segment') {
+                // A phrase already spoken cannot be replaced: a later replacement is dropped.
+                if (dropping) return;
+                if (!sink.render) {
+                  streamTtsStartedAt ??= performance.now();
+                  sink.render = renderResponseText(event.text, {
+                    feed, turnId, turnIndex, attemptId: telemetry.attemptId, onVoiceObservation: telemetry.observe,
+                    onServiceObserved: telemetry.service, onAvatarCue: telemetry.avatarCue, signal: turnController.signal,
+                    onPlaybackStart: () => {
+                      if (!isCurrentTurn()) return;
+                      avatarPlaybackAt ??= performance.now();
+                      earlyFirstPlaybackAt ??= avatarPlaybackAt;
+                      latePlaybackStart?.();
+                    },
+                    voiceId: activeVoiceIdRef.current ?? undefined, providerId: activeTTSProviderIdRef.current ?? undefined,
+                    characterKey: turnCharacter, userMessage: userText,
+                    speechPerformanceContext: { state: responseIntent?.parole ?? null,
+                      rugosite: speechRuntimeForVoice.rugosite, states: speechRuntimeForVoice.states },
+                  });
+                  sink.render.catch(() => {});
+                }
+                feed.push(event.text);
+              } else if (event.type === 'complete') {
+                expectedAvatarTextRef.current.set(turnId, event.response);
+                feed.end(); resolveAvatarDelivery(event.response);
+              } else { feed.fail(event.error); rejectAvatarDelivery(event.error); }
+            } };
+          avatarStream = sink;
+        }
         const prepareHandoff = async (ev: import('@/types').PRD4PostTurnEvaluation, text: string, preparationSignal: AbortSignal, started: number): Promise<boolean> => {
           if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return false;
           if (turnHandoffState.state === 'available') return true;
@@ -1948,24 +2013,25 @@ const IndexPRD4 = () => {
           onVersionsObserved: telemetry.versions,
           onGmObserved: telemetry.gm,
         };
-        const result = streamedVoice
+        const streamSink = streamedVoice ?? avatarStream;
+        const result = streamSink
           ? await streamPRD4Turn(turnInput, event => {
               if (event.type === 'segment' && needsHandoffPreparation(event.text)) heldOutput = true;
               if (heldOutput) heldEvents.push(event);
-              else streamedVoice?.onEvent(event);
+              else streamSink.onEvent(event);
               if (isCurrentTurn() && event.type === 'segment') {
                 lastCharacterTextRef.current += ` ${event.text}`;
               }
-            }, streamedVoice.delivery)
+            }, streamSink.delivery)
           : await processPRD4Turn(turnInput);
 
         if (!isCurrentTurn()) return;
-        if (heldOutput && streamedVoice) {
+        if (heldOutput && streamSink) {
           if (result.handoffPreparationBlocked) {
-            streamedVoice.onEvent({ type: 'reset' });
-            streamedVoice.onEvent({ type: 'segment', text: result.maxResponse });
-            streamedVoice.onEvent({ type: 'complete', response: result.maxResponse });
-          } else for (const event of heldEvents) streamedVoice.onEvent(event);
+            streamSink.onEvent({ type: 'reset' });
+            streamSink.onEvent({ type: 'segment', text: result.maxResponse });
+            streamSink.onEvent({ type: 'complete', response: result.maxResponse });
+          } else for (const event of heldEvents) streamSink.onEvent(event);
         }
         streamGenerationComplete = true;
 
@@ -2148,6 +2214,10 @@ const IndexPRD4 = () => {
         };
         // One guard for every director action; the cinematic path below and the
         // post-reply director share it so a waiting video obeys the same rules.
+        if (avatarStream) {
+          latePlaybackStart = onPlaybackStart;
+          if (avatarPlaybackAt != null) onPlaybackStart();
+        }
         const guardDirector = (decision: ExperienceDirectorDecisionV1,
           director: { config: PRD4PostTurnEvaluation["orchestration_config"]; versionId: string | null | undefined },
           videos: VideoTriggerRow[], proposalProfile: { enabled?: boolean; ready?: boolean } | null) => {
@@ -2363,7 +2433,7 @@ const IndexPRD4 = () => {
           })().catch((cinematicError) => console.warn("[PRD4] overlay cinematic ignored:", cinematicError));
         }
 
-        const outputResult = await (streamedVoice ? streamedVoice.finish() : renderResponseText(result.maxResponse, {
+        const outputResult = await (streamedVoice ? streamedVoice.finish() : avatarStream?.render ?? renderResponseText(result.maxResponse, {
           turnId,
           turnIndex,
           attemptId: telemetry.attemptId,

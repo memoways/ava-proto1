@@ -26,6 +26,7 @@ vi.mock("@/services/tts/textChunking", () => ({ chunkTextForTTS: (text: string) 
 import { TavusStreamingAvatarOutput } from "./tavus";
 import { streamingAvatarDefaults } from "../settings";
 import { AvatarRenderError } from "../types";
+import { createAvatarLineFeed } from "../avatarAudioBridge";
 import type { PerformanceIntent } from "@/services/tts/performanceIntent";
 
 class Stream {
@@ -89,6 +90,39 @@ describe("Tavus with Ava's voice (Echo audio)", () => {
     event("conversation.started_speaking"); await vi.advanceTimersByTimeAsync(700); event("conversation.stopped_speaking");
     await expect(line).resolves.toMatchObject({ status: "played", provider: "Tavus", started: true, generatedSegments: 1 });
     await output.dispose();
+  });
+
+  it("lot T7: speaks the first phrase while the reply is still generated, then closes the turn", async () => {
+    const onPlaybackStart = vi.fn();
+    const output = new TavusStreamingAvatarOutput({ ...settings, streamedLlm: true }, {}, 1000, 1000); await ready(output);
+    expect(output.canStreamText()).toBe(true);
+    const feed = createAvatarLineFeed();
+    const line = output.renderTextStream(feed, { turnId: "t7", onPlaybackStart });
+    feed.push("Première phrase.");
+    await vi.advanceTimersByTimeAsync(0);
+    // Audio is out before the reply is complete; nothing marks the turn as done yet.
+    expect(echoes().length).toBeGreaterThan(0);
+    expect(echoes().some((message) => message.properties.done)).toBe(false);
+    event("conversation.started_speaking");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onPlaybackStart).toHaveBeenCalledOnce();
+    feed.push("Deuxième phrase."); feed.end();
+    await vi.advanceTimersByTimeAsync(0);
+    const sent = echoes();
+    expect(sent.at(-1)?.properties.done).toBe(true);
+    expect(sent.slice(0, -1).every((message) => message.properties.done === false)).toBe(true);
+    expect(new Set(sent.map((message) => message.properties.inference_id)).size).toBe(1);
+    await vi.advanceTimersByTimeAsync(1500); event("conversation.stopped_speaking");
+    await expect(line).resolves.toMatchObject({ status: "played", started: true, generatedSegments: 2 });
+    await output.dispose();
+  });
+
+  it("lot T7: refuses to stream the text unless the switch is on and the voice is Ava's", async () => {
+    const off = new TavusStreamingAvatarOutput(settings, {}, 1000, 1000);
+    expect(off.canStreamText()).toBe(false);
+    await expect(off.renderTextStream(createAvatarLineFeed(), { turnId: "t7" })).rejects.toBeInstanceOf(AvatarRenderError);
+    const pal = new TavusStreamingAvatarOutput({ ...settings, streamedLlm: true, voiceSource: "tavus" }, {}, 1000, 1000);
+    expect(pal.canStreamText()).toBe(false);
   });
 
   it("follows the speech events: one start, pauses between segments ignored, ends after the last chunk", async () => {

@@ -65,6 +65,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
     echoEmotion: "dejected",
     // Ava's own voice by default: the PAL voice reads French badly (6 November 2026).
     voiceSource: "ava",
+    streamedLlm: false,
     characters: { max: {}, emma: {} },
   },
   // Sad speaking style and closed idling attitude, like the Tavus emotions; IDs set in the admin.
@@ -186,6 +187,7 @@ export function normalizeStreamingAvatarSettings(
       voiceSource: isTavusVoiceSource(tavus.voiceSource)
         ? tavus.voiceSource
         : tavusDefaults.voiceSource,
+      streamedLlm: tavus.streamedLlm === true,
       characters: normalizeTavusCharacters(tavus.characters),
     },
     anam: normalizeAnamSettings(raw.anam),

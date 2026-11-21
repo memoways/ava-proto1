@@ -1,3 +1,4 @@
+import type { AvatarLineFeed } from "./avatarAudioBridge";
 import type {
   AnamAvatarSettings,
   HeyGenEncoding,
@@ -136,6 +137,11 @@ export interface TavusAvatarSettings {
   echoEmotion: TavusEchoEmotion;
   /** Voice of the lines; absent in older JSON means Ava's audio. */
   voiceSource: TavusVoiceSource;
+  /**
+   * Lot T7 (prototype): speak the first safe phrase while the LLM is still answering. Only with
+   * Ava's audio; every other case keeps the whole reply validated before the first word.
+   */
+  streamedLlm: boolean;
   /** Per-character overrides keyed by character (`max`, `emma`); empty means global. */
   characters: Record<string, TavusCharacterOverride>;
 }
@@ -279,6 +285,10 @@ export interface ResponseOutput {
   readonly videoFit?: AvatarVideoFit;
   prepare(context: ResponseOutputPrepareContext): Promise<void>;
   renderText(text: string, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;
+  /** Lot T7: true when `renderTextStream` can speak a reply that is still being generated. */
+  canStreamText?(): boolean;
+  /** Lot T7: speaks the segments of `feed` as they arrive; same result contract as `renderText`. */
+  renderTextStream?(feed: AvatarLineFeed, context?: ResponseOutputTurnContext): Promise<ResponseOutputResult>;
   attachMedia(element: HTMLMediaElement): void;
   interrupt(): void;
   /** Listening posture while the player speaks (HeyGen, LemonSlice); others ignore the call. */

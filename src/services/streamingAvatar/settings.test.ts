@@ -228,6 +228,18 @@ describe("Tavus Echo tag and per-character settings (lot 1)", () => {
   });
 });
 
+describe("Tavus streamed LLM switch (lot T7)", () => {
+  it("is off by default, including for JSON saved before the field existed", () => {
+    expect(streamingAvatarDefaults.tavus.streamedLlm).toBe(false);
+    expect(normalize({ tavus: { replicaId: "r", characters: {} } }).tavus.streamedLlm).toBe(false);
+  });
+
+  it("is on only for an explicit true", () => {
+    expect(normalize({ tavus: { streamedLlm: true, characters: {} } }).tavus.streamedLlm).toBe(true);
+    expect(normalize({ tavus: { streamedLlm: "true", characters: {} } }).tavus.streamedLlm).toBe(false);
+  });
+});
+
 describe("Tavus voice source (Ava audio or PAL voice)", () => {
   it("defaults to Ava's audio, including for JSON saved before the field existed", () => {
     expect(streamingAvatarDefaults.tavus.voiceSource).toBe("ava");

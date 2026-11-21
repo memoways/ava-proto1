@@ -496,6 +496,7 @@ function TavusFields({
             <SwitchField label="Sous-titres Tavus" hint="enable_closed_captions ; Ava affiche déjà ses sous-titres." checked={value.enableClosedCaptions} onChange={(enableClosedCaptions) => patch({ enableClosedCaptions })} />
             <SwitchField label="Fond vert" hint="apply_greenscreen ; sans effet sur un Face Phoenix-4.5." checked={value.applyGreenscreen} onChange={(applyGreenscreen) => patch({ applyGreenscreen })} />
             <SwitchField label="Politique UE" hint="policy « eu » : réglages automatiques résolus selon l'AI Act." checked={value.euPolicy} onChange={(euPolicy) => patch({ euPolicy })} />
+            <SwitchField label="Réponse parlée en cours de génération (prototype)" hint="Lot T7 : la première phrase part au TTS dès que le LLM l'a écrite. Voix d'Ava seulement ; désactivé par défaut. À mesurer sur sandbox-ulrich." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
           </div>
           <div className="space-y-2 rounded-md border p-3">
             <div className="flex items-center justify-between gap-3">

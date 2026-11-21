@@ -1,5 +1,5 @@
 import { observeService } from "../voiceTurnTelemetryV2";
-import type { ResponseOutput, ResponseOutputTurnContext, VideoLatencyObservation } from "./types";
+import type { ResponseOutput, ResponseOutputResult, ResponseOutputTurnContext, VideoLatencyObservation } from "./types";
 
 /** A provider's integrated voice is included in video; local fallback follows it. */
 export function splitOutputLatency(outputWaitMs?: number, video?: VideoLatencyObservation) {
@@ -16,8 +16,10 @@ export async function renderWithVideoLatency(
   text: string,
   context: ResponseOutputTurnContext,
   onObservation: (value: VideoLatencyObservation) => void,
+  /** Lot T7: replaces `renderText` when the reply is spoken while it is generated. */
+  render: (context: ResponseOutputTurnContext) => Promise<ResponseOutputResult> = (turn) => output.renderText(text, turn),
 ) {
-  if (output.mode !== "streaming_avatar") return output.renderText(text, context);
+  if (output.mode !== "streaming_avatar") return render(context);
   const start = performance.now();
   let firstStart: number | undefined;
   observeService(context.onServiceObserved, {
@@ -34,7 +36,7 @@ export async function renderWithVideoLatency(
     } catch { /* Telemetry never changes delivery or fallback. */ }
   };
   try {
-    const result = await output.renderText(text, {
+    const result = await render({
       ...context,
       onPlaybackStart: () => {
         if (!context.signal?.aborted) firstStart ??= performance.now();

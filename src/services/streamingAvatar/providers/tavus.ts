@@ -8,8 +8,10 @@ import { endAvatarSession, startAvatarSession } from "../api";
 import {
   createAvatarAudioProgress,
   streamAvatarSpeech,
+  streamAvatarSpeechFromFeed,
   withDeadline,
   type AvatarAudioProgress,
+  type AvatarLineFeed,
 } from "../avatarAudioBridge";
 import { pcm16ToBase64 } from "../lemonSliceAudio";
 import {
@@ -237,10 +239,32 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     }
   }
 
+  /** Lot T7: the reply may be spoken while it is generated only with Ava's audio and the admin switch. */
+  canStreamText(): boolean {
+    return this.settings.streamedLlm === true && this.active.voiceSource === "ava";
+  }
+
+  async renderTextStream(
+    feed: AvatarLineFeed,
+    context?: ResponseOutputTurnContext,
+  ): Promise<ResponseOutputResult> {
+    if (!this.canStreamText()) throw new AvatarRenderError("Tavus text streaming is not enabled", false);
+    await this.assertRenderable(context);
+    return this.renderAvaAudio({ feed }, context);
+  }
+
   async renderText(
     text: string,
     context?: ResponseOutputTurnContext,
   ): Promise<ResponseOutputResult> {
+    await this.assertRenderable(context);
+    return this.active.voiceSource === "ava"
+      ? this.renderAvaAudio({ text }, context)
+      : this.renderEchoText(text, context);
+  }
+
+  /** Connection, character and audible media checks shared by every render entry point. */
+  private async assertRenderable(context?: ResponseOutputTurnContext): Promise<void> {
     if (!this.call || !this.ready || !this._externalSessionId) {
       throw new AvatarRenderError("Tavus video stream is not ready", false);
     }
@@ -261,9 +285,6 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     } catch (cause) {
       throw new AvatarRenderError("Tavus audio/video playback failed", false, { cause });
     }
-    return this.active.voiceSource === "ava"
-      ? this.renderAvaAudio(text, context)
-      : this.renderEchoText(text, context);
   }
 
   /** PAL voice: Echo text, one message per segment, each closed by `stopped_speaking`. */
@@ -334,7 +355,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
    * acting intent that shapes the voice also picks the face emotion of the line.
    */
   private async renderAvaAudio(
-    text: string,
+    source: { text: string } | { feed: AvatarLineFeed },
     context?: ResponseOutputTurnContext,
   ): Promise<ResponseOutputResult> {
     const turnAbort = new AbortController();
@@ -355,8 +376,7 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
     let startWatch: Promise<void> | null = null;
     let startFailure: Error | null = null;
     try {
-      await streamAvatarSpeech({
-        text,
+      const bridgeOptions = {
         context,
         sampleRate: TAVUS_ECHO_AUDIO_SAMPLE_RATE,
         chunkMs: TAVUS_ECHO_AUDIO_CHUNK_MS,
@@ -375,7 +395,9 @@ export class TavusStreamingAvatarOutput implements ResponseOutput {
             turnAbort.abort();
           });
         },
-      });
+      };
+      if ("feed" in source) await streamAvatarSpeechFromFeed({ ...bridgeOptions, feed: source.feed });
+      else await streamAvatarSpeech({ ...bridgeOptions, text: source.text });
       if (progress.sentChunks === 0 || !startWatch) throw new Error("Ava TTS produced no audio for Tavus");
       await startWatch;
       audio.committed = true;
