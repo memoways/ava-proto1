@@ -7,11 +7,12 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cinematicPresentationFrom, type CinematicPresentation } from "@/services/cinematicTransition";
 import { toast } from "sonner";
-import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles } from "lucide-react";
+import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic } from "lucide-react";
 import {
   listVideoTriggers,
   updateVideoTriggerOnNotion,
   describeVideoWithAi,
+  transcribeVideoWithAi,
   type VideoTriggerRow,
   type UpdateVideoTriggerPatch,
 } from "@/services/videoTriggerService";
@@ -37,6 +38,10 @@ import {
   type VideoSyncRunSummary,
 } from "@/services/videoSyncHistory";
 import { selectVideosToDescribe } from "../../supabase/functions/_shared/videoDescription";
+import {
+  selectExtractsToTranscribe,
+  transcribeBlockedReason,
+} from "../../supabase/functions/_shared/videoTranscription";
 import { extractTranscriptStatus, type ExtractTranscriptStatus } from "../../supabase/functions/_shared/videoMetadata";
 import CinematicPreview from "@/components/CinematicPreview";
 
@@ -453,6 +458,10 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
   const [describingId, setDescribingId] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [reanalyze, setReanalyze] = useState(false);
+  const [transcribingId, setTranscribingId] = useState<string | null>(null);
+  const [transcribeProgress, setTranscribeProgress] = useState<{ done: number; total: number } | null>(null);
+  const [retranscribe, setRetranscribe] = useState(false);
+  const [transcribeErrors, setTranscribeErrors] = useState<Record<string, string>>({});
 
   const fetchTriggers = useCallback(async () => {
     setLoading(true);
@@ -565,7 +574,65 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
     toast.success(`${written}/${toDescribe.length} Description(s) IA écrite(s)`);
   }
 
-  const busy = describingId !== null || bulkProgress !== null;
+  async function transcribeOne(t: VideoTriggerRow, options: { reanalyze?: boolean; confirmOverwriteVerified?: boolean } = {}): Promise<boolean> {
+    if (!t.notion_id) return false;
+    setTranscribingId(t.id);
+    setTranscribeErrors((errors) => { const { [t.id]: _drop, ...rest } = errors; return rest; });
+    try {
+      const result = await transcribeVideoWithAi(t.notion_id, options);
+      if (!result.written || !result.transcription) {
+        setTranscribeErrors((errors) => ({ ...errors, [t.id]: "Aucune parole détectée : rien n'a été écrit." }));
+        toast.message(`Aucune parole détectée : ${t.title}`);
+        return false;
+      }
+      const text = result.transcription;
+      setTriggers((rows) => rows.map((row) => (row.id === t.id
+        ? { ...row, transcription: text, ...(result.verified_cleared ? { transcription_verified: false } : {}) }
+        : row)));
+      toast.success(`Transcription écrite (à vérifier) : ${t.title}`);
+      return true;
+    } catch (err) {
+      const message = (err as Error).message;
+      setTranscribeErrors((errors) => ({ ...errors, [t.id]: message }));
+      toast.error(`Transcription impossible (${t.title}) : ${message}`);
+      return false;
+    } finally {
+      setTranscribingId(null);
+    }
+  }
+
+  async function transcribeSingle(t: VideoTriggerRow) {
+    const hasText = !!t.transcription?.trim();
+    if (!hasText) {
+      if (!window.confirm(`Transcrire « ${t.title} » ? 1 vidéo envoyée à l'IA. Seule « Transcription » sera écrite dans Notion (non vérifiée).`)) return;
+      await transcribeOne(t);
+      return;
+    }
+    const verified = t.transcription_verified === true;
+    const message = verified
+      ? `« ${t.title} » a une transcription VÉRIFIÉE. La retranscrire l'écrase et décoche « Transcription vérifiée » (à re-relire). Continuer ?`
+      : `Retranscrire « ${t.title} » ? La transcription actuelle (non vérifiée) sera remplacée.`;
+    if (!window.confirm(message)) return;
+    await transcribeOne(t, { reanalyze: true, confirmOverwriteVerified: verified });
+  }
+
+  const toTranscribe = isExtracts ? selectExtractsToTranscribe(visibleTriggers, { retranscribe }) : [];
+
+  async function transcribeMissing() {
+    if (toTranscribe.length === 0) return;
+    const message = `Transcrire ${toTranscribe.length} extrait(s) parlé(s) ? ${toTranscribe.length} vidéo(s) envoyée(s) à l'IA (coût proportionnel). Seule « Transcription » sera écrite dans Notion, non vérifiée${retranscribe ? " ; les transcriptions existantes non vérifiées seront remplacées (jamais les vérifiées)" : ""}.`;
+    if (!window.confirm(message)) return;
+    setTranscribeProgress({ done: 0, total: toTranscribe.length });
+    let written = 0;
+    for (const [index, video] of toTranscribe.entries()) {
+      if (await transcribeOne(video, { reanalyze: !!video.transcription?.trim() })) written += 1;
+      setTranscribeProgress({ done: index + 1, total: toTranscribe.length });
+    }
+    setTranscribeProgress(null);
+    toast.success(`${written}/${toTranscribe.length} transcription(s) écrite(s)`);
+  }
+
+  const busy = describingId !== null || bulkProgress !== null || transcribingId !== null || transcribeProgress !== null;
 
   if (loading) return <p className="text-sm text-muted-foreground">Chargement des triggers…</p>;
 
@@ -608,6 +675,28 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
           </Button>
         </div>
       </div>
+
+      {isExtracts && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border rounded p-3 bg-muted/5" data-testid="extract-transcribe-panel">
+          <div className="text-xs text-muted-foreground max-w-xl">
+            <strong>Transcription IA</strong> : Gemini écoute la bande son des extraits <em>parlés</em> (label « Dialogue » de Notion)
+            et note les paroles dites, sans interprétation. Écrit seulement « Transcription » dans Notion, jamais « Description »,
+            « Dialogue » ni « Transcription vérifiée » : la relecture humaine reste nécessaire avant toute utilisation en jeu.
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch checked={retranscribe} onCheckedChange={setRetranscribe} disabled={busy} />
+              Retranscrire les transcriptions existantes non vérifiées
+            </label>
+            <Button size="sm" variant="outline" onClick={transcribeMissing} disabled={busy || toTranscribe.length === 0} data-testid="extract-transcribe-bulk">
+              <Mic className="h-3 w-3 mr-1" />
+              {transcribeProgress
+                ? `Transcription ${transcribeProgress.done}/${transcribeProgress.total}…`
+                : `Transcrire les extraits parlés sans transcription (${toTranscribe.length})`}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {visibleTriggers.length === 0 && (
         <p className="text-sm text-muted-foreground/60 text-center py-4">
@@ -789,6 +878,20 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
                 <div className="space-y-2 border-t pt-3 text-xs">
                   <TranscriptStatusBadge video={t} />
                   {t.transcription && <TextField label="Transcription" clamp="line-clamp-4 whitespace-pre-line">{t.transcription}</TextField>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const blocked = transcribeBlockedReason(t);
+                      return blocked ? (
+                        <span className="text-muted-foreground" data-testid="extract-transcribe-blocked">{blocked}</span>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => void transcribeSingle(t)} disabled={busy} data-testid="extract-transcribe-one">
+                          <Mic className={`h-3 w-3 mr-1 ${transcribingId === t.id ? "animate-pulse" : ""}`} />
+                          {transcribingId === t.id ? "Transcription…" : t.transcription?.trim() ? "Retranscrire" : "Transcrire"}
+                        </Button>
+                      );
+                    })()}
+                    {transcribeErrors[t.id] && <span className="text-destructive" data-testid="extract-transcribe-error">{transcribeErrors[t.id]}</span>}
+                  </div>
                 </div>
               )}
 

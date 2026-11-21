@@ -16,7 +16,7 @@ Date : 2026-11-21. Tâche Notion : [Intégrer les extraits du film AVA dans le p
 | Statut | `extractTranscriptStatus` : `silent`, `spoken_verified`, `spoken_unverified`, `spoken_missing`, `unknown`. Seuls `silent` et `spoken_verified` sont fiables ; `unknown` n'est jamais silencieux |
 | Back-office | onglet Extraits (`VideoTriggersEditor scope="extracts"`), cinématiques sans extraits, réglages `ava_extract_settings` inactifs |
 
-## Lot 1b — transcription IA sur demande (à faire, indépendant du lot 2, à faire en premier)
+## Lot 1b — transcription IA sur demande (code livré le 21 novembre ; déploiement Lovable et essai réel : lot 1c)
 
 Chaîne d'édition voulue par Ulrich (21 novembre) : **ajouter la vidéo dans Notion → la labelliser (Nature, Personnages, Dialogue, thèmes) → générer depuis l'application la « Description IA » et la « Transcription »**, puis relecture humaine (« Transcription vérifiée »). Même principe que la description IA existante (`describe-video`, Gemini, écrit une seule propriété Notion et la recopie dans Supabase).
 

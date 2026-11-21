@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (latence Tavus, lot T8)
+> **Last Updated**: 2026-11-21 (extraits, lot 1b)
 
 ---
+
+## Extraits du film, lot 1b — écouter, pas regarder (21 novembre 2026)
+
+La « Description IA » regarde une rendition vidéo **sans son** : la réutiliser pour transcrire aurait produit du texte inventé. Les extraits Gumlet ont pourtant une piste audio séparée (AAC, ≈ 1,5 Mo) : c'est elle qu'on envoie à Gemini. Règle de fond : une transcription est une preuve, pas une aide. Donc : seulement les extraits labellisés « Parlé » par un humain, aucune parole détectée = rien d'écrit, texte toujours « à vérifier », et une transcription déjà vérifiée n'est écrasée qu'avec confirmation explicite (la case est alors décochée). Qualité réelle de la transcription : non mesurée, relecture Romed à faire.
 
 ## Extraits du film, lot 2 — une mécanique à part (21 novembre 2026)
 

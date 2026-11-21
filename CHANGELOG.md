@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Extraits du film, lot 1b : transcription IA sur demande] — 2026-11-21
+
+- **Edge Function `transcribe-video`** (admin seulement) : Gemini écoute la **bande son** d'un extrait *parlé* et écrit les paroles dans la seule propriété Notion « Transcription » (puis `video_triggers.transcription`), toujours non vérifiée. Refus explicites : `not_an_extract`, `dialogue_silent`, `dialogue_missing` (jamais silencieux ni « non renseigné »), `already_transcribed`, `verified_requires_confirmation`. Aucune parole → rien n'est écrit, `no_speech_detected`.
+- **Piège du son levé** : la rendition d'analyse des descriptions est sans son. Les masters Gumlet exposent une rendition audio séparée (`EXT-X-MEDIA TYPE=AUDIO`, AAC ≈ 1,5 Mo pour les 3 extraits réels) : lue par `pickAudioRendition`, jamais de son inventé ; `no_audio_rendition` / `video_too_large` sinon. Un second essai renvoie les mêmes octets en média MP4 si la route refuse la partie audio.
+- **Écriture** (`videoTranscription.ts`) : texte découpé en éléments rich_text de 2 000 car. ; garde `assertOnlyTranscription` (jamais Description, Description IA, Dialogue). Seule exception : une transcription **vérifiée** n'est remplacée qu'après réanalyse confirmée, et « Transcription vérifiée » est alors décochée (Notion et miroir).
+- **Back-office** (onglet Extraits seulement) : « Transcrire » / « Retranscrire » par extrait parlé (extraits silencieux ou sans Dialogue : raison affichée, pas de bouton), « Transcrire les extraits parlés sans transcription (N) » avec confirmation (nombre de vidéos) et progression, interrupteur « Retranscrire les transcriptions existantes non vérifiées » (jamais les vérifiées en lot), erreur par extrait.
+- **Tests** : `videoTranscription.test.ts` (21), `transcribeVideoEndpoint.test.ts` (12), `VideoTriggersEditor.extracts.test.tsx` (+3). **Non fait** : déploiement Lovable de la fonction (à coller dans le chat Lovable), essai réel sur un extrait parlé, relecture humaine (Romed). Aucune production, aucune migration. Reprise : [docs/prompt_reprise_extraits_film_lot_1c_essai_reel.md](docs/prompt_reprise_extraits_film_lot_1c_essai_reel.md).
+
 ## [Extraits du film, lot 2 : sélection, lecture et bascule du pool] — 2026-11-21
 
 - **Bascule unique** : `Activer les extraits` (Admin › Expérience › Extraits, inactif par défaut) retire les extraits du pool des cinématiques (GM, garde du directeur, superposition) et leur donne leur propre sélection. Tant qu'elle est inactive, rien ne change en jeu. `MIN_EXTRACTS_BEFORE_CINEMATIC` garde sa signification (inactive) et n'a plus d'effet quand la bascule est active (dit dans l'éditeur).
