@@ -205,5 +205,21 @@ l'échantillon après T3 (9 tours) reste petit pour le p90. Le « blocker_step =
 
 Recommandation : (a) d'abord, en mode conditionnel (rerank seulement si l'écart entre les cosinus du top 5 est faible), car sans effet sur le client et réversible par réglage ; (b) seulement si (a) ne suffit pas.
 
+### Lot T5 : rejeu du rerank conditionnel (21 novembre, sandbox-ulrich, aucun changement de code)
+
+Ulrich a choisi le rerank conditionnel. Rejeu de 20 questions réelles du laboratoire RAG sur les 2 personnages indexés (40 appels à `query-rag`,
+rerank `rerank-2.5-lite`, `retrieve_k` 15, top 5 ; outil `npm run eval:rerank-replay`) : ordre par cosinus (`retrieval_matches`) contre top 5 reranké.
+Sur les 38 appels qui ont remonté des passages :
+
+- **Le rerank change l'ensemble servi** : recouvrement moyen du top 5 cosinus et du top 5 reranké = 2,4 / 5 (distribution 5 : 1, 4 : 6, 3 : 12, 2 : 10, 1 : 7, 0 : 2) ;
+  le premier passage est identique dans 32 % des cas seulement ; le premier reranké est absent du top 5 cosinus dans 39 % des cas.
+- **Aucun critère de cosinus ne désigne un cas sûr** : écart entre les rangs 5 et 6 ≥ 0,02 (4 cas) → recouvrement 2,25 ; ≥ 0,04 (3 cas) → 1,67 ;
+  similarité du premier ≥ 0,5 (2 cas) → 2,5, aucun cas ≥ 0,55. Même quand la coupure cosinus est nette, le rerank réordonne l'ensemble.
+- **Seul cas sans perte d'ensemble** : 5 appels sur 40 ont ≤ 5 passages (dont 2 sans résultat) ; 3 d'entre eux passent par le rerank pour un simple réordonnancement, soit ≈ 7 % des tours.
+
+Conclusion : un rerank conditionnel sur le cosinus dégraderait ou changerait la sélection sans gain mesurable en moyenne (≈ 0,2 s sur ≈ 7 % des tours seulement).
+Le rejeu mesure la divergence, pas la qualité : savoir si le rerank améliore réellement les réponses demande `evalJudge` avec et sans rerank. **Rien n'est modifié** (`RAG_RERANK_ENABLED` reste vrai).
+Pistes restantes : `evalJudge` avec/sans rerank (décide du retrait pur), `retrieve_k` 15 → 10 (rerank moins long, qualité à rejouer), embedding sur transcript partiel (lot lourd), LLM streamé.
+
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
