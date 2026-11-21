@@ -79,6 +79,7 @@ import {
 } from "@/services/cinematicTransition";
 import {
   OVERLAY_SELECTOR_MAX_TOKENS,
+  orderOverlayCandidates,
   overlaySelectionTimeoutMs,
   recentOverlayExchanges,
   selectOverlayVideo,
@@ -153,10 +154,13 @@ import {
   extractDecisionBlockedReason,
   extractPresentation,
   extractSelectionTimeoutMs,
+  extractUsability,
+  orderExtractCandidates,
   selectExtract,
   selectExtractCandidates,
   type ExtractVideo,
 } from "@/services/extractSelection";
+import { videoDecisionJournal } from "@/services/videoDecisionLog";
 import { buildPostVideoContext, formatWatchedVideos, rememberWatchedVideo, watchedVideoFrom, type WatchedVideo } from "@/services/watchedVideoMemory";
 import { experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import {
@@ -2285,7 +2289,13 @@ const IndexPRD4 = () => {
             resultIsCurrent: isCurrentTurn(),
           });
         };
-        const logDirectorBlocked = (guarded: GuardedDirectorDecision, ev: PRD4PostTurnEvaluation) => {
+        const journalFor = (
+          mechanism: "overlay" | "extract" | "game_master",
+          candidates: readonly { id: string; title?: string | null }[],
+          excluded: readonly { id: string; reason: string | null | undefined }[],
+          linkDetail?: string | null,
+        ) => videoDecisionJournal({ mechanism, candidates, excluded, replyText: result.maxResponse, userText, linkDetail });
+        const logDirectorBlocked = (guarded: GuardedDirectorDecision, ev: PRD4PostTurnEvaluation, extra: Record<string, unknown> = {}) => {
           if (guarded.accepted || guarded.recommendedAction.type === "none") return;
           const sid = sessionIdRef.current;
           trackEvent(`prd4_${guarded.recommendedAction.type}_blocked`, { session_id: sid, turn_id: turnId, reason: guarded.blockedReason });
@@ -2297,7 +2307,7 @@ const IndexPRD4 = () => {
             turnIndex,
             character: activeCharacterRef.current,
             orchestrationVersionId: ev.orchestration_version_id,
-            payload: { blockedReason: guarded.blockedReason, action: guarded.recommendedAction },
+            payload: { blockedReason: guarded.blockedReason, action: guarded.recommendedAction, ...extra },
           });
         };
 
@@ -2339,13 +2349,32 @@ const IndexPRD4 = () => {
               memoryDelta: ev.memory_delta ?? null,
               action: ev.action,
             }, { config: ev.orchestration_config, versionId: ev.orchestration_version_id }, videos, null);
-            logDirectorBlocked(guarded, ev);
+            const triggerSettings = videoTriggerSettingsRef.current;
+            const eligible = selectEligibleVideos(videos, {
+              path: experiencePathFromFilmAnswer(hasSeenFilmRef.current),
+              currentCharacter: activeCharacterRef.current,
+              playedVideoIds: triggeredVideoIdsRef.current,
+              extractsShown: countPlayedExtracts(videos, triggeredVideoIdsRef.current),
+              minExtractsBeforeCinematic: triggerSettings.MIN_EXTRACTS_BEFORE_CINEMATIC,
+              extractsSeparate: extractSettingsRef.current.ENABLED,
+            });
+            const excluded = videos.filter((video) => Boolean(video.video_url)).flatMap((video) => {
+              const guard = guardDirector({
+                labels: ev.labels ?? { themes: [], topics: [], intentions: [] },
+                nextTurnGuidance: null,
+                memoryDelta: null,
+                action: { type: "cinematic", videoId: video.id, reason: "journal", confidence: 1 },
+              }, { config: ev.orchestration_config, versionId: ev.orchestration_version_id }, videos, null);
+              return guard.accepted ? [] : [{ id: video.id, reason: guard.blockedReason }];
+            });
+            const journal = journalFor("game_master", eligible, excluded);
+            logDirectorBlocked(guarded, ev, journal);
             if (guarded.action.type !== "cinematic" || cinematicRef.current.phase !== "idle") return;
             const cinematic = guarded.action;
             const video = videos.find((candidate) => candidate.id === cinematic.videoId && candidate.video_url) ?? null;
             if (!video) return;
             reserveCinematic(video, { reason: cinematic.reason ?? null, confidence: cinematic.confidence ?? null,
-              orchestrationVersionId: ev.orchestration_version_id ?? null, source: "game_master" });
+              orchestrationVersionId: ev.orchestration_version_id ?? null, source: "game_master", extra: journal });
             const audio = audioStateRef.current;
             dispatchCinematicRef.current({
               type: "decided",
@@ -2391,26 +2420,29 @@ const IndexPRD4 = () => {
             const allowed = (video: VideoTriggerRow) => guardVideo(video).accepted;
             // Frequency, eligibility and played videos first: no selection call when nothing may play.
             const playable = videos.filter((video) => Boolean(video.video_url));
-            const candidates = playable.filter(allowed);
+            const guardedPlayable = playable.map((video) => ({ video, guard: guardVideo(video) }));
+            const candidates = guardedPlayable.filter((entry) => entry.guard.accepted).map((entry) => entry.video);
+            const excluded = guardedPlayable
+              .filter((entry) => !entry.guard.accepted)
+              .map((entry) => ({ id: entry.video.id, reason: entry.guard.blockedReason ?? "unknown" }));
+            const ordered = orderOverlayCandidates(candidates, result.maxResponse);
+            const overlayJournal = (linkDetail?: string | null) => journalFor("overlay", ordered, excluded, linkDetail);
             if (!candidates.length) {
               // Lot 2: a turn kept free by the backoffice rules (first video, spacing, maximum) is visible.
               const guardReasons: Record<string, number> = {};
-              for (const video of playable) {
-                const reason = guardVideo(video).blockedReason ?? "unknown";
-                guardReasons[reason] = (guardReasons[reason] ?? 0) + 1;
-              }
+              for (const entry of excluded) guardReasons[entry.reason] = (guardReasons[entry.reason] ?? 0) + 1;
               const mainReason = Object.entries(guardReasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "no_video";
               const rules = videoTriggerSettingsRef.current;
               logOverlaySkip("overlay_no_allowed_video", { guardReason: mainReason, guardReasons, videos: playable.length,
                 // The backoffice rules as applied this turn, to check the spacing against the settings.
                 rules: { minTurnsBeforeFirst: rules.MIN_TURNS_BEFORE_FIRST, minTurnsBetween: rules.MIN_TURNS_BETWEEN,
                   maxPerSession: rules.MAX_PER_SESSION, lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
-                  played: triggeredVideoIdsRef.current.length } });
+                  played: triggeredVideoIdsRef.current.length }, ...overlayJournal() });
               return;
             }
             const before = replyStillAhead();
             if (!before.inFlight || !before.enough) {
-              logOverlaySkip(before.inFlight ? "overlay_reply_too_short" : "overlay_reply_over", { remainingSpeechMs: before.remainingSpeechMs });
+              logOverlaySkip(before.inFlight ? "overlay_reply_too_short" : "overlay_reply_over", { remainingSpeechMs: before.remainingSpeechMs, ...overlayJournal() });
               return;
             }
             const llm = getLLMSettings();
@@ -2438,19 +2470,19 @@ const IndexPRD4 = () => {
             })).content);
             if (selection.status !== "selected") {
               logOverlaySkip(`overlay_selection_${selection.status}`, { selectionMs: selection.latencyMs, detail: selection.detail ?? null,
-                timeoutMs, model: selectorModel, candidates: candidates.length });
+                timeoutMs, model: selectorModel, ...overlayJournal(selection.status === "weak_link" ? selection.detail ?? null : null) });
               return;
             }
             const video = candidates.find((candidate) => candidate.id === selection.videoId) ?? null;
             const after = replyStillAhead();
             if (!video || !after.inFlight || !after.enough || cinematicRef.current.phase !== "idle" || !allowed(video)) {
               logOverlaySkip(!after.inFlight ? "overlay_reply_over" : "overlay_reply_too_short",
-                { videoId: selection.videoId, selectionMs: selection.latencyMs, remainingSpeechMs: after.remainingSpeechMs });
+                { videoId: selection.videoId, selectionMs: selection.latencyMs, remainingSpeechMs: after.remainingSpeechMs, ...overlayJournal() });
               return;
             }
             reserveCinematic(video, { reason: selection.reason || null, confidence: selection.confidence,
               orchestrationVersionId: director.versionId, source: "overlay_selector", latencyMs: selection.latencyMs,
-              extra: { replyCue: selection.replyCue, videoCue: selection.videoCue, timeoutMs, model: selectorModel, candidates: candidates.length } });
+              extra: { replyCue: selection.replyCue, videoCue: selection.videoCue, timeoutMs, model: selectorModel, ...overlayJournal() } });
             dispatchCinematicRef.current({
               type: "decided",
               video,
@@ -2498,14 +2530,27 @@ const IndexPRD4 = () => {
             userTurn: turnIndex,
             lastExtractTurn: Number.isFinite(lastExtractTurnRef.current) ? lastExtractTurnRef.current : null,
           });
+          const extractExcluded = (videos as ExtractVideo[]).flatMap((video) => {
+            const usability = extractUsability(video, {
+              character: turnCharacter,
+              shownVideoIds: triggeredVideoIdsRef.current,
+              requireVerifiedTranscript: extractSettingsRef.current.REQUIRE_VERIFIED_TRANSCRIPT,
+            });
+            if (usability === "usable" || usability === "not_extract") return [];
+            return [{ id: video.id, reason: usability }];
+          });
           if ("reason" in gate) {
             // Silent for paths and settings that simply do not apply; visible when usable extracts exist but are held back.
-            if (gate.reason !== "extract_film_seen_path" && gate.reason !== "extracts_disabled") logExtractSkip(gate.reason, { skipped: gate.skippedByReason });
+            if (gate.reason !== "extract_film_seen_path" && gate.reason !== "extracts_disabled") {
+              logExtractSkip(gate.reason, { skipped: gate.skippedByReason, ...journalFor("extract", [], extractExcluded) });
+            }
             return;
           }
-          if (cinematicRef.current.phase !== "idle") { logExtractSkip("extract_video_overlap"); return; }
+          const orderedExtracts = orderExtractCandidates(gate.candidates);
+          const extractJournal = (linkDetail?: string | null) => journalFor("extract", orderedExtracts, extractExcluded, linkDetail);
+          if (cinematicRef.current.phase !== "idle") { logExtractSkip("extract_video_overlap", extractJournal()); return; }
           const before = replyAhead();
-          if (!before.inFlight) { logExtractSkip("extract_reply_over", { remainingSpeechMs: before.remainingSpeechMs }); return; }
+          if (!before.inFlight) { logExtractSkip("extract_reply_over", { remainingSpeechMs: before.remainingSpeechMs, ...extractJournal() }); return; }
           const llm = getLLMSettings();
           const selectorModel = llm.LLM_MODEL_GM;
           const timeoutMs = extractSelectionTimeoutMs(before.remainingSpeechMs);
@@ -2533,7 +2578,7 @@ const IndexPRD4 = () => {
           })).content);
           if (selection.status !== "selected") {
             logExtractSkip(`extract_selection_${selection.status}`, { selectionMs: selection.latencyMs, detail: selection.detail ?? null,
-              timeoutMs, model: selectorModel, candidates: gate.candidates.length });
+              timeoutMs, model: selectorModel, ...extractJournal(selection.status === "weak_link" ? selection.detail ?? null : null) });
             return;
           }
           const video = gate.candidates.find((candidate) => candidate.id === selection.videoId) ?? null;
@@ -2548,7 +2593,7 @@ const IndexPRD4 = () => {
             presentation: selection.presentation,
           });
           if (!video || blocked) {
-            logExtractSkip(blocked ?? "extract_unknown_video", { videoId: selection.videoId, selectionMs: selection.latencyMs, remainingSpeechMs: after.remainingSpeechMs });
+            logExtractSkip(blocked ?? "extract_unknown_video", { videoId: selection.videoId, selectionMs: selection.latencyMs, remainingSpeechMs: after.remainingSpeechMs, ...extractJournal() });
             return;
           }
           // Reserved at decision time: never offered twice, counted for the extracts' own spacing.
@@ -2568,9 +2613,9 @@ const IndexPRD4 = () => {
             character: activeCharacterRef.current,
             orchestrationVersionId: director.versionId,
             payload: { videoId: video.id, reason: selection.reason, confidence: selection.confidence, presentation: selection.presentation,
-              source: "extract_selector", mechanism: "extract", dialogue: video.dialogue ?? null, selectionMs: selection.latencyMs,
+              source: "extract_selector", dialogue: video.dialogue ?? null, selectionMs: selection.latencyMs,
               replyCue: selection.replyCue, videoCue: selection.videoCue, complement: selection.complement, timeoutMs, model: selectorModel,
-              candidates: gate.candidates.length },
+              ...extractJournal() },
           });
           dispatchCinematicRef.current({
             type: "decided",

@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (extraits, lot 1b)
+> **Last Updated**: 2026-11-21 (décisions vidéo, lot 1)
 
 ---
+
+## Décisions vidéo, lot 1 — voir pourquoi, avant de corriger (21 novembre 2026)
+
+L'historique admin montrait quarante événements bruts : un type et un identifiant. Impossible de dire si un choix était juste. Le lot ajoute un onglet partagé qui relie, pour chaque tour, la réplique, la vidéo, le motif d'écart et les thèmes du Game Master. Il compte aussi les lectures. Il n'améliore pas encore la sélection : on mesure d'abord, on corrige ensuite (vocabulaire commun, puis règles). Les sessions déjà jouées s'affichent avec ce que le journal savait alors, souvent sans la liste des candidates.
 
 ## Extraits du film, lot 3 — le sélecteur perdait un tiers de ses réponses (21 novembre 2026)
 

@@ -39,6 +39,7 @@ describe("Admin navigation invariants", () => {
       "devices",
       "video-triggers",
       "extracts",
+      "video-decisions",
       "architecture",
     ]);
     expect(TAB_GROUPS.find((group) => group.id === "quality")?.tabs.map((tab) => tab.id)).toEqual([
