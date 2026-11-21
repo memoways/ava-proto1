@@ -188,5 +188,22 @@ Le chevauchement est confirmé. La baisse de `character_rag` (≈ 45–60 ms) co
 9 tours, et le p90 de l'embedding (660 ms) vient de Voyage, pas de T3. Gain non établi statistiquement, comportement validé.
 Restent embedding (≈ 215 ms) et rerank (≈ 205 ms) : voir [reprise T4](prompt_reprise_latence_tavus_lot_t4.md).
 
+### Contrôle de non-régression RAG après T3 (21 novembre, lecture `voice_turn_events`)
+
+Tours `voice_turn_completed` du 19 au 21 novembre, avant redéploiement (n = 103) et après (n = 9) : **0 erreur** de part et d'autre,
+tours sans passage RAG 1 contre 0, `rag.matches_count` moyen 5,85 contre 6,00, `t_rag_total_ms` médian 740 → 690 ms, p90 1 184 → 1 177 ms.
+Revue du code : la lecture du profil démarre avant le quota, son rejet est absorbé (`.catch`) quand la requête est refusée ou invalide,
+et l'erreur de profil est relancée à l'`await` d'origine ; le contrat de réponse n'a pas changé. Aucun problème potentiel relevé ;
+l'échantillon après T3 (9 tours) reste petit pour le p90. Le « blocker_step = rag » des tours critiques désigne l'étape la plus lente, pas une erreur.
+
+### Décision attendue d'Ulrich (levier contexte restant, aucun code modifié)
+
+| Option | Gain médian | Risque | Pré-requis |
+|---|---|---|---|
+| (a) rerank retiré ou conditionnel en voix (`RAG_RERANK_ENABLED`) | ≈ 0,2 s (rerank 206 ms) | ordre des 5 passages moins fin (retrieve_k 15 → top 5 par cosinus seul) | rejeu de qualité : laboratoire RAG + `evalJudge`, avant tout changement |
+| (b) embedding lancé sur le transcript partiel | ≈ 0,2 s (embedding 217 ms, p90 660 ms) | requête fondée sur un texte incomplet, appels Voyage gaspillés, plus de code client | protocole d'abandon si le final diverge |
+
+Recommandation : (a) d'abord, en mode conditionnel (rerank seulement si l'écart entre les cosinus du top 5 est faible), car sans effet sur le client et réversible par réglage ; (b) seulement si (a) ne suffit pas.
+
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
