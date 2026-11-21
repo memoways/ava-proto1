@@ -1,19 +1,17 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import sheets from "@/agents/__fixtures__/speechSandbox20261109.json";
+import sheets from "@/agents/__fixtures__/speechSandbox20261121.json";
 import { buildOptimizedPromptAssembly, OPTIMIZED_V3_LIMITS } from "@/agents/maxOptimizedPromptCompiler";
 import type { CharacterPrompt } from "@/services/characterPromptService";
-import { buildExperienceFrame } from "@/services/experienceFrame";
+import { buildExperienceFrame, DEFAULT_CALL_PRESENT_TEXT } from "@/services/experienceFrame";
 import {
-  CALL_PRESENT_INVARIANT,
   ESTABLISHED_FACTS_MAX_CHARS,
   ESTABLISHED_FACTS_TITLE,
   ESTABLISHED_FACTS_USAGE_LINE,
   characterEstablishedFacts,
+  findAwaitedCallSentences,
   kinshipFromTimeline,
-  neutralizeAwaitedCall,
-  sheetAtCallTime,
   withoutEstablishedFacts,
 } from "./establishedFacts";
 
@@ -57,27 +55,48 @@ describe("established facts — source", () => {
   });
 });
 
-describe("the awaited call is the call in progress", () => {
+describe("the sheet is the only logic: no rewrite of « tu attends l'appel » (lot F)", () => {
+  it.each(["Max", "Emma"] as const)("la fiche de %s ne dit plus « tu attends l'appel » (garde-fou : une fiche fautive est signalée, pas réécrite)", (name) => {
+    expect(findAwaitedCallSentences(sheet(name))).toEqual([]);
+  });
+
   it.each([
-    ["Tu attends l'appel de la cellule de bénévoles. Tu as besoin de parler.", "Tu parles en ce moment avec la personne de la cellule de bénévoles dont tu attendais l'appel. Tu as besoin de parler."],
-    ["Il attend l'appel d'une cellule de bénévoles, car il a besoin de parler.", "Il parle en ce moment avec la personne d'une cellule de bénévoles dont il attendait l'appel, car il a besoin de parler."],
-    ["Elle attend un appel de la cellule de bénévoles, car elle a besoin de parler.", "Elle parle en ce moment avec la personne de la cellule de bénévoles dont elle attendait l'appel, car elle a besoin de parler."],
-    ["Chacun de son côté, et l'appel que tu attends", "Chacun de son côté, et l'appel que tu attendais, et qui a lieu maintenant"],
-    ["Emma attend dans la cuisine.", "Emma attend dans la cuisine."],
-  ])("%s", (source, expected) => {
-    expect(neutralizeAwaitedCall(source)).toBe(expected);
+    ["Tu attends l'appel de la cellule de bénévoles.", "identite_fondamentale"],
+    ["Elle attend un appel de la cellule.", "timeline"],
+    ["Chacun de son côté, et l'appel que tu attends", "qui_tu_es"],
+  ])("signale « %s »", (text, field) => {
+    const hits = findAwaitedCallSentences({ ...sheet("Max"), [field]: text });
+    expect(hits.map((hit) => hit.field)).toContain(field);
+    expect(hits[0].excerpt).toContain(text.slice(0, 12));
   });
 
-  it.each(["Max", "Emma"] as const)("plus aucune attente de l'appel dans la fiche de %s lue au moment de l'appel", (name) => {
-    const fields = Object.values(sheetAtCallTime(sheet(name))).filter((value): value is string => typeof value === "string");
-    expect(Object.values(sheet(name)).some((value) => typeof value === "string" && AWAITED.test(value))).toBe(true);
-    expect(fields.some((value) => AWAITED.test(value))).toBe(false);
+  it("ne signale pas une attente sans rapport avec l'appel", () => {
+    expect(findAwaitedCallSentences({ ...sheet("Max"), timeline: "Emma attend dans la cuisine. Tu attendais l'appel hier." })).toEqual([]);
   });
 
-  it("partage l'invariant avec le Game Master par le cadre commun", () => {
-    expect(buildExperienceFrame({ config: undefined, filmAnswer: null }).prompt).toBe(CALL_PRESENT_INVARIANT);
-    expect(buildExperienceFrame({ config: undefined, filmAnswer: "vu" }).prompt.startsWith(CALL_PRESENT_INVARIANT)).toBe(true);
+  it("ne réécrit rien : une fiche fautive arrive telle quelle dans le prompt", () => {
+    const faulty = { ...sheet("Max"), situation_summary: "Tu attends l'appel de la cellule de bénévoles, assis dans le salon." };
+    const result = buildOptimizedPromptAssembly({
+      character: faulty, characterName: faulty.name!, userMessage: "Et aujourd'hui ?", historyChars: 0,
+      ragCandidates: [{ id: "today", rank: 1, content: "Tu attends l'appel de la cellule de bénévoles, assis dans le salon." }],
+    });
+    expect(result.finalSystemPrompt).toContain("Tu attends l'appel de la cellule de bénévoles");
+    expect(result.finalSystemPrompt).not.toContain("dont tu attendais l'appel");
+  });
+
+  it("partage l'invariant avec le Game Master par le cadre commun, éditable dans la configuration", () => {
+    expect(buildExperienceFrame({ config: undefined, filmAnswer: null }).prompt).toBe(DEFAULT_CALL_PRESENT_TEXT);
+    expect(buildExperienceFrame({ config: undefined, filmAnswer: "vu" }).prompt.startsWith(DEFAULT_CALL_PRESENT_TEXT)).toBe(true);
     expect(buildExperienceFrame({ config: undefined, filmAnswer: null, callPresent: false }).prompt).toBe("");
+    expect(buildExperienceFrame({ config: { callPresentText: "Texte publié." } as never, filmAnswer: null }).prompt).toBe("Texte publié.");
+  });
+
+  it("le champ rempli est la seule source : le paragraphe de l'identité n'est jamais lu à côté", () => {
+    const field = "Tu sais aujourd'hui que c'était Lise.";
+    expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toEqual({ content: field, source: "field" });
+    // A filled field with no complete sentence in budget yields nothing, never the paragraph.
+    expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: "x".repeat(1_300) })).toBeNull();
+    expect(withoutEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field }).identite_fondamentale).toContain("Ce qui est vrai aujourd'hui");
   });
 });
 
@@ -89,7 +108,7 @@ describe("optimized_v3 core with established facts", () => {
     for (const historyChars of [0, OPTIMIZED_V3_LIMITS.memoryChars]) {
       const result = build(name, "Qu'est-ce qui s'est passé à la montagne ?", undefined, historyChars);
       const prompt = result.finalSystemPrompt;
-      const facts = characterEstablishedFacts(sheetAtCallTime(sheet(name)))!.content;
+      const facts = characterEstablishedFacts(sheet(name))!.content;
       // The usage line keeps the block from being read as a closed list.
       expect(prompt).toContain(`## ${ESTABLISHED_FACTS_TITLE}\n${ESTABLISHED_FACTS_USAGE_LINE}\n${facts}`);
       expect(prompt.indexOf(ESTABLISHED_FACTS_TITLE)).toBeLessThan(prompt.indexOf("## MANIÈRE DE PARLER"));
@@ -129,14 +148,6 @@ describe("optimized_v3 core with established facts", () => {
     expect(result.finalSystemPrompt).not.toContain(ESTABLISHED_FACTS_TITLE);
     expect(result.finalSystemPrompt).toContain(tight.maniere_de_parler);
   });
-
-  it("lit les souvenirs au moment de l'appel", () => {
-    const result = buildOptimizedPromptAssembly({
-      character: sheet("Max"), characterName: sheet("Max").name!, userMessage: "Et aujourd'hui ?", historyChars: 0,
-      ragCandidates: [{ id: "today", rank: 1, content: "Tu attends l'appel de la cellule de bénévoles, assis dans le salon." }],
-    });
-    expect(result.finalSystemPrompt).toContain("Tu parles en ce moment avec la personne de la cellule de bénévoles dont tu attendais l'appel, assis dans le salon.");
-  });
 });
 
 // Non-regression guard: what the compiled core holds for the calibration turns.
@@ -167,7 +178,6 @@ describe("canon checklist (lot K1)", () => {
   it("montre ce que le bloc apporte : sans lui, les faits établis manquent", () => {
     const max = sheet("Max");
     const before = buildOptimizedPromptAssembly({ character: max, characterName: max.name!, userMessage: question("max-A·5"), historyChars: 0, establishedFacts: false }).finalSystemPrompt;
-    expect(before).not.toContain("Emma a été contaminée hier");
-    expect(AWAITED.test(before)).toBe(true);
+    expect(before).not.toContain("Emma a donc été contaminée hier");
   });
 });

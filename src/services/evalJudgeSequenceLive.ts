@@ -24,6 +24,7 @@ import {
   type SequenceTurnRequest,
   type SequenceTurnTrace,
 } from "@/services/evalJudgeSequence";
+import { buildFactualityJudgePrompt, parseFactualityJudgeResponse } from "@/services/evalJudgeFactuality";
 import { withRateLimitRetry, type EvalRunHooks } from "@/services/evalJudgeRunner";
 import type { PRD4PostTurnEvaluation } from "@/types";
 
@@ -105,6 +106,17 @@ export function createLiveSequenceDeps(
       canonReference: context.canonReference,
       priorExchanges: context.priorExchanges,
     })),
+    judgeFactuality: (turn, characterName, response, context, signal) => withRetry(async () => {
+      const prompt = buildFactualityJudgePrompt(turn, characterName, response, context.canonReference, context.priorExchanges);
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const result = await callLLMWithUsage([{ role: "system", content: prompt }], {
+          model: judgeModel, temperature: 0, max_tokens: 900, feature_key: EVAL_FEATURE_KEY, signal, timeoutMs: 30_000,
+        });
+        const verdict = parseFactualityJudgeResponse(result.content, turn);
+        if (verdict) return verdict;
+      }
+      return null;
+    }),
     judgeSequence: (sequence, transcript, canonReference, signal) => withRetry(async () => {
       // An empty or unreadable answer is retried once; the stop reason is kept for the report.
       let last = { finish: "", tokens: 0 };

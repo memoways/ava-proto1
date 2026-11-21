@@ -121,7 +121,7 @@ export async function loadCharacterPrompt(characterId: string): Promise<Characte
       maniere_de_parler: row.maniere_de_parler || "",
       speech_states: Array.isArray(row.speech_states) ? (row.speech_states as CharacterPrompt["speech_states"]) : [],
       situation_summary: row.situation_summary || "",
-      ce_que_tu_sais_aujourdhui: (row as { ce_que_tu_sais_aujourdhui?: string | null }).ce_que_tu_sais_aujourdhui || "",
+      ce_que_tu_sais_aujourdhui: row.ce_que_tu_sais_aujourdhui || "",
       updated_at: row.updated_at,
     };
     if (requestEpoch !== promptCacheEpoch) return prompt;

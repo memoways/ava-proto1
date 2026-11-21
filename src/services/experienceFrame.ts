@@ -9,9 +9,12 @@
  */
 import type { ConversationMessage, ExperienceFrameConfig, FilmAnswer } from "@/types";
 import { characterDisplayName } from './characterConversation';
-import { CALL_PRESENT_INVARIANT, ESTABLISHED_FACTS_DEFAULT } from './establishedFacts';
+import { ESTABLISHED_FACTS_DEFAULT } from './establishedFacts';
 
 export type ExperiencePath = "seen" | "unseen";
+
+/** Valeur par défaut de la règle du présent de l'appel (lot K1, déplacée en configuration au lot F). */
+export const DEFAULT_CALL_PRESENT_TEXT = "PRÉSENT DE L'APPEL : l'appel attendu a lieu maintenant ; la personne au bout du fil est celle qui devait appeler. Plus personne n'attend cet appel : « j'attends l'appel » est faux pendant toute la conversation.";
 
 export const DEFAULT_EXPERIENCE_FRAME_CONFIG: ExperienceFrameConfig = {
   enabled: false,
@@ -26,6 +29,7 @@ export const DEFAULT_EXPERIENCE_FRAME_CONFIG: ExperienceFrameConfig = {
   posture: "reserved",
   postureNotes: "",
   forbidSpontaneousHandoff: true,
+  callPresentText: DEFAULT_CALL_PRESENT_TEXT,
 };
 
 export const EXPERIENCE_FRAME_POSTURE_TEXT: Record<ExperienceFrameConfig["posture"], string> = {
@@ -47,6 +51,7 @@ export function normalizeExperienceFrameConfig(raw: Partial<ExperienceFrameConfi
     posture: raw?.posture === "open" ? "open" : "reserved",
     postureNotes: text(raw?.postureNotes, "", 600),
     forbidSpontaneousHandoff: raw?.forbidSpontaneousHandoff !== false,
+    callPresentText: text(raw?.callPresentText, base.callPresentText),
   };
 }
 
@@ -85,7 +90,7 @@ export function buildExperienceFrame(input: ExperienceFrameInput): ExperienceFra
   const transferContext = source ? `CONTINUITÉ DE L'APPEL : cet appel t'a été ${transfer?.returning ? 'repassé' : 'passé'} par ${source}. Tu sais qu'une discussion était en cours : tu as seulement perçu sa voix, sans connaître ses mots ni les confidences échangées. ${transfer?.returning ? 'Reprends ta propre conversation avec cet interlocuteur et tes seuls souvenirs.' : 'Accueille cet interlocuteur comme un appel transféré, sans prétendre déjà le connaître.'} Ne rejoue pas l'accueil d'un appel initial et ne répète pas l'annonce du transfert à chaque tour.` : '';
   // Like the film answer, the present of the call is factual context shared
   // identically by the character and the GM, whatever the editorial frame.
-  const callPresent = (input.callPresent ?? ESTABLISHED_FACTS_DEFAULT) ? CALL_PRESENT_INVARIANT : "";
+  const callPresent = (input.callPresent ?? ESTABLISHED_FACTS_DEFAULT) ? config.callPresentText : "";
   const facts = [callPresent, filmContext, transferContext].filter(Boolean);
   if (!config.enabled) return { enabled: false, path, prompt: facts.join('\n') };
   const lines: string[] = [...facts];

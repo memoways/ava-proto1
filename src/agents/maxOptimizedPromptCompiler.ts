@@ -19,8 +19,6 @@ import {
   ESTABLISHED_FACTS_TITLE,
   ESTABLISHED_FACTS_USAGE_LINE,
   characterEstablishedFacts,
-  neutralizeAwaitedCall,
-  sheetAtCallTime,
   withoutEstablishedFacts,
 } from "@/services/establishedFacts";
 import type { ConversationMemoryV1, MaxPromptAssemblyTrace } from "@/types";
@@ -569,7 +567,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   if (!input.character) throw new Error("Fiche personnage absente : génération interdite");
   const establishedFacts = input.establishedFacts ?? ESTABLISHED_FACTS_DEFAULT;
   // Read at call time: the awaited call is the one taking place (in memory, the sheet is untouched).
-  const character = establishedFacts ? sheetAtCallTime(input.character) : input.character;
+  const character = input.character;
   const canonicalName = character.name?.trim() || input.characterName.trim();
   if (!canonicalName) throw new Error("Fiche personnage incohérente : identité absente");
   const firstName = canonicalName.split(/\s+/)[0].toLocaleLowerCase("fr");
@@ -686,7 +684,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
   const ragBlocks: string[] = [];
   for (const candidate of input.ragCandidates ?? []) {
-    const clean = establishedFacts ? neutralizeAwaitedCall(cleanRagContent(candidate.content)) : cleanRagContent(candidate.content);
+    const clean = cleanRagContent(candidate.content);
     const unit: CandidateUnit = {
       id: candidate.id,
       source: "rag",

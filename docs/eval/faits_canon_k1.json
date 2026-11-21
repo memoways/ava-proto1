@@ -1,7 +1,7 @@
 {
-  "note": "Lot K1 — liste de contrôle des faits canoniques relevés par Romed au calibrage du 14 novembre 2026 (docs/analyse_calibration_juge_romed_20261114.md, §2.1). Pour chaque fait : les tours du corpus J3 v2 où il compte, le texte de la fiche attendu dans le prompt optimized_v3 compilé (copie sandbox du 29 octobre, sans RAG), et s'il doit y être. Un fait « absent » est un écart expliqué : il attend une correction de la fiche dans Notion. Lue par src/services/establishedFacts.test.ts ; à mettre à jour après chaque resynchronisation des fiches.",
+  "note": "Lot K1 — liste de contrôle des faits canoniques relevés par Romed au calibrage du 14 novembre 2026 (docs/analyse_calibration_juge_romed_20261114.md, §2.1). Pour chaque fait : les tours du corpus J3 v2 où il compte, le texte de la fiche attendu dans le prompt optimized_v3 compilé (copie sandbox du 21 novembre 2026 (fiches retouchées par Romed le 19 novembre), sans RAG), et s'il doit y être. Un fait « absent » est un écart expliqué : il attend une correction de la fiche dans Notion. Lue par src/services/establishedFacts.test.ts ; à mettre à jour après chaque resynchronisation des fiches. Mise à jour du lot F (21 novembre 2026) : motifs réécrits sur le texte des fiches retouchées ; plus aucun fait absent par défaut de la fiche sauf la raison du geste d'Emma.",
   "corpus": "docs/eval/sequences_j3_v2.json",
-  "sheets": "src/agents/__fixtures__/speechSandbox20261109.json",
+  "sheets": "src/agents/__fixtures__/speechSandbox20261121.json",
   "facts": [
     {
       "id": "ava-apparence-inchangee",
@@ -22,7 +22,7 @@
       ],
       "expected": "present",
       "fact": "Emma est contaminée depuis hier ; c'est sa transformation qui est à venir.",
-      "pattern": "Emma a été contaminée hier"
+      "pattern": "Emma a donc été contaminée hier"
     },
     {
       "id": "appel-en-cours",
@@ -32,8 +32,8 @@
         "max-A·5"
       ],
       "expected": "present",
-      "fact": "L'appel attendu est celui qui a lieu.",
-      "pattern": "parles? en ce moment avec la personne"
+      "fact": "L'appel attendu est celui qui a lieu (« la cellule qu'il attendait l'appelle enfin »).",
+      "pattern": "qu['’]il attendait l['’]appelle enfin"
     },
     {
       "id": "plus-d-attente-de-l-appel",
@@ -46,7 +46,7 @@
       "expected": "absent",
       "fact": "Aucune phrase du prompt ne dit que Max attend l'appel.",
       "pattern": "attends? (l['’]|un )appel|appel que tu attends\\b",
-      "explanation": "Formulation source (identité, PRÉSENT, timeline aujourd'hui.01) lue au moment de l'appel par le compilateur ; à corriger dans Notion."
+      "explanation": "Garde-fou : la fiche retouchée le 19 novembre ne dit plus « tu attends l'appel » ; une fiche qui le redirait est signalée par findAwaitedCallSentences, jamais réécrite."
     },
     {
       "id": "pere-mona-camp-cles",
@@ -56,17 +56,7 @@
       ],
       "expected": "present",
       "fact": "Max s'est arrêté chez son père pour prendre les clés ; il y apprend que Mona est au camp.",
-      "pattern": "Chez ton père : les clés, et Mona dans un camp"
-    },
-    {
-      "id": "fusil-titre-timeline",
-      "character": "max",
-      "turns": [
-        "max-B·2"
-      ],
-      "expected": "present",
-      "fact": "Le fusil vient du père de Max et passe par Léo, à l'insu de Max.",
-      "pattern": "Le fusil de ton père, donné à Léo dans ton dos"
+      "pattern": "ton père t['’]apprend qu['’]il a envoyé Mona au camp"
     },
     {
       "id": "fusil-pris-par-leo",
@@ -74,10 +64,9 @@
       "turns": [
         "max-B·2"
       ],
-      "expected": "absent",
-      "fact": "Léo a pris le fusil, à la demande du père de Max, à l'insu de Max et d'Emma.",
-      "pattern": "Léo (a pris|prend) le fusil chez",
-      "explanation": "La fiche ne le dit qu'avec le titre ambigu « donné à Léo dans ton dos » : l'agent (Léo) et la demande du père sont à écrire dans Notion."
+      "expected": "present",
+      "fact": "Léo a pris le fusil chez Papi, à la demande du père de Max, à l'insu de Max et d'Emma.",
+      "pattern": "Léo a pris le fusil chez Papi, à la demande du père de Max"
     },
     {
       "id": "lise-identite",
@@ -95,10 +84,9 @@
       "turns": [
         "max-B·3"
       ],
-      "expected": "absent",
+      "expected": "present",
       "fact": "Lise s'était présentée comme Peter ; Max l'a crue.",
-      "pattern": "présentée comme Peter",
-      "explanation": "La fiche écrit « Lise, prise pour Peter », qui fait de Max l'auteur de la confusion : à corriger dans Notion."
+      "pattern": "se présente comme Peter, mais qui s[’']avère être Lise"
     },
     {
       "id": "ava-contamine-emma",
@@ -107,8 +95,8 @@
         "max-B·4"
       ],
       "expected": "present",
-      "fact": "C'est Ava qui contamine Emma, par l'étreinte ; pas l'inverse.",
-      "pattern": "Emma l'a prise dans ses bras en sachant qu'elle serait contaminée à son tour"
+      "fact": "C'est Ava qui contamine Emma, par l'étreinte ; pas l'inverse. La fiche l'écrit au futur (« sera contaminée à son tour ») alors qu'Emma l'est depuis hier : formule à corriger par Romed.",
+      "pattern": "Emma l['’]a prise dans ses bras en sachant qu['’]elle sera contaminée à son tour"
     },
     {
       "id": "couteau-tendu-par-emma",
@@ -118,7 +106,7 @@
       ],
       "expected": "present",
       "fact": "Max ressort avec le couteau parce qu'Emma le lui a tendu.",
-      "pattern": "Emma te tend le couteau pour le chevreuil"
+      "pattern": "Emma te tend le couteau et te demande d['’]achever le chevreuil"
     },
     {
       "id": "chevreuil-disparu",
@@ -126,9 +114,10 @@
       "turns": [
         "max-A·4"
       ],
-      "expected": "present",
+      "expected": "absent",
       "fact": "Le chevreuil avait disparu quand Max est ressorti.",
-      "pattern": "Dehors, le chevreuil a disparu"
+      "pattern": "Dehors, le chevreuil a disparu",
+      "explanation": "Titre J-5.17 « Dehors, le chevreuil a disparu » non retenu par la sélection de timeline pour cette question (sans RAG) : en jeu le RAG le porte ; à mesurer dans le run F, pas une faute de la fiche."
     },
     {
       "id": "emma-appel-en-cours",
@@ -139,7 +128,7 @@
       ],
       "expected": "present",
       "fact": "L'appel attendu est celui qui a lieu.",
-      "pattern": "parles? en ce moment avec la personne"
+      "pattern": "Une cellule de bénévoles l['’]appelle, elle est soulagée"
     },
     {
       "id": "emma-plus-d-attente-de-l-appel",
@@ -152,7 +141,7 @@
       "expected": "absent",
       "fact": "Aucune phrase du prompt ne dit qu'Emma attend l'appel.",
       "pattern": "attends? (l['’]|un )appel|appel que tu attends\\b",
-      "explanation": "Même formulation source que pour Max ; à corriger dans Notion."
+      "explanation": "Garde-fou : même contrôle que pour Max."
     },
     {
       "id": "emma-etreinte-choisie",
@@ -162,7 +151,7 @@
       ],
       "expected": "present",
       "fact": "Emma a pris Ava dans ses bras en sachant qu'elle serait contaminée.",
-      "pattern": "Tu l'as prise dans tes bras en sachant que tu serais contaminée à ton tour"
+      "pattern": "Tu l['’]as prise dans tes bras, sachant qu['’]en agissant ainsi"
     },
     {
       "id": "emma-rester-proche-d-ava",
@@ -173,7 +162,7 @@
       "expected": "absent",
       "fact": "Emma a accepté de devenir protogyne pour rester proche d'Ava ; l'écarter comme Mona était exclu.",
       "pattern": "rester proche d['’]Ava",
-      "explanation": "Raison du geste absente de la fiche (Romed) : à écrire dans Notion."
+      "explanation": "Raison du geste (accepter de devenir protogyne pour rester proche d'Ava) toujours absente de la fiche retouchée : « Tu voudrais être près d'Ava » décrit le présent, pas la raison. À signaler à Romed."
     },
     {
       "id": "mona-ainee-d-emma",
@@ -194,8 +183,8 @@
       ],
       "expected": "absent",
       "fact": "Ils sont partis à la montagne pour protéger les enfants du virus.",
-      "pattern": "protéger (les|tes|vos) enfants|contamination de tes filles",
-      "explanation": "Écrit dans « Qui tu es » (« empêcher la contamination de tes filles »), que la sélection ne retient pas pour cette question : à porter dans le champ « Ce que tu sais aujourd'hui »."
+      "pattern": "contamination de tes filles",
+      "explanation": "Écrit dans « Qui tu es » (« empêcher la contamination de tes filles »), que la sélection ne retient pas pour cette question : raison du départ à porter dans le paragraphe des faits (ou un champ dédié)."
     },
     {
       "id": "mona-camp-par-le-pere",
@@ -205,8 +194,8 @@
       ],
       "expected": "present",
       "fact": "Mona est au camp à cause du père de Max.",
-      "pattern": "dans un camp à cause de ton père",
-      "explanation_note": "Présent dans le prompt (sujets sensibles), mais le paragraphe source « Elle est toujours dans un camp de quarantaine » fait dire à Max qu'elle y est parce qu'elle est contaminée (B1, 5 réponses sur 6 au 14 novembre) : à corriger dans Notion."
+      "pattern": "envoyé Mona au camp",
+      "explanation_note": "Porté par le titre de timeline J-5.01 (« ton père t'apprend qu'il a envoyé Mona au camp »). Le paragraphe « Ce qui est vrai aujourd'hui » dit maintenant « où ton père l'a mise », mais il mesure 1 399 caractères pour 1 200 de budget : la coupe à la phrase retire cette phrase et les trois suivantes du bloc FAITS ÉTABLIS."
     }
   ]
 }

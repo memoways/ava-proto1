@@ -27,6 +27,7 @@ import {
   type EvalTurnConfig,
   type EvalFactor,
 } from "@/services/evalJudgePipeline";
+import { factualityInputOf, factualityScore, type FactualityTurnInput, type FactualityVerdict, type JudgeFocus } from "@/services/evalJudgeFactuality";
 import {
   criterionValues,
   readJudgeSubScores,
@@ -51,6 +52,8 @@ export interface EvalSequenceTurn {
   continuityCriteria: string;
   tone: string;
   maxLength: number | null;
+  /** Lot F: false premise of the player's question (factuality focus); absent when the question has none. */
+  falsePremise?: string;
 }
 
 export interface EvalSequence {
@@ -128,6 +131,7 @@ export function parseSequenceCorpus(raw: string): { sequences: EvalSequence[]; e
         continuityCriteria: text(turn.continuityCriteria),
         tone: text(turn.tone) || "retenu",
         maxLength,
+        ...(text(turn.falsePremise) ? { falsePremise: text(turn.falsePremise) } : {}),
       };
     });
     if (problems.length) {
@@ -419,6 +423,8 @@ export interface SequenceRunDeps {
   runTurn: (config: EvalTurnConfig, request: SequenceTurnRequest, signal?: AbortSignal) => Promise<SequenceTurnTrace>;
   judgeTurn: (item: EvalItem, response: string, context: { priorExchanges: string; canonReference: string }, signal?: AbortSignal) => Promise<EvalJudgeScore | null>;
   judgeSequence: (sequence: EvalSequence, transcript: TranscriptTurn[], canonReference: string, signal?: AbortSignal) => Promise<SequenceJudgeScore>;
+  /** Lot F: factuality-only judge of one turn (focus "factuality"). */
+  judgeFactuality?: (turn: FactualityTurnInput, characterName: string, response: string, context: { priorExchanges: string; canonReference: string }, signal?: AbortSignal) => Promise<FactualityVerdict | null>;
 }
 
 export interface SequenceTurnResult {
@@ -436,7 +442,9 @@ export interface SequenceTurnResult {
   memoryLastTurnBefore: number;
   memoryLastTurnAfter: number;
   judge: EvalJudgeScore | null;
-  /** J1 weighted grade /10 (null when the judge failed). */
+  /** Lot F: factuality verdict, set only in the factuality focus (then `judge` stays null). */
+  factuality?: FactualityVerdict | null;
+  /** Weighted grade /10 of the focus (J1 grid, or factuality alone); null when the judge failed. */
   score: number | null;
 }
 
@@ -475,7 +483,13 @@ export function describeGmIssue(gm: PRD4PostTurnEvaluation | null): string | nul
 }
 
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const cause = error as { message?: unknown; code?: unknown };
+    if (typeof cause.message === "string") return cause.message;
+    try { return JSON.stringify(error).slice(0, 200); } catch { /* fall through */ }
+  }
+  return String(error);
 }
 
 /**
@@ -493,6 +507,8 @@ export async function runEvalSequence(input: {
   signal?: AbortSignal;
   now?: () => number;
   onTurn?: (turn: SequenceTurnResult) => void;
+  /** "factuality": only the facts are judged (no style criterion, no sequence judge). */
+  focus?: JudgeFocus;
 }): Promise<SequenceRunResult> {
   const { sequence, config, deps } = input;
   const now = input.now ?? Date.now;
@@ -525,8 +541,22 @@ export async function runEvalSequence(input: {
     }
     if (trace.canonReference) canonReference = trace.canonReference;
     let judge: EvalJudgeScore | null = null;
+    let factuality: FactualityVerdict | null = null;
     let judgeError: string | null = null;
-    if (trace.response.trim()) {
+    if (trace.response.trim() && input.focus === "factuality") {
+      try {
+        if (!deps.judgeFactuality) throw new Error("juge de factualité non fourni");
+        const item = sequenceTurnAsEvalItem(sequence, index);
+        factuality = await deps.judgeFactuality(factualityInputOf(item, corpusTurn), sequence.character, trace.response, {
+          priorExchanges: formatPriorExchanges(sequence, transcript),
+          canonReference,
+        }, input.signal);
+      } catch (error) {
+        if (isAbortError(error)) throw error;
+        judgeError = `juge : ${errorText(error)}`;
+      }
+      if (!factuality && !judgeError) judgeError = "juge : réponse illisible, tour écarté des moyennes";
+    } else if (trace.response.trim()) {
       try {
         judge = await deps.judgeTurn(sequenceTurnAsEvalItem(sequence, index), trace.response, {
           priorExchanges: formatPriorExchanges(sequence, transcript),
@@ -561,7 +591,8 @@ export async function runEvalSequence(input: {
       memoryLastTurnBefore: memoryBefore,
       memoryLastTurnAfter: next.memory?.lastTurn ?? 0,
       judge,
-      score: sub ? weightedScore(sub, input.turnWeights) : null,
+      ...(input.focus === "factuality" ? { factuality } : {}),
+      score: factuality ? factualityScore(factuality) : sub ? weightedScore(sub, input.turnWeights) : null,
     };
     turns.push(result);
     input.onTurn?.(result);
@@ -570,11 +601,14 @@ export async function runEvalSequence(input: {
   }
 
   let sequenceJudge: SequenceJudgeScore | null = null;
-  try {
-    sequenceJudge = await deps.judgeSequence(sequence, transcript, canonReference, input.signal);
-  } catch (error) {
-    if (isAbortError(error)) throw error;
-    sequenceJudge = null;
+  // Factuality focus: continuity criteria are style/continuity judgments, out of this round.
+  if (input.focus !== "factuality") {
+    try {
+      sequenceJudge = await deps.judgeSequence(sequence, transcript, canonReference, input.signal);
+    } catch (error) {
+      if (isAbortError(error)) throw error;
+      sequenceJudge = null;
+    }
   }
   const scored = turns.map((turn) => turn.score).filter((score): score is number => typeof score === "number");
   return {
@@ -589,7 +623,7 @@ export async function runEvalSequence(input: {
     sequenceScore: sequenceJudge ? sequenceScore(sequenceJudge, input.sequenceWeights) : null,
     turnMean: scored.length ? Number(mean(scored).toFixed(3)) : null,
     guidanceTransmitted: turns.filter((turn) => turn.gmGuidanceIn).length,
-    errors: turns.filter((turn) => turn.error).length + (sequenceJudge ? 0 : 1),
+    errors: turns.filter((turn) => turn.error).length + (sequenceJudge || input.focus === "factuality" ? 0 : 1),
   };
 }
 

@@ -60,9 +60,10 @@ export function kinshipFromTimeline(timeline: string | undefined): string[] {
 
 export function characterEstablishedFacts(prompt: CharacterPrompt): EstablishedFacts | null {
   const field = prompt.ce_que_tu_sais_aujourdhui?.trim();
+  // A filled field is the only source: the identity paragraph is never read next to it.
   if (field) {
-    const content = capAtSentence(neutralizeAwaitedCall(field), ESTABLISHED_FACTS_MAX_CHARS);
-    if (content) return { content, source: "field" };
+    const content = capAtSentence(field, ESTABLISHED_FACTS_MAX_CHARS);
+    return content ? { content, source: "field" } : null;
   }
   const paragraph = establishedFactsSourceParagraph(prompt);
   if (!paragraph) return null;
@@ -77,7 +78,7 @@ export function characterEstablishedFacts(prompt: CharacterPrompt): EstablishedF
   if (chronology && !body.includes(chronology) && content.length + chronology.length + 1 <= ESTABLISHED_FACTS_MAX_CHARS) {
     content = `${content}\n${chronology}`;
   }
-  return { content: neutralizeAwaitedCall(content), source: "extracted" };
+  return { content, source: "extracted" };
 }
 
 /** Avoid paying twice for the extracted paragraph; the saved sheet is never rewritten. */
@@ -88,27 +89,7 @@ export function withoutEstablishedFacts(prompt: CharacterPrompt): CharacterPromp
   return { ...prompt, identite_fondamentale: prompt.identite_fondamentale.replace(/\r\n?/g, "\n").replace(paragraph, "").trim() };
 }
 
-// ------------------------------------------------------- the awaited call
-
-const AWAITED_CALL = /\b(Il|Elle|Tu)(\s+)attends?\s+(?:l['’]|un\s+|cet\s+)appel\s+(d['’]une?\s+|de\s+la\s+|du\s+|de\s+l['’])([^,.;:\n]+)/g;
-const AWAITED_CALL_TITLE = /l['’]appel que tu attends\b/gi;
-
-/**
- * At the moment of the experience the awaited call is the one taking place.
- * The sheets still say « Tu attends l'appel de la cellule de bénévoles » (a
- * source wording to be fixed in Notion): read at call time, it becomes the
- * call in progress. Deterministic, wording kept from the sheet.
- */
-export function neutralizeAwaitedCall(text: string): string {
-  if (!text) return text;
-  return text
-    .replace(AWAITED_CALL, (_match, pronoun: string, gap: string, preposition: string, caller: string) => {
-      const second = pronoun.toLocaleLowerCase("fr") === "tu";
-      const subject = pronoun.toLocaleLowerCase("fr");
-      return `${pronoun}${gap}${second ? "parles" : "parle"} en ce moment avec la personne ${preposition}${caller.trim()} dont ${subject} ${second ? "attendais" : "attendait"} l'appel`;
-    })
-    .replace(AWAITED_CALL_TITLE, "l'appel que tu attendais, et qui a lieu maintenant");
-}
+// ------------------------------------------------------- the awaited call (guard only)
 
 const SHEET_TEXT_FIELDS = [
   "identite_fondamentale", "qui_tu_es", "ce_que_tu_ne_fais_jamais", "ce_que_tu_sais_utilisateur",
@@ -116,15 +97,25 @@ const SHEET_TEXT_FIELDS = [
   "maniere_de_parler", "situation_summary", "ce_que_tu_sais_aujourdhui",
 ] as const;
 
-/** The sheet as read at call time (in memory only). */
-export function sheetAtCallTime<T extends CharacterPrompt>(prompt: T): T {
-  const next = { ...prompt };
-  for (const key of SHEET_TEXT_FIELDS) {
-    const value = next[key];
-    if (typeof value === "string" && value) next[key] = neutralizeAwaitedCall(value);
-  }
-  return next;
-}
+/** « il/elle/tu attend(s) l'appel », « attend un appel », « l'appel que tu attends ». */
+const AWAITED_CALL = /\battends?\s+(?:l['’]|un\s+|cet\s+)appel|l['’]appel que tu attends\b/gi;
 
-/** Shared by the character and the Game Master through the experience frame. */
-export const CALL_PRESENT_INVARIANT = "PRÉSENT DE L'APPEL : l'appel attendu a lieu maintenant ; la personne au bout du fil est celle qui devait appeler. Plus personne n'attend cet appel : « j'attends l'appel » est faux pendant toute la conversation.";
+export interface AwaitedCallHit { field: string; excerpt: string }
+
+/**
+ * Lot F guard. The code no longer rewrites the sheet: since the 19 November 2026 retouch the
+ * synced sheets describe the call in progress. A sheet that says « tu attends l'appel » again
+ * is a source fault, reported here (test and `eval:judge:sheets`) to be fixed in Notion.
+ */
+export function findAwaitedCallSentences(prompt: CharacterPrompt): AwaitedCallHit[] {
+  const hits: AwaitedCallHit[] = [];
+  for (const key of SHEET_TEXT_FIELDS) {
+    const value = prompt[key];
+    if (typeof value !== "string" || !value) continue;
+    for (const match of value.matchAll(AWAITED_CALL)) {
+      const at = match.index ?? 0;
+      hits.push({ field: key, excerpt: value.slice(Math.max(0, at - 30), at + 90).replace(/\s+/g, " ").trim() });
+    }
+  }
+  return hits;
+}

@@ -22,6 +22,7 @@
     "eval:rerank-replay": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/rerankReplay.ts --",
     "eval:judge:sequences": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/sequences.ts --",
     "eval:judge:calibrate": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/calibrate.ts --",
+    "eval:judge:merge-factuality": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/mergeFactuality.ts --",
     "eval:judge:sheets": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/sheets.ts --",
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test",

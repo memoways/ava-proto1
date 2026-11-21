@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import sheets from "./__fixtures__/speechSandbox20261109.json";
+import sheets from "./__fixtures__/speechSandbox20261121.json";
 import {
   buildOptimizedPromptAssembly,
   LIVED_IMPACT_TITLE,
@@ -9,11 +9,10 @@ import {
 } from "./maxOptimizedPromptCompiler";
 import { characterLivedImpact } from "@/services/characterEmbodiment";
 import type { CharacterPrompt } from "@/services/characterPromptService";
-import { neutralizeAwaitedCall } from "@/services/establishedFacts";
 
 const asPrompt = (row: (typeof sheets)[number]) => row as unknown as CharacterPrompt;
 
-// Sandbox sheets as synced on 29 October 2026 (read-only copy of the Notion fields).
+// Sandbox sheets as synced on 21 November 2026 (read-only copy of the Notion fields).
 describe("optimized_v3 — ce que ça te fait (parole sous le choc)", () => {
   const cases = sheets.flatMap(row => [0, OPTIMIZED_V3_LIMITS.memoryChars].map(historyChars => ({ row, historyChars })));
 
@@ -27,8 +26,8 @@ describe("optimized_v3 — ce que ça te fait (parole sous le choc)", () => {
     });
     const prompt = result.finalSystemPrompt;
     expect(prompt).toContain(`## ${LIVED_IMPACT_TITLE}\n${lived!.content}`);
-    // Lot K1: the present is read at call time (the awaited call is taking place).
-    expect(prompt).toContain(`## ${PRESENT_TITLE}\n${neutralizeAwaitedCall(sheet.situation_summary.trim())}`);
+    // The present comes from the sheet itself (lot F: no rewrite).
+    expect(prompt).toContain(`## ${PRESENT_TITLE}\n${sheet.situation_summary.trim()}`);
     expect(prompt.indexOf(LIVED_IMPACT_TITLE)).toBeLessThan(prompt.indexOf(PRESENT_TITLE));
     // Paid once: the lived paragraph is not selected again as a relevance fragment.
     expect(prompt.split(lived!.content.split("\n")[2]).length - 1).toBe(1);

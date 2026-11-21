@@ -585,6 +585,10 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
                     <Textarea id="gm-frame-text" className="min-h-28" value={frame.frameText} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ frameText: event.target.value })} />
                     <GmSettingPreview id="frameText" config={config} />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gm-call-present">Présent de l'appel (envoyé même si le cadre est désactivé) <Hint text="Règle de l'expérience, pas un fait de personnage : l'appel attendu a lieu maintenant. Vide : rien n’est envoyé. Les faits des personnages restent dans leur fiche Notion." /></Label>
+                    <Textarea id="gm-call-present" className="min-h-20" value={frame.callPresentText} disabled={selected.status !== "draft"} onChange={(event) => patchFrame({ callPresentText: event.target.value })} />
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label htmlFor="gm-frame-seen">Exposition — film vu <Hint text="Ce que le joueur est censé savoir s’il a répondu avoir vu le film." /></Label>

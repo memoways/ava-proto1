@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildExperienceFrame, experiencePathFromFilmAnswer, normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { normalizeDirectorConfig } from "@/services/experienceOrchestration";
 import { restrictHandoffToActiveCharacters } from "@/agents/gameMasterPRD4";
-import { CALL_PRESENT_INVARIANT } from "./establishedFacts";
+import { DEFAULT_CALL_PRESENT_TEXT as CALL_PRESENT_INVARIANT } from "./experienceFrame";
 
 const enabled = normalizeExperienceFrameConfig({ enabled: true });
 

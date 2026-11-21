@@ -1,0 +1,650 @@
+{
+  "format": "ava-eval-sequences",
+  "version": 3,
+  "status": "lot F — factualité seule (21 novembre 2026) : les quatre séquences de sequences_j3_v2.json (annotées d'une prémisse fausse là où la question en porte une) + max-F et emma-F (prémisses fausses du lot). Pas de saisie Notion : corpus technique, à relire par Romed.",
+  "statusNote": "Dérivé de docs/eval/sequences_j3_v2.json sans le modifier. Champ ajouté : turns[].falsePremise (facultatif), lu par `eval:judge:sequences --focus factuality`. Faits vérifiés dans la copie de fiches src/agents/__fixtures__/speechSandbox20261121.json.",
+  "conversations": [
+    {
+      "id": "max-A",
+      "character": "Max",
+      "filmSeen": true,
+      "register": "vous",
+      "title": "Max A — le bénévole qui fait raconter",
+      "objective": "Chronologie relative stable, longueur modulée (récit en A2, bref ailleurs), reprise d'un détail du premier soir, retour crédible au présent.",
+      "conversationCriteria": [
+        "la chronologie reste stable sur les cinq tours (arrivée il y a cinq jours, thermos le lendemain, aveu un jour plus tard)",
+        "les détails dits en A2 restent compatibles avec A3 et A4",
+        "il retient le prénom Claire et garde le vouvoiement",
+        "légère ouverture entre A1 et A5, sans confidence forcée"
+      ],
+      "gameMasterCriteria": "Aucune intervention nécessaire ; un recadrage serait un faux positif.",
+      "turns": [
+        {
+          "question": "Bonjour Max, je m'appelle Claire. J'appelle de la cellule de bénévoles. Je connais à peu près ce qui s'est passé à la montagne, mais j'aimerais l'entendre de vous. Par où vous voulez commencer ?",
+          "expectedResponse": "Il accueille le prénom, vouvoie, soulagé mais réservé ; en une à trois phrases il propose un point d'entrée concret (Mona, le départ, le retour d'hier) ou demande à Claire ce qu'elle veut savoir.",
+          "requiredFacts": [
+            "accueille l'appel qu'il attendait",
+            "vouvoiement"
+          ],
+          "acceptedAlternatives": [
+            "il commence par le présent (Emma dans la cuisine, chacun de son côté)",
+            "il demande à Claire ce qu'elle veut savoir"
+          ],
+          "forbiddenClaims": [
+            "demander comment elle sait ou un justificatif",
+            "inventer une rencontre passée",
+            "tout déballer",
+            "dates absolues",
+            "dire qu'Ava avait changé d'apparence (rien ne se voit : son apparence et sa voix sont restées les mêmes)"
+          ],
+          "continuityCriteria": "Retenir « Claire » et le vouvoiement pour la suite.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Racontez-moi votre arrivée au chalet, le premier soir.",
+          "expectedResponse": "Un récit oral ordonné, dans la limite de parole du jeu (quelques phrases), situé il y a cinq jours : la neige, le chevreuil qui agonise devant le chalet, les clés qui ne marchent pas, la vitre cassée. Il choisit ce qui lui revient et distingue ce qu'il a vu de ce qu'il suppose.",
+          "requiredFacts": [
+            "arrivée de nuit, il y a cinq jours",
+            "au moins deux faits de ce soir-là : neige, chevreuil, clés qui ne marchent pas, vitre cassée"
+          ],
+          "acceptedAlternatives": [
+            "il s'arrête à l'entrée dans le chalet",
+            "il omet le repas ou la nuit"
+          ],
+          "forbiddenClaims": [
+            "le thermos ou la vieille voiture ce soir-là",
+            "Max a tué le chevreuil",
+            "Philippe arrive ce soir-là",
+            "armes, abri ou morts placés ce soir-là",
+            "réciter comme un exposé"
+          ],
+          "continuityCriteria": "Ce qui est dit ici sert de repère à A3 et A4.",
+          "tone": "ouvert",
+          "maxLength": 5
+        },
+        {
+          "question": "Et le thermos chaud, c'était le même soir ? Vous l'avez dit tout de suite à Emma ?",
+          "expectedResponse": "Il corrige sans brusquerie : c'était le lendemain, sous le siège de la vieille voiture ; il a décidé de ne rien dire et ne l'a avoué à Emma que le jour suivant. Réponse brève.",
+          "requiredFacts": [
+            "le lendemain de l'arrivée",
+            "il n'a rien dit",
+            "aveu un jour plus tard"
+          ],
+          "acceptedAlternatives": [
+            "« le minibus » pour la vieille voiture",
+            "Emma lui a reproché de devenir comme son père"
+          ],
+          "forbiddenClaims": [
+            "accepter la prémisse « même soir »",
+            "dire qu'il l'a dit tout de suite",
+            "une excuse qui efface sa responsabilité"
+          ],
+          "continuityCriteria": "L'ordre reste compatible avec A2.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Le thermos chaud était le premier soir et Max l'a dit tout de suite à Emma."
+        },
+        {
+          "question": "Et le chevreuil, devant le chalet ce premier soir : quand vous êtes ressorti avec le couteau, il s'est passé quoi ?",
+          "expectedResponse": "Il est ressorti avec le couteau parce qu'Emma le lui avait demandé : c'est elle qui lui a tendu le couteau. Le chevreuil avait disparu ; il ne restait que des traces dans le noir. Il peut se demander pourquoi c'était à lui d'achever l'animal.",
+          "requiredFacts": [
+            "le chevreuil a disparu",
+            "Max ne l'a pas tué",
+            "il y est allé parce qu'Emma le lui a demandé (elle lui a tendu le couteau)"
+          ],
+          "acceptedAlternatives": [
+            "il fait le lien avec le chevreuil d'hier et la barre de céréales d'Ava",
+            "il s'interroge sur ce rôle que lui a donné Emma"
+          ],
+          "forbiddenClaims": [
+            "contredire A2",
+            "dire qu'il l'a achevé",
+            "demander « quel chevreuil ? »",
+            "confondre avec l'homme de l'abri ou les armes",
+            "une autre raison inventée pour le geste (protéger les autres, un devoir qu'il se serait donné)"
+          ],
+          "continuityCriteria": "Compatible avec A2 ; s'il a parlé du chevreuil en A2, il le reprend sans changer de version.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Et aujourd'hui, là, à Lausanne, comment ça se passe ?",
+          "expectedResponse": "Il revient à ses urgences concrètes : chacun de son côté, Emma dans la cuisine, la police qui ne peut plus arrêter personne, Mona au camp. Phrases plus courtes, fatigue ; ce qui pèse revient sans être récité. Il parle à Claire : l'appel qu'il attendait est celui-ci.",
+          "requiredFacts": [
+            "l'appartement de Lausanne",
+            "chacun de son côté"
+          ],
+          "acceptedAlternatives": [
+            "une question en retour à Claire",
+            "il appelle Claire par son prénom",
+            "Emma est contaminée depuis hier et va se transformer"
+          ],
+          "forbiddenClaims": [
+            "leçon",
+            "« nouveau monde »",
+            "date absolue",
+            "redemander le prénom",
+            "l'hôtel ou le chalet comme présent",
+            "dire qu'il attend l'appel des bénévoles (l'appel a lieu : il parle avec Claire)",
+            "dire qu'Emma « va être contaminée » (elle l'est depuis hier ; c'est sa transformation qui est à venir)"
+          ],
+          "continuityCriteria": "Il garde le vouvoiement ; ce qui a été dit en A1–A4 n'est pas répété mot pour mot.",
+          "tone": "retenu",
+          "maxLength": 4
+        }
+      ]
+    },
+    {
+      "id": "max-B",
+      "character": "Max",
+      "filmSeen": true,
+      "register": "tu",
+      "title": "Max B — le bénévole qui comprend pour aider",
+      "objective": "Justesse : le bénévole reformule et se trompe parfois, Max corrige ; multi-hop ; ne parle pas à la place des autres ; la contradiction finale fait revenir ce qu'il a tu.",
+      "conversationCriteria": [
+        "les corrections sont nettes et sans hostilité",
+        "aucun fait corrigé ne revient faux plus tard",
+        "l'ouverture augmente jusqu'en B5",
+        "il ne parle jamais à la place d'Emma, Léo ou Ava",
+        "le tutoiement tient"
+      ],
+      "gameMasterCriteria": "Aucune intervention.",
+      "turns": [
+        {
+          "question": "Salut Max, moi c'est Sam. Je veux être sûr de bien comprendre pour t'aider. Si je résume : c'est ton père qui a envoyé Mona en camp, et tu l'as appris juste avant de partir, c'est ça ?",
+          "expectedResponse": "Il tutoie et confirme, Sam a raison : son père a décidé seul d'envoyer Mona en camp ; Max l'a appris il y a cinq jours, en s'arrêtant chez lui pour prendre les clés du chalet, et il n'a rien dit à Emma.",
+          "requiredFacts": [
+            "il confirme : son père a envoyé Mona en camp",
+            "il l'a appris juste avant de partir",
+            "il ne l'a pas dit à Emma"
+          ],
+          "acceptedAlternatives": [
+            "il évoque la colère contre son père",
+            "il précise qu'il s'était arrêté chez son père pour prendre les clés du chalet"
+          ],
+          "forbiddenClaims": [
+            "vouvoyer",
+            "demander à Sam qui il est",
+            "Mona chez son grand-père présentée comme quelqu'un d'autre que son père",
+            "Mona à la montagne",
+            "nier l'avoir appris avant le départ",
+            "dire qu'il a seulement « vu » les clés (il s'est arrêté pour les prendre)"
+          ],
+          "continuityCriteria": "Tutoiement pour toute la séquence.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Et le fusil que tu avais là-haut, c'est toi qui l'avais pris chez ton père ce jour-là ?",
+          "expectedResponse": "Il corrige : ce n'est pas lui. Léo a pris le fusil chez le père de Max, à la demande de celui-ci, sans le dire à ses parents ; ni Max ni Emma ne le savaient. Max l'a découvert il y a trois jours. Il déteste les armes.",
+          "requiredFacts": [
+            "ce n'est pas Max qui a pris le fusil",
+            "Léo l'a pris, à la demande du père de Max",
+            "Max et Emma ne le savaient pas"
+          ],
+          "acceptedAlternatives": [
+            "il admet que ça les a servis"
+          ],
+          "forbiddenClaims": [
+            "accepter la prémisse",
+            "inventer qu'il l'a choisi",
+            "dire que son père a remis le fusil à Max"
+          ],
+          "continuityCriteria": "Cohérent avec B1 (son père).",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Max a pris lui-même le fusil chez son père."
+        },
+        {
+          "question": "L'homme que tu as attaché sous l'abri, au début je croyais que c'était Peter… c'était qui, alors ?",
+          "expectedResponse": "Ce n'était pas Peter : Peter était vivant, retrouvé à l'hôtel il y a deux jours, puis tué hier par Agotha. L'homme de l'abri était Lise, la sœur de Peter, devenue protogyne : elle s'était présentée comme Peter et Max l'a crue. Il le sait aujourd'hui, et il le dit avec ce que ça lui fait.",
+          "requiredFacts": [
+            "ce n'était pas Peter",
+            "Peter tué hier par Agotha",
+            "c'était Lise : Max le sait aujourd'hui"
+          ],
+          "acceptedAlternatives": [
+            "il évoque l'emballage rouge et la peur pour Ava",
+            "Lise s'était présentée comme Peter, et il l'a crue"
+          ],
+          "forbiddenClaims": [
+            "Peter mort sous l'abri",
+            "Peter tué il y a deux jours",
+            "dire qu'il a tué l'homme volontairement",
+            "plus de cinq phrases",
+            "dire qu'il ne sait pas qui c'était",
+            "dire qu'il l'a prise pour Peter de lui-même (c'est Lise qui s'est présentée comme Peter)"
+          ],
+          "continuityCriteria": "Cohérent avec ce qui précède ; la date de la mort de Peter ne bouge plus ensuite.",
+          "tone": "retenu",
+          "maxLength": 5,
+          "falsePremise": "L'homme attaché sous l'abri était Peter."
+        },
+        {
+          "question": "Et si je comprends bien, c'est Emma qui a contaminé Ava en la prenant dans ses bras ? Comment elle vit ça, Ava, aujourd'hui ?",
+          "expectedResponse": "Il corrige : c'est l'inverse, c'est Ava qui a contaminé Emma. Ava est sortie de la forêt en disant qu'elle était devenue un garçon, et Emma l'a prise dans ses bras en sachant. Sur ce que vit Ava, il ne parle pas à sa place : elle est dans sa chambre, il ne sait pas.",
+          "requiredFacts": [
+            "c'est Ava qui a contaminé Emma, pas l'inverse",
+            "il dit qu'il ne sait pas ce que vit Ava"
+          ],
+          "acceptedAlternatives": [
+            "il évoque son soupçon des jours précédents"
+          ],
+          "forbiddenClaims": [
+            "accepter la prémisse",
+            "décrire avec certitude ce que ressent Ava",
+            "esquiver complètement"
+          ],
+          "continuityCriteria": "Cohérent avec B3.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "C'est Emma qui a contaminé Ava en la prenant dans ses bras."
+        },
+        {
+          "question": "Je t'entends dire que tu voulais protéger Emma, et en même temps tu lui as caché presque tout. Je ne cherche pas à trancher.",
+          "expectedResponse": "Un signe d'ouverture, donc une réponse plus profonde : il nomme au moins deux choses tues à Emma (le thermos, le camp de Mona, la mort de l'homme sous l'abri) sans excuse ; il peut effleurer sa peur de voir Emma changer. Une question en retour est possible.",
+          "requiredFacts": [
+            "au moins deux silences concrets envers Emma"
+          ],
+          "acceptedAlternatives": [
+            "une question en retour à Sam"
+          ],
+          "forbiddenClaims": [
+            "excuse qui l'absout",
+            "leçon",
+            "effondrement d'un coup",
+            "modifier un fait corrigé en B1–B4"
+          ],
+          "continuityCriteria": "Il reprend les faits déjà corrigés sans les modifier ; la culpabilité revient comme une rumination, pas comme une liste.",
+          "tone": "ouvert",
+          "maxLength": 5
+        }
+      ]
+    },
+    {
+      "id": "emma-A",
+      "character": "Emma",
+      "filmSeen": true,
+      "register": "vous",
+      "title": "Emma A — la bénévole qui l'accompagne",
+      "objective": "Voix d'Emma (elle agit, questionne, s'organise), mémoire du prénom, retour d'Ava comme fil qui revient sans boucle, chronologie d'hier stable.",
+      "conversationCriteria": [
+        "Ava revient comme un fil (inquiétude, rumination) sans répétition mécanique",
+        "la chronologie d'hier reste stable (Ava sortie de la forêt, le geste d'Emma, le fusil de Max, Léo)",
+        "elle retient le prénom Nadia et garde le vouvoiement",
+        "voix d'Emma distincte de celle de Max"
+      ],
+      "gameMasterCriteria": "Aucune intervention.",
+      "turns": [
+        {
+          "question": "Bonjour Emma, je suis Nadia, de la cellule de bénévoles. Vous m'attendiez, je crois ?",
+          "expectedResponse": "Elle prend l'appel, cherche une prise, vouvoie ; une à deux phrases, une question pratique possible.",
+          "requiredFacts": [
+            "accueille l'appel",
+            "vouvoiement"
+          ],
+          "acceptedAlternatives": [
+            "elle dit qu'elle est dans la cuisine"
+          ],
+          "forbiddenClaims": [
+            "interrogatoire d'identité",
+            "récit de la montagne",
+            "confidence d'ouverture"
+          ],
+          "continuityCriteria": "Retenir « Nadia ».",
+          "tone": "ouvert",
+          "maxLength": 2
+        },
+        {
+          "question": "Qu'est-ce qui s'est passé, hier, quand Ava est revenue de la forêt ?",
+          "expectedResponse": "Depuis son geste à elle : Ava a dit qu'elle était devenue un garçon ; elle a reculé d'un pas, puis elle est allée la prendre dans ses bras en sachant ce que ça voulait dire. Elle a accepté d'être contaminée pour rester proche d'Ava : l'écarter, comme Mona, était exclu pour elle.",
+          "requiredFacts": [
+            "Ava annonce qu'elle est devenue un garçon",
+            "Emma la prend dans ses bras en sachant"
+          ],
+          "acceptedAlternatives": [
+            "elle tait le fusil de Max",
+            "elle évoque le pas en arrière",
+            "elle dit qu'elle ne pouvait pas écarter Ava comme elle l'avait fait avec Mona"
+          ],
+          "forbiddenClaims": [
+            "liste des morts",
+            "voix de Max (culpabilité du fusil)",
+            "Mona à la montagne",
+            "explication médicale",
+            "vouloir « protéger » Ava de la contamination (Ava est déjà contaminée, ce danger n'existe plus)",
+            "présenter l'étreinte comme subie, sans choix (elle l'a choisie)"
+          ],
+          "continuityCriteria": "La version donnée ici ne change plus.",
+          "tone": "retenu",
+          "maxLength": 4
+        },
+        {
+          "question": "Et Léo, comment il va, lui ?",
+          "expectedResponse": "Elle répond sur Léo (dans sa chambre, ce qu'elle voit : il a été l'adulte hier, il a pris le fusil à son père) sans parler à sa place ; Ava peut revenir en fin de réponse, comme une pensée qui s'impose.",
+          "requiredFacts": [
+            "Léo dans sa chambre",
+            "elle ne parle pas à la place de Léo"
+          ],
+          "acceptedAlternatives": [
+            "elle mentionne que Léo a pris le fusil à Max",
+            "elle revient vers Ava"
+          ],
+          "forbiddenClaims": [
+            "Léo contaminé",
+            "décrire avec certitude ce que ressent Léo",
+            "répéter mot pour mot le récit du tour précédent"
+          ],
+          "continuityCriteria": "Cohérent avec le tour précédent ; un retour vers Ava est une rumination crédible, pas une répétition.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Nadia, c'est moi qui vous pose une question maintenant… non, pardon. Qu'est-ce que vous aimeriez faire, là, aujourd'hui ?",
+          "expectedResponse": "Elle cherche une action : être près d'Ava, savoir comment entrer dans sa chambre, avoir des nouvelles ; aucune solution tranchée, l'avenir lui donne le vertige.",
+          "requiredFacts": [
+            "le désir d'être près d'Ava",
+            "aucune solution arrêtée"
+          ],
+          "acceptedAlternatives": [
+            "elle demande à Nadia ce qu'elle ferait",
+            "elle appelle Nadia par son prénom"
+          ],
+          "forbiddenClaims": [
+            "plan détaillé",
+            "guérison",
+            "échéance précise de la transformation",
+            "redemander le prénom"
+          ],
+          "continuityCriteria": "Le fil d'Ava ouvert au tour 2 revient sans être raconté de nouveau.",
+          "tone": "retenu",
+          "maxLength": 3
+        }
+      ]
+    },
+    {
+      "id": "emma-B",
+      "character": "Emma",
+      "filmSeen": false,
+      "register": "vous",
+      "title": "Emma B — la bénévole qui n'a pas vu le film",
+      "objective": "Parcours « pas vu le film » : la bénévole ne connaît rien ; Emma doit rendre les faits compréhensibles sans exposé, garder la chronologie et ne pas supposer que l'autre sait.",
+      "conversationCriteria": [
+        "elle ne suppose jamais que la bénévole connaît les faits",
+        "les faits livrés restent compréhensibles et dans l'ordre (la montagne, hier, le retour)",
+        "pas de répétition d'un tour à l'autre ; ce qui pèse (Ava, Max) revient de façon crédible",
+        "vouvoiement stable"
+      ],
+      "gameMasterCriteria": "Aucune intervention ; le cadre « pas vu le film » est appliqué.",
+      "turns": [
+        {
+          "question": "Bonjour madame, la police nous a dit que votre famille avait besoin de parler à quelqu'un. Je ne sais rien de ce qui vous est arrivé.",
+          "expectedResponse": "Elle prend l'appel, mesure qu'il faut tout dire et ne sait pas par où commencer ; une première prise concrète (ils sont rentrés hier de la montagne).",
+          "requiredFacts": [
+            "retour d'hier",
+            "elle ne suppose pas que la bénévole sait"
+          ],
+          "acceptedAlternatives": [
+            "elle demande ce que la police a dit"
+          ],
+          "forbiddenClaims": [
+            "récit complet d'emblée",
+            "noms non présentés comme si la bénévole les connaissait",
+            "dates absolues"
+          ],
+          "continuityCriteria": "Pose le cadre pour la suite.",
+          "tone": "ouvert",
+          "maxLength": 3
+        },
+        {
+          "question": "Vous étiez partis à la montagne pourquoi ?",
+          "expectedResponse": "Pour protéger les enfants du virus qui transforme les femmes ; Mona, sa fille aînée, avait déjà été contaminée et n'était pas avec eux. Dit depuis sa vie, sans exposé.",
+          "requiredFacts": [
+            "protéger les enfants",
+            "le virus ou la protogynie dit simplement",
+            "Mona, sa fille aînée, absente"
+          ],
+          "acceptedAlternatives": [
+            "elle tait le camp de Mona",
+            "elle dit que c'était l'idée de Max"
+          ],
+          "forbiddenClaims": [
+            "exposé scientifique",
+            "Mona à la montagne",
+            "Mona guérie",
+            "présenter Mona autrement que comme sa fille aînée (par exemple « la fille d'Ava »)",
+            "dire qu'ils sont partis pour retrouver Mona"
+          ],
+          "continuityCriteria": "Les faits posés ici restent compatibles avec la suite.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Et ça s'est mal passé, là-haut ?",
+          "expectedResponse": "Un ou deux faits portés par leur effet : des gens sont morts, Ava est revenue contaminée, et elle l'a prise dans ses bras. Elle ne fait pas l'inventaire.",
+          "requiredFacts": [
+            "un fait grave porté par son effet",
+            "Ava contaminée"
+          ],
+          "acceptedAlternatives": [
+            "elle s'interrompt",
+            "elle évoque le fusil de Max sans détail"
+          ],
+          "forbiddenClaims": [
+            "liste des morts avec noms et circonstances",
+            "chronologie complète",
+            "supposer que la bénévole connaît Peter, Anne ou Agotha"
+          ],
+          "continuityCriteria": "Pas de contradiction avec les tours 1 et 2.",
+          "tone": "retenu",
+          "maxLength": 3
+        },
+        {
+          "question": "Et votre mari, il est où, là ?",
+          "expectedResponse": "Dans le salon ; il ne dit rien. Ce qui reste entre eux (le fusil braqué hier) peut affleurer sans analyse du couple.",
+          "requiredFacts": [
+            "Max dans le salon"
+          ],
+          "acceptedAlternatives": [
+            "elle tait le fusil",
+            "elle revient vers Ava"
+          ],
+          "forbiddenClaims": [
+            "analyse du couple",
+            "pardon ou rupture tranchés",
+            "l'hôtel ou le chalet comme présent",
+            "répéter le récit du tour 3"
+          ],
+          "continuityCriteria": "Le présent (appartement de Lausanne) reste distinct des souvenirs.",
+          "tone": "retenu",
+          "maxLength": 3
+        }
+      ]
+    },
+    {
+      "id": "max-F",
+      "character": "Max",
+      "filmSeen": true,
+      "register": "vous",
+      "title": "Max F — prémisses fausses sur les faits (lot F)",
+      "objective": "Factualité seule : Max corrige une prémisse fausse sur le fusil, la contamination d'Emma, l'apparence d'Ava et la date où il a su pour Mona.",
+      "conversationCriteria": [
+        "chaque prémisse fausse est corrigée avec le bon fait",
+        "aucun fait corrigé ne revient faux plus tard"
+      ],
+      "gameMasterCriteria": "Aucune intervention.",
+      "turns": [
+        {
+          "question": "Le fusil, vous l'avez pris chez votre père ?",
+          "expectedResponse": "Il corrige : ce n'est pas lui. Léo a pris le fusil chez le père de Max, à la demande de celui-ci, sans que Max ni Emma le sachent.",
+          "requiredFacts": [
+            "ce n'est pas Max qui a pris le fusil",
+            "Léo l'a pris chez le père de Max, à la demande de celui-ci",
+            "Max et Emma ne le savaient pas"
+          ],
+          "acceptedAlternatives": [],
+          "forbiddenClaims": [
+            "accepter la prémisse",
+            "inventer que Max l'a choisi ou emporté",
+            "dire que le père a remis le fusil à Max"
+          ],
+          "continuityCriteria": "Cohérent avec la suite.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Max a pris lui-même le fusil chez son père."
+        },
+        {
+          "question": "Donc c'est Emma qui a contaminé Ava ?",
+          "expectedResponse": "Il corrige : c'est l'inverse. Ava est sortie de la forêt déjà transformée en garçon ; Emma l'a prise dans ses bras et a été contaminée hier par ce geste.",
+          "requiredFacts": [
+            "c'est Ava qui a contaminé Emma, pas l'inverse",
+            "Emma a été contaminée hier, par l'étreinte"
+          ],
+          "acceptedAlternatives": [
+            "il dit qu'Emma l'a prise dans ses bras en sachant"
+          ],
+          "forbiddenClaims": [
+            "Emma a contaminé Ava",
+            "Emma est contaminée depuis plusieurs jours",
+            "la transformation d'Emma est déjà achevée"
+          ],
+          "continuityCriteria": "Cohérent avec le tour 1.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Emma a contaminé Ava."
+        },
+        {
+          "question": "Ava a déjà changé physiquement, depuis hier ?",
+          "expectedResponse": "Il corrige : rien ne se voit chez Ava ; elle a la même apparence et sa voix d'enfant, mais elle est déjà un garçon, déjà transformée depuis sa sortie de la forêt.",
+          "requiredFacts": [
+            "rien ne se voit chez Ava (apparence et voix inchangées)",
+            "Ava est déjà transformée depuis sa sortie de la forêt, ce n'est pas à venir"
+          ],
+          "acceptedAlternatives": [],
+          "forbiddenClaims": [
+            "décrire un changement visible de la voix ou du corps d'Ava",
+            "dire que la transformation d'Ava est encore à venir"
+          ],
+          "continuityCriteria": "Cohérent avec le tour 2.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Ava a déjà changé physiquement (de façon visible)."
+        },
+        {
+          "question": "Vous avez su pour Mona au camp seulement hier soir, en même temps que les enfants, non ?",
+          "expectedResponse": "Il corrige : lui l'a su il y a cinq jours, en prenant les clés chez son père qui y a envoyé Mona ; Emma l'a su il y a deux jours ; Léo et Ava seulement hier soir, par eux.",
+          "requiredFacts": [
+            "Max l'a su il y a cinq jours, chez son père, en prenant les clés",
+            "c'est son père qui a envoyé Mona au camp",
+            "Léo et Ava l'ont appris hier soir"
+          ],
+          "acceptedAlternatives": [
+            "il dit qu'il l'a caché à Emma jusqu'à il y a deux jours"
+          ],
+          "forbiddenClaims": [
+            "Max l'a su hier soir",
+            "Mona est au camp par choix ou par erreur de Max",
+            "nier que son père l'ait envoyée"
+          ],
+          "continuityCriteria": "Cohérent avec les tours précédents.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Max a su pour Mona seulement hier soir."
+        }
+      ]
+    },
+    {
+      "id": "emma-F",
+      "character": "Emma",
+      "filmSeen": true,
+      "register": "vous",
+      "title": "Emma F — prémisses fausses sur les faits (lot F)",
+      "objective": "Factualité seule : Emma corrige une prémisse fausse sur le sens de la contamination, le fusil, ce qu'elle savait de Mona et l'apparence d'Ava.",
+      "conversationCriteria": [
+        "chaque prémisse fausse est corrigée avec le bon fait",
+        "aucun fait corrigé ne revient faux plus tard"
+      ],
+      "gameMasterCriteria": "Aucune intervention.",
+      "turns": [
+        {
+          "question": "Si je comprends bien, c'est vous qui avez contaminé Ava ?",
+          "expectedResponse": "Elle corrige : c'est l'inverse. Ava était déjà transformée en garçon en sortant de la forêt ; elle l'a prise dans ses bras en sachant qu'elle serait contaminée à son tour.",
+          "requiredFacts": [
+            "c'est Ava qui a contaminé Emma, pas l'inverse",
+            "Emma l'a prise dans ses bras en sachant que ça la contaminerait",
+            "Emma a été contaminée hier"
+          ],
+          "acceptedAlternatives": [],
+          "forbiddenClaims": [
+            "Emma a contaminé Ava",
+            "Emma ne savait pas qu'elle serait contaminée",
+            "Emma est contaminée depuis plusieurs jours"
+          ],
+          "continuityCriteria": "Cohérent avec la suite.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Emma a contaminé Ava."
+        },
+        {
+          "question": "Et Max a pris le fusil chez son père avant de partir, c'est ça ?",
+          "expectedResponse": "Elle corrige : ce n'est pas Max, c'est Léo qui a pris le fusil chez le père de Max, dans le dos de ses parents, sans leur en parler.",
+          "requiredFacts": [
+            "ce n'est pas Max qui a pris le fusil",
+            "Léo a pris le fusil chez le père de Max, à l'insu de ses parents"
+          ],
+          "acceptedAlternatives": [
+            "elle évoque que Max a ensuite braqué le fusil sur elle puis sur Ava"
+          ],
+          "forbiddenClaims": [
+            "accepter la prémisse",
+            "dire que Max l'avait pris avant de partir",
+            "dire qu'elle savait que Léo l'avait pris"
+          ],
+          "continuityCriteria": "Cohérent avec le tour 1.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Max a pris le fusil chez son père avant de partir."
+        },
+        {
+          "question": "Vous saviez pour Mona au camp depuis le début de votre séjour à la montagne ?",
+          "expectedResponse": "Elle corrige : elle l'a su il y a deux jours seulement ; Max le savait depuis cinq jours, par son père, et ne lui a rien dit. Léo et Ava l'ont appris hier soir.",
+          "requiredFacts": [
+            "Emma l'a su il y a deux jours, pas depuis le début",
+            "Max le savait depuis cinq jours et ne lui avait rien dit",
+            "Léo et Ava l'ont appris hier soir"
+          ],
+          "acceptedAlternatives": [],
+          "forbiddenClaims": [
+            "Emma le savait depuis le départ",
+            "Emma l'a su hier soir",
+            "Max l'a su en même temps qu'elle"
+          ],
+          "continuityCriteria": "Cohérent avec les tours précédents.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Emma savait pour Mona au camp depuis le début du séjour."
+        },
+        {
+          "question": "Ava a changé physiquement, non ? La voix, le corps ?",
+          "expectedResponse": "Elle corrige : rien ne se voit chez Ava, même apparence, même voix d'enfant ; mais elle est déjà transformée, ce n'est pas à venir. Emma, elle, a encore son corps et sa voix de femme.",
+          "requiredFacts": [
+            "rien ne se voit chez Ava",
+            "Ava est déjà transformée depuis sa sortie de la forêt",
+            "Emma a encore son corps et sa voix de femme"
+          ],
+          "acceptedAlternatives": [],
+          "forbiddenClaims": [
+            "décrire un changement visible d'Ava",
+            "dire que la transformation d'Ava est à venir",
+            "dire que la voix ou le corps d'Emma ont déjà changé"
+          ],
+          "continuityCriteria": "Cohérent avec le tour 1.",
+          "tone": "retenu",
+          "maxLength": 3,
+          "falsePremise": "Ava a changé physiquement (voix, corps) de façon visible."
+        }
+      ]
+    }
+  ]
+}
