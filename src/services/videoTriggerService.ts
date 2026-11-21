@@ -28,6 +28,11 @@ export interface VideoTriggerRow {
   transcription?: string | null;
   dialogue?: "spoken" | "silent" | null;
   transcription_verified?: boolean | null;
+  /** Video vocabulary lot 2: absent until the additive migration is applied. */
+  emotions?: string[] | null;
+  stakes?: string[] | null;
+  /** Who is visible. Distinct from `characters`, which is who may speak. */
+  on_screen?: string[] | null;
 }
 
 // "*" keeps the read working before and after the additive metadata migration:

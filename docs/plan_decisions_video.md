@@ -103,6 +103,8 @@ signalées.
 
 ## Lot 2 — Vocabulaire commun : Thèmes, Émotion, Enjeu, Personnages à l'écran (Notion + synchro)
 
+**Code livré.** La sélection ne change pas. Migration à coller par Ulrich, propriétés Notion et valeurs à créer par Ulrich ou Romed : [proposition](proposition_vocabulaire_videos_romed.md). Suite : [lot 3](prompt_reprise_decisions_video_lot_3.md).
+
 La source unique et évolutive est la base Notion « Vidéos AVA ». Cette base n'est **pas** la base Caractères,
 qui reste en lecture seule ; on y a déjà créé des propriétés au lot 1 des extraits.
 - **Thèmes** : on garde la multi-sélection existante, avec un nettoyage proposé à Romed (`patricarcat`, doublons

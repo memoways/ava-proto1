@@ -6,6 +6,14 @@
  * Older events, written before these fields existed, still render.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { isMissingVideoLabelColumnError } from "../../supabase/functions/_shared/videoVocabulary";
+import {
+  interpretVocabularyRead,
+  isOutsideList,
+  vocabularyFromRows,
+  type VideoLabelLists,
+  type VocabularyLoad,
+} from "@/services/videoLabelVocabulary";
 
 export const VIDEO_DECISION_CANDIDATE_LIMIT = 16;
 export const VIDEO_DECISION_TITLE_MAX = 80;
@@ -166,12 +174,19 @@ export interface VideoCatalogEntry {
   title: string;
   themes: string[];
   characters: string[];
+  emotions?: string[] | null;
+  stakes?: string[] | null;
+  on_screen?: string[] | null;
 }
+
+export type LabelDimension = "themes" | "emotions" | "stakes";
 
 export interface GmTurnLabels {
   themes: string[];
   topics: string[];
   intentions: string[];
+  emotions: string[];
+  stakes: string[];
 }
 
 export interface DecisionTurn {
@@ -197,6 +212,8 @@ export interface DecisionTurn {
   linkDetail: string | null;
   themes: string[];
   topics: string[];
+  emotions: string[];
+  stakes: string[];
   /** True when the event predates the enriched payload. */
   degraded: boolean;
 }
@@ -248,6 +265,13 @@ export interface VideoDecisionReport {
   error: string | null;
   catalogUnreadable: boolean;
   themesUnreadable: boolean;
+  /** Notion lists when the snapshot was read. Null when it is missing, unreadable, or returned no row. */
+  vocabulary: VideoLabelLists | null;
+  vocabularyZeroRows: boolean;
+  vocabularyUnavailable: boolean;
+  vocabularyError: string | null;
+  /** Emotion or stake can be chosen once a column or the exported list actually contains a term. */
+  labelDimensions: { emotion: boolean; stake: boolean };
 }
 
 interface Payload {
@@ -344,7 +368,7 @@ function excludedFrom(payload: Payload): { reason: string; label: string; videoI
 
 interface GmEntry {
   turn_index?: unknown;
-  labels?: { themes?: unknown; topics?: unknown; intentions?: unknown };
+  labels?: { themes?: unknown; topics?: unknown; intentions?: unknown; emotions?: unknown; stakes?: unknown };
 }
 
 function gmLabels(log: unknown): Map<number, GmTurnLabels> {
@@ -357,6 +381,8 @@ function gmLabels(log: unknown): Map<number, GmTurnLabels> {
       themes: stringList(entry.labels?.themes),
       topics: stringList(entry.labels?.topics),
       intentions: stringList(entry.labels?.intentions),
+      emotions: stringList(entry.labels?.emotions),
+      stakes: stringList(entry.labels?.stakes),
     });
   }
   return map;
@@ -514,6 +540,8 @@ export function groupBySession(
       linkDetail,
       themes: labels?.themes ?? [],
       topics: labels?.topics ?? [],
+      emotions: labels?.emotions ?? [],
+      stakes: labels?.stakes ?? [],
       degraded: parsed.degraded || (!replyExcerpt && !userExcerpt && !Array.isArray(richest.candidates)),
     };
     const list = sessions.get(bucket.sessionId) ?? [];
@@ -562,22 +590,50 @@ function addFlow(map: Map<string, FlowLink>, source: string, target: string, exa
   map.set(key, current);
 }
 
-export function themeFlows(sessions: readonly DecisionSession[]): ThemeFlows {
+const DIMENSION_EMPTY: Record<LabelDimension, string> = {
+  themes: "(sans thème)",
+  emotions: "(sans émotion)",
+  stakes: "(sans enjeu)",
+};
+
+function dimensionLabels(turn: DecisionTurn, dimension: LabelDimension): string[] {
+  if (dimension === "emotions") return turn.emotions ?? [];
+  if (dimension === "stakes") return turn.stakes ?? [];
+  return turn.themes;
+}
+
+function flowSource(label: string, list: readonly string[] | null | undefined): string {
+  return list && isOutsideList(label, list) ? `${label} (hors liste)` : label;
+}
+
+export function themeFlows(
+  sessions: readonly DecisionSession[],
+  options?: { dimension?: LabelDimension; vocabulary?: VideoLabelLists | null },
+): ThemeFlows {
+  const dimension = options?.dimension ?? "themes";
+  const list = dimension === "emotions"
+    ? options?.vocabulary?.emotions
+    : dimension === "stakes"
+      ? options?.vocabulary?.stakes
+      : options?.vocabulary?.themes;
+  const empty = DIMENSION_EMPTY[dimension];
   const toVideos = new Map<string, FlowLink>();
   const evolution = new Map<string, FlowLink>();
   for (const session of sessions) {
     const turns = [...session.turns].sort((a, b) => (a.turnIndex ?? 0) - (b.turnIndex ?? 0));
     turns.forEach((turn, index) => {
-      const themes = turn.themes.length ? turn.themes : ["(sans thème)"];
+      const labels = dimensionLabels(turn, dimension);
+      const sources = (labels.length ? labels : [empty]).map((label) => label === empty ? empty : flowSource(label, list));
       const target = turn.outcome === "played"
         ? (turn.videoTitle ?? "vidéo")
         : `aucune vidéo (${turn.reasonLabel})`;
-      for (const theme of themes) addFlow(toVideos, theme, target, turn.quote);
+      for (const source of sources) addFlow(toVideos, source, target, turn.quote);
       const next = turns[index + 1];
       if (!next || turn.turnIndex == null || next.turnIndex == null || next.turnIndex <= turn.turnIndex) return;
-      const nextThemes = next.themes.length ? next.themes : ["(sans thème)"];
-      for (const theme of themes) {
-        for (const later of nextThemes) addFlow(evolution, theme, later, null);
+      const nextLabels = dimensionLabels(next, dimension);
+      const nextSources = (nextLabels.length ? nextLabels : [empty]).map((label) => label === empty ? empty : flowSource(label, list));
+      for (const source of sources) {
+        for (const later of nextSources) addFlow(evolution, source, later, null);
       }
     });
   }
@@ -658,6 +714,7 @@ export interface DecisionReader {
   events(sinceIso: string, sessionId: string | null, from: number, to: number): Promise<QueryResult<DecisionEventRow>>;
   videos(): Promise<QueryResult<VideoCatalogEntry>>;
   sessionLogs(ids: string[]): Promise<QueryResult<{ id: string; gm_post_turn_log: unknown }>>;
+  vocabulary?(): Promise<VocabularyLoad>;
 }
 
 export function supabaseDecisionReader(client: typeof supabase = supabase): DecisionReader {
@@ -672,8 +729,30 @@ export function supabaseDecisionReader(client: typeof supabase = supabase): Deci
       return query.range(from, to);
     },
     videos() {
-      return (client.from("video_triggers" as never) as unknown as { select: (columns: string) => Promise<QueryResult<VideoCatalogEntry>> })
-        .select("id, title, themes, characters");
+      const select = (columns: string) =>
+        (client.from("video_triggers" as never) as unknown as { select: (columns: string) => Promise<QueryResult<VideoCatalogEntry>> })
+          .select(columns);
+      return select("id, title, themes, characters, emotions, stakes, on_screen").then((result) => {
+        if (result.error && isMissingVideoLabelColumnError(result.error)) return select("id, title, themes, characters");
+        return result;
+      });
+    },
+    async vocabulary() {
+      try {
+        const { data, error } = await client
+          .from("video_label_vocabulary")
+          .select("themes, emotions, stakes, on_screen")
+          .eq("id", "current")
+          .maybeSingle();
+        return interpretVocabularyRead({ data, error });
+      } catch (error) {
+        return {
+          lists: null,
+          zeroRows: false,
+          unavailable: false,
+          error: error instanceof Error ? error.message : "lecture impossible",
+        };
+      }
     },
     sessionLogs(ids) {
       return (client.from("sessions" as never) as unknown as { select: (columns: string) => { in: (column: string, values: string[]) => Promise<QueryResult<{ id: string; gm_post_turn_log: unknown }>> } })
@@ -695,7 +774,20 @@ function emptyReport(partial: Partial<VideoDecisionReport>): VideoDecisionReport
     error: null,
     catalogUnreadable: false,
     themesUnreadable: false,
+    vocabulary: null,
+    vocabularyZeroRows: false,
+    vocabularyUnavailable: false,
+    vocabularyError: null,
+    labelDimensions: { emotion: false, stake: false },
     ...partial,
+  };
+}
+
+function labelDimensionsFrom(catalog: readonly VideoCatalogEntry[], vocabulary: VideoLabelLists | null): { emotion: boolean; stake: boolean } {
+  const filled = (values: readonly string[] | null | undefined) => (values?.length ?? 0) > 0;
+  return {
+    emotion: filled(vocabulary?.emotions) || catalog.some((video) => filled(video.emotions)),
+    stake: filled(vocabulary?.stakes) || catalog.some((video) => filled(video.stakes)),
   };
 }
 
@@ -726,6 +818,9 @@ export async function loadVideoDecisions(options: {
     title: video.title,
     themes: video.themes ?? [],
     characters: video.characters ?? [],
+    emotions: video.emotions ?? undefined,
+    stakes: video.stakes ?? undefined,
+    on_screen: video.on_screen ?? undefined,
   }));
   const sessionIds = [...new Set(events.map((event) => event.session_id))];
   const logs = new Map<string, unknown>();
@@ -741,17 +836,28 @@ export async function loadVideoDecisions(options: {
   }
   const sessions = groupBySession(events, catalog, logs);
   const turns = sessions.flatMap((session) => session.turns);
+  const vocabularyLoad: VocabularyLoad = reader.vocabulary
+    ? await reader.vocabulary()
+    : { lists: null, zeroRows: false, unavailable: true, error: null };
+  const vocabulary = vocabularyLoad.zeroRows || vocabularyLoad.error
+    ? null
+    : (vocabularyLoad.lists ?? vocabularyFromRows(catalog));
   return {
     sessions,
     turns,
     playCounts: playCounts(events, catalog),
-    themeFlows: themeFlows(sessions),
+    themeFlows: themeFlows(sessions, { vocabulary }),
     criteria: criteriaSummary(turns),
     zeroRows: false,
     truncated,
     error: null,
     catalogUnreadable: Boolean(videos.error) || (catalog.length === 0 && events.some((event) => asString(asPayload(event.payload).videoId))),
     themesUnreadable,
+    vocabulary,
+    vocabularyZeroRows: vocabularyLoad.zeroRows,
+    vocabularyUnavailable: vocabularyLoad.unavailable,
+    vocabularyError: vocabularyLoad.error,
+    labelDimensions: labelDimensionsFrom(catalog, vocabulary),
   };
 }
 

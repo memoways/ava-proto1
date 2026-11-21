@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo, lot 2 : vocabulaire commun thèmes, émotion, enjeu, à l'écran] — 2026-11-21
+
+- **Notion « 🎬 Vidéos AVA »** reste la source. Le code n'y écrit pas. Proposition pour Romed (nettoyage de `patricarcat` et du doublon Contamination / pandémie, listes de départ Émotion, Enjeu, À l'écran) : [docs/proposition_vocabulaire_videos_romed.md](docs/proposition_vocabulaire_videos_romed.md). Les trois propriétés ne sont pas créées ici.
+- **Migration additive** `20261121193000_video_triggers_label_vocabulary.sql` : `video_triggers.emotions`, `stakes`, `on_screen` (`text[]`) et l'instantané `video_label_vocabulary`, remplacé à chaque synchro. **À coller dans le chat Lovable.** Tant qu'elle n'est pas appliquée, `sync-notion` réécrit les vidéos sans ces colonnes et sans la table, et le dit dans la réponse (`video_label_columns_synced`, `video_vocabulary_synced`).
+- **Synchro** : options Notion de Thèmes, Émotion, Enjeu et À l'écran ; si une propriété n'a pas d'options, union des valeurs des vidéos en ligne. Propriété absente ou liste effacée → tableau vide, jamais une valeur laissée en place. `characters` ne change pas de sens (qui peut parler). À l'écran est un autre champ.
+- **Game Master** : bloc ajouté au post-turn avec les listes courantes. `labels.emotions` et `labels.stakes` sont parsés comme les autres listes. Le plafond de 4 reste la somme themes + topics + intentions. Une valeur hors liste est gardée. Le prompt éditorial Notion n'est pas modifié.
+- **Onglet Décisions vidéo** : le Sankey peut passer en émotion ou en enjeu dès qu'une de ces listes contient un terme. Sans cela, la vue thèmes du lot 1 reste celle par défaut. Une étiquette hors liste est marquée. Zéro ligne de vocabulaire est signalé, ce n'est pas une liste vide.
+- **Inchangé** : sélection, gardes, lien concret. Rien en production. Non vérifié ici : resynchronisation sandbox après la migration, et l'apparition d'un terme ajouté dans Notion. Suite : [lot 3](docs/prompt_reprise_decisions_video_lot_3.md).
+
 ## [Décisions vidéo, lot 1 : onglet de lecture et compteur de lectures] — 2026-11-21
 
 - **Journal** (`cinematic_recommended` et `cinematic_blocked`, payload seulement) : `mechanism` (`overlay`, `extract`, `game_master`), candidates `[{ id, title }]` dans l'ordre envoyé au sélecteur (16 au plus, titres à 80 car.) plus `candidateCount`, vidéos écartées par motif, extraits de réplique (300) et de question (200), `linkDetail` quand le lien est trop faible. Aucun changement de sélection, de garde ou de prompt.

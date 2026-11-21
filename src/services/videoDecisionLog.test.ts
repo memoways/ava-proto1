@@ -220,6 +220,20 @@ describe("themeFlows and criteria", () => {
     expect(flows.evolution).toEqual([expect.objectContaining({ source: "famille", target: "peur", count: 1 })]);
   });
 
+  it("switches dimension and marks a label outside the exported list", () => {
+    const withFeelings = groupBySession([
+      event({
+        event_type: "cinematic_played",
+        payload: { videoId: "v-suspendus", mechanism: "overlay" },
+      }),
+    ], catalog, new Map([["session-a", [{ turn_index: 3, labels: { themes: ["famille"], emotions: ["angoisse"], stakes: ["protéger"] } }]]]));
+    const vocabulary = { themes: ["famille"], emotions: ["peur"], stakes: ["protéger"], on_screen: ["Léo"] };
+    const flows = themeFlows(withFeelings, { dimension: "emotions", vocabulary });
+    expect(flows.toVideos).toEqual([expect.objectContaining({ source: "angoisse (hors liste)" })]);
+    expect(themeFlows(withFeelings, { dimension: "stakes", vocabulary }).toVideos[0].source).toBe("protéger");
+    expect(withFeelings[0].turns[0].emotions).toEqual(["angoisse"]);
+  });
+
   it("summarises played share, reasons and confidence", () => {
     const summary = criteriaSummary(sessions[0].turns);
     expect(summary.played).toBe(1);

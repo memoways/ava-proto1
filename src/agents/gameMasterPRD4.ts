@@ -20,6 +20,12 @@ import type { ServiceObservation, ServerObservation } from "@/services/voiceTurn
 import { callLLMWithUsage, LLMProxyRequestError } from "@/services/openRouterLLM";
 import { getLLMSettings } from "@/services/settingsService";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
+import {
+  buildVideoVocabularyBlock,
+  loadVideoLabelVocabulary,
+  vocabularyFromRows,
+  type VideoLabelLists,
+} from "@/services/videoLabelVocabulary";
 import { countPlayedExtracts, DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC, selectEligibleVideos } from "@/services/videoEligibility";
 import type { ExperiencePath } from "@/services/experienceFrame";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
@@ -27,7 +33,7 @@ import { normalizeMemoryText } from "@/services/conversationMemoryV1";
 import { asRuntimeCharacter } from "@/services/characterConversation";
 import { handoffSpeechEvidence, materializeHandoffAssessment, validateCharacterHandoff } from "@/services/characterHandoff";
 import { rugosityDirectorDirective } from "@/services/speechRugosity";
-import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
+import type { CharacterRelationshipPolicy, ConversationMemoryDelta, ConversationMemoryV1, ConversationMessage, DirectorAction, ExperienceDirectorConfig, LLMCallDiagnosticTrace, PRD4PostTurnEvaluation, PRD4TurnLabels, RelationshipStateProposal, RuntimeCharacter, TraceMessage, TurnRelationshipDirective, UserRoleProfile } from "@/types";
 import type { CharacterExecutionContext } from "@/services/characterIdentityGuard";
 import { resolveGmMode } from "@/services/gmSpeechGuidance";
 import { buildGmStateSection, validateStateDelta, type CharacterStateProfile, type StateLevels } from "@/services/characterState";
@@ -38,7 +44,7 @@ import {
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
-export const GM_CODE_VERSION = "gm-2026-11-06-handoff-recovery";
+export const GM_CODE_VERSION = "gm-2026-11-21-video-vocabulary";
 
 export interface PRD4PostTurnInput {
   onGmObserved?: (service: ServiceObservation, spans: ServerObservation) => void;
@@ -106,6 +112,12 @@ export interface PRD4PostTurnInput {
   characterState?: { profile: CharacterStateProfile; levels: StateLevels } | null;
   /** Admin draft tests set this to false so they cannot mutate live sessions. */
   persist?: boolean;
+  /**
+   * Current Notion lists. `undefined` loads them; `null` falls back to the
+   * video rows (table missing or unreadable). An object is used as exported,
+   * including when a list is empty.
+   */
+  videoVocabulary?: VideoLabelLists | null;
 }
 
 export type PRD4PostTurnDetailedResult = PRD4PostTurnEvaluation & {
@@ -143,8 +155,10 @@ export const EXPERIENCE_DIRECTOR_SYSTEM_PROMPT = `Tu es le directeur d'expérien
 
 Tu retournes EXACTEMENT cet objet :
 {
-  "labels": {                       // Labels extraits du DERNIER message utilisateur. Max 4 labels au total cumulés sur les 3 listes. Ne PAS inventer : si rien d'évident, mets une liste vide. Ne force jamais.
+  "labels": {                       // Labels extraits du DERNIER message utilisateur. Max 4 labels au total cumulés sur themes + topics + intentions. emotions et stakes sont en plus et ne comptent pas dans ce plafond. Ne PAS inventer : si rien d'évident, mets une liste vide. Ne force jamais.
     "themes": string[],             // Grand thème narratif (1-3 mots, en minuscules). Ex: "famille", "patriarcat", "trahison", "secrets", "confiance", "deuil", "violence", "mémoire". Vide si pas clair.
+    "emotions": string[],           // Émotion du tour, recopiée depuis la LISTE COURANTE quand elle est fournie. Vide si pas claire.
+    "stakes": string[],             // Enjeu du tour, recopié depuis la LISTE COURANTE quand elle est fournie. Vide si pas clair.
     "topics": string[],             // Sujet concret évoqué (1-3 mots). Ex: "sœur", "enfance", "disparition", "film", "police". Vide si pas clair.
     "intentions": string[]          // Intention de l'utilisateur (1-2 mots). Ex: "question", "défi", "empathie", "doute", "provocation", "hors-sujet". Vide si pas claire.
   },
@@ -202,10 +216,11 @@ Règles "hors-monde" — le personnage n'a le droit de parler que de ce que cont
 - Un premier hors-sujet est un recadrage, pas un dérapage : n'utilise pas action.type=end pour cela et laisse moderation_flag=false.
 
 Règles "labels" :
-- MAX 4 labels au total (additionnés sur themes + topics + intentions).
+- MAX 4 labels au total (additionnés sur themes + topics + intentions). emotions et stakes ne comptent pas dans ce plafond et ne prennent pas la place de topics ni d'intentions.
 - NE PAS inventer ni extrapoler. Si le message utilisateur est trop court / vague / général (ex: "salut", "ok", "je sais pas"), retourne des listes vides.
 - N'utilise que des mots simples, minuscules, sans accents superflus, sans phrase.
 - Pour "themes", privilégie les grands thèmes narratifs : famille, patriarcat, trahison, secrets, confiance, deuil, violence, mémoire, identité, amour, mensonge.
+- Quand une LISTE COURANTE DES VIDÉOS est fournie, recopie themes, emotions et stakes depuis ces listes. Une valeur hors liste est gardée telle quelle.
 
 Règles "trigger_video_id" — choix au sens, PRIORITÉ HAUTE :
 - VIDÉOS DISPONIBLES ne liste que des vidéos déjà autorisées pour ce moment (parcours film, personnage en ligne, vidéos déjà jouées exclues). Choisis uniquement parmi elles.
@@ -513,6 +528,38 @@ export function resolveNextSpeechState(
   return states.find((state) => state.name.toLowerCase() === needle)?.name ?? null;
 }
 
+const GM_LABEL_CAP = 4;
+const GM_LABEL_ITEM_MAX = 30;
+
+/** Same cleaning as the historical post-turn parser. Does not drop a value for being outside the current list. */
+export function cleanGmLabelList(list: unknown, max = GM_LABEL_CAP): string[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((value) => String(value).trim().toLowerCase())
+    .filter((value) => value.length > 0 && value.length <= GM_LABEL_ITEM_MAX)
+    .slice(0, max);
+}
+
+/**
+ * themes, topics and intentions keep the cap of 4 (themes, then topics, then intentions).
+ * emotions and stakes are cleaned the same way and do not consume that cap.
+ */
+export function parseGmTurnLabels(raw: unknown): PRD4TurnLabels {
+  const record = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  const themes = cleanGmLabelList(record.themes);
+  const topics = cleanGmLabelList(record.topics);
+  const intentions = cleanGmLabelList(record.intentions);
+  const emotions = cleanGmLabelList(record.emotions);
+  const stakes = cleanGmLabelList(record.stakes);
+  const total = () => themes.length + topics.length + intentions.length;
+  while (total() > GM_LABEL_CAP) {
+    if (intentions.length) intentions.pop();
+    else if (topics.length) topics.pop();
+    else themes.pop();
+  }
+  return { themes, topics, intentions, emotions, stakes };
+}
+
 function isCompleteGMJson(value: unknown): value is Partial<PRD4PostTurnEvaluation> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
@@ -563,12 +610,18 @@ export async function evaluatePostTurnPRD4(
   });
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);
+  const storedVocabulary = input.videoVocabulary !== undefined
+    ? input.videoVocabulary
+    : (await withTimeout("gm_vocabulary", loadVideoLabelVocabulary(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => null))?.lists ?? null;
+  const vocabularyLists = storedVocabulary ?? vocabularyFromRows(allVideos);
+  const vocabularyBlock = buildVideoVocabularyBlock(vocabularyLists);
   const effectiveSystemPrompt = resolveDirectorSystemPrompt(input.systemPromptOverride,
     input.compileSettingsBlock === false ? null : input.orchestrationConfig);
+  const runtimeInstructions = `${GM_RUNTIME_OUTPUT_INSTRUCTIONS}${vocabularyBlock}`;
   const messages: TraceMessage[] = [
     { role: "system", content: input.handoffContext
-      ? `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}${input.handoffContext.candidateText !== undefined ? '\nMODE CANDIDAT : analyse le texte généré avant diffusion. Les références speech_N portent sur ce candidat, pas sur une parole entendue. La preuve sera revalidée avec le reçu réel ; aucune autorisation de transfert ni mémoire avant cette livraison.' : ''}`
-      : `${effectiveSystemPrompt}\n${GM_RUNTIME_OUTPUT_INSTRUCTIONS}` },
+      ? `${effectiveSystemPrompt}\n${runtimeInstructions}\n${CHARACTER_HANDOFF_ASSESSMENT_INSTRUCTIONS}${input.handoffContext.candidateText !== undefined ? '\nMODE CANDIDAT : analyse le texte généré avant diffusion. Les références speech_N portent sur ce candidat, pas sur une parole entendue. La preuve sera revalidée avec le reçu réel ; aucune autorisation de transfert ni mémoire avant cette livraison.' : ''}`
+      : `${effectiveSystemPrompt}\n${runtimeInstructions}` },
     { role: "user", content: buildUserPrompt(input, videos) },
   ];
   let llmTrace: LLMCallDiagnosticTrace | null = null;
@@ -625,26 +678,10 @@ export async function evaluatePostTurnPRD4(
       }
       const rawTrigger = parsed.trigger_video_id ? String(parsed.trigger_video_id) : null;
       const safeTrigger = rawTrigger && validIds.has(rawTrigger) && !triggered.has(rawTrigger) ? rawTrigger : null;
-      const rawLabels = (parsed as { labels?: { themes?: unknown[]; topics?: unknown[]; intentions?: unknown[] } }).labels;
-      const cleanList = (list: unknown[] | undefined): string[] =>
-        Array.isArray(list)
-          ? list.map((v) => String(v).trim().toLowerCase()).filter((v) => v && v.length <= 30).slice(0, 4)
-          : [];
-      const themes = cleanList(rawLabels?.themes);
-      const topics = cleanList(rawLabels?.topics);
-      const intentions = cleanList(rawLabels?.intentions);
-      // Cap total à 4 labels (priorité themes > topics > intentions)
-      const cap = 4;
-      const total = () => themes.length + topics.length + intentions.length;
-      while (total() > cap) {
-        if (intentions.length) intentions.pop();
-        else if (topics.length) topics.pop();
-        else themes.pop();
-      }
-      const labels = { themes, topics, intentions };
+      const labels = parseGmTurnLabels((parsed as { labels?: unknown }).labels);
       const topicsCovered = Array.isArray(parsed.topics_covered) && parsed.topics_covered.length
         ? parsed.topics_covered.slice(0, 6).map(String)
-        : topics;
+        : labels.topics;
       const endRecommended = Boolean(parsed.end_recommended);
       const handoffProofContext = input.handoffContext ? {
         currentCharacter: input.currentCharacter, turnId: input.handoffContext.turnId, turnIndex: input.turnIndex,
