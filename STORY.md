@@ -7,6 +7,10 @@
 
 ---
 
+## Extraits du film, lot 2 — une mécanique à part (21 novembre 2026)
+
+Les extraits n'étaient que des cinématiques avec une priorité. Ils deviennent des réponses vidéo : choisis pour la question du joueur et la réplique en cours, avec leur propre fréquence. Deux choix de fond : un extrait parlé joue **après** la réplique avec son propre son (sinon double parole), un extrait silencieux se superpose à la voix ; et une décision qui arrive tard ou pour un autre tour est abandonnée plutôt que rattrapée. Tout est derrière une seule bascule, inactive : le parcours garde son comportement tant que Romed n'a pas renseigné Dialogue et transcription (les 3 extraits en base sont encore vides) et qu'une recette avec des personnes n'ayant pas vu le film n'a pas eu lieu.
+
 ## Latence Tavus, lot T8 — pourquoi le flux relançait le LLM (21 novembre 2026)
 
 La première mesure de T7 (7 tours) montrait le gain attendu sur les tours propres (≈ −0,5 s) mais deux relances d'intent. Cause :

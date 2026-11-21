@@ -147,10 +147,23 @@ import {
 } from "@/services/prd4Questionnaire";
 import { getVideoTriggersCached, type VideoTriggerRow } from "@/services/videoTriggerService";
 import { countPlayedExtracts, selectEligibleVideos } from "@/services/videoEligibility";
+import {
+  buildExtractPostVideoContext,
+  EXTRACT_SELECTOR_MAX_TOKENS,
+  extractDecisionBlockedReason,
+  extractPresentation,
+  extractSelectionTimeoutMs,
+  selectExtract,
+  selectExtractCandidates,
+  type ExtractVideo,
+} from "@/services/extractSelection";
 import { buildPostVideoContext, formatWatchedVideos, rememberWatchedVideo, watchedVideoFrom, type WatchedVideo } from "@/services/watchedVideoMemory";
 import { experiencePathFromFilmAnswer } from "@/services/experienceFrame";
 import {
   loadVideoTriggerSettingsFromDB,
+  loadExtractSettingsFromDB,
+  extractDefaults,
+  type ExtractSettings,
   videoTriggerDefaults,
   type VideoTriggerSettings,
 } from "@/services/settingsService";
@@ -380,6 +393,10 @@ const IndexPRD4 = () => {
   const triggeredVideoIdsRef = useRef<string[]>([]);
   const lastVideoTurnRef = useRef<number>(-Infinity);
   const videoTriggerSettingsRef = useRef<VideoTriggerSettings>(videoTriggerDefaults);
+  // Film extracts: own settings, own spacing, own pending decision (never mixed with the cinematics').
+  const extractSettingsRef = useRef<ExtractSettings>(extractDefaults);
+  const lastExtractTurnRef = useRef<number>(-Infinity);
+  const extractMetaRef = useRef<{ videoId: string; question: string; previousLastExtractTurn: number } | null>(null);
   const pendingPostVideoContextRef = useRef<string | null>(null);
   // Lot 5 : vidéos vues pendant la page de jeu, dans l'ordre (ni GM ni personnage ne les oublient).
   const watchedVideosRef = useRef<WatchedVideo[]>([]);
@@ -1312,6 +1329,8 @@ const IndexPRD4 = () => {
     triggeredVideoIdsRef.current = [];
     watchedVideosRef.current = [];
     lastVideoTurnRef.current = -Infinity;
+    lastExtractTurnRef.current = -Infinity;
+    extractMetaRef.current = null;
     pendingPostVideoContextRef.current = null;
     const startingCharacter = startingCharacterRef.current;
     const profile = await getCharacterRuntimeProfile(startingCharacter).catch(() => null);
@@ -1351,6 +1370,9 @@ const IndexPRD4 = () => {
     loadVideoTriggerSettingsFromDB()
       .then((s) => { videoTriggerSettingsRef.current = s; })
       .catch(() => { videoTriggerSettingsRef.current = videoTriggerDefaults; });
+    loadExtractSettingsFromDB()
+      .then((s) => { extractSettingsRef.current = s; })
+      .catch(() => { extractSettingsRef.current = extractDefaults; });
     // Le réglage admin est relu au démarrage pour éviter un cache public obsolète.
     timer.reset(configuredDuration);
     timer.start();
@@ -1545,6 +1567,7 @@ const IndexPRD4 = () => {
         watchedVideosRef.current = rememberWatchedVideo(watchedVideosRef.current,
           watchedVideoFrom(video, meta?.turnIndex ?? null, partial));
       }
+      if (extractMetaRef.current?.videoId === video.id) extractMetaRef.current = null;
       const visibleMs = previous.startedAt == null ? null : Math.round(performance.now() - previous.startedAt);
       trackEvent("prd4_video_completed", { session_id: sid, video_id: video.id, skipped: partial, outcome,
         played_ms: visibleMs, presentation: "overlay" });
@@ -1569,6 +1592,7 @@ const IndexPRD4 = () => {
         // Never shown: the director may offer it again later.
         triggeredVideoIdsRef.current = triggeredVideoIdsRef.current.filter((id) => id !== video.id);
         if (meta) lastVideoTurnRef.current = meta.previousLastVideoTurn;
+        if (extractMetaRef.current?.videoId === video.id) lastExtractTurnRef.current = extractMetaRef.current.previousLastExtractTurn;
       }
       if (sid && meta) void appendExperienceEvent({
         sessionId: sid,
@@ -1993,6 +2017,7 @@ const IndexPRD4 = () => {
           userRole: userRoleRef.current,
           hasSeenFilm: hasSeenFilmRef.current,
           minExtractsBeforeCinematic: videoTriggerSettingsRef.current.MIN_EXTRACTS_BEFORE_CINEMATIC,
+          extractsSeparate: extractSettingsRef.current.ENABLED,
           userPostureRaw: userPostureRef.current?.raw ?? null,
           timeElapsedSeconds: elapsed,
           characterContext: turnCharacterContext,
@@ -2250,6 +2275,7 @@ const IndexPRD4 = () => {
               playedVideoIds: triggeredVideoIdsRef.current,
               extractsShown: countPlayedExtracts(videos, triggeredVideoIdsRef.current),
               minExtractsBeforeCinematic: settings.MIN_EXTRACTS_BEFORE_CINEMATIC,
+              extractsSeparate: extractSettingsRef.current.ENABLED,
             }).map((video) => video.id),
             lastVideoTurn: Number.isFinite(lastVideoTurnRef.current) ? lastVideoTurnRef.current : null,
             minimumVideoTurn: settings.ENABLED ? settings.MIN_TURNS_BEFORE_FIRST : Number.MAX_SAFE_INTEGER,
@@ -2436,6 +2462,126 @@ const IndexPRD4 = () => {
             });
           })().catch((cinematicError) => console.warn("[PRD4] overlay cinematic ignored:", cinematicError));
         }
+
+        // Film extracts (« film pas vu »): their own selection, settings and playback, in parallel with
+        // the cinematics. Decided while the reply is still ahead; a late decision, another turn,
+        // character or video in progress drops it (no waiting). Spoken → after the reply with its own
+        // sound; silent → laid over the voice.
+        if (extractSettingsRef.current.ENABLED && !result.handoffPreparationBlocked && result.maxResponse.trim()) void (async () => {
+          const sid = sessionIdRef.current;
+          const director = result.director ?? { versionId: null, config: null };
+          const logExtractSkip = (blockedReason: string, payload: Record<string, unknown> = {}) => {
+            trackEvent("prd4_extract_blocked", { session_id: sid, turn_id: turnId, reason: blockedReason });
+            if (sid) void appendExperienceEvent({
+              sessionId: sid,
+              eventKey: `extract-selection:${turnId}`,
+              eventType: "cinematic_blocked",
+              turnId,
+              turnIndex,
+              character: activeCharacterRef.current,
+              orchestrationVersionId: director.versionId,
+              payload: { blockedReason, mechanism: "extract", ...payload },
+            });
+          };
+          const replyAhead = () => {
+            const audio = audioStateRef.current;
+            const inFlight = isCurrentTurn() && activeOutputControllerRef.current === outputController && !outputController.signal.aborted
+              && (audio === "max_thinking" || audio === "max_speaking");
+            return { inFlight, remainingSpeechMs: estimatedRemainingSpeechMs(result.maxResponse, firstPlaybackAt, performance.now()) };
+          };
+          const videos = await withTimeout('extract_videos', getVideoTriggersCached(), HANDOFF_DEPENDENCY_TIMEOUT_MS).catch(() => []);
+          const gate = selectExtractCandidates(videos as ExtractVideo[], {
+            path: experiencePathFromFilmAnswer(hasSeenFilmRef.current),
+            character: turnCharacter,
+            shownVideoIds: triggeredVideoIdsRef.current,
+            settings: extractSettingsRef.current,
+            userTurn: turnIndex,
+            lastExtractTurn: Number.isFinite(lastExtractTurnRef.current) ? lastExtractTurnRef.current : null,
+          });
+          if ("reason" in gate) {
+            // Silent for paths and settings that simply do not apply; visible when usable extracts exist but are held back.
+            if (gate.reason !== "extract_film_seen_path" && gate.reason !== "extracts_disabled") logExtractSkip(gate.reason, { skipped: gate.skippedByReason });
+            return;
+          }
+          if (cinematicRef.current.phase !== "idle") { logExtractSkip("extract_video_overlap"); return; }
+          const before = replyAhead();
+          if (!before.inFlight) { logExtractSkip("extract_reply_over", { remainingSpeechMs: before.remainingSpeechMs }); return; }
+          const llm = getLLMSettings();
+          const selectorModel = llm.LLM_MODEL_GM;
+          const timeoutMs = extractSelectionTimeoutMs(before.remainingSpeechMs);
+          const shownExtracts = (videos as ExtractVideo[]).filter((video) => triggeredVideoIdsRef.current.includes(video.id) && video.nature === "extract")
+            .map((video) => ({ title: video.title, summary: video.description || video.ai_description || "" }));
+          const selection = await selectExtract({
+            replyText: result.maxResponse,
+            userMessage: userText,
+            characterName: characterDisplayName(turnCharacter),
+            candidates: gate.candidates,
+            shown: shownExtracts,
+            recentExchanges: recentOverlayExchanges(conversationRef.current, { userMessage: userText, replyText: result.maxResponse }),
+            signal: outputController.signal,
+            timeoutMs,
+          }, async (messages, options) => (await callLLMWithUsage(messages, {
+            model: selectorModel,
+            temperature: 0,
+            max_tokens: EXTRACT_SELECTOR_MAX_TOKENS,
+            reasoning: false,
+            disableReasoning: true,
+            timeoutMs: options.timeoutMs,
+            signal: options.signal,
+            feature_key: "prd4_extract_selection",
+            session_id: sid ?? undefined,
+          })).content);
+          if (selection.status !== "selected") {
+            logExtractSkip(`extract_selection_${selection.status}`, { selectionMs: selection.latencyMs, detail: selection.detail ?? null,
+              timeoutMs, model: selectorModel, candidates: gate.candidates.length });
+            return;
+          }
+          const video = gate.candidates.find((candidate) => candidate.id === selection.videoId) ?? null;
+          const after = replyAhead();
+          const blocked = !video ? "extract_unknown_video" : extractDecisionBlockedReason({
+            turnIsCurrent: isCurrentTurn(),
+            replyInFlight: after.inFlight,
+            sameCharacter: activeCharacterRef.current === turnCharacter,
+            transitionIdle: cinematicRef.current.phase === "idle",
+            alreadyShown: triggeredVideoIdsRef.current.includes(video.id),
+            enoughSpeechForOverlay: overlayHasTimeToShow(after.remainingSpeechMs),
+            presentation: selection.presentation,
+          });
+          if (!video || blocked) {
+            logExtractSkip(blocked ?? "extract_unknown_video", { videoId: selection.videoId, selectionMs: selection.latencyMs, remainingSpeechMs: after.remainingSpeechMs });
+            return;
+          }
+          // Reserved at decision time: never offered twice, counted for the extracts' own spacing.
+          extractMetaRef.current = { videoId: video.id, question: userText, previousLastExtractTurn: lastExtractTurnRef.current };
+          cinematicMetaRef.current = { turnId, turnIndex, reason: selection.reason || null, confidence: selection.confidence,
+            orchestrationVersionId: director.versionId ?? null, previousLastVideoTurn: lastVideoTurnRef.current };
+          triggeredVideoIdsRef.current = [...triggeredVideoIdsRef.current, video.id];
+          lastExtractTurnRef.current = turnIndex;
+          trackEvent("prd4_video_recommended", { session_id: sid, turn_id: turnId, video_id: video.id, confidence: selection.confidence,
+            presentation: selection.presentation, source: "extract_selector" });
+          if (sid) void appendExperienceEvent({
+            sessionId: sid,
+            eventKey: `cinematic-recommended:${turnId}`,
+            eventType: "cinematic_recommended",
+            turnId,
+            turnIndex,
+            character: activeCharacterRef.current,
+            orchestrationVersionId: director.versionId,
+            payload: { videoId: video.id, reason: selection.reason, confidence: selection.confidence, presentation: selection.presentation,
+              source: "extract_selector", mechanism: "extract", dialogue: video.dialogue ?? null, selectionMs: selection.latencyMs,
+              replyCue: selection.replyCue, videoCue: selection.videoCue, complement: selection.complement, timeoutMs, model: selectorModel,
+              candidates: gate.candidates.length },
+          });
+          dispatchCinematicRef.current({
+            type: "decided",
+            video: video as unknown as VideoTriggerRow,
+            at: performance.now(),
+            presentation: extractPresentation(video),
+            replySpeaking: audioStateRef.current === "max_speaking",
+            conversationBusy: true,
+            playerSpeaking: false,
+          });
+        })().catch((extractError) => console.warn("[PRD4] extract selection ignored:", extractError));
 
         const outputResult = await (streamedVoice ? streamedVoice.finish() : avatarStream?.render ?? renderResponseText(result.maxResponse, {
           turnId,
@@ -3834,6 +3980,8 @@ const IndexPRD4 = () => {
     sessionDurationRef.current = 0;
     triggeredVideoIdsRef.current = [];
     watchedVideosRef.current = [];
+    lastExtractTurnRef.current = -Infinity;
+    extractMetaRef.current = null;
     pendingPostVideoContextRef.current = null;
     pendingGmGuidanceRef.current = null;
     pendingEmotionalStateRef.current = null;
@@ -3867,11 +4015,17 @@ const IndexPRD4 = () => {
       || transition.phase !== "playing") return;
     const skipped = outcome !== "completed";
     if (outcome !== "error") {
-      pendingPostVideoContextRef.current = buildPostVideoContext(activeVideo);
+      const extractMeta = extractMetaRef.current?.videoId === activeVideo.id ? extractMetaRef.current : null;
+      // A film extract: the next turn knows the question that led to it and what was really broadcast.
+      pendingPostVideoContextRef.current = extractMeta
+        ? buildExtractPostVideoContext(activeVideo, { question: extractMeta.question, partial: skipped })
+        : buildPostVideoContext(activeVideo);
       // Passée en cours de lecture : vue en partie, gardée et marquée comme telle.
       watchedVideosRef.current = rememberWatchedVideo(watchedVideosRef.current,
-        watchedVideoFrom(activeVideo, cinematicMetaRef.current?.turnIndex ?? null, skipped));
+        watchedVideoFrom(activeVideo, cinematicMetaRef.current?.turnIndex ?? null, skipped,
+          extractMeta && activeVideo.dialogue === "spoken" ? { transcription: activeVideo.transcription } : undefined));
     }
+    if (extractMetaRef.current?.videoId === activeVideo.id) extractMetaRef.current = null;
     trackEvent("prd4_video_completed", {
       session_id: sessionIdRef.current,
       video_id: activeVideo.id,

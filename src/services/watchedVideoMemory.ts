@@ -21,6 +21,7 @@ export const WATCHED_VIDEOS_KEPT = 3;
 export const WATCHED_VIDEOS_SECTION_TITLE = "VIDÉOS DÉJÀ VUES PAR LE JOUEUR";
 export const WATCHED_VIDEO_TITLE_MAX_CHARS = 80;
 export const WATCHED_VIDEO_SHOWS_MAX_CHARS = 140;
+export const WATCHED_VIDEO_SAID_MAX_CHARS = 120;
 /** Character prompt cap for the watched videos section. */
 export const WATCHED_VIDEOS_SECTION_MAX_CHARS = 750;
 
@@ -33,6 +34,8 @@ export interface WatchedVideo {
   turn: number | null;
   /** Skipped during playback: the player saw only its beginning. */
   partial: boolean;
+  /** Spoken film extract really heard (never set for a partial one): the gist of what was said. */
+  said?: string;
 }
 
 type VideoText = Pick<VideoTriggerRow, "context" | "post_video_context" | "description" | "ai_description">;
@@ -63,8 +66,11 @@ export function watchedVideoFrom(
   video: Pick<VideoTriggerRow, "id" | "title" | "description" | "ai_description">,
   turn: number | null,
   partial: boolean,
+  spoken?: { transcription: string | null | undefined },
 ): WatchedVideo {
+  const said = !partial && spoken ? capAtWord(spoken.transcription, WATCHED_VIDEO_SAID_MAX_CHARS) : "";
   return {
+    ...(said ? { said } : {}),
     id: video.id,
     title: capAtWord(video.title, WATCHED_VIDEO_TITLE_MAX_CHARS),
     shows: capAtWord(rawShows(video), WATCHED_VIDEO_SHOWS_MAX_CHARS),
@@ -83,6 +89,6 @@ export function formatWatchedVideos(list: readonly WatchedVideo[], kept = WATCHE
   return list.slice(-kept).map((video) => {
     const details = [video.turn == null ? "" : `tour ${video.turn}`, video.partial ? "passée avant la fin" : ""]
       .filter(Boolean).join(", ");
-    return `- « ${video.title} »${details ? ` (${details})` : ""}${video.shows ? ` : ${video.shows}` : ""}`;
+    return `- « ${video.title} »${details ? ` (${details})` : ""}${video.shows ? ` : ${video.shows}` : ""}${video.said ? ` — dit : « ${video.said} »` : ""}`;
   }).join("\n");
 }

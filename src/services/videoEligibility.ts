@@ -20,6 +20,12 @@ export interface VideoEligibilityInput {
   /** Film extracts already shown this session (see `countPlayedExtracts`). */
   extractsShown: number;
   minExtractsBeforeCinematic: number;
+  /**
+   * The single switch (`ExtractSettings.ENABLED`): extracts have their own selection and
+   * leave the cinematic pool. `minExtractsBeforeCinematic` then has no effect; it keeps its
+   * meaning when this is false.
+   */
+  extractsSeparate?: boolean;
 }
 
 export function videoNature(video: Pick<EligibilityVideo, "nature">): "extract" | "transformed" {
@@ -48,6 +54,7 @@ export function selectEligibleVideos<T extends EligibilityVideo>(videos: readonl
     && !played.has(video.id)
     && videoAvailableForCharacter(video, input.currentCharacter));
 
+  if (input.extractsSeparate) return candidates.filter((video) => videoNature(video) === "transformed");
   if (input.path === "seen") return candidates.filter((video) => videoNature(video) === "transformed");
   if (input.path !== "unseen") return candidates;
 

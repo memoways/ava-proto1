@@ -205,7 +205,7 @@ export const OVERLAY_PARAPHRASE_MIN_CONFIDENCE = 0.85;
 export function checkOverlayLink(
   link: { replyCue: string; videoCue: string; confidence: number },
   replyText: string,
-  video: Pick<VideoTriggerRow, "title" | "context" | "description" | "ai_description" | "themes">,
+  video: Pick<VideoTriggerRow, "title" | "context" | "description" | "ai_description" | "themes"> & { transcription?: string | null },
   extraNames: readonly string[] = [],
 ): { ok: true } | { ok: false; detail: string } {
   const reply = cueWords(link.replyCue, extraNames);
@@ -214,7 +214,8 @@ export function checkOverlayLink(
   const inReply = reply.content.filter((word) => wordIn(word, replyIndex.words, replyIndex.stems));
   if (!inReply.length || inReply.length * 2 < reply.content.length) return { ok: false, detail: "cue_not_in_reply" };
   // Themes are labels, not what the video shows: they never make a link.
-  const videoText = [video.title, video.context, video.description, video.ai_description].filter(Boolean).join(" ");
+  // A spoken extract's transcription is what it says: it counts like what it shows.
+  const videoText = [video.title, video.context, video.description, video.ai_description, video.transcription].filter(Boolean).join(" ");
   const videoIndex = wordIndex(videoText);
   const fromVideo = cueWords(link.videoCue, extraNames).content;
   if (!fromVideo.some((word) => wordIn(word, videoIndex.words, videoIndex.stems))) return { ok: false, detail: "cue_not_in_video" };
