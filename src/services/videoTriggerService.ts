@@ -127,3 +127,50 @@ export async function describeVideoWithAi(notionId: string): Promise<DescribeVid
   invalidateVideoTriggerCache();
   return parsed as DescribeVideoResult;
 }
+
+export interface TranscribeVideoResult {
+  ok: true;
+  written: boolean;
+  notion_id: string;
+  transcription?: string;
+  /** "no_speech_detected": nothing was written. */
+  reason?: string;
+  verified_cleared?: boolean;
+  audio_bytes: number;
+  latency_ms?: number;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number } | null;
+}
+
+/**
+ * Admin only: AI transcription of one SPOKEN film extract, written to Notion
+ * "Transcription" alone (unverified). `reanalyze` replaces an existing text; a verified one
+ * also needs `confirmOverwriteVerified` (the "vérifiée" case is then unticked).
+ */
+export async function transcribeVideoWithAi(
+  notionId: string,
+  options: { reanalyze?: boolean; confirmOverwriteVerified?: boolean } = {},
+): Promise<TranscribeVideoResult> {
+  const cachedAuthSession = await getCachedSession();
+  const token = cachedAuthSession?.access_token;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-video`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      notion_id: notionId,
+      reanalyze: options.reanalyze === true,
+      confirm_overwrite_verified: options.confirmOverwriteVerified === true,
+    }),
+  });
+  const text = await res.text();
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(text); } catch { /* ignore */ }
+  if (!res.ok) {
+    const errMsg = (parsed as { error?: string } | null)?.error || text || `HTTP ${res.status}`;
+    throw new Error(errMsg);
+  }
+  invalidateVideoTriggerCache();
+  return parsed as TranscribeVideoResult;
+}
