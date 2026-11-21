@@ -25,6 +25,9 @@ import {
   isMissingVideoMetadataColumnError,
   mapVideoCharacters,
   mapVideoNature,
+  isMissingExtractColumnError,
+  mapVideoDialogue,
+  mapVideoTranscription,
 } from "../_shared/videoMetadata.ts";
 
 const corsHeaders = {
@@ -53,6 +56,7 @@ interface NotionProperty {
   multi_select?: NotionNamedOption[];
   number?: number | null;
   url?: string | null;
+  checkbox?: boolean;
 }
 
 interface NotionPage {
@@ -68,6 +72,9 @@ interface VideoSyncResult {
   nature: string;
   characters: string[];
   has_url: boolean;
+  transcription?: string | null;
+  dialogue?: string | null;
+  transcription_verified?: boolean;
 }
 
 interface CharacterSyncResult {
@@ -129,6 +136,9 @@ function extractMultiSelect(prop?: NotionProperty): string[] {
 }
 function extractNumber(prop?: NotionProperty): number | null {
   return typeof prop?.number === "number" ? prop.number : null;
+}
+function extractCheckbox(prop?: NotionProperty): boolean {
+  return prop?.checkbox === true;
 }
 function extractUrl(prop?: NotionProperty): string | null {
   return prop?.url || null;
@@ -359,6 +369,7 @@ serve(async (req) => {
     let videosSkipped = 0;
     const perVideo: VideoSyncResult[] = [];
     let videoMetadataColumnsAvailable = true;
+    let extractColumnsAvailable = true;
     const videoSyncErrors: Array<{ title: string; error: string }> = [];
     const videoSkippedDetails: Array<{ title: string; reason: string }> = [];
     if (videosDbId) {
@@ -399,6 +410,12 @@ serve(async (req) => {
         const nature = mapVideoNature(extractSelect(props['Nature']));
         const characters = mapVideoCharacters(extractMultiSelect(props['Personnages']));
         const aiDescription = extractRichText(props['Description IA']);
+        // Extracts lot 1: absent or cleared Notion values are written as null, never kept stale.
+        const extractFields = {
+          transcription: mapVideoTranscription(extractRichText(props['Transcription'])),
+          dialogue: mapVideoDialogue(extractSelect(props['Dialogue'])),
+          transcription_verified: extractCheckbox(props['Transcription vérifiée']),
+        };
 
         const record = {
           notion_id: page.id,
@@ -417,8 +434,19 @@ serve(async (req) => {
         let { error: vErr } = videoMetadataColumnsAvailable
           ? await supabase
             .from('video_triggers')
-            .upsert({ ...record, ...metadata }, { onConflict: 'notion_id' })
+            .upsert(
+              { ...record, ...metadata, ...(extractColumnsAvailable ? extractFields : {}) },
+              { onConflict: 'notion_id' },
+            )
           : { error: null };
+        if (videoMetadataColumnsAvailable && extractColumnsAvailable && isMissingExtractColumnError(vErr)) {
+          // Transcription migration not applied yet: keep the selection metadata.
+          console.warn('[sync-notion] extract columns missing, syncing without them:', vErr?.message);
+          extractColumnsAvailable = false;
+          ({ error: vErr } = await supabase
+            .from('video_triggers')
+            .upsert({ ...record, ...metadata }, { onConflict: 'notion_id' }));
+        }
         if (!videoMetadataColumnsAvailable || isMissingVideoMetadataColumnError(vErr)) {
           // Additive migration not applied yet: keep syncing the legacy columns.
           if (videoMetadataColumnsAvailable) {
@@ -436,7 +464,7 @@ serve(async (req) => {
         }
         seenNotionIds.push(page.id);
         videosSynced++;
-        perVideo.push({ title, themes, priority, type, nature, characters, has_url: !!videoUrl });
+        perVideo.push({ title, themes, priority, type, nature, characters, has_url: !!videoUrl, ...extractFields });
       }
 
       // Prune rows whose Notion page disappeared or is no longer "En ligne"
@@ -814,6 +842,7 @@ serve(async (req) => {
 
       per_video: perVideo,
       video_metadata_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable,
+      video_extract_columns_synced: Boolean(videosDbId) && videoMetadataColumnsAvailable && extractColumnsAvailable,
       wiped_all: wipedAll,
       in_place_profile_refresh: inPlaceProfileRefresh,
       total_embeddings_in_db: totalEmb || 0,

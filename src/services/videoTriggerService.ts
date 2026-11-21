@@ -24,6 +24,10 @@ export interface VideoTriggerRow {
   nature?: "extract" | "transformed" | null;
   characters?: string[] | null;
   ai_description?: string | null;
+  /** Extracts lot 1: absent until the transcription migration is applied. */
+  transcription?: string | null;
+  dialogue?: "spoken" | "silent" | null;
+  transcription_verified?: boolean | null;
 }
 
 // "*" keeps the read working before and after the additive metadata migration:

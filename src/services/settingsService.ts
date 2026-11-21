@@ -736,6 +736,45 @@ export async function saveVideoTriggerSettingsToDB(settings: VideoTriggerSetting
   await saveToDB(VIDEO_TRIGGER_STORAGE_KEY, settings);
 }
 
+// ===== Film extract settings (extracts lot 1: stored and editable, read by the selection in lot 2) =====
+
+export interface ExtractSettings {
+  /** Si false, aucun extrait n'est proposé en réponse (défaut : inactif tant que la sélection n'est pas livrée et recettée). */
+  ENABLED: boolean;
+  /** Nombre minimum d'échanges utilisateur avant le 1er extrait. */
+  MIN_TURNS_BEFORE_FIRST: number;
+  /** Nombre minimum de tours utilisateur entre deux extraits. */
+  MIN_TURNS_BETWEEN: number;
+  /** Nombre max d'extraits sur une session (0 = illimité). */
+  MAX_PER_SESSION: number;
+  /** Extrait parlé : exige une transcription vérifiée par un humain (recommandé : oui). */
+  REQUIRE_VERIFIED_TRANSCRIPT: boolean;
+}
+
+const EXTRACT_STORAGE_KEY = "ava_extract_settings";
+
+export const extractDefaults: ExtractSettings = {
+  ENABLED: false,
+  MIN_TURNS_BEFORE_FIRST: 2,
+  MIN_TURNS_BETWEEN: 2,
+  MAX_PER_SESSION: 0,
+  REQUIRE_VERIFIED_TRANSCRIPT: true,
+};
+
+export async function loadExtractSettingsFromDB(): Promise<ExtractSettings> {
+  return loadFromDB(EXTRACT_STORAGE_KEY, extractDefaults);
+}
+
+export async function saveExtractSettingsToDB(settings: ExtractSettings): Promise<void> {
+  await saveToDB(EXTRACT_STORAGE_KEY, settings);
+}
+
+export function resetExtractSettings(): ExtractSettings {
+  removeEnvironmentStorage(EXTRACT_STORAGE_KEY);
+  void deleteEnvironmentSetting(EXTRACT_STORAGE_KEY).catch(() => {});
+  return { ...extractDefaults };
+}
+
 export function resetVideoTriggerSettings(): VideoTriggerSettings {
   removeEnvironmentStorage(VIDEO_TRIGGER_STORAGE_KEY);
   void deleteEnvironmentSetting(VIDEO_TRIGGER_STORAGE_KEY).catch(() => {});

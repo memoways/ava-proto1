@@ -16,6 +16,11 @@ import {
   type UpdateVideoTriggerPatch,
 } from "@/services/videoTriggerService";
 import {
+  loadExtractSettingsFromDB,
+  saveExtractSettingsToDB,
+  resetExtractSettings,
+  extractDefaults,
+  type ExtractSettings,
   loadVideoTriggerSettingsFromDB,
   saveVideoTriggerSettingsToDB,
   resetVideoTriggerSettings,
@@ -32,6 +37,7 @@ import {
   type VideoSyncRunSummary,
 } from "@/services/videoSyncHistory";
 import { selectVideosToDescribe } from "../../supabase/functions/_shared/videoDescription";
+import { extractTranscriptStatus, type ExtractTranscriptStatus } from "../../supabase/functions/_shared/videoMetadata";
 import CinematicPreview from "@/components/CinematicPreview";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -65,6 +71,91 @@ function TextField({ label, clamp, children }: { label: string; clamp?: string; 
   );
 }
 
+
+const TRANSCRIPT_STATUS_LABEL: Record<ExtractTranscriptStatus, { label: string; ok: boolean }> = {
+  silent: { label: "Sans dialogue", ok: true },
+  spoken_verified: { label: "Parlé · transcription vérifiée", ok: true },
+  spoken_unverified: { label: "Parlé · transcription à vérifier", ok: false },
+  spoken_missing: { label: "Parlé · transcription absente", ok: false },
+  unknown: { label: "Dialogue non renseigné", ok: false },
+};
+
+function TranscriptStatusBadge({ video }: { video: VideoTriggerRow }) {
+  const { label, ok } = TRANSCRIPT_STATUS_LABEL[extractTranscriptStatus(video)];
+  return <Badge variant={ok ? "outline" : "destructive"} data-testid="extract-transcript-status">{label}</Badge>;
+}
+
+function ExtractRulesPanel() {
+  const [settings, setSettings] = useState<ExtractSettings>(extractDefaults);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadExtractSettingsFromDB().then(setSettings).finally(() => setLoading(false));
+  }, []);
+
+  const update = (patch: Partial<ExtractSettings>) => setSettings((s) => ({ ...s, ...patch }));
+
+  async function save() {
+    setSaving(true);
+    try {
+      await saveExtractSettingsToDB(settings);
+      toast.success("Réglages des extraits enregistrés ✓");
+    } catch (err) {
+      toast.error("Erreur sauvegarde : " + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return null;
+
+  return (
+    <section className="border rounded-lg p-4 space-y-3 bg-muted/5" data-testid="extract-rules">
+      <div className="flex items-center gap-2">
+        <SettingsIcon className="h-4 w-4 text-primary" />
+        <h3 className="font-semibold text-base">Règles des extraits</h3>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Propres aux extraits du film (parcours « film pas vu »), distincts des cinématiques d'ambiance : leurs réglages
+        ne modifient pas ceux des cinématiques. <strong>La sélection et la lecture des extraits ne sont pas encore
+        branchées</strong> : ces réglages sont enregistrés pour la prochaine étape et n'ont aucun effet en jeu.
+      </p>
+      <label className="flex items-center gap-2 text-sm">
+        <Switch checked={settings.ENABLED} onCheckedChange={(ENABLED) => update({ ENABLED })} />
+        Activer les extraits
+      </label>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Tours avant le 1er extrait</label>
+          <Input type="number" min={0} value={settings.MIN_TURNS_BEFORE_FIRST}
+            onChange={(e) => update({ MIN_TURNS_BEFORE_FIRST: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Tours entre deux extraits</label>
+          <Input type="number" min={0} value={settings.MIN_TURNS_BETWEEN}
+            onChange={(e) => update({ MIN_TURNS_BETWEEN: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Maximum par session (0 = illimité)</label>
+          <Input type="number" min={0} value={settings.MAX_PER_SESSION}
+            onChange={(e) => update({ MAX_PER_SESSION: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <Switch checked={settings.REQUIRE_VERIFIED_TRANSCRIPT}
+          onCheckedChange={(REQUIRE_VERIFIED_TRANSCRIPT) => update({ REQUIRE_VERIFIED_TRANSCRIPT })} />
+        Extrait parlé : exiger une transcription vérifiée
+      </label>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" size="sm" disabled={saving} onClick={() => { setSettings(resetExtractSettings()); toast.success("Réglages réinitialisés"); }}>Réinitialiser</Button>
+        <Button size="sm" onClick={save} disabled={saving}>
+          <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
+        </Button>
+      </div>
+    </section>
+  );
+}
 
 function VideoTriggerRulesPanel() {
   const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
@@ -347,7 +438,8 @@ function NotionVideoSyncPanel({ onSynced }: { onSynced: () => Promise<void> | vo
   );
 }
 
-export default function VideoTriggersEditor() {
+export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: "cinematics" | "extracts" } = {}) {
+  const isExtracts = scope === "extracts";
 
   const [triggers, setTriggers] = useState<VideoTriggerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -454,7 +546,9 @@ export default function VideoTriggersEditor() {
     }
   }
 
-  const toDescribe = selectVideosToDescribe(triggers, { reanalyze });
+  // Film extracts and AI cinematics are managed in separate sections of the back-office.
+  const visibleTriggers = triggers.filter((t) => (t.nature === "extract") === isExtracts);
+  const toDescribe = selectVideosToDescribe(visibleTriggers, { reanalyze });
 
   async function describeMissing() {
     if (toDescribe.length === 0) return;
@@ -477,14 +571,16 @@ export default function VideoTriggersEditor() {
   return (
     <div className="space-y-4">
     <NotionVideoSyncPanel onSynced={fetchTriggers} />
-    <VideoTriggerRulesPanel />
+    {isExtracts ? <ExtractRulesPanel /> : <VideoTriggerRulesPanel />}
 
     <section className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-base mb-1">🎬 Catalogue et déclenchement des cinématiques</h3>
+          <h3 className="font-semibold text-base mb-1">{isExtracts ? "🎞️ Extraits du film" : "🎬 Catalogue et déclenchement des cinématiques"}</h3>
           <p className="text-xs text-muted-foreground">
-            Source éditoriale : Notion · média : Gumlet. Le GM recommande ; le moteur vérifie disponibilité, rythme et doublons avant lecture après la voix.
+            {isExtracts
+              ? "Médias de « 🎬 Vidéos AVA » dont la Nature est « Extrait du film » · média : Gumlet. Réponses vidéo du parcours « film pas vu », distinctes des cinématiques d'ambiance."
+              : "Source éditoriale : Notion · média : Gumlet. Le GM recommande ; le moteur vérifie disponibilité, rythme et doublons avant lecture après la voix."}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchTriggers}>
@@ -512,13 +608,13 @@ export default function VideoTriggersEditor() {
         </div>
       </div>
 
-      {triggers.length === 0 && (
+      {visibleTriggers.length === 0 && (
         <p className="text-sm text-muted-foreground/60 text-center py-4">
-          Aucune vidéo en base. Lance une sync Notion depuis l'onglet <em>Contenu Notion → Vidéos</em>.
+          {isExtracts ? "Aucun extrait en base (Nature = « Extrait du film », État = « En ligne »). " : "Aucune cinématique en base. "} Lance une sync Notion depuis l'onglet <em>Contenu Notion → Vidéos</em>.
         </p>
       )}
 
-      {triggers.map((t) => {
+      {visibleTriggers.map((t) => {
         const isEditing = editingId === t.id;
 
         if (isEditing) {
@@ -688,6 +784,13 @@ export default function VideoTriggersEditor() {
               </dl>
 
               {/* Editorial texts read by the Game Master. */}
+              {isExtracts && (
+                <div className="space-y-2 border-t pt-3 text-xs">
+                  <TranscriptStatusBadge video={t} />
+                  {t.transcription && <TextField label="Transcription" clamp="line-clamp-4 whitespace-pre-line">{t.transcription}</TextField>}
+                </div>
+              )}
+
               {(t.context || t.description || t.ai_description) && (
                 <dl className="space-y-2 border-t pt-3 text-xs">
                   {t.context && <TextField label="Contexte">{t.context}</TextField>}

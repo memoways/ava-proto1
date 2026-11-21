@@ -1566,6 +1566,9 @@ export type Database = {
       video_triggers: {
         Row: {
           ai_description: string | null
+          transcription: string | null
+          dialogue: string | null
+          transcription_verified: boolean
           characters: string[] | null
           context: string | null
           created_at: string | null
@@ -1587,6 +1590,9 @@ export type Database = {
         }
         Insert: {
           ai_description?: string | null
+          transcription?: string | null
+          dialogue?: string | null
+          transcription_verified?: boolean
           characters?: string[] | null
           context?: string | null
           created_at?: string | null
@@ -1608,6 +1614,9 @@ export type Database = {
         }
         Update: {
           ai_description?: string | null
+          transcription?: string | null
+          dialogue?: string | null
+          transcription_verified?: boolean
           characters?: string[] | null
           context?: string | null
           created_at?: string | null
