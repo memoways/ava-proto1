@@ -1185,7 +1185,6 @@ test("capture remplacée : un démarrage rejeté après recommencement laisse le
   await expect(page.getByText("Micro en cours d'ouverture…", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Terminer", exact: true }).click();
   await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-  await page.getByRole("button", { name: "Continuer", exact: true }).click();
   await page.getByRole("button", { name: /Recommencer/ }).click();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
@@ -1643,7 +1642,6 @@ for (const followUp of ["Qu'est-ce qui accrochait, exactement ?", "fail"] as con
     await expect.poll(fakes.getMaxTurnCount).toBe(1);
     await page.getByRole("button", { name: "Terminer", exact: true }).click();
     await page.getByRole("button", { name: "Terminer l’expérience", exact: true }).click();
-    await page.getByRole("button", { name: "Continuer", exact: true }).click();
 
     await expect(page.getByText("1/5", { exact: true })).toBeVisible();
     await expect(page.getByText("10 questions courtes — 2 min.")).toHaveCount(0);
@@ -2299,7 +2297,6 @@ test('lot 2 : une révocation ancienne retardée ne remplace pas la nouvelle ses
   await expect.poll(() => revocationStarted).toBe(true);
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
   await page.getByRole('button', { name: /Recommencer/ }).click();
   disabled = false;
   await page.getByRole('button', { name: 'Commencer' }).click();
@@ -3110,7 +3107,6 @@ for (const device of [
     await expect(page.getByRole('button', { name: 'Terminer', exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
     await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
     await expect(page.locator(`[data-questionnaire-layout="${device.layout}"]`)).toBeVisible();
     await expect(page.getByText('1/5', { exact: true })).toBeVisible();
