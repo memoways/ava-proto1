@@ -1,4 +1,6 @@
-# Prompt de reprise — Extraits du film, lot 1c (déploiement et essai réel de `transcribe-video`)
+# [RÉALISÉ le 21 novembre — conservé pour mémoire] Extraits du film, lot 1c (déploiement et essai réel de `transcribe-video`)
+
+> Réalisé : fonctions déployées, essai réel concluant, format audio accepté sans changement de code. Reste la relecture Romed. Voir `docs/etat_courant.md`. Suite : [lot 3](prompt_reprise_extraits_film_lot_3.md).
 
 À copier dans un nouveau chat Ava. Contexte : [plan](plan_extraits_film_pas_vu.md), lot 1b livré (Edge Function `transcribe-video`, onglet Extraits).
 
