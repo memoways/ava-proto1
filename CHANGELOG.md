@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Décisions vidéo : titres de session, comptes et cinématique / extrait] — 2026-11-21
+
+- **Par session** : chaque session est fermée par défaut. Le titre est celui de Données session (nom saisi, sinon personne, date, personnages et longueur). À côté : le nombre de vidéos jouées et, s'il y en a, les décisions écartées. Le détail du tour est inchangé une fois ouvert.
+- **Filtre** : Cinématiques (pendant la réplique ou en interruption) et Extraits. « Superposition » et « Game Master » ne sont plus des catégories : un extrait peut aussi se superposer. Le filtre de session reprend le même titre humain.
+- **Par thèmes** : chaque thème et chaque vidéo affichent leur nombre et leur part de l'ensemble. Le lien porte son nombre. Le survol dit quelle part du thème va vers quelle vidéo. Les barres sont rangées de la plus grande à la plus petite. Le détail de chaque thème est replié.
+- **Synthèse** : motifs, confiance et liens sont triés du plus grand pourcentage au plus petit.
+- **Inchangé** : la sélection en jeu. Rien en production.
+
 ## [Décisions vidéo, lot 2 : vocabulaire commun thèmes, émotion, enjeu, à l'écran] — 2026-11-21
 
 - **Notion « 🎬 Vidéos AVA »** reste la source. Le code n'y écrit pas. Proposition pour Romed (nettoyage de `patricarcat` et du doublon Contamination / pandémie, listes de départ Émotion, Enjeu, À l'écran) : [docs/proposition_vocabulaire_videos_romed.md](docs/proposition_vocabulaire_videos_romed.md). Les trois propriétés ne sont pas créées ici.

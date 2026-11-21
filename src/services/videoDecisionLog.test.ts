@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   criteriaSummary,
   filterSessions,
+  decisionSessionTitle,
   groupBySession,
   loadVideoDecisions,
   playCounts,
@@ -246,8 +247,41 @@ describe("themeFlows and criteria", () => {
 
   it("filters by mechanism and session without dropping the other session's rows from the source", () => {
     expect(filterSessions(sessions, { mechanism: "extract" })).toEqual([]);
-    expect(filterSessions(sessions, { mechanism: "overlay" })[0].turns).toHaveLength(2);
+    expect(filterSessions(sessions, { mechanism: "cinematic" })[0].turns).toHaveLength(2);
     expect(filterSessions(sessions, { sessionId: "missing" })).toEqual([]);
+  });
+
+  it("keeps an interrupt cinematic with the cinematics and ranks confidence by share", () => {
+    const mixed = groupBySession([
+      event({ turn_id: "a", turn_index: 1, event_type: "cinematic_blocked", payload: { mechanism: "game_master", blockedReason: "cinematic_cooldown", confidence: 0.95 } }),
+      event({ turn_id: "b", turn_index: 2, event_type: "cinematic_blocked", payload: { mechanism: "extract", blockedReason: "extract_spacing", confidence: 0.2 } }),
+      event({ turn_id: "c", turn_index: 3, event_type: "cinematic_blocked", payload: { mechanism: "overlay", blockedReason: "overlay_selection_timeout", confidence: 0.2 } }),
+      event({ turn_id: "d", turn_index: 4, event_type: "cinematic_blocked", payload: { mechanism: "overlay", blockedReason: "overlay_reply_too_short", confidence: 0.2 } }),
+    ], catalog, new Map());
+    expect(filterSessions(mixed, { mechanism: "cinematic" })[0].turns.map((turn) => turn.mechanism).sort()).toEqual(["game_master", "overlay", "overlay"]);
+    expect(filterSessions(mixed, { mechanism: "extract" })[0].turns).toHaveLength(1);
+    expect(criteriaSummary(mixed[0].turns).confidence[0]).toMatchObject({ label: "< 0,5", count: 3 });
+  });
+});
+
+describe("decisionSessionTitle", () => {
+  it("uses the custom name, otherwise the same human title as session data, never the id", () => {
+    expect(decisionSessionTitle({ id: "session-secret", gm_post_turn_log: null, name: "Lecture avec Ulrich" }, "2026-11-20T10:00:00.000Z")).toBe("Lecture avec Ulrich");
+    const titled = decisionSessionTitle({
+      id: "session-secret",
+      gm_post_turn_log: null,
+      environment_id: "sandbox-ulrich",
+      started_at: "2026-11-20T10:00:00.000Z",
+      ended_at: "2026-11-20T10:20:00.000Z",
+      conversation_log: [
+        { role: "user", spokenWith: "max", content: "bonjour" },
+        { role: "max", content: "salut" },
+      ],
+    }, "2026-11-20T10:00:00.000Z");
+    expect(titled.startsWith("Ulrich ·")).toBe(true);
+    expect(titled).toContain("Max");
+    expect(titled).not.toContain("session-secret");
+    expect(decisionSessionTitle(undefined, "2026-11-20T10:00:00.000Z")).toMatch(/^Session · /);
   });
 });
 

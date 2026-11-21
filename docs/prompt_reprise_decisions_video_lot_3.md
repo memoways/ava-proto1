@@ -24,7 +24,11 @@ vocabulaire commun. Il n'a pas changé les gardes, le lien concret ni l'ordre de
   garde `labels.emotions` et `labels.stakes`. Le plafond de 4 reste sur themes + topics + intentions.
   Une valeur hors liste est conservée. L'onglet la marque « hors liste ».
 - Le Sankey peut passer en émotion ou en enjeu quand une de ces listes contient un terme. Sinon la
-  vue thèmes du lot 1 reste celle par défaut.
+  vue thèmes du lot 1 reste celle par défaut. Depuis la relecture du 21 novembre soir, chaque thème,
+  chaque vidéo et chaque lien affichent leur nombre et leur pourcentage, et la synthèse est triée
+  du plus grand pourcentage au plus petit. Ne pas réintroduire « Superposition » ni « Game Master »
+  comme filtres : le filtre est Cinématiques / Extraits. Les sessions utilisent le titre de
+  Données session et sont fermées par défaut.
 - `characters` = qui peut parler. `on_screen` = qui est visible. La sélection ne lit pas encore
   `on_screen`.
 - Proposition à valider par Romed : [docs/proposition_vocabulaire_videos_romed.md](proposition_vocabulaire_videos_romed.md).
