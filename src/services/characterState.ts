@@ -85,7 +85,70 @@ export const STATE_LEVEL_TEXT: Record<StateAxis, Record<StateLevel, string>> = {
   },
 };
 
+/**
+ * Lot H: attitudes as lived, never as cognition. Same five axes and levels,
+ * but no sentence asks the character to analyse, name contradictions, frame or
+ * run the exchange, or speak « sans filtre »: the radar sets what the character
+ * feels like doing and how much it gives, never what is true nor the register.
+ * Wording to be validated by Romed; played only when the profile sets
+ * `livedTexts` (off by default) or an evaluation override asks for it.
+ */
+export const STATE_LEVEL_TEXT_LIVED: Record<StateAxis, Record<StateLevel, string>> = {
+  combativite: {
+    0: "tu n'as plus de ressort : tu laisses passer, tu ne te défends pas, tu lâches facilement",
+    1: "tu es à plat : tu te défends mollement et tu cèdes dès qu'on insiste",
+    2: "tu es sur la défensive sans énergie : tu marques ton désaccord mais tu ne le portes pas",
+    3: "tu tiens ta position sans chercher le conflit",
+    4: "tu as envie de te défendre : tu réponds du tac au tac quand on te met en cause et tu ne laisses pas passer ce qui te blesse",
+    5: "tu es prêt à te battre : tu réponds dur à ce qui te touche et tu ne veux rien lâcher",
+  },
+  initiative: {
+    0: "tu subis l'échange : tu réponds au plus court et tu n'amènes rien de toi",
+    1: "tu suis : tu réponds à ce qu'on te demande et tu relances rarement",
+    2: "tu laisses l'autre aller où il veut, avec de petites relances de temps en temps",
+    3: "tu réponds et tu amènes parfois quelque chose de toi",
+    4: "tu as envie de dire des choses : tu poses une question de toi-même et tu reviens sur ce qui te travaille",
+    5: "tu as besoin de parler : tu reviens sans cesse sur ce qui te pèse et tu poses tes propres questions",
+  },
+  lucidite: {
+    0: "tu es sonné : tu perds le fil, tu confonds des éléments et tu as du mal à te souvenir de ce qui vient d'être dit",
+    1: "tu es confus : tu hésites, tu te reprends et tu demandes de répéter",
+    2: "tu es un peu brouillé : tu suis l'essentiel mais tu peux manquer une nuance",
+    3: "tu es présent et tu suis l'échange normalement",
+    4: "tu es à l'écoute : tu suis ce qui est dit et tu te souviens de ce que tu as déjà dit",
+    5: "tu es très présent : tu suis chaque mot de l'autre et rien ne t'échappe de ce qui vient d'être dit",
+  },
+  ouverture: {
+    0: "tu es fermé : tu ne donnes rien de personnel et tu écartes les questions qui t'approchent",
+    1: "tu te protèges : tu réponds par des généralités et tu ne te livres pas",
+    2: "tu te livres au compte-gouttes, seulement ce qui est déjà su",
+    3: "tu parles de toi avec mesure, quand la question s'y prête",
+    4: "tu te livres : tu donnes des détails personnels et tu laisses voir ce que tu ressens",
+    5: "tu as du mal à retenir ce que tu ressens : ça affleure dans ta voix, et tu en dis plus que prévu",
+  },
+  agitation: {
+    0: "tu es très calme : tu poses chaque chose sans hâte et sans tension",
+    1: "tu es calme : tu parles posément, rien ne te presse",
+    2: "tu es détendu avec un fond de tension qui ne se voit presque pas",
+    3: "tu es attentif, avec une légère tension",
+    4: "tu es agité : tu enchaînes vite et tu relances sur le moindre mot",
+    5: "tu es à vif : tu réagis à tout, tu perds patience et tu coupes l'autre dans son élan",
+  },
+};
+
+export type RadarTextVariant = "legacy" | "lived";
+
+/**
+ * Proposed per-character bounds (lot H, to validate with Romed; not applied
+ * anywhere automatically): Max stays out of the analytical high end.
+ */
+export const RECOMMENDED_STATE_BOUNDS: Record<string, { min?: Partial<StateLevels>; max?: Partial<StateLevels> }> = {
+  max: { max: { lucidite: 3, ouverture: 4 } },
+};
+
 export interface CharacterStateProfile {
+  /** Lot H: play the lived-attitude texts (off until Romed validated the wording). */
+  livedTexts?: boolean;
   initial: StateLevels;
   min: StateLevels;
   max: StateLevels;
@@ -138,6 +201,7 @@ export function normalizeStateProfile(raw: unknown): CharacterStateProfile | nul
     if (typeof label === "string" && label.trim()) labels[axis] = label.trim().slice(0, STATE_LABEL_MAX_CHARS);
   }
   return {
+    ...(source.livedTexts === true ? { livedTexts: true } : {}),
     initial, min, max,
     gmCanEvolve: source.gmCanEvolve !== false,
     maxStepPerTurn: Number.isFinite(step) ? Math.min(STATE_MAX_STEP_LIMIT, Math.max(1, step)) : 1,
@@ -241,13 +305,18 @@ export function validateStateDelta(params: {
 }
 
 /** Block « ÉTAT DU PERSONNAGE À CE TOUR » sent to the character. */
-export function compileCharacterStateBlock(levels: StateLevels, profile: CharacterStateProfile | null): string {
+export function resolveRadarTextVariant(profile: Pick<CharacterStateProfile, "livedTexts"> | null, override?: RadarTextVariant): RadarTextVariant {
+  return override ?? (profile?.livedTexts ? "lived" : "legacy");
+}
+
+export function compileCharacterStateBlock(levels: StateLevels, profile: CharacterStateProfile | null, variant?: RadarTextVariant): string {
+  const texts = resolveRadarTextVariant(profile, variant) === "lived" ? STATE_LEVEL_TEXT_LIVED : STATE_LEVEL_TEXT;
   const lines = STATE_AXES.map((axis) => {
     const level = toLevel(levels[axis], STATE_NEUTRAL_LEVEL) as StateLevel;
-    return `- ${stateAxisLabel(axis, profile)} : ${STATE_LEVEL_TEXT[axis][level]}.`;
+    return `- ${stateAxisLabel(axis, profile)} : ${texts[axis][level]}.`;
   });
   return [
-    "Ton état intérieur à ce tour règle ton attitude (ce que tu veux faire, ce que tu donnes), pas la forme de ta parole, que les états de parole et la rugosité continuent de régler. Ne le nomme jamais et n'en cite aucun chiffre.",
+    "Ton état intérieur à ce tour règle ton attitude (ce que tu veux faire, ce que tu donnes), jamais la vérité de ce que tu sais ni le registre de ta parole : les faits de ta fiche et la forme de ta parole (états de parole, rugosité) ne bougent pas avec lui. Ne le nomme jamais et n'en cite aucun chiffre.",
     ...lines,
   ].join("\n");
 }
@@ -267,7 +336,7 @@ export function buildGmStateSection(params: {
   return `## ÉTAT DU PERSONNAGE
 État transmis au personnage à ce tour, sur cinq axes de 0 à 5 :
 ${rows.join("\n")}
-Fais évoluer cet état selon ce que vit le personnage dans cet échange : au plus ${profile.maxStepPerTurn} cran par axe et par tour, seulement pour un axe qui bouge vraiment. Le résultat s'applique au tour suivant ; le moteur borne tout.
+Fais évoluer cet état selon ce que vit le personnage dans cet échange : au plus ${profile.maxStepPerTurn} cran par axe et par tour, seulement pour un axe qui bouge vraiment. Le résultat s'applique au tour suivant ; le moteur borne tout. Tu prends une seule décision par tour : l'état de parole que tu proposes (next_speech_state) doit rester cohérent avec cet état (un personnage fermé ou à plat ne reçoit pas un état de parole expansif, un personnage à vif pas un état posé).
 Champ optionnel character_state_delta à la racine du JSON : null ou absent si rien ne change, sinon recopie exactement characterKey et sourceTurn, avec des changements signés. Exemple : ${example}`;
 }
 

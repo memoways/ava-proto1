@@ -1,6 +1,6 @@
 # Plan — juge, fiches et direction de jeu : état des lieux et rounds de test
 
-Date : 21 novembre 2026. Lot 0 (documentaire) livré ; **lot F (factualité) livré le 21 novembre** (voir « Lot F — résultat » ci-dessous). Prochain lot : [H — une seule hiérarchie](prompt_reprise_juge_lot_h.md).
+Date : 21 novembre 2026. Lot 0 (documentaire) livré ; **lot F (factualité) livré le 21 novembre** (voir « Lot F — résultat » ci-dessous). Lot H livré le 21 novembre (voir « Lot H — résultat »). Prochain lot : [D2](prompt_reprise_juge_lot_d2.md).
 
 ## Contexte
 
@@ -116,6 +116,13 @@ faits `faits_canon_k1.json` réécrite sur les fiches retouchées ; `neutralizeA
 `eval:judge:sequences --focus factuality` (note séparée, style exclu, rapport par fait) ; corpus
 `docs/eval/sequences_factuality_f.json` (J3 v2 + `max-F`, `emma-F`). Équivalent admin du mode factualité : non fait (hors
 « simple »). Calibrage : en attente des dix réponses notées par Romed.
+
+### Lot H — résultat (21 novembre 2026)
+Rapport : `docs/eval/juge_hierarchie_lot_h_20261121.md`. Livré : hiérarchie écrite (`INSTRUCTION_HIERARCHY`), textes de radar
+vécus derrière `livedTexts` (désactivé), cohérence état de parole/radar dans le contrat GM, vue de provenance des couches,
+interrupteurs d'évaluation `instructionHierarchy` / `intellectualReferences` / `radarTexts`, propositions à Romed
+(`docs/proposition_romed_hierarchie_lot_h.md` : libellés, bornes Max, format/longueur hors identité). Mesure : factualité 6,83 → 5,95
+(−0,88, même signe pour Max et Emma) : à arbitrer. Non fait : mesure des textes vécus (aucun profil actif en sandbox).
 
 ## Ordre et dépendances
 Lot 0 → F (en attendant les retours Romed/Benoît 23–24 nov.) → H → D2 → J4 → J5. Chaque round ne démarre que si le

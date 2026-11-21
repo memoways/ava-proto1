@@ -111,6 +111,10 @@ export function CharacterStateEditor({ characterName, value, onChange }: {
           Le GM peut faire évoluer l'état
         </label>
         <label className="flex items-center gap-2 text-xs">
+          <Switch checked={profile.livedTexts === true} onCheckedChange={(checked) => update({ livedTexts: checked })} aria-label="Textes d'attitude vécue (à valider avec Romed)" />
+          Textes d'attitude vécue (à valider avec Romed avant activation)
+        </label>
+        <label className="flex items-center gap-2 text-xs">
           Pas maximum par tour
           <Select value={String(profile.maxStepPerTurn)} onValueChange={(v) => update({ maxStepPerTurn: Number(v) })} disabled={!profile.gmCanEvolve}>
             <SelectTrigger className="h-7 w-16"><SelectValue /></SelectTrigger>

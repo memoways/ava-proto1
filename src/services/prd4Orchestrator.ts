@@ -43,7 +43,7 @@ import {
   normalizeRelationshipState,
 } from "@/services/relationshipEngine";
 import { fetchCharacterSpeechRuntime, fetchCharacterStateProfile, fetchPinnedDirectorRuntime, normalizeDirectorConfig } from "@/services/experienceOrchestration";
-import { compileCharacterStateBlock, resolveCharacterStateForTurn, type StateLevels } from "@/services/characterState";
+import { compileCharacterStateBlock, resolveCharacterStateForTurn, type RadarTextVariant, type StateLevels } from "@/services/characterState";
 import { selectSpeechState } from "@/services/speechRugosity";
 import { withTimeout } from "@/services/asyncUtils";
 import { compactConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -145,6 +145,12 @@ export interface PRD4TurnInput {
     streamContract?: ResponseStreamContractVariant;
     /** In-memory lot K1 switch: `false` plays the core and the frame without the established facts; never persisted. */
     establishedFacts?: boolean;
+    /** In-memory lot H switch: `false` plays without the « références intellectuelles » field; never persisted. */
+    intellectualReferences?: boolean;
+    /** In-memory lot H switch: `false` plays without the written instruction hierarchy (reference side); never persisted. */
+    instructionHierarchy?: boolean;
+    /** In-memory lot H switch: radar attitude wording (`legacy` as stored, `lived` = lived attitudes); never persisted. */
+    radarTexts?: RadarTextVariant;
     /** In-memory GM mode (off / light / full) for sessionless replays; never persisted. */
     gmMode?: GmMode;
     /** In-memory GM analysis priority levels (lot B) merged over the pinned config; never persisted. */
@@ -448,7 +454,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     relationshipDirective: relationshipDirective.prompt,
     experienceFrame: experienceFrame.prompt || undefined,
     speechStateDirective: proposedSpeechState,
-    characterState: characterStateForGm ? compileCharacterStateBlock(characterStateForGm.levels, characterStateForGm.profile) : undefined,
+    characterState: characterStateForGm ? compileCharacterStateBlock(characterStateForGm.levels, characterStateForGm.profile, evaluationOverrides?.radarTexts) : undefined,
     rugosite,
     speechStateHistory: recentSpeechStates,
   };
@@ -486,6 +492,8 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
           situationSummaryOverride: evaluationOverrides?.situationSummary,
           streamContract: evaluationOverrides?.streamContract,
           establishedFacts: evaluationOverrides?.establishedFacts,
+          intellectualReferences: evaluationOverrides?.intellectualReferences,
+          instructionHierarchy: evaluationOverrides?.instructionHierarchy,
           onSpeechToken: retry || !input.streamControl ? undefined : text => {
             if (attempt.signal.aborted) throw new DOMException('Obsolete character attempt', 'AbortError');
             input.streamControl!.onToken(text);

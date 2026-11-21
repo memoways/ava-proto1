@@ -10,6 +10,15 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Pourquoi : le paragraphe « Ce qui est vrai aujourd'hui » de l'identité fait 1 399 (Max) et 1 414 (Emma) caractères pour 1 200 protégés ; la coupe retirait « où ton père l'a mise » (mesure du lot F). Un champ court dédié permet à Romed de choisir ce qui est protégé, dans l'ordre.
 - `npm run eval:judge:sheets` signale désormais la source des faits, sa taille et ce qui est coupé (Max 309 car., Emma 313 car. de fin coupés tant que le champ est vide).
 
+## [Juge, lot H : une seule hiérarchie des consignes, radar en attitudes vécues] — 2026-11-21
+
+- **Hiérarchie écrite** en tête du prompt personnage (`INSTRUCTION_HIERARCHY`, `optimized_v3`) : faits de la fiche > cadre de l'appel > état de l'app (radar, directive GM, orientation) > parole du tour ; le radar règle l'attitude, jamais la vérité ni le registre (aussi dit dans le bloc radar). Budget de contexte +500 car.
+- **Radar** : textes « attitude vécue » (`STATE_LEVEL_TEXT_LIVED`, sans « tu nommes les contradictions », « tu cadres », « sans filtre »), joués seulement si le profil coche « Textes d'attitude vécue » (désactivé par défaut, à valider avec Romed) ; anciens textes inchangés. Bornes proposées pour Max (lucidité ≤ 3, ouverture ≤ 4) : constante, non appliquées.
+- **Une décision GM par tour** : la section d'état du GM impose un `next_speech_state` cohérent avec le radar.
+- **Back-office** : « Voir ce que reçoit le personnage » (Réglages personnages) avec la provenance et le niveau de chaque couche (`characterPromptLayers.ts`).
+- **Interrupteurs d'évaluation en mémoire** (instantané du juge) : `instructionHierarchy`, `intellectualReferences`, `radarTexts`.
+- **Mesure** (factualité, 68 tours, même corpus) : avant 6,83/10, après 5,95/10 (−0,88, dans le critère de 1,37 pt mais de même signe pour Max et Emma, probablement réel) ; coût 3,35 $. Rapport : `docs/eval/juge_hierarchie_lot_h_20261121.md`. Propositions à Romed : `docs/proposition_romed_hierarchie_lot_h.md`. Aucune production, aucune migration.
+
 ## [Juge, lot F : round 1 factualité, une seule logique pour la fiche] — 2026-11-21
 
 - **Une seule logique, la fiche** : les fiches retouchées par Romed le 19 novembre ne disent plus « tu attends l'appel » ; `neutralizeAwaitedCall` / `sheetAtCallTime` sont supprimés (compilateur, souvenirs RAG, repère canon du juge) avec leurs tests. Un garde-fou signale une fiche fautive (`findAwaitedCallSentences` : test sur la copie `speechSandbox20261121.json` et avertissement de `npm run eval:judge:sheets`, qui accepte maintenant `--resync` pour la resynchro `fields_only` du sandbox) sans jamais la réécrire. Le champ « Ce que tu sais aujourd'hui », quand il est rempli, est la seule source des faits établis.
