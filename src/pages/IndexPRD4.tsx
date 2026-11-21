@@ -16,7 +16,7 @@ import { createLocalSpeechDetector } from "@/services/localSpeechDetection";
 import { generateSpeech } from "@/services/tts";
 import { playAudioBlobRobust } from "@/services/audioPlayback";
 import { GM_CODE_VERSION } from "@/agents/gameMasterPRD4";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { useExperienceState } from "@/hooks/useExperienceState";
 import type { AudioState, ConversationMessage, FilmAnswer } from "@/types";
@@ -132,7 +132,6 @@ import { ensureExperienceSettings, startExperienceSettingsLoad } from "@/service
 import { describeCurrentEffectiveVoice } from "@/services/effectiveVoiceCurrent";
 import { buildSessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 import { cn } from "@/lib/utils";
-import EndSessionScreen from "@/components/prd4/EndSessionScreen";
 import QuestionnaireScreenPRD4 from "@/components/prd4/QuestionnaireScreenPRD4";
 import ConversationalQuestionnaire from "@/components/prd4/ConversationalQuestionnaire";
 import { baseDimensionQuestions, buildSessionContext } from "@/services/conversationalQuestionnaire";
@@ -3606,10 +3605,11 @@ const IndexPRD4 = () => {
   }, []);
 
   // ---- End / Questionnaire --------------------------------------------------
-  const handleEndContinue = useCallback(
-    () => setPhase(showQuestionnaireRef.current ? "questionnaire" : "thanks"),
-    [setPhase],
-  );
+  // No intermediate « La communication se coupe » screen: the end of the
+  // experience leads straight to the questionnaire (or the thanks screen).
+  useLayoutEffect(() => {
+    if (state.phase === "end_session") setPhase(showQuestionnaireRef.current ? "questionnaire" : "thanks");
+  }, [state.phase, setPhase]);
 
   const handleQuestionnaireSubmit = useCallback(
     async (answers: QuestionnairePRD4Answers) => {
@@ -3932,7 +3932,7 @@ const IndexPRD4 = () => {
       );
       break;
     case "end_session":
-      screen = <EndSessionScreen onContinue={handleEndContinue} />;
+      screen = null; // transient: the layout effect above moves on before paint
       break;
     case "questionnaire":
       screen = conversationalContext && conversationalQuestions ? (

@@ -1185,7 +1185,6 @@ test("capture remplacée : un démarrage rejeté après recommencement laisse le
   await expect(page.getByText("Micro en cours d'ouverture…", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Terminer", exact: true }).click();
   await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-  await page.getByRole("button", { name: "Continuer", exact: true }).click();
   await page.getByRole("button", { name: /Recommencer/ }).click();
   await page.getByRole("button", { name: "Commencer" }).click();
   await page.getByRole("button", { name: /Passer/ }).click();
@@ -1643,7 +1642,6 @@ for (const followUp of ["Qu'est-ce qui accrochait, exactement ?", "fail"] as con
     await expect.poll(fakes.getMaxTurnCount).toBe(1);
     await page.getByRole("button", { name: "Terminer", exact: true }).click();
     await page.getByRole("button", { name: "Terminer l’expérience", exact: true }).click();
-    await page.getByRole("button", { name: "Continuer", exact: true }).click();
 
     await expect(page.getByText("1/5", { exact: true })).toBeVisible();
     await expect(page.getByText("10 questions courtes — 2 min.")).toHaveCount(0);
@@ -2299,7 +2297,6 @@ test('lot 2 : une révocation ancienne retardée ne remplace pas la nouvelle ses
   await expect.poll(() => revocationStarted).toBe(true);
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
   await page.getByRole('button', { name: /Recommencer/ }).click();
   disabled = false;
   await page.getByRole('button', { name: 'Commencer' }).click();
@@ -2851,7 +2848,7 @@ test('F2 : recharge active consomme le budget, expiration technique reste distin
   fakes.changeSessionRow({ conversation_log: log });
   await page.reload();
   await page.getByRole('button', { name: /Reprendre/ }).click();
-  await expect(page.getByText('La communication se coupe.', { exact: true })).toBeVisible();
+  await expect(page.getByText("Ton retour sur l'expérience")).toBeVisible();
   await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('timeout_configured_duration');
 });
 
@@ -2884,7 +2881,7 @@ test('F2 : expiration technique sur grille ferme l’expérience sans dépenser 
   await expect(page.getByText('Sauvegarde de la fermeture…', {exact:true})).toHaveCount(0);
   const before = (fakes.getSessionRow().conversation_log as Array<{callClose?:{remainingSeconds:number}}>)[0].callClose!.remainingSeconds;
   await page.clock.fastForward(4 * 60 * 60 * 1000 + 1000);
-  await expect(page.getByText('La communication se coupe.', {exact:true})).toBeVisible();
+  await expect(page.getByText("Ton retour sur l'expérience")).toBeVisible();
   await expect.poll(() => fakes.getSessionRow().game_over_reason).toBe('resume_expired');
   expect(fakes.getSessionRow().duration_seconds).toBe(930 - before);
 });
@@ -3110,7 +3107,6 @@ for (const device of [
     await expect(page.getByRole('button', { name: 'Terminer', exact: true })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
     await page.getByRole('button', { name: 'Terminer l’expérience', exact: true }).click();
-    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
     await expect(page.locator(`[data-questionnaire-layout="${device.layout}"]`)).toBeVisible();
     await expect(page.getByText('1/5', { exact: true })).toBeVisible();

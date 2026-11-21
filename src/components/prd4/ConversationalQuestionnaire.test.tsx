@@ -200,4 +200,13 @@ describe("ConversationalQuestionnaire", () => {
     expect(panel.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: "Valider et envoyer" })).toBeDisabled();
   });
+
+  it("introduces the questionnaire on the first question only", async () => {
+    render(<ConversationalQuestionnaire questions={questions} sessionContext={context} requestFollowUp={vi.fn().mockResolvedValue(null)} onSave={vi.fn()} />);
+    expect(screen.getByTestId("questionnaire-intro")).toHaveTextContent(/améliorer l'expérience.*5 minutes.*à la voix/);
+    answer("Réponse 1");
+    fireEvent.click(await screen.findByRole("button", { name: "Note 3 sur 5" }));
+    fireEvent.click(screen.getByRole("button", { name: "Question suivante" }));
+    expect(screen.queryByTestId("questionnaire-intro")).not.toBeInTheDocument();
+  });
 });

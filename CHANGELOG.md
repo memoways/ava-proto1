@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Fin d'expérience : suppression de l'écran « La communication se coupe »] — 2026-11-20
+
+- L'écran intermédiaire (`EndSessionScreen`) est supprimé : la fin de l'expérience mène directement au questionnaire (ou au merci si le questionnaire est désactivé). La phase `end_session` reste interne et transitoire.
+- Questionnaire conversationnel : introduction sur la première question (retours utiles à l'amélioration, environ 5 minutes, réponse à la voix possible).
+- Deux tests e2e de reprise expirée attendent désormais le questionnaire ; non rejoués en local, CI uniquement.
+
 ## [Questionnaire conversationnel : lisibilité (relance, réponse, envoi)] — 2026-11-20
 
 - Relance affichée en premier dans un encadré, question initiale et réponse précédente repliées (« Revoir ma question et ma réponse »).

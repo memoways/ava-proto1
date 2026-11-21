@@ -373,6 +373,11 @@ const ConversationalQuestionnaire = ({ questions, sessionContext, requestFollowU
             )}
           </div>
           {state.step !== "review" && <p className="text-sm text-muted-foreground">{DIMENSION_LABELS[key]}</p>}
+          {state.index === 0 && state.step === "answer" && (
+            <p className="rounded-md border border-border bg-secondary/30 p-3 text-sm text-foreground" data-testid="questionnaire-intro">
+              Tes retours vont nous aider à améliorer l'expérience. Ce questionnaire prend environ 5 minutes, et tu peux répondre à la voix.
+            </p>
+          )}
         </header>
 
         {state.step !== "review" && (
