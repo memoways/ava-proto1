@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence Tavus, lot T5 : rejeu du rerank conditionnel] — 2026-11-21
+
+- Nouvel outil `npm run eval:rerank-replay` (`scripts/eval-judge/rerankReplay.ts`) : rejoue des questions du laboratoire RAG avec rerank et enregistre l'ordre cosinus et l'ordre reranké.
+- Résultat : le rerank change fortement le top 5 (recouvrement moyen 2,4/5), aucun critère de cosinus ne permet de le sauter sans changer la sélection. `query-rag` et `RAG_RERANK_ENABLED` inchangés ; qualité réelle à trancher par `evalJudge`.
+
 ## [Latence Tavus, lot T4 : contrôle de T3 et options contexte] — 2026-11-21
 
 - Contrôle de non-régression RAG après T3 (0 erreur, passages moyens 5,85 → 6,00, `character_rag` médian 740 → 690 ms) documenté dans l'analyse.
