@@ -98,7 +98,7 @@ describe("VideoDecisionsTab", () => {
   it("renders the three views, the quote and an unknown reason", async () => {
     render(<VideoDecisionsTab />);
     const session = await screen.findByRole("button", { name: /Ulrich · 20.11.26/ });
-    expect(session.textContent).toContain("1 vidéo jouée");
+    expect(session.textContent).toMatch(/1\s+vidéo jouée/);
     expect(screen.queryByText("Tour 3")).toBeNull();
     expect(screen.queryByText("session-a")).toBeNull();
     fireEvent.click(session);
@@ -142,10 +142,11 @@ describe("VideoDecisionsTab", () => {
     expect(screen.getByRole("button", { name: "Évolution des émotions" })).toBeTruthy();
   });
 
-  it("says when the vocabulary read returned zero rows", async () => {
+  it("does not explain a missing vocabulary on the session list", async () => {
     loadVideoDecisions.mockResolvedValue({ ...report, vocabulary: null, vocabularyZeroRows: true, labelDimensions: { emotion: false, stake: false } });
     render(<VideoDecisionsTab />);
-    expect(await screen.findByTestId("video-vocabulary-zero-rows")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Ulrich · 20.11.26/ })).toBeTruthy();
+    expect(screen.queryByText(/vocabulaire/i)).toBeNull();
     expect(screen.queryByRole("button", { name: "Émotion" })).toBeNull();
   });
 

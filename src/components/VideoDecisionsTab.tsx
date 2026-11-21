@@ -43,8 +43,8 @@ function characterLabel(character: string | null): string {
   return character ?? "—";
 }
 
-function videoCountLabel(played: number): string {
-  return `${played} vidéo${played > 1 ? "s" : ""} jouée${played > 1 ? "s" : ""}`;
+function videoCountWords(played: number): string {
+  return `vidéo${played > 1 ? "s" : ""} jouée${played > 1 ? "s" : ""}`;
 }
 
 function Bar({ label, count, total }: { label: string; count: number; total: number }) {
@@ -275,14 +275,13 @@ function SessionList({ sessions, vocabulary }: { sessions: DecisionSession[]; vo
         const skipped = session.turns.length - played;
         return (
           <Collapsible key={session.sessionId} className="rounded-lg border bg-card" data-testid="video-decision-session">
-            <CollapsibleTrigger className="flex w-full items-start gap-2 p-3 text-left [&[data-state=open]>svg]:rotate-90">
-              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 transition-transform" />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">{session.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {videoCountLabel(played)}
-                  {skipped > 0 ? ` · ${skipped} écartée${skipped > 1 ? "s" : ""}` : ""}
-                </span>
+            <CollapsibleTrigger className="flex w-full items-center gap-3 p-3 text-left [&[data-state=open]>svg]:rotate-90">
+              <ChevronRight className="h-4 w-4 shrink-0 transition-transform" />
+              <span className="min-w-0 flex-1 text-sm font-semibold">{session.title}</span>
+              <span className="shrink-0 text-sm text-muted-foreground">
+                <span className="text-2xl font-semibold tabular-nums leading-none text-foreground">{played}</span>
+                {` ${videoCountWords(played)}`}
+                {skipped > 0 ? ` · ${skipped} écartée${skipped > 1 ? "s" : ""}` : ""}
               </span>
             </CollapsibleTrigger>
             <CollapsibleContent className="px-3 pb-3">
@@ -372,11 +371,6 @@ export default function VideoDecisionsTab() {
       )}
       {report?.catalogUnreadable && <p className="text-sm text-amber-700 dark:text-amber-300">Les titres de vidéos n'ont pas pu être lus : les identifiants sont affichés tels quels.</p>}
       {report?.themesUnreadable && <p className="text-sm text-amber-700 dark:text-amber-300">Les thèmes du Game Master n'ont pas pu être lus pour ces sessions.</p>}
-      {report?.vocabularyZeroRows && (
-        <p className="text-sm text-amber-700 dark:text-amber-300" data-testid="video-vocabulary-zero-rows">
-          Le vocabulaire n'a renvoyé aucune ligne. Une lecture bloquée par les règles d'accès ressemble à ça : ce n'est pas une liste vide.
-        </p>
-      )}
       {report?.vocabularyError && <p role="alert" className="text-sm text-destructive">{report.vocabularyError}</p>}
       {report?.truncated && <p className="text-sm text-muted-foreground">Journal tronqué aux 5 000 événements les plus anciens de la période.</p>}
 
