@@ -169,3 +169,11 @@ describe("resumption", () => {
     expect(formatWatchedVideos([watchedVideoFrom(spokenVerified, 3, false)])).not.toContain("dit :");
   });
 });
+
+describe("selector answer budget", () => {
+  it("leaves room for the full JSON and asks for short cues", async () => {
+    const { EXTRACT_SELECTOR_MAX_TOKENS, EXTRACT_SELECTOR_SYSTEM_PROMPT } = await import("./extractSelection");
+    expect(EXTRACT_SELECTOR_MAX_TOKENS).toBeGreaterThanOrEqual(400);
+    expect(EXTRACT_SELECTOR_SYSTEM_PROMPT).toContain("Reste bref");
+  });
+});

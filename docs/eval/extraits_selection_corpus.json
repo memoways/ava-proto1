@@ -1,0 +1,14 @@
+[
+  {"id":"peter-1","character":"Max","user":"Qui est Peter ? Tu as l'air de parler de quelqu'un que tu as perdu.","reply":"Peter, c'était mon ami. On était ensemble dans cette histoire jusqu'au bout, et puis un jour je l'ai retrouvé couché dans un champ.","expect":["mort Peter"]},
+  {"id":"peter-2","character":"Max","user":"Comment tu as découvert qu'il était mort ?","reply":"Je marchais avec le fusil sur l'épaule, et là, sous une tôle, j'ai vu un corps. Je ne voulais pas y croire.","expect":["mort Peter"]},
+  {"id":"couteau-1","character":"Emma","user":"Qu'est-ce qui s'est passé avec l'animal ?","reply":"Il fallait faire quelque chose, elle souffrait. Max a hésité, moi non plus je ne savais pas faire.","expect":["couteau"]},
+  {"id":"couteau-2","character":"Max","user":"Tu as déjà dû tuer quelque chose toi ?","reply":"Une fois. Je n'avais jamais fait ça. On l'a fait à deux, dans la maison, et personne n'en parle depuis.","expect":["couteau"]},
+  {"id":"conscience-1","character":"Max","user":"Pourquoi tu en veux autant au gouvernement ?","reply":"Parce qu'ils déchirent des familles au nom de la sécurité. Les camps de quarantaine, c'est ça le vrai scandale.","expect":["mauvaise conscience"]},
+  {"id":"conscience-2","character":"Emma","user":"Tu penses que les ministres savent ce qu'ils font ?","reply":"Je crois qu'ils s'accrochent. Et nous on regarde, on se sent coupables sans pouvoir rien faire.","expect":["mauvaise conscience"]},
+  {"id":"none-1","character":"Max","user":"Tu aimes quel genre de musique ?","reply":"Franchement, plutôt le silence ces temps-ci. Ça repose.","expect":[]},
+  {"id":"none-2","character":"Emma","user":"Il fait quel temps chez vous ?","reply":"Du brouillard, tout le temps. On ne voit pas à dix mètres.","expect":[]},
+  {"id":"none-3","character":"Max","user":"Salut, ça va ?","reply":"Ça va. Et toi, tu viens d'où ?","expect":[]},
+  {"id":"none-4","character":"Emma","user":"Tu peux m'expliquer comment marche cette application ?","reply":"Je ne suis pas là pour ça. Parle-moi plutôt de ce que tu veux savoir sur nous.","expect":[]},
+  {"id":"vague-1","character":"Max","user":"Et sinon, c'est quoi ton plus grand regret ?","reply":"Ne pas avoir été là à temps. Il y a des choses qu'on ne rattrape pas.","expect":["mort Peter","mauvaise conscience"]},
+  {"id":"vague-2","character":"Emma","user":"Vous vous disputez souvent avec Max ?","reply":"Quand on est fatigués. Mais on tient ensemble, on n'a pas trop le choix.","expect":[]}
+]

@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Extraits du film, lot 3 : rejeu de la sélection et correctif de troncature] — 2026-11-21
+
+- **Données** : Romed a vérifié et coché « Transcription vérifiée » ; en base, « couteau » et « mauvaise conscience » sont parlés, « mort Peter » est silencieux, tous vérifiés : les 3 extraits sont sélectionnables dès que la bascule est activée (inactive par défaut, rien en production).
+- **Outil `npm run eval:extracts`** (`scripts/eval-judge/extractsReplay.ts`, corpus `docs/eval/extraits_selection_corpus.json`, 12 cas) : rejoue le sélecteur sur les vraies lignes de `video_triggers`, bascule forcée **en mémoire**, sandbox seulement (prod refusée), aucune écriture d'`admin_settings`. Sortie : taux de sélection, statuts, latence, accord avec l'extrait attendu.
+- **Bug trouvé et corrigé** : avec `max_tokens` = 160, le sélecteur (Gemini 2.5 Flash) recopiait parfois la description entière dans `videoCue` et le JSON était coupé (`no_json`) : **7 réponses sur 24 perdues**, dont des cas clairement pertinents. Plafond relevé à 400 et consigne « reste bref » dans le prompt. Après correctif : rappel sur les cas pertinents 64 % → 100 %, 0 faux positif sur les cas hors sujet, latence de sélection médiane 0,76 s (p90 0,94 s, max 1,1 s) contre 0,92 s.
+- **Non fait** : activation sandbox, écoute (parlé sans double parole, silencieux superposé, reprise, changement de personnage, interruption, média en erreur), recette humaine avec des personnes n'ayant pas vu le film, décision sur le blocage de l'entrée du joueur. Le rejeu est hors ligne (corpus écrit à la main, 12 cas) : il ne prouve ni la pertinence réelle ni le rendu à l'écoute.
+
 ## [Extraits du film, lot 1b : transcription IA sur demande] — 2026-11-21
 
 - **Edge Function `transcribe-video`** (admin seulement) : Gemini écoute la **bande son** d'un extrait *parlé* et écrit les paroles dans la seule propriété Notion « Transcription » (puis `video_triggers.transcription`), toujours non vérifiée. Refus explicites : `not_an_extract`, `dialogue_silent`, `dialogue_missing` (jamais silencieux ni « non renseigné »), `already_transcribed`, `verified_requires_confirmation`. Aucune parole → rien n'est écrit, `no_speech_detected`.

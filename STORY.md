@@ -7,6 +7,10 @@
 
 ---
 
+## Extraits du film, lot 3 — le sélecteur perdait un tiers de ses réponses (21 novembre 2026)
+
+Données prêtes (3 extraits vérifiés par Romed), donc première mesure possible sans activer quoi que ce soit : rejeu hors ligne du sélecteur sur un corpus de 12 cas. Il a révélé que le budget de 160 tokens coupait le JSON quand le modèle recopiait une description entière (7 réponses sur 24 en `no_json`). Corrigé (400 tokens, cues courts) : rappel 100 % sur les cas pertinents, 0 faux positif, ~0,8 s. Ce que ça ne prouve pas : la pertinence réelle et le rendu à l'écoute ; l'activation sandbox et la recette humaine restent à faire.
+
 ## Extraits du film, lot 1b — écouter, pas regarder (21 novembre 2026)
 
 La « Description IA » regarde une rendition vidéo **sans son** : la réutiliser pour transcrire aurait produit du texte inventé. Les extraits Gumlet ont pourtant une piste audio séparée (AAC, ≈ 1,5 Mo) : c'est elle qu'on envoie à Gemini. Règle de fond : une transcription est une preuve, pas une aide. Donc : seulement les extraits labellisés « Parlé » par un humain, aucune parole détectée = rien d'écrit, texte toujours « à vérifier », et une transcription déjà vérifiée n'est écrasée qu'avec confirmation explicite (la case est alors décochée). Qualité réelle de la transcription : non mesurée, relecture Romed à faire.

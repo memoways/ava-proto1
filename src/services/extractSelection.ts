@@ -31,7 +31,7 @@ export const EXTRACT_MAX_CANDIDATES = 12;
 export const EXTRACT_SELECTION_MIN_TIMEOUT_MS = 1_500;
 export const EXTRACT_SELECTION_MAX_TIMEOUT_MS = 5_000;
 export const EXTRACT_SELECTION_TIMEOUT_MS = 3_500;
-export const EXTRACT_SELECTOR_MAX_TOKENS = 160;
+export const EXTRACT_SELECTOR_MAX_TOKENS = 400; // 160 cut the JSON when the model copied a whole description into videoCue (7 of 24 replays: no_json)
 export const EXTRACT_MIN_COMPLEMENT_CHARS = 12;
 const LINE_TEXT_MAX_CHARS = 200;
 const TRANSCRIPT_MAX_CHARS = 320;
@@ -144,7 +144,8 @@ Règles :
 - Ne reprends pas un extrait déjà montré, ni un qui apporte la même chose qu'un extrait déjà montré.
 - Si aucun extrait ne convient, retourne null : jamais d'extrait par défaut.
 Réponds uniquement en JSON, sans autre texte :
-{"videoId": "id de l'extrait (ex. v2)" | null, "confidence": nombre 0..1, "replyCue": "mots exacts de la question du joueur ou de la réplique", "videoCue": "mots de « montre » ou « dit » de l'extrait qui y correspondent", "complement": "ce que l'extrait apporte de plus que la réplique"}`;
+{"videoId": "id de l'extrait (ex. v2)" | null, "confidence": nombre 0..1, "replyCue": "mots exacts de la question du joueur ou de la réplique", "videoCue": "mots de « montre » ou « dit » de l'extrait qui y correspondent", "complement": "ce que l'extrait apporte de plus que la réplique"}
+Reste bref : replyCue et videoCue = quelques mots recopiés (moins de 15 mots chacun), jamais la description entière ; complement = une phrase courte.`;
 
 /** Candidate order: priority, then the most words shared with the question and the reply. */
 export function orderExtractCandidates(videos: readonly ExtractVideo[]): ExtractVideo[] {
