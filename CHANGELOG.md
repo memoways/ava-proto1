@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Faits établis : champ Notion créé, budget signalé] — 2026-11-21
+
+- Le champ « Ce que tu sais aujourd'hui » est créé dans la base Caractères AVA (propriété texte, **vide** : Romed le remplit ; aucun contenu de fiche modifié). La synchronisation le lisait déjà (`sync-notion`, propriété optionnelle, colonne `ce_que_tu_sais_aujourdhui` existante) : resynchro `fields_only` de sandbox-ulrich vérifiée sans erreur ni avertissement avec le champ vide. Aucun changement d'Edge Function.
+- Pourquoi : le paragraphe « Ce qui est vrai aujourd'hui » de l'identité fait 1 399 (Max) et 1 414 (Emma) caractères pour 1 200 protégés ; la coupe retirait « où ton père l'a mise » (mesure du lot F). Un champ court dédié permet à Romed de choisir ce qui est protégé, dans l'ordre.
+- `npm run eval:judge:sheets` signale désormais la source des faits, sa taille et ce qui est coupé (Max 309 car., Emma 313 car. de fin coupés tant que le champ est vide).
+
 ## [Juge, lot F : round 1 factualité, une seule logique pour la fiche] — 2026-11-21
 
 - **Une seule logique, la fiche** : les fiches retouchées par Romed le 19 novembre ne disent plus « tu attends l'appel » ; `neutralizeAwaitedCall` / `sheetAtCallTime` sont supprimés (compilateur, souvenirs RAG, repère canon du juge) avec leurs tests. Un garde-fou signale une fiche fautive (`findAwaitedCallSentences` : test sur la copie `speechSandbox20261121.json` et avertissement de `npm run eval:judge:sheets`, qui accepte maintenant `--resync` pour la resynchro `fields_only` du sandbox) sans jamais la réécrire. Le champ « Ce que tu sais aujourd'hui », quand il est rempli, est la seule source des faits établis.
