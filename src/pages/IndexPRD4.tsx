@@ -210,6 +210,9 @@ import {
   type CharacterHandoffOffer,
 } from "@/services/characterConversation";
 
+/** Longest extra wait for the player to stop audibly speaking before the turn is closed. */
+const END_OF_SPEECH_VOICE_HOLD_MAX_MS = 4_000;
+
 
 const TEASER_VIDEO_URL = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
 /** Microphone kept open this long after a cinematic, while hands-free capture reopens it. */
@@ -281,6 +284,7 @@ const IndexPRD4 = () => {
   const lastCharacterTextRef = useRef("");
   const streamedVoiceRef = useRef<ReturnType<typeof prepareStreamedVoiceTurn> | null>(null);
   const acousticRef = useRef<ReturnType<typeof createAcousticInterruptionController> | null>(null);
+  const voiceHoldStartRef = useRef(0);
   const detectorRef = useRef<Awaited<ReturnType<typeof createLocalSpeechDetector>>>(null);
   const acousticVoiceRef = useRef(false);
   const lastTranscriptRef = useRef("");
@@ -3034,10 +3038,17 @@ const IndexPRD4 = () => {
     const stt = sttRef.current;
     if (!stt || handsFreeFinalizingRef.current || isProcessingRef.current || handsFreeBlockedRef.current
       || cinematicHoldsInput(cinematicRef.current)) return;
+    // The player is still audibly speaking although recognition went quiet (provider lag):
+    // never cut the turn mid-sentence. Bounded so persistent noise cannot hold the turn.
     if (acousticVoiceRef.current) {
-      handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), 100);
-      return;
+      const now = performance.now();
+      if (!voiceHoldStartRef.current) voiceHoldStartRef.current = now;
+      if (now - voiceHoldStartRef.current < END_OF_SPEECH_VOICE_HOLD_MAX_MS) {
+        handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), 100);
+        return;
+      }
     }
+    voiceHoldStartRef.current = 0;
     handsFreeFinalizingRef.current = true;
     turnInputReadyAtRef.current = performance.now();
     inputTelemetryRef.current?.observe("turn_decided", turnInputReadyAtRef.current);
@@ -3135,15 +3146,21 @@ const IndexPRD4 = () => {
       const stt = await createSTT(initialStream);
       stt.setManualMode(true); // application-owned end of speech
       const stream = stt.getStream?.();
-      if (stream && handsFreeSettingsRef.current.interruptionStrategy === "acoustic_confirmed") {
+      if (stream) {
+        // Always listening for voice: in text mode it only gates the end of speech.
         const detector = await createLocalSpeechDetector(stream, (voiced, at) => {
           if (sttRef.current !== stt || !handsFreeListeningRef.current || handsFreeBlockedRef.current
             || cinematicHoldsInput(cinematicRef.current)) return;
           acousticVoiceRef.current = voiced;
+          if (handsFreeSettingsRef.current.interruptionStrategy !== "acoustic_confirmed") return;
           const output = handsFreeSettingsRef.current.bargeInEnabled && isProcessingRef.current ? streamedVoiceRef.current?.reversibleOutput ?? null : null;
           acousticRef.current?.signal(voiced, at, output, lastTranscriptRef.current);
         }, () => {
           if (sttRef.current !== stt) return;
+          // Text mode: the detector only guards end of speech; losing it must not stop the call.
+          if (handsFreeSettingsRef.current.interruptionStrategy !== "acoustic_confirmed") {
+            detectorRef.current?.stop(); detectorRef.current = null; acousticVoiceRef.current = false; return;
+          }
           activeTurnControllerRef.current?.abort("acoustic-capture-failed");
           activeOutputControllerRef.current?.abort("acoustic-capture-failed");
           try { responseOutputRef.current?.interrupt(); } catch { /* already stopped */ }

@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [STT : phrases coupées et mots reportés au tour suivant] — 2026-11-21
+
+- Symptôme (capture d'Ulrich) : tours qui se terminent en plein milieu, mots manquants dans la transcription retrouvés au début de la phrase suivante, personnage qui ne reçoit pas tout.
+- Cause 1 : en mains libres (stratégie « texte », par défaut), la fin de parole n'était décidée que sur le silence du texte reconnu ; un retard du fournisseur en pleine phrase coupait le tour. Le détecteur de voix local tourne désormais toujours en mains libres et retient la fin de tour tant que le joueur parle (plafond 4 s) ; en mode texte il ne sert qu'à cette garde et sa perte n'arrête pas l'appel.
+- Cause 2 : si Deepgram n'accusait pas le `Finalize` dans les 1,5 s, les derniers mots du tour déjà envoyé arrivaient ensuite dans le tampon du tour suivant. Ils sont maintenant ignorés jusqu'à l'accusé tardif (fenêtre 1,5 s) : un tour ne reprend plus jamais un reste du précédent. Délai de réponse inchangé (aucune attente ajoutée).
+- Non traité : Gradium garde ses propres gardes (`flush_id`, `start_s`). À recetter sur appareils : parler longtemps avec pauses, vérifier l'absence de coupure et de mot reporté.
+
 ## [Latence Tavus, lot T9 : décomposition de l'attente vidéo (analyse, lot arrêté)] — 2026-11-21
 
 - Analyse seule, aucun code ni réglage : sur 31 tours Tavus, `video_wait_ms` médian ≈ 0,90 s = ≈ 0,34 s jusqu'aux premiers octets ElevenLabs + ≈ 0,56 s jusqu'aux lèvres ; surcoût propre à Tavus ≈ 0,2 s par rapport au TTS seul.

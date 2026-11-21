@@ -62,3 +62,22 @@ export async function requestLatestRecorderData(
     setTimeout(finish, timeoutMs);
   });
 }
+
+/** How long after an unacknowledged flush late results are treated as the old turn's tail. */
+export const STALE_TAIL_WINDOW_MS = 1500;
+
+export type StaleTailVerdict = "accept" | "drop" | "acknowledge";
+
+/**
+ * A flush that timed out without the provider acknowledging it leaves the old
+ * turn's last words in flight. They must never open the next turn: everything
+ * received until the late acknowledgement (or the window's end) is dropped.
+ */
+export function classifyAfterAbandonedFlush(
+  staleUntil: number,
+  now: number,
+  message: { fromFinalize: boolean },
+): StaleTailVerdict {
+  if (now >= staleUntil) return "accept";
+  return message.fromFinalize ? "acknowledge" : "drop";
+}
