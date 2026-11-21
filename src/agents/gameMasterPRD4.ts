@@ -66,6 +66,8 @@ export interface PRD4PostTurnInput {
   experiencePath?: ExperiencePath | null;
   /** Parcours unseen : extraits à montrer avant une vidéo transformée. */
   minExtractsBeforeCinematic?: number;
+  /** Extracts have their own selection (ExtractSettings.ENABLED): they leave the cinematic pool. */
+  extractsSeparate?: boolean;
   signal?: AbortSignal;
   diagnosticTrace?: boolean;
   systemPromptOverride?: string | null;
@@ -557,6 +559,7 @@ export async function evaluatePostTurnPRD4(
     playedVideoIds: input.triggeredVideoIds ?? [],
     extractsShown: countPlayedExtracts(allVideos, input.triggeredVideoIds ?? []),
     minExtractsBeforeCinematic: input.minExtractsBeforeCinematic ?? DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC,
+    extractsSeparate: input.extractsSeparate === true,
   });
   const validIds = new Set(videos.map((v) => v.id));
   const triggered = new Set(input.triggeredVideoIds ?? []);

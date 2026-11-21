@@ -118,9 +118,10 @@ function ExtractRulesPanel() {
       </div>
       <p className="text-xs text-muted-foreground">
         Propres aux extraits du film (parcours « film pas vu »), distincts des cinématiques d'ambiance : leurs réglages
-        ne modifient pas ceux des cinématiques. <strong>La sélection et la lecture des extraits ne sont pas encore
-        branchées</strong> : ces réglages sont enregistrés pour la prochaine étape et n'ont aucun effet en jeu.
-      </p>
+        ne modifient pas ceux des cinématiques. <strong>Activer les extraits est la bascule unique</strong> : les extraits quittent alors le pool des
+        cinématiques et sont choisis par leur propre sélection (parlé : après la réplique, avec son propre son ;
+        silencieux : superposé à la voix). Seuls les extraits silencieux ou parlés avec transcription vérifiée sont
+        proposés ; parcours « film pas vu » uniquement. Inactif par défaut.</p>
       <label className="flex items-center gap-2 text-sm">
         <Switch checked={settings.ENABLED} onCheckedChange={(ENABLED) => update({ ENABLED })} />
         Activer les extraits
@@ -305,7 +306,7 @@ function VideoTriggerRulesPanel() {
             value={settings.MIN_EXTRACTS_BEFORE_CINEMATIC}
             onChange={(e) => update({ MIN_EXTRACTS_BEFORE_CINEMATIC: Math.max(0, Number(e.target.value) || 0) })}
           />
-          <p className="text-[10px] text-muted-foreground mt-1">Parcours « film pas vu » : extraits du film montrés avant d'autoriser une vidéo transformée.</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Parcours « film pas vu » : extraits du film montrés avant d'autoriser une vidéo transformée. Sans effet quand les extraits sont activés (onglet Extraits) : ils ont alors leur propre sélection.</p>
         </div>
       </div>
 

@@ -27,10 +27,23 @@ Chaîne d'édition voulue par Ulrich (21 novembre) : **ajouter la vidéo dans No
 - **Back-office** : dans l'onglet Extraits, bouton « Transcrire » par extrait parlé et « Transcrire les extraits parlés sans transcription (N) », case « Retranscrire les transcriptions existantes non vérifiées » ; progression, erreurs par vidéo ; texte visible avec son statut ; admin seulement.
 - Prompt : [prompt_reprise_extraits_film_lot_transcription_ia.md](prompt_reprise_extraits_film_lot_transcription_ia.md).
 
-## Lot 2 — sélection, lecture, bascule du pool (à faire)
+## Lot 2 — sélection, lecture, bascule du pool (livré le 21 novembre, code, inactif par défaut)
 
 1. **Bascule atomique du pool** : retirer les extraits de `selectEligibleVideos` / du GM cinématique et de `MIN_EXTRACTS_BEFORE_CINEMATIC` **au moment** où la sélection d'extraits est active ; garder la compatibilité de ce réglage (sa signification ne change pas silencieusement : le documenter).
 2. **Sélection** : appel dédié et borné (modèle de `overlayVideoSelector.ts`) : question du joueur, contexte récent, personnage, description visuelle **et** transcription distinguées (`formatVideoCandidateLine`), extraits déjà montrés, apport complémentaire identifiable (un thème commun ne suffit pas), gardes `extractTranscriptStatus` fiable + `REQUIRE_VERIFIED_TRANSCRIPT`. Décision tardive, autre tour/personnage/appel → ignorée, aucune attente artificielle.
 3. **Lecture** : parlé = fin de la réplique puis extrait avec son propre son (pas de double parole) ; silencieux = superposition (machine `cinematicTransition`, branche overlay) ; reprise avec la question initiale et le contenu réellement diffusé (`watchedVideos`) ; erreur, média absent, interruption, changement de personnage → poursuite sans blocage ni fausse annonce.
 4. **Réglages** : brancher `ExtractSettings` (activation, fréquence) ; ne pas modifier ceux des cinématiques.
 5. **Tests** : cas du cahier des charges (procès-verbal pertinent / thème sans apport, transcription absente, déjà montré, décision tardive, chevauchement) ; recette humaine avec des personnes n'ayant pas vu le film (pas Benoît).
+
+### Lot 2 — ce qui est livré
+
+| Élément | Choix |
+|---|---|
+| Bascule | `ExtractSettings.ENABLED` : seule bascule. Actif → `selectEligibleVideos(extractsSeparate)` retire les extraits du pool des cinématiques (GM, garde du directeur, superposition) et `MIN_EXTRACTS_BEFORE_CINEMATIC` n'a plus d'effet (sa signification est inchangée tant que la bascule est inactive ; l'éditeur le dit). |
+| Candidats | `extractSelection.ts` : parcours `unseen` seulement, extrait avec média, personnage, jamais montré, statut fiable (`silent` ou `spoken_verified` ; `spoken_unverified` seulement si « exiger une transcription vérifiée » est décoché ; `unknown` jamais). Fréquence propre (tours avant le premier, entre deux, maximum). |
+| Sélection | un appel borné (modèle GM, sans réflexion, ≤ 5 s, selon la parole restante) dès que le texte de la réplique existe ; ligne candidate « montre » (description) / « dit » (transcription) ; extraits déjà montrés listés ; lien concret exigé (la question du joueur compte) et champ `complement` (ce que l'extrait apporte de plus) obligatoire. |
+| Lecture | parlé → machine `interrupt` : attend la fin de la réplique puis joue avec son propre son (aucune double parole) ; silencieux → machine `overlay`, superposé à la voix. Décision tardive, autre tour/personnage, vidéo déjà en cours, déjà montré → abandon (`extractDecisionBlockedReason`), aucune attente ajoutée. |
+| Reprise | `buildExtractPostVideoContext` : question initiale, ce qui était montré, ce qui était dit (jamais si interrompu) ; `watchedVideos` garde un extrait de la parole entendue. Erreur de média → rien n'est mémorisé ni annoncé. |
+| Journal | `cinematic_recommended` / `cinematic_blocked` avec `mechanism: "extract"`, motifs `extract_*`. |
+
+**Limites connues** : un extrait parlé décidé pendant la réplique bloque l'entrée du joueur (pas d'interruption) jusqu'à son retour, comme une cinématique annoncée. Aucun extrait n'est utilisable aujourd'hui en base : les 3 extraits (« mort Peter », « couteau », « mauvaise conscience ») n'ont ni Dialogue ni transcription (Romed). Pas de recette humaine faite.

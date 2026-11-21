@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Extraits du film, lot 2 : sélection, lecture et bascule du pool] — 2026-11-21
+
+- **Bascule unique** : `Activer les extraits` (Admin › Expérience › Extraits, inactif par défaut) retire les extraits du pool des cinématiques (GM, garde du directeur, superposition) et leur donne leur propre sélection. Tant qu'elle est inactive, rien ne change en jeu. `MIN_EXTRACTS_BEFORE_CINEMATIC` garde sa signification (inactive) et n'a plus d'effet quand la bascule est active (dit dans l'éditeur).
+- **Sélection** (`extractSelection.ts`, parcours « film pas vu ») : un appel borné dès que la réplique existe ; candidats = extraits silencieux ou parlés avec transcription vérifiée, jamais montrés ; la question du joueur, les échanges récents et les extraits déjà montrés sont fournis ; « montre » et « dit » distingués ; lien concret et apport complémentaire exigés (un thème commun ne suffit pas). Fréquence propre aux extraits.
+- **Lecture** : parlé = après la réplique, avec son propre son (aucune double parole) ; silencieux = superposé à la voix. Décision tardive, autre tour ou personnage, vidéo déjà en cours, déjà montré → abandonnée sans attente. Reprise : le tour suivant reçoit la question initiale et ce qui a réellement été diffusé (rien de la suite si interrompu) ; erreur de média → ni mémoire ni annonce.
+- **Tests** : `extractSelection.test.ts` (20), `selectEligibleVideos(extractsSeparate)`, mémoire des vidéos vues. **Non fait** : recette humaine (personnes n'ayant pas vu le film), données Romed (Dialogue/transcription vides sur les 3 extraits). Aucune production. Plan : [docs/plan_extraits_film_pas_vu.md](docs/plan_extraits_film_pas_vu.md) ; reprise : [lot 3](docs/prompt_reprise_extraits_film_lot_3.md).
+
 ## [Extraits du film, lot 1 : transcription, dialogue et section « Extraits »] — 2026-11-21
 
 - **Notion « 🎬 Vidéos AVA »** : trois propriétés créées (aucune donnée saisie) : « Transcription » (texte : ce qui est dit, distinct de « Description »), « Dialogue » (Parlé / Silencieux) et « Transcription vérifiée » (case cochée par un humain). Un extrait parlé sans transcription vérifiée n'est pas une base fiable ; un dialogue non renseigné n'est jamais traité comme silencieux (`extractTranscriptStatus`).

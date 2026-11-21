@@ -93,6 +93,7 @@ export interface PRD4TurnInput {
   hasSeenFilm?: string | null;
   /** Parcours « film pas vu » : extraits à montrer avant une vidéo transformée. */
   minExtractsBeforeCinematic?: number;
+  extractsSeparate?: boolean;
   timeElapsedSeconds: number;
   /** Attribution immuable du personnage, résolue avant le tour. */
   characterContext: CharacterExecutionContext;
@@ -618,6 +619,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
         watchedVideos: input.watchedVideos ?? null,
         experiencePath: experiencePathFromFilmAnswer(input.hasSeenFilm),
         minExtractsBeforeCinematic: input.minExtractsBeforeCinematic,
+        extractsSeparate: input.extractsSeparate,
         signal: candidateSignal ?? input.postTurnSignal ?? input.signal,
         persist: candidate ? false : undefined,
         diagnosticTrace: diagnosticTraceEnabled,
