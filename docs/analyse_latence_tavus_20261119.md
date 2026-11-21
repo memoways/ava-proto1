@@ -238,3 +238,12 @@ Gain attendu du retrait : ≈ 0,2 s médian sur `character_rag` (rerank 206 ms),
 
 La médiane de Max audible (≈ 4,1 s) ne peut plus baisser que par ces quatre leviers ; aucun n'est sans contrepartie. Le plus sûr
 est le premier (contexte), le plus gros le LLM streamé, le seul spécifique à Tavus l'attente vidéo.
+
+
+### Lot T7 : LLM streamé, première phrase (21 novembre, prototype, désactivé par défaut)
+
+Levier choisi par Ulrich parmi `retrieve_k` 15 → 10 (< 0,1 s, extrapolé), embedding partiel (≈ 0,2 s, lourd), LLM streamé (0,5–0,9 s estimé) et attente vidéo (≈ 1,0 s, gain inconnu).
+Implémentation : réglage Tavus `streamedLlm` (faux par défaut) ; `IndexPRD4` passe par `streamPRD4Turn` (appel LLM en flux, mêmes gardes que Gradium) et nourrit un `AvatarLineFeed` ;
+`renderTextStream` (Tavus, voix d'Ava) lit le flux de lignes : première ligne en PCM streamé (T1), lignes suivantes en blob une ligne d'avance, chunk final vide à la fin.
+Retenue de passage (`heldOutput`) et phrase déjà dite non remplaçable : une substitution tardive est ignorée, le texte dit reste.
+**Mesure à faire** (sandbox-ulrich, ≥ 10 tours, réglage activé puis désactivé) : `tts_text_sent`, Max audible, taux de salvage et de coupure ; critère de l'évaluation : gain médian > 0,5 s sans phrase retirée.

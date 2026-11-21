@@ -3,7 +3,18 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-19 (latence Tavus, lot T2)
+> **Last Updated**: 2026-11-21 (latence Tavus, lot T7)
+
+---
+
+## Latence Tavus, lot T7 — la première phrase pendant que le LLM écrit (21 novembre 2026)
+
+Après T3 à T6 (RAG sans régression, rerank conservé), le seul levier à plus de 0,5 s estimé était le LLM streamé. Ulrich l'a
+retenu. Le prototype ne change que Tavus avec la voix d'Ava et seulement quand le réglage admin `streamedLlm` est actif
+(faux par défaut) : la première phrase sûre est dite avant la fin de la réponse, le reste suit ligne par ligne, et le tour
+est refermé par un chunk final vide. Les gardes de passage (`heldOutput`) et la reprise sur échec restent ceux du mode
+progressif existant. Gain non mesuré ; la mesure sur sandbox-ulrich décidera de la suite.
+[Analyse](docs/analyse_latence_tavus_20261119.md) · [Évaluation des risques](docs/evaluation_llm_streame_vers_tts.md).
 
 ---
 

@@ -108,6 +108,149 @@ export async function streamAvatarSpeech(options: StreamAvatarSpeechOptions): Pr
   }
 }
 
+/**
+ * Lot T7: segments of a reply still being generated. The producer pushes each safe phrase as the
+ * LLM stream completes it; the bridge speaks from the first one. `completed()` gives the whole
+ * text once the producer ended, and rejects when it failed.
+ */
+export interface AvatarLineFeed {
+  push(text: string): void;
+  end(): void;
+  fail(error: unknown): void;
+  /** Number of segments pushed so far. */
+  readonly pushed: number;
+  /** The error given to `fail`, else null. */
+  failure(): unknown;
+  /** Resolves segment `index`, or null once the feed ended without it. Rejects after `fail`. */
+  segmentAt(index: number): Promise<string | null>;
+  /** The whole text (segments joined by a space) once the feed ended; rejects after `fail`. */
+  completed(): Promise<string>;
+}
+
+export function createAvatarLineFeed(): AvatarLineFeed {
+  const segments: string[] = [];
+  let ended = false;
+  let failed = false;
+  let failure: unknown = null;
+  let wake: Array<() => void> = [];
+  const notify = () => { const waiting = wake; wake = []; for (const resolve of waiting) resolve(); };
+  let resolveCompleted!: (text: string) => void;
+  let rejectCompleted!: (error: unknown) => void;
+  const completed = new Promise<string>((resolve, reject) => { resolveCompleted = resolve; rejectCompleted = reject; });
+  completed.catch(() => {}); // Observed by the consumer or dropped after an interruption.
+  return {
+    push(text) {
+      if (ended || failed) return;
+      segments.push(text);
+      notify();
+    },
+    end() {
+      if (ended || failed) return;
+      ended = true;
+      resolveCompleted(segments.join(" "));
+      notify();
+    },
+    fail(error) {
+      if (ended || failed) return;
+      failed = true;
+      failure = error;
+      rejectCompleted(error);
+      notify();
+    },
+    get pushed() { return segments.length; },
+    failure: () => (failed ? failure : null),
+    async segmentAt(index) {
+      for (;;) {
+        if (index < segments.length) return segments[index];
+        if (failed) throw failure;
+        if (ended) return null;
+        await new Promise<void>((resolve) => { wake.push(resolve); });
+      }
+    },
+    completed: () => completed,
+  };
+}
+
+/**
+ * Lot T7: like `streamAvatarSpeech`, for a reply still being generated. Lines are planned from the
+ * segments as they arrive; speech starts with the first one. Whether more lines follow is unknown
+ * while a line is sent, so no chunk is held back for `final`: the turn is closed by an empty final
+ * chunk once the feed ended and the last line is out. Same failure contract as `streamAvatarSpeech`.
+ */
+export async function streamAvatarSpeechFromFeed(
+  options: Omit<StreamAvatarSpeechOptions, "text"> & { feed: AvatarLineFeed },
+): Promise<void> {
+  const { context, signal, progress, feed } = options;
+  const providerId = context?.providerId ?? getActiveProviderId();
+  const fullOptions: StreamAvatarSpeechOptions = { ...options, text: "" };
+  const lines: string[] = [];
+  let cursor = 0;
+  let exhausted = false;
+  const load = async (index: number): Promise<string | null> => {
+    while (lines.length <= index && !exhausted) {
+      const segment = await abortable(feed.segmentAt(cursor), signal);
+      if (segment === null) { exhausted = true; break; }
+      cursor++;
+      lines.push(...planAvatarSpeechLines(segment, providerId));
+      progress.lines = lines.length;
+    }
+    return index < lines.length ? lines[index] : null;
+  };
+  // Calls are serialized: the loop and the prefetch both read the same cursor.
+  let tail: Promise<unknown> = Promise.resolve();
+  const lineAt = (index: number): Promise<string | null> => {
+    const pending = tail.then(() => load(index));
+    tail = pending.catch(() => {});
+    return pending;
+  };
+  const assertAlive = () => {
+    if (signal.aborted || options.isAlive?.() === false) {
+      throw new DOMException("Avatar turn aborted", "AbortError");
+    }
+  };
+  const send = (pcm: Int16Array, final: boolean) => {
+    if (!options.sendChunk(pcm, final)) throw new Error(`${options.label} audio bridge is closed`);
+    progress.sentChunks++;
+    progress.sentAudioMs += (pcm.length / options.sampleRate) * 1000;
+    if (progress.sentChunks === 1) {
+      progress.firstSentAt = performance.now();
+      options.onFirstChunk?.();
+    }
+  };
+  let prefetched = -1;
+  let next: Promise<Int16Array[] | null> | null = null;
+  const prefetch = (index: number) => {
+    if (prefetched >= index) return;
+    prefetched = index;
+    const pending = (async () => {
+      if ((await lineAt(index)) === null) return null;
+      return synthesizeLine(lines, index, providerId, fullOptions);
+    })();
+    pending.catch(() => {});
+    next = pending;
+  };
+  const streamFirst = canStreamFirstLine(fullOptions, providerId);
+  for (let index = 0; ; index++) {
+    if ((await lineAt(index)) === null) break;
+    if (index === 0 && streamFirst) {
+      const streamed = await streamFirstLine(lines, providerId, fullOptions, send, assertAlive, () => prefetch(1), true);
+      if (streamed) continue;
+    }
+    prefetch(index); // No-op when already requested; the blob path answers a line the stream could not.
+    const chunks = await withDeadline(
+      abortable(next!, signal),
+      avatarTtsDeadline(index, options.speechStartTimeoutMs),
+      `Ava TTS did not answer for ${options.label}`,
+    );
+    if (chunks === null) break;
+    prefetch(index + 1);
+    assertAlive();
+    for (const chunk of chunks) send(chunk, false);
+  }
+  assertAlive();
+  if (progress.sentChunks > 0) send(new Int16Array(0), true);
+}
+
 function canStreamFirstLine(options: StreamAvatarSpeechOptions, providerId: TTSProviderId): boolean {
   return options.streamFirstLine === true
     && providerId === "elevenlabs"
@@ -129,9 +272,11 @@ async function streamFirstLine(
   send: (pcm: Int16Array, final: boolean) => void,
   assertAlive: () => void,
   onFirstBytes: () => void,
+  /** Lot T7: a fed turn does not know yet whether more lines follow, so no chunk is held for `final`. */
+  openEnded = false,
 ): Promise<boolean> {
   const { context, signal, sampleRate, chunkMs, progress } = options;
-  const lastLine = lines.length === 1;
+  const lastLine = !openEnded && lines.length === 1;
   const local = new AbortController();
   const onAbort = () => local.abort();
   if (signal.aborted) local.abort();
