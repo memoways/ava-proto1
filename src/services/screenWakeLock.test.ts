@@ -4,6 +4,7 @@ import { disableScreenWakeLock, enableScreenWakeLock, getWakeLockStatus } from "
 describe("screenWakeLock", () => {
   afterEach(() => {
     disableScreenWakeLock();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -33,5 +34,26 @@ describe("screenWakeLock", () => {
   it("does not throw without the API", () => {
     Object.defineProperty(navigator, "wakeLock", { value: undefined, configurable: true });
     expect(() => enableScreenWakeLock()).not.toThrow();
+  });
+
+  it("stops the fallback once a later gesture obtains the API lock", async () => {
+    const release = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockRejectedValueOnce(new Error("temporarily refused"));
+    Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ fillRect: vi.fn() } as unknown as CanvasRenderingContext2D);
+    Object.defineProperty(HTMLCanvasElement.prototype, "captureStream", {
+      configurable: true,
+      value: () => ({} as MediaStream),
+    });
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+
+    enableScreenWakeLock();
+    await vi.waitFor(() => expect(document.querySelector("video[data-wake-lock]")).not.toBeNull());
+
+    request.mockResolvedValueOnce({ release, addEventListener: vi.fn() });
+    document.dispatchEvent(new Event("pointerdown"));
+    await vi.waitFor(() => expect(getWakeLockStatus().apiHeld).toBe(true));
+
+    expect(document.querySelector("video[data-wake-lock]")).toBeNull();
   });
 });
