@@ -87,7 +87,13 @@ function stopFallback(): void {
 async function acquire(): Promise<void> {
   if (!wanted) return;
   const ok = await requestApiLock();
-  if (!ok && wanted) startFallback();
+  if (ok) {
+    // A retry can gain the API lock after the fallback was already playing.
+    // Keep exactly one wake mechanism alive once that happens.
+    stopFallback();
+  } else if (wanted) {
+    startFallback();
+  }
 }
 
 function onVisibility(): void {
