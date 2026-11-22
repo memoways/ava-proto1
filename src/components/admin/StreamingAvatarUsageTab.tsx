@@ -11,12 +11,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
 import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
 
 /** Tarifs publics indicatifs (USD / minute de streaming). À ajuster selon le plan réel. */
 const COST_PER_MINUTE_USD: Record<string, number> = {
@@ -72,7 +70,7 @@ export default function StreamingAvatarUsageTab() {
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
-  const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [includeSandbox, setIncludeSandbox] = useState(true);
   const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
@@ -200,11 +198,17 @@ export default function StreamingAvatarUsageTab() {
             première image, première parole, replis TTS et coût estimé.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
-        </label>
       </div>
       <ServicePlanBoard family="video" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <UsageRangeBar
+        value={period}
+        options={VOICE_VIDEO_RANGES}
+        onChange={setPeriod}
+        includeSandbox={includeSandbox}
+        onIncludeSandbox={setIncludeSandbox}
+        onRefresh={loadData}
+        refreshing={loading}
+      />
 
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Sessions avatar" value={String(totalSessions)} />
@@ -222,7 +226,7 @@ export default function StreamingAvatarUsageTab() {
         Le bloc Forfaits est le décompte qui compte : abonnement, minutes incluses, minutes au-dessus.
         Le tarif public ci-dessous l'ignore (HeyGen {fmtUsd(COST_PER_MINUTE_USD.heygen)}/min, Tavus {fmtUsd(COST_PER_MINUTE_USD.tavus)}/min,
         autres {fmtUsd(DEFAULT_COST_PER_MINUTE_USD)}/min). Les minutes sont la durée de session Ava, pas le compteur du fournisseur.
-        Le forfait inclut les sandboxes.
+        Le forfait et les statistiques incluent les sandboxes, tant que l'interrupteur reste activé.
       </p>
 
       {fallbackRate > 20 && totalSessions >= 5 && (
@@ -230,21 +234,6 @@ export default function StreamingAvatarUsageTab() {
           ⚠️ Plus de 20% des sessions avatar sont retombées en mode TTS — vérifie les quotas et les identifiants du fournisseur actif.
         </div>
       )}
-
-      <div className="flex flex-wrap gap-3 items-center">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="24h">24 heures</SelectItem>
-            <SelectItem value="7d">7 jours</SelectItem>
-            <SelectItem value="30d">30 jours</SelectItem>
-            <SelectItem value="all">Tout</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
-          {loading ? "..." : "Rafraîchir"}
-        </Button>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {providerStats.map((s) => (

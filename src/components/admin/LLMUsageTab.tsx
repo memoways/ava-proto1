@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { retryCostForRow } from "@/services/llmUsageTracker";
 import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import UsageRangeBar, { LLM_RANGES } from "@/components/admin/UsageRangeBar";
 
 interface UsageRow {
   id: string;
@@ -52,7 +52,7 @@ export default function LLMUsageTab() {
   const [filterFeature, setFilterFeature] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPeriod, setFilterPeriod] = useState("30d");
-  const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [includeSandbox, setIncludeSandbox] = useState(true);
   const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
@@ -206,16 +206,20 @@ export default function LLMUsageTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
-        </label>
-      </div>
       <ServicePlanBoard family="llm" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <UsageRangeBar
+        value={filterPeriod}
+        options={LLM_RANGES}
+        onChange={setFilterPeriod}
+        includeSandbox={includeSandbox}
+        onIncludeSandbox={setIncludeSandbox}
+        onRefresh={loadData}
+        refreshing={loading}
+      />
       <p className="text-[11px] text-muted-foreground -mt-3">
         OpenRouter n'a pas de forfait minutes : le montant est déjà le prix des appels, RAG de rerank compris.
         Voyage, qui calcule les embeddings du RAG, n'est pas dans cette somme et n'est pas mesuré appel par appel.
-        Le forfait inclut les sandboxes. Les graphiques suivent l'interrupteur et la période.
+        Le forfait et les graphiques incluent les sandboxes, tant que l'interrupteur reste activé.
       </p>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 tablet-lg:grid-cols-5 gap-3">
@@ -235,41 +239,29 @@ export default function LLMUsageTab() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Aujourd'hui</SelectItem>
-            <SelectItem value="7d">7 jours</SelectItem>
-            <SelectItem value="30d">30 jours</SelectItem>
-            <SelectItem value="all">Tout</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={filterModel} onValueChange={setFilterModel}>
-          <SelectTrigger className="h-9 w-full min-w-[200px] text-xs sm:w-auto"><SelectValue placeholder="Modèle" /></SelectTrigger>
+          <SelectTrigger className="h-10 w-full min-w-[200px] text-sm sm:w-auto"><SelectValue placeholder="Modèle" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les modèles</SelectItem>
             {uniqueModels.map(m => <SelectItem key={m} value={m}>{m.split("/").pop()}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterFeature} onValueChange={setFilterFeature}>
-          <SelectTrigger className="h-9 w-full min-w-[150px] text-xs sm:w-auto"><SelectValue placeholder="Feature" /></SelectTrigger>
+          <SelectTrigger className="h-10 w-full min-w-[150px] text-sm sm:w-auto"><SelectValue placeholder="Feature" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes features</SelectItem>
             {uniqueFeatures.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue placeholder="Statut" /></SelectTrigger>
+          <SelectTrigger className="h-10 w-full min-w-[130px] text-sm sm:w-auto"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous statuts</SelectItem>
             {uniqueStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
 
-        <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
-          {loading ? "..." : "Rafraîchir"}
-        </Button>
-        <Button size="sm" variant="outline" onClick={retryAllFailedCosts} disabled={loading}>
+        <Button size="sm" variant="outline" className="h-10" onClick={retryAllFailedCosts} disabled={loading}>
           Recalculer coûts manquants
         </Button>
       </div>

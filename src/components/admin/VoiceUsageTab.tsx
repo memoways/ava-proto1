@@ -10,13 +10,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
 import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
 import type { Json } from "@/integrations/supabase/types";
 
 /**
@@ -67,7 +65,7 @@ export default function VoiceUsageTab() {
   const [rows, setRows] = useState<AudioRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
-  const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [includeSandbox, setIncludeSandbox] = useState(true);
   const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
@@ -188,12 +186,16 @@ export default function VoiceUsageTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
-        </label>
-      </div>
       <ServicePlanBoard family="voice" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <UsageRangeBar
+        value={period}
+        options={VOICE_VIDEO_RANGES}
+        onChange={setPeriod}
+        includeSandbox={includeSandbox}
+        onIncludeSandbox={setIncludeSandbox}
+        onRefresh={loadData}
+        refreshing={loading}
+      />
       {/* Header KPIs */}
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
@@ -212,7 +214,7 @@ export default function VoiceUsageTab() {
         « tarif public » plus bas ignorent le forfait ({fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k ElevenLabs,
         {fmtUsd(COST_PER_1K_CHARS_USD.gradium)}/1k Gradium, total période {fmtUsd(totalCostUsd)}).
         La voix se mesure en caractères : les minutes du forfait sont une estimation (750 caractères ≈ 1 min).
-        Le forfait inclut les sandboxes ; le tableau dessous suit l'interrupteur.
+        Le forfait inclut les sandboxes. Les statistiques aussi, tant que l'interrupteur reste activé.
       </p>
 
       {/* Alerte taux d'erreur */}
@@ -221,22 +223,6 @@ export default function VoiceUsageTab() {
           ⚠️ Taux d'erreur global supérieur à 10% sur la période sélectionnée — vérifie les clés API et quotas.
         </div>
       )}
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="h-9 w-full min-w-[130px] text-xs sm:w-auto"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="24h">24 heures</SelectItem>
-            <SelectItem value="7d">7 jours</SelectItem>
-            <SelectItem value="30d">30 jours</SelectItem>
-            <SelectItem value="all">Tout</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button size="sm" variant="outline" onClick={loadData} disabled={loading}>
-          {loading ? "..." : "Rafraîchir"}
-        </Button>
-      </div>
 
       {/* Provider cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
