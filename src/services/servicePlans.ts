@@ -57,6 +57,10 @@ export interface SavedServicePlan {
   overagePerUnitUsd: number | null;
   /** Next renewal the admin typed, `YYYY-MM-DD`. */
   renewsOn: string | null;
+  /** First invoice. Charges are counted from this day. */
+  startedOn: string | null;
+  /** Last day of this run. Empty while the subscription continues. */
+  endedOn: string | null;
   creditsPerMinute: number | null;
   /** Dollars loaded at `creditedOn`. Replaced on the next top-up. */
   balanceUsd: number | null;
@@ -117,6 +121,8 @@ export interface PlanSnapshot {
   spentUsd: number | null;
   /** Dollars still on a prepaid balance. */
   remainingUsd: number | null;
+  /** Invoices from the subscription start through the next one, when the start is known. */
+  spend: SubscriptionSpend | null;
   capped: boolean;
 }
 
@@ -341,6 +347,8 @@ export function emptyPlan(): SavedServicePlan {
     included: null,
     overagePerUnitUsd: null,
     renewsOn: null,
+    startedOn: null,
+    endedOn: null,
     creditsPerMinute: null,
     balanceUsd: null,
     creditedOn: null,
@@ -413,6 +421,76 @@ export function prepaidWindow(creditedOn: string | null, now: Date): BillingWind
   const [year, month, day] = creditedOn.split("-").map(Number);
   if (month < 1 || month > 12 || day < 1 || day > 31) return { start: new Date(0), end, source: "credit" };
   return { start: utcDate(year, month - 1, day), end, source: "credit" };
+}
+
+export interface SubscriptionSpend {
+  count: number;
+  from: string;
+  to: string;
+  totalUsd: number | null;
+  /** The last invoice counted is still in the future. */
+  includesUpcoming: boolean;
+}
+
+function dayStamp(iso: string): Date | null {
+  if (!DATE_RE.test(iso)) return null;
+  const [year, month, day] = iso.split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return utcDate(year, month - 1, day);
+}
+
+function stampIso(date: Date): string {
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Monthly (or yearly) invoices from the first one through the horizon.
+ * An active plan counts the next renewal. A stopped plan stops at its end, or at today.
+ */
+export function subscriptionSpend(input: {
+  startedOn: string | null;
+  renewsOn: string | null;
+  endedOn: string | null;
+  cadence: BillingCadence;
+  monthlyFeeUsd: number | null;
+  account: PlanAccount;
+  now: Date;
+}): SubscriptionSpend | null {
+  const start = input.startedOn ? dayStamp(input.startedOn) : null;
+  if (!start || !input.startedOn) return null;
+  const renews = input.renewsOn ? dayStamp(input.renewsOn) : null;
+  const ended = input.endedOn ? dayStamp(input.endedOn) : null;
+  const step = input.cadence === "yearly" ? 12 : 1;
+  let horizon = input.now;
+  let includesUpcoming = false;
+  if (input.account === "active" && renews && (!ended || renews.getTime() <= ended.getTime())) {
+    horizon = renews;
+    includesUpcoming = renews.getTime() > input.now.getTime();
+  } else if (ended) {
+    horizon = ended;
+  }
+  const invoice = input.cadence === "yearly"
+    ? (input.monthlyFeeUsd == null ? null : input.monthlyFeeUsd * 12)
+    : input.monthlyFeeUsd;
+  if (start.getTime() > horizon.getTime()) {
+    return { count: 0, from: input.startedOn, to: input.startedOn, totalUsd: invoice == null ? null : 0, includesUpcoming: false };
+  }
+  const dates: Date[] = [];
+  let cursor = start;
+  for (let i = 0; i < 240 && cursor.getTime() <= horizon.getTime(); i += 1) {
+    dates.push(cursor);
+    cursor = shiftMonths(cursor, step, start.getUTCDate());
+  }
+  const last = dates[dates.length - 1] ?? start;
+  return {
+    count: dates.length,
+    from: stampIso(dates[0] ?? start),
+    to: stampIso(last),
+    totalUsd: invoice == null ? null : invoice * dates.length,
+    includesUpcoming,
+  };
 }
 
 export function sumUsage(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): number {
@@ -490,6 +568,15 @@ export function planSnapshot(
     balanceUsd: plan.funding === "prepaid" ? plan.balanceUsd : null,
     spentUsd: null,
     remainingUsd: null,
+    spend: plan.funding === "prepaid" ? null : subscriptionSpend({
+      startedOn: plan.startedOn,
+      renewsOn: plan.renewsOn,
+      endedOn: plan.endedOn,
+      cadence: plan.cadence,
+      monthlyFeeUsd: plan.monthlyFeeUsd,
+      account: plan.account,
+      now,
+    }),
     capped,
   };
 
@@ -581,6 +668,8 @@ export function parseSavedPlan(value: unknown): SavedServicePlan | null {
   const record = value as Record<string, unknown>;
   const cadence = record.cadence === "yearly" ? "yearly" : "monthly";
   const renewsOn = typeof record.renewsOn === "string" && DATE_RE.test(record.renewsOn) ? record.renewsOn : null;
+  const startedOn = typeof record.startedOn === "string" && DATE_RE.test(record.startedOn) ? record.startedOn : null;
+  const endedOn = typeof record.endedOn === "string" && DATE_RE.test(record.endedOn) ? record.endedOn : null;
   const tierId = typeof record.tierId === "string" && record.tierId.length > 0 && record.tierId.length < 40 ? record.tierId : null;
   const funding = record.funding === "prepaid" ? "prepaid" : "subscription";
   const account = record.account === "paused" || record.account === "cancelled" ? record.account : "active";
@@ -594,6 +683,8 @@ export function parseSavedPlan(value: unknown): SavedServicePlan | null {
     included: finiteOrNull(record.included),
     overagePerUnitUsd: finiteOrNull(record.overagePerUnitUsd),
     renewsOn,
+    startedOn,
+    endedOn,
     creditsPerMinute: finiteOrNull(record.creditsPerMinute),
     balanceUsd: finiteOrNull(record.balanceUsd),
     creditedOn,

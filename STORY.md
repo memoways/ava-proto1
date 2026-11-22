@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-22 (Crédits prépayés)
+> **Last Updated**: 2026-11-22 (Début d'abonnement)
 
 ---
+
+## Consommation — depuis le premier prélèvement (22 novembre 2026)
+
+Un abonnement mensuel a un début. Tavus pris en octobre, repris en novembre et renouvelé en décembre, ce sont trois fois le prix du mois, pas seulement le mois en cours. La fiche demande cette date et le prochain renouvellement. La fin reste vide tant que ça continue : une reprise plus tard sera une autre période, ajoutée à la première.
 
 ## Consommation — crédit chargé, ou abonnement arrêté (22 novembre 2026)
 

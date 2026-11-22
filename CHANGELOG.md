@@ -22,6 +22,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Atténuation par défaut de la cinématique en superposition : −15 dB → −24 dB, pour que la voix de Max passe. Un réglage déjà enregistré dans l'admin (Déclenchement des vidéos) garde sa valeur : à baisser à la main si besoin.
 - **Inchangé** : pipeline voix, desktop, tablette. Rien en production.
 
+## [Consommation : début d'abonnement] — 2026-11-22
+
+- Un abonnement mensuel a une date de début, le prochain renouvellement, et une fin laissée vide tant qu'il continue.
+- Le total depuis le début additionne chaque facture, prochaine comprise. Tavus pris en octobre et renouvelé en décembre compte trois mensualités.
+- Une fin arrête le compte à la dernière facture de cette période. Une reprise plus tard sera une autre période.
+- **Inchangé** : le crédit prépayé. Rien en production.
+
 ## [Consommation : crédit prépayé et état de l'abonnement] — 2026-11-22
 
 - Chaque service a un état : actif, en pause (plus de mensualité) ou résilié. Fish Audio n'a pas de portefeuille : une fois résilié, il ne se recharge pas.
