@@ -13,10 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
-import PeriodCostLines from "@/components/admin/PeriodCostLines";
+import PeriodCostLines, { PeriodCostHeadlines } from "@/components/admin/PeriodCostLines";
 import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
-import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById, sumPeriodTotals } from "@/services/servicePlans";
+import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById } from "@/services/servicePlans";
 import type { Json } from "@/integrations/supabase/types";
 
 interface AudioRow {
@@ -164,8 +164,12 @@ export default function VoiceUsageTab() {
   const totalReqs = filtered.length;
   const totalErrors = filtered.filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok").length;
   const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
-  const realCost = sumPeriodTotals(providerStats.map((provider) => provider.reading));
   const totalChars = providerStats.reduce((s, p) => s + p.charsTotal, 0);
+  const headlines = providerStats.flatMap((provider) =>
+    provider.reading && provider.service
+      ? [{ id: provider.id, label: provider.label, reading: provider.reading, service: provider.service }]
+      : [],
+  );
 
   const recentErrors = filtered
     .filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok")
@@ -183,8 +187,9 @@ export default function VoiceUsageTab() {
         onRefresh={loadData}
         refreshing={loading}
       />
+      <PeriodCostHeadlines items={headlines} />
       {/* Header KPIs */}
-      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-5 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
         <KPI label="Erreurs" value={String(totalErrors)} tone={totalErrors > 0 ? "warn" : "ok"} />
         <KPI
@@ -194,11 +199,6 @@ export default function VoiceUsageTab() {
         />
         <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
         <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
-        <KPI
-          label={realCost.partial ? "Coût réel (partiel)" : "Coût réel"}
-          value={realCost.total == null ? "—" : formatUsd(realCost.total)}
-          tone="warn"
-        />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
         Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
@@ -224,12 +224,10 @@ export default function VoiceUsageTab() {
               <h3 className="font-semibold">{s.label}</h3>
               <span className="text-xs px-2 py-0.5 rounded bg-muted/50 font-mono">{s.id}</span>
             </div>
+            {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
 
             {s.total === 0 ? (
-              <>
-                <p className="text-sm text-muted-foreground">Aucun appel sur la période.</p>
-                {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
-              </>
+              <p className="text-sm text-muted-foreground">Aucun appel sur la période.</p>
             ) : (
               <>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -256,9 +254,7 @@ export default function VoiceUsageTab() {
                   </div>
                 </div>
 
-                {s.reading && s.service ? (
-                  <PeriodCostLines reading={s.reading} service={s.service} />
-                ) : (
+                {!s.reading && (
                   <div className="space-y-1 border-t border-border/40 pt-2">
                     <div className="flex justify-between text-sm font-mono">
                       <span>{s.charsSuccess.toLocaleString("fr-CH")} caractères</span>

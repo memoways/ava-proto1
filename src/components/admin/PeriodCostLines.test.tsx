@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import PeriodCostLines from "@/components/admin/PeriodCostLines";
+import PeriodCostLines, { PeriodCostHeadlines } from "@/components/admin/PeriodCostLines";
 import { applyTier, emptyPlan, periodCostReading, serviceById } from "@/services/servicePlans";
 
 const NOW = new Date("2026-11-22T08:00:00.000Z");
@@ -17,14 +17,20 @@ describe("PeriodCostLines", () => {
       NOW,
       7,
     );
-    render(<PeriodCostLines reading={reading} service={service} />);
+    const { unmount } = render(<PeriodCostLines reading={reading} service={service} />);
     expect(screen.getByText("Minutes consommées")).toBeTruthy();
     expect(screen.getByText("10 min")).toBeTruthy();
     expect(screen.getByText("Abonnement (7 j / 30)")).toBeTruthy();
-    expect(screen.getByText("Reste du forfait")).toBeTruthy();
-    expect(screen.getByText("165 min")).toBeTruthy();
-    expect(screen.getByText("Coût de la période")).toBeTruthy();
+    expect(screen.getByText("coût de la période")).toBeTruthy();
+    expect(screen.getByText("165 min restantes")).toBeTruthy();
+    expect(screen.getByText(/renouvellement/)).toBeTruthy();
     expect(screen.getAllByText("13,77 $")).toHaveLength(2);
+    unmount();
+    render(<PeriodCostHeadlines items={[{ id: "tavus", label: "Tavus", reading, service }]} />);
+    expect(screen.getByText("Tavus")).toBeTruthy();
+    expect(screen.getByText("13,77 $")).toBeTruthy();
+    expect(screen.getByText("165 min restantes")).toBeTruthy();
+    expect(screen.getByText(/renouvellement/)).toBeTruthy();
   });
 
   it("shows estimated voice minutes and the characters that were billed", () => {
@@ -42,7 +48,7 @@ describe("PeriodCostLines", () => {
     expect(screen.getByText("~2 min")).toBeTruthy();
     expect(screen.getByText("Crédits consommés")).toBeTruthy();
     expect(screen.getByText("1'500")).toBeTruthy();
-    expect(screen.getByText("119'500 crédits · ~159 min")).toBeTruthy();
+    expect(screen.getByText("~159 min restantes · 119'500 crédits")).toBeTruthy();
     expect(screen.getAllByText("5,13 $")).toHaveLength(2);
   });
 });

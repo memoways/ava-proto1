@@ -12,8 +12,9 @@ avec la part portée par les lieux. Le self-hosting se chiffre à part, sans ach
 **État vérifié.** Technique avancée (Consommation LLM, Voix, Streaming Avatar) sépare
 l'abonnement fixe, le quota inclus, la consommation du cycle et le dépassement. Les cartes Voix
 et Streaming Avatar partagent en plus cet abonnement sur les jours choisis (1, 7 ou 30 sur 30),
-avec les minutes consommées, le reste du forfait et le coût de la période. « Tout » reste le mois
-en cours. Les forfaits sont dans `admin_settings` (`billing.service_plans`, environnement `prod`).
+avec les minutes consommées, le reste du forfait et le coût de la période. Ce coût, les minutes
+restantes et la date de renouvellement sont en grand en haut de l'onglet et en tête de chaque carte.
+« Tout » reste le mois en cours. Les forfaits sont dans `admin_settings` (`billing.service_plans`, environnement `prod`).
 Le calcul est dans `src/services/servicePlans.ts` (`planSnapshot`, `periodCostReading`). Les minutes
 de voix sont une estimation (750 caractères). Voyage n'est pas mesuré appel par appel. Rien de ceci
 n'est en production tant que Lovable n'a pas publié.

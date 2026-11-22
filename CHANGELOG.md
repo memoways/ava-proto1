@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : coût et minutes restantes en tête] — 2026-11-22
+
+- Le coût de la période est le chiffre principal : grand sur chaque carte, et de nouveau en haut de Consommation Voix et Consommation Streaming Avatar.
+- À côté, les minutes encore disponibles et la date de renouvellement saisie. Une date vide est dite non saisie.
+- **Inchangé** : le calcul (prorata, reste du cycle, dépassement). Rien en production.
+
 ## [Consommation : coût réel sur la période choisie] — 2026-11-22
 
 - Consommation Voix et Consommation Streaming Avatar : chaque carte indique les minutes consommées, la part de l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30), le reste du forfait et le coût de la période. Le dépassement ne compte que les unités de cette période qui sortent du forfait.
