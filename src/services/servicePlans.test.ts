@@ -6,6 +6,7 @@ import {
   parseServicePlans,
   planSnapshot,
   serviceById,
+  subscriptionSpend,
   sumUsage,
   type UsageEvent,
 } from "./servicePlans";
@@ -196,6 +197,41 @@ describe("parseServicePlans", () => {
     expect(parsed.elevenlabs?.account).toBe("active");
     expect(parsed.other).toBeUndefined();
     expect(parsed.tavus?.monthlyFeeUsd).toBeNull();
+  });
+});
+
+describe("subscriptionSpend", () => {
+  it("adds every monthly invoice from October through the December renewal", () => {
+    const spend = subscriptionSpend({
+      startedOn: "2026-10-15",
+      renewsOn: "2026-12-15",
+      endedOn: null,
+      cadence: "monthly",
+      monthlyFeeUsd: 59,
+      account: "active",
+      now: NOW,
+    });
+    expect(spend?.count).toBe(3);
+    expect(spend?.totalUsd).toBe(177);
+    expect(spend?.from).toBe("2026-10-15");
+    expect(spend?.to).toBe("2026-12-15");
+    expect(spend?.includesUpcoming).toBe(true);
+  });
+
+  it("stops at the end date and does not count a later renewal", () => {
+    const spend = subscriptionSpend({
+      startedOn: "2026-10-15",
+      renewsOn: "2026-12-15",
+      endedOn: "2026-11-20",
+      cadence: "monthly",
+      monthlyFeeUsd: 59,
+      account: "cancelled",
+      now: NOW,
+    });
+    expect(spend?.count).toBe(2);
+    expect(spend?.totalUsd).toBe(118);
+    expect(spend?.to).toBe("2026-11-15");
+    expect(spend?.includesUpcoming).toBe(false);
   });
 });
 

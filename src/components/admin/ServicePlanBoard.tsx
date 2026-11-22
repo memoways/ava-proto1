@@ -216,6 +216,12 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
         <span className="text-muted-foreground">Ce cycle : </span>
         <span className="font-semibold">{periodSentence(snapshot)}</span>
       </p>
+      {snapshot.plan.funding === "subscription" && (
+        <p className="text-sm">
+          <span className="text-muted-foreground">Depuis le début : </span>
+          <span className="font-semibold">{spendSentence(snapshot)}</span>
+        </p>
+      )}
       {service.unmeasuredReason && <p className="text-xs text-muted-foreground">{service.unmeasuredReason}</p>}
       <div className="flex justify-end">
         <Button size="sm" variant="outline" onClick={() => setOpen((value) => !value)}>
@@ -276,7 +282,17 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
               onValueChange={(tierId) => {
                 setSeed((value) => value + 1);
                 if (tierId === "unset") {
-                  setDraft({ ...emptyPlan(), account: draft.account, funding: draft.funding, balanceUsd: draft.balanceUsd, creditedOn: draft.creditedOn, usdPerUnit: draft.usdPerUnit });
+                  setDraft({
+                    ...emptyPlan(),
+                    account: draft.account,
+                    funding: draft.funding,
+                    balanceUsd: draft.balanceUsd,
+                    creditedOn: draft.creditedOn,
+                    usdPerUnit: draft.usdPerUnit,
+                    startedOn: draft.startedOn,
+                    endedOn: draft.endedOn,
+                    renewsOn: draft.renewsOn,
+                  });
                 } else setDraft(applyTier(service, tierId, draft.cadence, draft));
               }}
             >
@@ -313,8 +329,17 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
           <NumberField key={`${seed}-included`} label={`Inclus (${service.unitLabel})`} value={draft.included} onChange={(included) => setDraft({ ...draft, tierId: "custom", included })} />
           <NumberField key={`${seed}-overage`} label="Prix d'une unité au-dessus ($)" value={draft.overagePerUnitUsd} onChange={(overagePerUnitUsd) => setDraft({ ...draft, tierId: "custom", overagePerUnitUsd })} />
           <label className="space-y-1 text-xs text-muted-foreground">
+            Début de l'abonnement
+            <Input type="date" className="h-9 text-foreground" value={draft.startedOn ?? ""} onChange={(event) => setDraft({ ...draft, startedOn: event.target.value || null })} />
+          </label>
+          <label className="space-y-1 text-xs text-muted-foreground">
             Prochain renouvellement
             <Input type="date" className="h-9 text-foreground" value={draft.renewsOn ?? ""} onChange={(event) => setDraft({ ...draft, renewsOn: event.target.value || null })} />
+          </label>
+          <label className="space-y-1 text-xs text-muted-foreground md:col-span-2">
+            Fin de cette période
+            <Input type="date" className="h-9 text-foreground" value={draft.endedOn ?? ""} onChange={(event) => setDraft({ ...draft, endedOn: event.target.value || null })} />
+            <span className="block pt-1">Vide tant que l'abonnement continue. Une reprise plus tard sera une nouvelle période, ajoutée à celle-ci.</span>
           </label>
           {service.creditsPerMinute != null && (
             <label className="space-y-1 text-xs text-muted-foreground">
@@ -404,6 +429,17 @@ function overage(snapshot: PlanSnapshot): string {
     : "";
   const price = snapshot.overageUsd == null ? "" : ` · ${formatUsd(snapshot.overageUsd)}`;
   return `${units}${minutes}${price}`;
+}
+
+function spendSentence(snapshot: PlanSnapshot): string {
+  const spend = snapshot.spend;
+  if (!spend) return "indique la date du premier prélèvement";
+  if (spend.count === 0) return "aucune facture sur cette période";
+  const noun = snapshot.plan.cadence === "yearly" ? "facture annuelle" : "mensualité";
+  const plural = spend.count > 1 ? "s" : "";
+  const upcoming = spend.includesUpcoming ? ", prochaine facture comprise" : "";
+  const total = spend.totalUsd == null ? "montant mensuel manquant" : formatUsd(spend.totalUsd);
+  return `${total} · ${spend.count} ${noun}${plural} du ${formatDay(new Date(`${spend.from}T00:00:00.000Z`))} au ${formatDay(new Date(`${spend.to}T00:00:00.000Z`))}${upcoming}`;
 }
 
 function prepaidSpent(snapshot: PlanSnapshot): string {

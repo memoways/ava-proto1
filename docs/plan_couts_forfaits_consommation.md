@@ -9,6 +9,8 @@ Le bloc s'ouvre replié. La période est une rangée de boutons. Les sandboxes s
 
 Un service est soit un abonnement mensuel, soit un crédit prépayé valable jusqu'à épuisement. L'état actif, en pause ou résilié dit si la mensualité court encore. Fish Audio n'a pas de solde à recharger.
 
+Un abonnement mensuel demande aussi la date du premier prélèvement. Le total depuis le début compte chaque facture jusqu'au prochain renouvellement. La fin de la période reste vide tant que l'abonnement continue.
+
 ## Ce qui faussait la lecture
 
 Les onglets Voix et Streaming Avatar multipliaient chaque appel par un tarif public. Un abonnement ElevenLabs, Gradium, Anam ou Tavus était donc compté une deuxième fois, et le dépassement n'apparaissait pas.

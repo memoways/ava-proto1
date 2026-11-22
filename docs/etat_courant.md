@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, début d'abonnement (22 novembre, code)** : la fiche d'un abonnement demande le premier prélèvement et le prochain renouvellement. Le total depuis le début additionne les mensualités jusqu'à cette prochaine facture. La fin reste vide tant que l'abonnement continue. Rien en production.
+
 **Cinématique smartphone, présentation (22 novembre, code, défaut inchangé)** : Admin › Cinématiques, ligne « Smartphone » : Actuel (image entière), Vertical 9:16 plein écran (panoramique au doigt, départ du cadrage réglable en %) ou Horizontal 16:9 plein écran (icône invitant à tourner). Smartphone seulement ; desktop et tablette restent sur Actuel. Rien d'écrit sur l'image. À faire : recette iPhone des trois modes (`?ecran=telephone` pour tester), puis choix du mode et, si utile, point de départ par vidéo. Rien en production.
 
 **Consommation, crédits (22 novembre, code)** : un service peut être actif, en pause ou résilié. Le crédit prépayé (OpenRouter, Inworld) suit le solde chargé, le consommé depuis la date, et le reste. Fish Audio résilié ne se recharge pas. Rien en production.
