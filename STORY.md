@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-22 (Forfaits de consommation)
+> **Last Updated**: 2026-11-22 (Lecture des forfaits)
 
 ---
+
+## Consommation — replier le forfait, voir la période (22 novembre 2026)
+
+Une fois le forfait saisi, la fiche n'a plus à occuper l'écran. Elle se replie, et la période (24 heures, 7 jours, 30 jours, tout) reste en gros boutons au-dessus des chiffres. Les essais en sandbox comptent, sauf si on les retire.
 
 ## Consommation — voir le forfait avant le dépassement (22 novembre 2026)
 

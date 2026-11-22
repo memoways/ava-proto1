@@ -3,6 +3,10 @@
 Tâche : [modèle de coûts IA](https://app.notion.com/p/91962322e59583d182f4813546ddf490).
 Ce lot couvre la mesure dans Technique avancée. Les scénarios de diffusion et le self-hosting restent le lot suivant.
 
+## Lecture
+
+Le bloc Forfaits du mois s'ouvre replié. La période des statistiques est une rangée de boutons. Les sandboxes sont incluses, sauf si on coupe l'interrupteur.
+
 ## Ce qui faussait la lecture
 
 Les onglets Voix et Streaming Avatar multipliaient chaque appel par un tarif public. Un abonnement ElevenLabs, Gradium, Anam ou Tavus était donc compté une deuxième fois, et le dépassement n'apparaissait pas.

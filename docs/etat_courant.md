@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, lecture (22 novembre, code)** : Forfaits du mois est replié par défaut. La période est une rangée de boutons. Les sandboxes sont incluses, sauf si on coupe l'interrupteur. Rien en production.
+
 **Consommation, forfaits (22 novembre, code)** : Technique avancée distingue, par service, l'abonnement mensuel, le quota inclus, la consommation du cycle et le dépassement. Les minutes déjà dans le forfait ne sont plus facturées une seconde fois. Le montant et la date de renouvellement se saisissent dans l'onglet (préremplis par les tarifs publics du 22 novembre 2026). Une ligne `admin_settings`, pas de nouvelle table. Voyage (RAG) n'est pas mesuré appel par appel. OpenRouter reste le prix déjà renvoyé. **À faire par Ulrich** : choisir le forfait réel et la date de renouvellement. Rien en production. [Plan](plan_couts_forfaits_consommation.md) · [reprise scénarios](prompt_reprise_couts_scenarios_diffusion.md).
 
 **Admin vidéo, densité (21 novembre, code)** : Synchronisation Notion est repliée sur Cinématiques et Extraits. Les règles d'extraits et de déclenchement sont plus courtes ; les valeurs et le comportement en jeu sont inchangés. Rien en production.
