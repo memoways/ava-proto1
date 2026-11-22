@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : crédit prépayé et état de l'abonnement] — 2026-11-22
+
+- Chaque service a un état : actif, en pause (plus de mensualité) ou résilié. Fish Audio n'a pas de portefeuille : une fois résilié, il ne se recharge pas.
+- Le mode crédit prépayé enregistre le solde chargé et sa date. La consommation d'après cette date donne le reste. Un solde épuisé demande un rechargement, puis la mise à jour du montant. OpenRouter et Inworld s'en servent. Le prix pour 1 000 caractères convertit la voix en dollars.
+- **Inchangé** : le calcul d'un abonnement mensuel encore actif. Rien en production.
+
 ## [Consommation : forfaits repliés, période visible] — 2026-11-22
 
 - Le bloc Forfaits du mois se replie. Il s'ouvre fermé : les statistiques sont tout de suite accessibles. Le choix reste mémorisé. Le filtre de service reste sur la ligne, même repliée.
