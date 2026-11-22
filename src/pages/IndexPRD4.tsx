@@ -642,7 +642,10 @@ const IndexPRD4 = () => {
     // This callback runs on the initial pointer/touch gesture. It unlocks the
     // top-level audio context for the whole session and starts the preloaded
     // native cinematic player without any additional play button.
-    void unlockAudioPlayback().catch(() => { /* native video activation still proceeds */ });
+    void unlockAudioPlayback()
+      // iOS: attach the attenuation gain now, while the context runs (it is interrupted once the mic opens).
+      .then(() => { if (videoTriggerSettingsRef.current.PRESENTATION === "overlay") cinematicPlayerRef.current?.prepareGain(); })
+      .catch(() => { /* native video activation still proceeds */ });
     cinematicPlayerRef.current?.playWithAudio();
   }, []);
 
@@ -1567,7 +1570,9 @@ const IndexPRD4 = () => {
         character: activeCharacterRef.current,
         orchestrationVersionId: meta.orchestrationVersionId,
         payload: { videoId: video.id, reason: meta.reason, confidence: meta.confidence, decisionToStartMs, deferrals: next.deferrals,
-          presentation: next.presentation },
+          presentation: next.presentation,
+          // Overlay: what the attenuation really did on this device (mode, iOS, read-back, context).
+          ...(next.presentation === "overlay" ? { audio: cinematicPlayerRef.current?.getAudioDiagnostics() } : {}) },
       });
       if (next.presentation === "interrupt") setActiveVideo(video);
     }

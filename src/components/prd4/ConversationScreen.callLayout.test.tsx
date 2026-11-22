@@ -103,4 +103,12 @@ describe("ConversationScreen — smartphone call layout", () => {
     expect(screen.getByTestId("call-portrait").className).toContain("opacity-0");
     expect(screen.getByRole("button", { name: /Terminer/ })).toBeInTheDocument();
   });
+
+  it("overlay cinematic: no name, status or subtitle is written over the image", () => {
+    const { rerender } = render(<ConversationScreen {...baseProps} audioState="max_speaking" />);
+    expect(screen.getByRole("heading", { level: 1 }).className).not.toContain("invisible");
+    rerender(<ConversationScreen {...baseProps} audioState="max_speaking" cinematicOverlay />);
+    expect(screen.getByRole("heading", { level: 1 }).className).toContain("invisible");
+    expect(screen.getByTestId("call-status").className).toContain("invisible");
+  });
 });

@@ -226,4 +226,6 @@ it("overlay cinematic: the character's image gives way to the video, the convers
   expect(avatar.className).toContain("opacity-0");
   expect(screen.getByRole("button", { name: "Terminer" })).toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Max répond");
+  // Nothing is darkened or written over the video image.
+  expect(root.querySelector(".bg-gradient-none, [aria-hidden].pointer-events-none.absolute.inset-0.opacity-0")).not.toBeNull();
 });
