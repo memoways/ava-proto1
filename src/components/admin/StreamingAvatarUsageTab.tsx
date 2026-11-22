@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
+import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
 
 /** Tarifs publics indicatifs (USD / minute de streaming). À ajuster selon le plan réel. */
 const COST_PER_MINUTE_USD: Record<string, number> = {
@@ -72,6 +73,7 @@ export default function StreamingAvatarUsageTab() {
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
   const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -104,14 +106,33 @@ export default function StreamingAvatarUsageTab() {
       rows.filter((r) => {
         const ts = r.started_at;
         if (!ts || new Date(ts) < periodStart) return false;
+        if (serviceId !== "all" && r.streaming_avatar_provider !== serviceId) return false;
         return (
           Boolean(r.streaming_avatar_provider) ||
           r.output_mode === "streaming_avatar" ||
           Boolean(r.streaming_avatar_fallback_reason)
         );
       }),
-    [rows, periodStart]
+    [rows, periodStart, serviceId]
   );
+
+  const loadPlanUsage = useCallback(async (fromIso: string) => {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("started_at, ended_at, duration_seconds, streaming_avatar_provider")
+      .gte("started_at", fromIso)
+      .not("streaming_avatar_provider", "is", null)
+      .limit(5000);
+    if (error) throw new Error(error.message);
+    const list = data ?? [];
+    return {
+      capped: list.length >= 5000,
+      events: list.flatMap((row) => {
+        if (!row.streaming_avatar_provider || !row.started_at) return [];
+        return [{ serviceId: row.streaming_avatar_provider, at: row.started_at, amount: sessionSeconds(row as SessionRow) / 60 }];
+      }),
+    };
+  }, []);
 
   // Fournisseurs connus (registre) + ceux réellement présents en base — extensible.
   const providerIds = useMemo(() => {
@@ -183,6 +204,7 @@ export default function StreamingAvatarUsageTab() {
           <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
         </label>
       </div>
+      <ServicePlanBoard family="video" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
 
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Sessions avatar" value={String(totalSessions)} />
@@ -194,12 +216,13 @@ export default function StreamingAvatarUsageTab() {
         />
         <KPI label="Fournisseurs actifs" value={String(activeProviders)} />
         <KPI label="Minutes streamées" value={fmtMinutes(totalSeconds)} />
-        <KPI label="Coût estimé" value={fmtUsd(totalCost)} tone="warn" />
+        <KPI label="Tarif public" value={fmtUsd(totalCost)} tone="warn" />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
-        Coûts estimés à partir de la durée des sessions et de tarifs publics indicatifs
-        (HeyGen {fmtUsd(COST_PER_MINUTE_USD.heygen)}/min · Tavus {fmtUsd(COST_PER_MINUTE_USD.tavus)}/min ·
-        autres fournisseurs {fmtUsd(DEFAULT_COST_PER_MINUTE_USD)}/min par défaut).
+        Le bloc Forfaits est le décompte qui compte : abonnement, minutes incluses, minutes au-dessus.
+        Le tarif public ci-dessous l'ignore (HeyGen {fmtUsd(COST_PER_MINUTE_USD.heygen)}/min, Tavus {fmtUsd(COST_PER_MINUTE_USD.tavus)}/min,
+        autres {fmtUsd(DEFAULT_COST_PER_MINUTE_USD)}/min). Les minutes sont la durée de session Ava, pas le compteur du fournisseur.
+        Le forfait inclut les sandboxes.
       </p>
 
       {fallbackRate > 20 && totalSessions >= 5 && (

@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-21 (Nouvelles de Gamiways)
+> **Last Updated**: 2026-11-22 (Forfaits de consommation)
 
 ---
+
+## Consommation — voir le forfait avant le dépassement (22 novembre 2026)
+
+Les onglets de consommation multipliaient chaque minute par un tarif public. Avec un abonnement ElevenLabs, Gradium, Anam ou Tavus, ce chiffre mélangeait ce qui est déjà payé et ce qui tombe en plus. Le décompte part maintenant du forfait : montant du mois, quota inclus, ce qui a été consommé sur le cycle, et seulement ensuite les unités au-dessus. Le prix affiché se corrige à la facture. La date de renouvellement fixe le cycle. Le RAG Voyage n'a toujours pas de coût par appel ; OpenRouter, lui, était déjà le vrai prix.
 
 ## Nouvelles de Gamiways — rester au courant, chez Memoways (21 novembre 2026)
 

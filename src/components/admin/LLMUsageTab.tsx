@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { retryCostForRow } from "@/services/llmUsageTracker";
+import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
 
 interface UsageRow {
   id: string;
@@ -52,6 +53,7 @@ export default function LLMUsageTab() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPeriod, setFilterPeriod] = useState("30d");
   const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -87,6 +89,20 @@ export default function LLMUsageTab() {
   }, [includeSandbox]);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  const loadPlanUsage = useCallback(async (fromIso: string) => {
+    const { data, error } = await supabase
+      .from("llm_usage")
+      .select("created_at, cost_usd")
+      .gte("created_at", fromIso)
+      .limit(5000);
+    if (error) throw new Error(error.message);
+    const list = data ?? [];
+    return {
+      capped: list.length >= 5000,
+      events: list.map((row) => ({ serviceId: "openrouter", at: row.created_at, amount: Number(row.cost_usd) || 0 })),
+    };
+  }, []);
 
   async function retryAllFailedCosts() {
     const failed = rows.filter(r => r.status === "cost_fetch_failed" && r.generation_id);
@@ -195,6 +211,12 @@ export default function LLMUsageTab() {
           <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
         </label>
       </div>
+      <ServicePlanBoard family="llm" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <p className="text-[11px] text-muted-foreground -mt-3">
+        OpenRouter n'a pas de forfait minutes : le montant est déjà le prix des appels, RAG de rerank compris.
+        Voyage, qui calcule les embeddings du RAG, n'est pas dans cette somme et n'est pas mesuré appel par appel.
+        Le forfait inclut les sandboxes. Les graphiques suivent l'interrupteur et la période.
+      </p>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 tablet-lg:grid-cols-5 gap-3">
         <KPICard label="Coût total (filtre)" value={fmtCost(totalCost)} />
