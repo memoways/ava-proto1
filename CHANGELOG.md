@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Écran allumé sur mobile, cinématiques plus basses] — 2026-11-22
+
+- Nouveau `screenWakeLock.ts` : au geste « Commencer », l'écran du téléphone reste allumé (Screen Wake Lock sur Android et iOS 16.4+, relancé au retour sur la page et à chaque geste ; repli par vidéo invisible sinon). Relâché à la fin de l'expérience. Une veille coupait la page, le micro et le son.
+- Atténuation par défaut de la cinématique en superposition : −15 dB → −24 dB, pour que la voix de Max passe. Un réglage déjà enregistré dans l'admin (Déclenchement des vidéos) garde sa valeur : à baisser à la main si besoin.
+- **Inchangé** : pipeline voix, desktop, tablette. Rien en production.
+
 ## [Consommation : forfait, quota, dépassement] — 2026-11-22
 
 - Technique avancée (LLM, Voix, Streaming Avatar) : pour chaque service, abonnement mensuel, quota inclus, consommation du cycle, unités au-dessus du forfait et date de renouvellement.
