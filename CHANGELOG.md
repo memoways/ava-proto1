@@ -11,6 +11,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Stockage : une ligne `admin_settings` (`billing.service_plans`), pas de nouvelle table. Voyage (RAG) reste un abonnement sans consommation mesurée. OpenRouter reste la somme déjà renvoyée.
 - **Inchangé** : le pipeline voix, vidéo et LLM. Rien en production.
 
+## [Cinématiques : rien sur l'image, son iPhone fiabilisé] — 2026-11-22
+
+- **Superposition, tous écrans** : plus aucun texte sur l'image (nom, « parle… », sous-titre du joueur) ni voile sombre. Les commandes (Terminer, micro, minuteur) restent. Hors superposition : inchangé.
+- **iPhone/iPad** : la lecture de `video.volume` n'est plus crue (iOS la renvoie sans l'appliquer) ; le gain Web Audio est branché dès le geste « Commencer » en mode superposition, tant que le contexte audio tourne. Desktop et Android inchangés.
+- **Diagnostic** : l'événement `cinematic_played` (superposition) porte `audio` : mode, moteur, iOS, volume relu, état du contexte.
+
 ## [Cinématiques : atténuation du son sur iPhone] — 2026-11-22
 
 - **Superposition sur iOS** : le réglage « Son sous la voix (dB) » passe par un gain Web Audio quand la lecture le permet (hls.js ou fichier même origine) ; sinon la vidéo reste muette plutôt que de couvrir le personnage. Desktop et Android gardent `video.volume`.

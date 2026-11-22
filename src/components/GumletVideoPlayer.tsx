@@ -2,7 +2,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import Hls from "hls.js";
 import { cn } from "@/lib/utils";
 import { START_BUFFER_MAX_WAIT_MS, START_BUFFER_S, bufferedAheadSeconds, resolveNativeVideoSource } from "@/services/videoPlayback";
-import { attachVideoGain, canRouteThroughGain, getVideoGain, keepVideoGainAudible } from "@/services/videoGain";
+import { attachVideoGain, canRouteThroughGain, getVideoGain, isIosWebKit, keepVideoGainAudible } from "@/services/videoGain";
+import { getAudioContextState } from "@/services/audioPlayback";
 
 /** Idle time before the pointer hides again over a playing video. */
 const POINTER_IDLE_HIDE_MS = 1_500;
@@ -31,9 +32,21 @@ function leaveFullscreen(video: HTMLVideoElement | null): void {
   } catch { /* already inline */ }
 }
 
+export interface GumletVideoPlayerAudioDiagnostics {
+  mode: string;
+  engine: string;
+  iosWebKit: boolean;
+  volumeReadBack: number | null;
+  contextState: string | null;
+}
+
 export interface GumletVideoPlayerHandle {
   playWithAudio: () => void;
   stop: () => void;
+  /** iOS: routes the element through a Web Audio gain while the context is running (call from a gesture). */
+  prepareGain: () => void;
+  /** What the attenuation actually did on this device (telemetry). */
+  getAudioDiagnostics: () => GumletVideoPlayerAudioDiagnostics;
 }
 
 interface GumletVideoPlayerProps {
@@ -162,7 +175,8 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       return;
     }
     try { video.volume = wanted; } catch { /* read-only volume */ }
-    if (wanted < 1 && Math.abs(video.volume - wanted) > 0.01) {
+    // iOS never honours `volume`, whatever it reads back: do not rely on the read-back there.
+    if (wanted < 1 && (isIosWebKit() || Math.abs(video.volume - wanted) > 0.01)) {
       volumeUnsupportedRef.current = true;
       requestGain(video);
     }
@@ -295,6 +309,20 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   useImperativeHandle(ref, () => ({
     playWithAudio,
     stop: stopPlayback,
+    prepareGain: () => {
+      const video = videoRef.current;
+      if (video && isIosWebKit()) requestGain(video);
+    },
+    getAudioDiagnostics: () => {
+      const video = videoRef.current;
+      return {
+        mode: video?.dataset.audioMode ?? "unknown",
+        engine: playbackEngineRef.current,
+        iosWebKit: isIosWebKit(),
+        volumeReadBack: video ? video.volume : null,
+        contextState: getAudioContextState(),
+      };
+    },
   }), [playWithAudio, stopPlayback]);
 
   useEffect(() => {

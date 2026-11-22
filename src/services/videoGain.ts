@@ -17,6 +17,15 @@ export interface VideoGain {
 
 export type VideoGainEngine = "hls.js" | "native-file" | "native-hls" | "pending" | "unsupported";
 
+/**
+ * iPhone, iPad and iPod (any browser: all WebKit), including iPadOS posing as a Mac. There
+ * `HTMLMediaElement.volume` is ignored, whatever the read-back says, so it is never trusted.
+ */
+export function isIosWebKit(nav: Pick<Navigator, "userAgent" | "maxTouchPoints"> | undefined = typeof navigator !== "undefined" ? navigator : undefined): boolean {
+  if (!nav) return false;
+  return /iPad|iPhone|iPod/.test(nav.userAgent) || (/Macintosh/.test(nav.userAgent) && (nav.maxTouchPoints ?? 0) > 1);
+}
+
 const attached = new WeakMap<HTMLMediaElement, VideoGain>();
 const failed = new WeakSet<HTMLMediaElement>();
 

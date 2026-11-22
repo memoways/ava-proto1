@@ -411,12 +411,13 @@ const ConversationScreen = ({
               cinematicOverlay && "opacity-0",
             )}
           />
-          <h1 className="font-serif text-3xl text-foreground">{displayName}</h1>
-          <p data-testid="call-status" aria-live="polite" className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          {/* Cinematic overlay: nothing is written over the image (name, status, subtitles). */}
+          <h1 className={cn("font-serif text-3xl text-foreground", cinematicOverlay && "invisible")}>{displayName}</h1>
+          <p data-testid="call-status" aria-live="polite" className={cn("text-xs uppercase tracking-[0.18em] text-muted-foreground", cinematicOverlay && "invisible")}>
             {callStatus}
           </p>
           {displayedUser && (
-            <p className="mt-4 max-w-sm text-base italic leading-snug text-foreground/90" aria-live="polite">
+            <p className={cn("mt-4 max-w-sm text-base italic leading-snug text-foreground/90", cinematicOverlay && "invisible")} aria-live="polite">
               « {displayedUser} »
             </p>
           )}
@@ -481,7 +482,7 @@ const ConversationScreen = ({
 
       {/* Dark gradients to keep face area clear and bottom legible */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className={cn("pointer-events-none absolute inset-0", cinematicOverlay && "opacity-0")}
         style={{
           background:
             "linear-gradient(to bottom, hsl(var(--background)/0.55) 0%, hsl(var(--background)/0.08) 22%, hsl(var(--background)/0.05) 45%, hsl(var(--background)/0.75) 78%, hsl(var(--background)/0.97) 100%)",
@@ -542,7 +543,7 @@ const ConversationScreen = ({
 
           {displayedUser && (
             <p
-              className="text-center text-base italic leading-snug text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] md:text-lg"
+              className={cn("text-center text-base italic leading-snug text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)] md:text-lg", cinematicOverlay && "invisible")}
               aria-live="polite"
             >
               « {displayedUser} »

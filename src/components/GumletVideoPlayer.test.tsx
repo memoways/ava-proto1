@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { resolveNativeVideoSource } from "@/services/videoPlayback";
-import { attachVideoGain, getVideoGain, type VideoGain } from "@/services/videoGain";
+import { attachVideoGain, getVideoGain, isIosWebKit, type VideoGain } from "@/services/videoGain";
 import GumletVideoPlayer from "./GumletVideoPlayer";
 
 vi.mock("@/services/videoGain", () => ({
@@ -9,6 +9,7 @@ vi.mock("@/services/videoGain", () => ({
   getVideoGain: vi.fn(() => null),
   attachVideoGain: vi.fn(async () => null),
   keepVideoGainAudible: vi.fn(),
+  isIosWebKit: vi.fn(() => false),
 }));
 
 describe("GumletVideoPlayer", () => {
@@ -254,6 +255,25 @@ describe("GumletVideoPlayer", () => {
     expect(player.muted).toBe(false);
     expect(player.dataset.audioMode).toBe("web-audio-gain");
     vi.mocked(getVideoGain).mockReturnValue(null);
+  });
+
+  it("overlay on iOS: the volume read-back is never trusted (it can claim the volume was applied)", async () => {
+    vi.mocked(attachVideoGain).mockClear();
+    vi.mocked(isIosWebKit).mockReturnValue(true);
+    try {
+      render(
+        <GumletVideoPlayer videoUrl="https://gumlet.tv/watch/6acc8341689a80cf2e4a427d" onComplete={() => {}} onSkip={() => {}}
+          active muted={false} volume={0.178} allowFullscreen={false} touchFirst showSkip={false} />,
+      );
+      const player = screen.getByLabelText("Video player") as HTMLVideoElement;
+      fireEvent.play(player); // jsdom reads the volume back as set: a read-back check would see "supported"
+      await act(async () => { await Promise.resolve(); });
+      expect(attachVideoGain).toHaveBeenCalled();
+      expect(player.muted).toBe(true);
+      expect(player.dataset.audioMode).toBe("muted-fallback");
+    } finally {
+      vi.mocked(isIosWebKit).mockReturnValue(false);
+    }
   });
 
   it("overlay on iOS: stays muted when no gain can be attached", async () => {
