@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, coût de la période (22 novembre, code)** : sur Consommation Voix et Consommation Streaming Avatar, chaque carte indique les minutes consommées sur les jours choisis, la part de l'abonnement (1, 7 ou 30 jours sur 30), le reste du forfait et le coût de la période. « Tout » affiche le mois en cours, sans prorata. Un forfait vide n'est plus remplacé par un tarif à la minute. Rien en production. [Plan](plan_couts_forfaits_consommation.md).
+
 **Consommation, début d'abonnement (22 novembre, code)** : la fiche d'un abonnement demande le premier prélèvement et le prochain renouvellement. Le total depuis le début additionne les mensualités jusqu'à cette prochaine facture. La fin reste vide tant que l'abonnement continue. Rien en production.
 
 **Cinématique smartphone, présentation (22 novembre, code, défaut inchangé)** : Admin › Cinématiques, ligne « Smartphone » : Actuel (image entière), Vertical 9:16 plein écran (panoramique au doigt, départ du cadrage réglable en %) ou Horizontal 16:9 plein écran (icône invitant à tourner). Smartphone seulement ; desktop et tablette restent sur Actuel. Rien d'écrit sur l'image. À faire : recette iPhone des trois modes (`?ecran=telephone` pour tester), puis choix du mode et, si utile, point de départ par vidéo. Rien en production.

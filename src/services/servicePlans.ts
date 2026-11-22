@@ -493,6 +493,172 @@ export function subscriptionSpend(input: {
   };
 }
 
+/** A monthly fee is shared across this many days when the admin picks 24 h, 7 days or 30 days. */
+export const PLAN_MONTH_DAYS = 30;
+
+export type PeriodCostKind = "subscription" | "prepaid" | "unset" | "stopped" | "month";
+
+export interface PeriodCostReading {
+  /** Days the admin asked for. Null means the whole history: the fee shown is one month, not a proration. */
+  days: number | null;
+  monthDays: number;
+  consumedUnits: number | null;
+  consumedMinutes: number | null;
+  minutesAreEstimate: boolean;
+  includedUnits: number | null;
+  includedMinutes: number | null;
+  /** Left on the current cycle after every measured unit, sandboxes included. */
+  remainingUnits: number | null;
+  remainingMinutes: number | null;
+  /** Share of the monthly fee for `days`, or the whole month when `days` is null. */
+  subscriptionUsd: number | null;
+  overageUnits: number | null;
+  overageMinutes: number | null;
+  overageUsd: number | null;
+  /** Subscription share plus the overage that falls in the requested window. */
+  totalUsd: number | null;
+  kind: PeriodCostKind;
+  remainingUsd: number | null;
+  /** Prepaid dollars spent inside the requested window. */
+  spentUsd: number | null;
+  allowanceMissing: boolean;
+  rateMissing: boolean;
+  capped: boolean;
+}
+
+export function requestedDays(periodId: string): number | null {
+  if (periodId === "24h") return 1;
+  if (periodId === "7d") return 7;
+  if (periodId === "30d") return 30;
+  return null;
+}
+
+/**
+ * Real cost of the window the admin picked.
+ *
+ * The monthly fee is multiplied by `days / 30`. Minutes consumed are the ones
+ * passed in (`periodAmount`, the same unit as a usage event). Minutes left are
+ * the subscription allowance minus the whole current cycle, so a 7-day view
+ * does not pretend the rest of the month was free. Only units of this window
+ * that sit past the allowance are priced as overage. "Tout" shows the current
+ * month, not a prorata of all history.
+ */
+export function periodCostReading(
+  service: ServiceDefinition,
+  plan: SavedServicePlan,
+  cycleEvents: readonly UsageEvent[],
+  periodAmount: number,
+  now: Date,
+  days: number | null,
+  capped = false,
+): PeriodCostReading {
+  const window = plan.funding === "prepaid"
+    ? prepaidWindow(plan.creditedOn, now)
+    : billingWindow(plan.renewsOn, plan.cadence, now);
+  const cycleRaw = service.measured ? sumUsage(cycleEvents, service.id, window.start, window.end) : null;
+  const cycleUsed = billedAmount(service, plan, cycleRaw);
+  const safePeriod = Number.isFinite(periodAmount) && periodAmount > 0 ? periodAmount : 0;
+  const periodUsed = billedAmount(service, plan, service.measured ? safePeriod : null);
+  const consumedMinutes = asMinutes(service, plan, periodUsed);
+  const included = plan.included;
+  const includedMinutes = asMinutes(service, plan, included);
+  const base: PeriodCostReading = {
+    days,
+    monthDays: PLAN_MONTH_DAYS,
+    consumedUnits: periodUsed,
+    consumedMinutes: consumedMinutes.minutes,
+    minutesAreEstimate: consumedMinutes.estimated,
+    includedUnits: included,
+    includedMinutes: includedMinutes.minutes,
+    remainingUnits: null,
+    remainingMinutes: null,
+    subscriptionUsd: null,
+    overageUnits: null,
+    overageMinutes: null,
+    overageUsd: null,
+    totalUsd: null,
+    kind: "unset",
+    remainingUsd: null,
+    spentUsd: null,
+    allowanceMissing: false,
+    rateMissing: false,
+    capped,
+  };
+  if (!service.measured) return base;
+
+  if (plan.funding === "prepaid") {
+    const spent = spentUsd(service, plan, periodUsed);
+    const cycleSpent = spentUsd(service, plan, cycleUsed);
+    const remainingUsd = plan.balanceUsd == null || cycleSpent == null ? null : Math.max(0, plan.balanceUsd - cycleSpent);
+    return {
+      ...base,
+      kind: "prepaid",
+      spentUsd: spent,
+      remainingUsd,
+      totalUsd: spent,
+      rateMissing: plan.balanceUsd != null && spent == null && service.unit !== "usd",
+    };
+  }
+
+  if (plan.account !== "active") {
+    return { ...base, kind: "stopped", subscriptionUsd: 0, totalUsd: 0 };
+  }
+
+  const fee = plan.monthlyFeeUsd;
+  if (fee == null && included == null) return base;
+
+  const subscriptionUsd = fee == null ? null : days == null ? fee : fee * (days / PLAN_MONTH_DAYS);
+  const remainingUnits = included != null && cycleUsed != null ? Math.max(0, included - cycleUsed) : null;
+  const remainingMinutes = asMinutes(service, plan, remainingUnits);
+  let overageUnits: number | null = null;
+  if (included != null && cycleUsed != null && periodUsed != null) {
+    if (days == null) {
+      overageUnits = Math.max(0, cycleUsed - included);
+    } else {
+      const attributable = Math.min(periodUsed, cycleUsed);
+      const before = cycleUsed - attributable;
+      const left = Math.max(0, included - before);
+      overageUnits = Math.max(0, attributable - left);
+    }
+  }
+  const overageMinutes = asMinutes(service, plan, overageUnits);
+  let overageUsd: number | null = null;
+  let rateMissing = false;
+  if (overageUnits === 0) overageUsd = 0;
+  else if (overageUnits != null && plan.overagePerUnitUsd == null) rateMissing = true;
+  else if (overageUnits != null && plan.overagePerUnitUsd != null) overageUsd = overageUnits * plan.overagePerUnitUsd;
+
+  const allowanceMissing = included == null && fee != null;
+  let totalUsd: number | null = null;
+  if (subscriptionUsd != null && overageUsd != null) totalUsd = subscriptionUsd + overageUsd;
+  else if (subscriptionUsd != null && allowanceMissing) totalUsd = subscriptionUsd;
+
+  return {
+    ...base,
+    kind: days == null ? "month" : "subscription",
+    subscriptionUsd,
+    remainingUnits,
+    remainingMinutes: remainingMinutes.minutes,
+    overageUnits,
+    overageMinutes: overageMinutes.minutes,
+    overageUsd,
+    totalUsd,
+    allowanceMissing,
+    rateMissing,
+  };
+}
+
+export function sumPeriodTotals(readings: Array<PeriodCostReading | null>): { total: number | null; partial: boolean } {
+  const present = readings.filter((reading): reading is PeriodCostReading => reading != null);
+  const known = present.filter((reading) => reading.totalUsd != null);
+  const partial = present.some((reading) => reading.totalUsd == null && (reading.consumedUnits ?? 0) > 0);
+  if (known.length === 0) return { total: null, partial };
+  return {
+    total: known.reduce((sum, reading) => sum + (reading.totalUsd ?? 0), 0),
+    partial,
+  };
+}
+
 export function sumUsage(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): number {
   let total = 0;
   for (const event of events) {
@@ -513,6 +679,13 @@ export function earliestWindowStart(services: readonly ServiceDefinition[], plan
     if (start.getTime() < earliest.getTime()) earliest = start;
   }
   return earliest;
+}
+
+function billedAmount(service: ServiceDefinition, plan: SavedServicePlan, raw: number | null): number | null {
+  if (raw == null) return null;
+  const perMinute = plan.creditsPerMinute ?? service.creditsPerMinute;
+  if (service.creditsPerMinute && perMinute) return raw * perMinute;
+  return raw;
 }
 
 function asMinutes(service: ServiceDefinition, plan: SavedServicePlan, amount: number | null): { minutes: number | null; estimated: boolean } {
@@ -541,9 +714,8 @@ export function planSnapshot(
   const window = plan.funding === "prepaid"
     ? prepaidWindow(plan.creditedOn, now)
     : billingWindow(plan.renewsOn, plan.cadence, now);
-  const perMinute = plan.creditsPerMinute ?? service.creditsPerMinute;
   const raw = service.measured ? sumUsage(events, service.id, window.start, window.end) : null;
-  const used = raw == null ? null : service.creditsPerMinute && perMinute ? raw * perMinute : raw;
+  const used = billedAmount(service, plan, raw);
   const usedMinutes = asMinutes(service, plan, used);
   const included = plan.included;
   const includedMinutes = asMinutes(service, plan, included);

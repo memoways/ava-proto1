@@ -13,27 +13,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
-import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import PeriodCostLines from "@/components/admin/PeriodCostLines";
+import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
+import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById, sumPeriodTotals } from "@/services/servicePlans";
 import type { Json } from "@/integrations/supabase/types";
-
-/**
- * Coût estimé par 1000 caractères TTS (USD).
- * Tarifs publics de référence — à ajuster selon le plan réel souscrit.
- *  - ElevenLabs : ~$0.30/1k chars (plan Creator pay-as-you-go)
- *  - Fish Audio : ~$0.20/1k chars
- *  - Inworld : $5 / 1M chars = $0.005/1k chars
- */
-const COST_PER_1K_CHARS_USD: Record<TTSProviderId, number> = {
-  elevenlabs: 0.30,
-  fish: 0.20,
-  inworld: 0.005,
-  gradium: 0.15,
-  cartesia: 0.15,
-};
-
-const fmtUsd = (v: number) =>
-  v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`;
 
 interface AudioRow {
   id: string;
@@ -67,6 +51,9 @@ export default function VoiceUsageTab() {
   const [period, setPeriod] = useState("7d");
   const [includeSandbox, setIncludeSandbox] = useState(true);
   const [serviceId, setServiceId] = useState("all");
+  const [plans, setPlans] = useState<MeasuredPlans | null>(null);
+  const [now] = useState(() => new Date());
+  const onPlans = useCallback((state: MeasuredPlans) => setPlans(state), []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -140,9 +127,11 @@ export default function VoiceUsageTab() {
       const totalVals = provRows.map((r) => r.t_tts_total_ms).filter((v): v is number => v != null);
       const charsTotal = provRows.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
       const charsSuccess = success.reduce((sum, r) => sum + (r.tts_text_len || 0), 0);
-      const rate = COST_PER_1K_CHARS_USD[p.id as TTSProviderId] ?? 0;
-      const costTotalUsd = (charsTotal / 1000) * rate;
-      const costSuccessUsd = (charsSuccess / 1000) * rate;
+      const service = serviceById(p.id);
+      const visible = serviceId === "all" || serviceId === p.id;
+      const reading = service && plans && visible
+        ? periodCostReading(service, plans.plans[p.id] ?? emptyPlan(), plans.events, charsSuccess, now, requestedDays(period), plans.capped)
+        : null;
       const lastError = errors[0];
       return {
         id: p.id as TTSProviderId,
@@ -159,9 +148,8 @@ export default function VoiceUsageTab() {
         totalP95: percentile(totalVals, 95),
         charsTotal,
         charsSuccess,
-        costTotalUsd,
-        costSuccessUsd,
-        ratePer1k: rate,
+        service,
+        reading,
         lastError: lastError
           ? {
               when: lastError.created_at,
@@ -171,13 +159,12 @@ export default function VoiceUsageTab() {
           : null,
       };
     });
-  }, [filtered]);
+  }, [filtered, plans, now, period, serviceId]);
 
   const totalReqs = filtered.length;
   const totalErrors = filtered.filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok").length;
   const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
-  const totalCostUsd = providerStats.reduce((s, p) => s + p.costTotalUsd, 0);
-  const totalCostSuccessUsd = providerStats.reduce((s, p) => s + p.costSuccessUsd, 0);
+  const realCost = sumPeriodTotals(providerStats.map((provider) => provider.reading));
   const totalChars = providerStats.reduce((s, p) => s + p.charsTotal, 0);
 
   const recentErrors = filtered
@@ -186,7 +173,7 @@ export default function VoiceUsageTab() {
 
   return (
     <div className="space-y-6">
-      <ServicePlanBoard family="voice" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <ServicePlanBoard family="voice" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} onReady={onPlans} />
       <UsageRangeBar
         value={period}
         options={VOICE_VIDEO_RANGES}
@@ -207,14 +194,19 @@ export default function VoiceUsageTab() {
         />
         <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
         <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
-        <KPI label="Tarif public (succès)" value={fmtUsd(totalCostSuccessUsd)} tone="warn" />
+        <KPI
+          label={realCost.partial ? "Coût réel (partiel)" : "Coût réel"}
+          value={realCost.total == null ? "—" : formatUsd(realCost.total)}
+          tone="warn"
+        />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
-        Le bloc Forfaits compte l'abonnement et seulement ce qui dépasse le quota. Les montants
-        « tarif public » plus bas ignorent le forfait ({fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k ElevenLabs,
-        {fmtUsd(COST_PER_1K_CHARS_USD.gradium)}/1k Gradium, total période {fmtUsd(totalCostUsd)}).
-        La voix se mesure en caractères : les minutes du forfait sont une estimation (750 caractères ≈ 1 min).
-        Le forfait inclut les sandboxes. Les statistiques aussi, tant que l'interrupteur reste activé.
+        Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
+        seulement ce qui dépasse le forfait sur cette période. Les minutes sont une estimation
+        (750 caractères ≈ 1 min). Le reste est le forfait du cycle en cours. « Tout » affiche le mois,
+        sans prorata. Un crédit prépayé montre le consommé de la période et ce qui reste du solde.
+        Un forfait non saisi reste vide. Le forfait inclut les sandboxes. Les statistiques aussi, tant
+        que l'interrupteur reste activé.
       </p>
 
       {/* Alerte taux d'erreur */}
@@ -234,7 +226,10 @@ export default function VoiceUsageTab() {
             </div>
 
             {s.total === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun appel sur la période.</p>
+              <>
+                <p className="text-sm text-muted-foreground">Aucun appel sur la période.</p>
+                {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
+              </>
             ) : (
               <>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -261,19 +256,15 @@ export default function VoiceUsageTab() {
                   </div>
                 </div>
 
-                <div className="space-y-1 border-t border-border/40 pt-2">
-                  <p className="text-xs text-muted-foreground">Coût estimé ({s.ratePer1k}$/1k chars)</p>
-                  <div className="flex justify-between text-sm font-mono">
-                    <span title="Caractères TTS (succès)">{s.charsSuccess.toLocaleString("fr-CH")} chars</span>
-                    <span className="text-amber-400 font-semibold">{fmtUsd(s.costSuccessUsd)}</span>
-                  </div>
-                  {s.errors > 0 && s.costTotalUsd > s.costSuccessUsd && (
-                    <div className="flex justify-between text-[11px] text-muted-foreground">
-                      <span>incl. erreurs</span>
-                      <span>{fmtUsd(s.costTotalUsd)}</span>
+                {s.reading && s.service ? (
+                  <PeriodCostLines reading={s.reading} service={s.service} />
+                ) : (
+                  <div className="space-y-1 border-t border-border/40 pt-2">
+                    <div className="flex justify-between text-sm font-mono">
+                      <span>{s.charsSuccess.toLocaleString("fr-CH")} caractères</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Codes HTTP</p>
                   <div className="flex flex-wrap gap-1">
@@ -339,8 +330,7 @@ export default function VoiceUsageTab() {
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p50</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Tot. p95</th>
               <th className="text-right p-2 font-medium text-muted-foreground">Chars</th>
-              <th className="text-right p-2 font-medium text-muted-foreground">Coût (succès)</th>
-              <th className="text-right p-2 font-medium text-muted-foreground">Coût total</th>
+              <th className="text-right p-2 font-medium text-muted-foreground">Coût réel</th>
             </tr>
           </thead>
           <tbody>
@@ -356,8 +346,7 @@ export default function VoiceUsageTab() {
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP50)}</td>
                 <td className="p-2 text-right font-mono">{fmtMs(s.totalP95)}</td>
                 <td className="p-2 text-right font-mono">{s.charsTotal.toLocaleString("fr-CH")}</td>
-                <td className="p-2 text-right font-mono text-amber-400">{fmtUsd(s.costSuccessUsd)}</td>
-                <td className="p-2 text-right font-mono">{fmtUsd(s.costTotalUsd)}</td>
+                <td className="p-2 text-right font-mono text-amber-400">{s.reading?.totalUsd == null ? "—" : formatUsd(s.reading.totalUsd)}</td>
               </tr>
             ))}
           </tbody>
