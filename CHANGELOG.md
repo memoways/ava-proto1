@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Correctif : mode vertical noir] — 2026-11-22
+
+- Le mode « Vertical 9:16 plein écran » affichait du noir : la règle de base de Tailwind (`video { max-width: 100% }`) ramenait le film à la largeur de l'écran, puis le décalage du cadrage le sortait entièrement de l'écran. `max-w-none` sur la vidéo du mode vertical ; vérifié dans le navigateur (viewport 375×812) et test de non-régression.
+
 ## [Cinématique smartphone : trois présentations testables] — 2026-11-22
 
 - Nouveau réglage admin (onglet Cinématiques, ligne « Smartphone »), **smartphone seulement** : **Actuel** (image 16:9 entière, bandes noires — défaut, comportement inchangé), **Vertical 9:16 plein écran** (le film occupe toute la hauteur ; panoramique au doigt sur sa largeur, cadrage de départ réglable en %), **Horizontal 16:9 plein écran** (icône sans texte invitant à tourner le téléphone). S'applique au teaser, à l'interlude et à la superposition (même lecteur).
