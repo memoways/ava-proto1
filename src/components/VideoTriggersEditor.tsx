@@ -256,7 +256,7 @@ function VideoTriggerRulesPanel() {
             Superposer à la réponse
           </label>
           </RadioGroup>
-          <label htmlFor="cinematic-overlay-gain" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Superposition seulement. −15 dB = valeur d'essai. Sur iPhone/iPad, le volume ne se règle pas : la vidéo y reste muette.">
+          <label htmlFor="cinematic-overlay-gain" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Superposition seulement. −15 dB = valeur d'essai. Sur iPhone/iPad, le réglage passe par Web Audio ; si la source ne le permet pas, la vidéo y reste muette.">
           Son sous la voix (dB)
           <Input
             id="cinematic-overlay-gain"

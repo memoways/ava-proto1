@@ -65,7 +65,18 @@ Machine pure `cinematicTransition.ts`, branche superposition :
 ## Son
 
 Réglage `OVERLAY_VIDEO_GAIN_DB` (défaut **−15 dB**, valeur d'essai, non validée artistiquement) → volume 0,178.
-iPhone/iPad ignorent `volume` : détecté, la vidéo y reste **muette** plutôt que de couvrir la voix.
+iPhone/iPad ignorent `volume` : détecté, la vidéo reste **muette** le temps d'être routée par Web Audio
+(`src/services/videoGain.ts` : MediaElementSource → GainNode sur le contexte partagé), puis le gain applique le dB.
+Sans routage possible, elle reste **muette** plutôt que de couvrir la voix.
+
+| Plateforme | Atténuation | Repli |
+|---|---|---|
+| Desktop, Android (Chrome, Firefox, Edge, Safari macOS) | `video.volume` | — |
+| iOS, lecture hls.js (MSE) ou fichier même origine | gain Web Audio (contexte `running` exigé) | muet |
+| iOS, HLS natif ou fichier cross-origin sans CORS | impossible (WebKit : silence via Web Audio) | muet |
+
+`video[data-audio-mode]` = `native-volume`, `web-audio-gain` ou `muted-fallback` (diagnostic). Non vérifié sur
+appareil réel : recette iPhone à faire (voix intelligible pendant la vidéo, micro actif).
 
 ## Réglages (`ava_video_trigger_settings`)
 
@@ -103,7 +114,7 @@ Réglage par environnement (production / sandbox), comme les autres règles de d
 - Un appel LLM supplémentaire par tour éligible (seulement quand la fréquence l'autorise).
 - Mains libres : le son atténué de la vidéo peut être capté par le micro ; la confirmation par parole reconnue limite
   les faux barge-in, à vérifier en recette.
-- iOS : vidéo muette en superposition (pas d'atténuation possible sans Web Audio).
+- iOS : atténuation par gain Web Audio si la lecture passe par hls.js ou un fichier même origine ; sinon vidéo muette. Un élément routé ne sonne que si le contexte partagé tourne (iOS l'interrompt au démarrage du micro ; reprise au geste et sur `statechange`).
 - Annulation (changement de personnage) pendant l'affichage : retour immédiat, sans événement `cinematic_completed`.
 
 ## Protocole de recette humaine (Ulrich, Romed — sandbox)
