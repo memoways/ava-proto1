@@ -72,6 +72,7 @@ import {
   estimatedRemainingSpeechMs,
   overlayHasTimeToShow,
   overlayVideoVolume,
+  cinematicSilencedOnPhone,
   cinematicTransitionStep,
   cinematicVeilOpacity,
   cinematicVeilTransitionMs,
@@ -4300,7 +4301,8 @@ const IndexPRD4 = () => {
         onReady={teaserActive || state.phase === "welcome" ? () => setTeaserPlayerReady(true) : undefined}
         onPlaying={overlayActive ? () => dispatchCinematicRef.current({ type: "media_started", at: performance.now() }) : undefined}
         active={cinematicActive || overlayActive}
-        muted={overlayActive && !overlayVisible}
+        muted={(overlayActive && !overlayVisible)
+          || cinematicSilencedOnPhone(getDeviceClass(), videoTriggerSettingsRef.current.MUTE_CINEMATICS_ON_SMARTPHONE, overlayActive || interludeActive)}
         volume={overlayActive ? overlayVideoVolume(videoTriggerSettingsRef.current.OVERLAY_VIDEO_GAIN_DB) : 1}
         allowFullscreen={!overlayActive}
         showSkip={teaserActive || (interludeActive && cinematic.phase === "playing")}

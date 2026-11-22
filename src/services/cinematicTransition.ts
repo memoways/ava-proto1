@@ -261,6 +261,19 @@ export function overlayVideoVolume(gainDb: unknown): number {
   return Math.round(10 ** (db / 20) * 1000) / 1000;
 }
 
+/**
+ * Smartphone-only switch (back-office, Cinématiques tab): the cinematic plays with no sound at all.
+ * Only the cinematic itself is concerned (overlay and interlude), never the welcome teaser; desktop
+ * and tablet are never silenced by it.
+ */
+export function cinematicSilencedOnPhone(
+  deviceClass: "smartphone" | "tablet" | "desktop",
+  muteOnSmartphone: unknown,
+  cinematicPlaying: boolean,
+): boolean {
+  return cinematicPlaying && deviceClass === "smartphone" && muteOnSmartphone === true;
+}
+
 /** Rough French speech rate used to estimate how long a reply lasts. */
 export const OVERLAY_SPEECH_CHARS_PER_SECOND = 15;
 /** Below this estimated remaining speech, the overlay would only flash: the reply stays as is. */
