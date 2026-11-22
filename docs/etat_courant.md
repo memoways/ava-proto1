@@ -125,6 +125,8 @@ lien concret exigé (un prénom seul refusé), tours sans vidéo journalisés av
 redéploiement `proxy-llm` par Lovable, mesurer en sandbox, recette de pertinence Ulrich + Romed ; production non publiée.
 [Plan](plan_cinematiques_interruption_superposition.md) · [reprise lot 3](prompt_reprise_cinematiques_superposition_lot_3.md).
 
+**Écran allumé et son (22 novembre, code)** : `screenWakeLock.ts` garde l'écran allumé dès « Commencer » (API Wake Lock, repli vidéo invisible) ; atténuation par défaut −24 dB (un réglage admin existant n'est pas modifié). Cause réelle du « trop fort » toujours à lire dans `experience_events.cinematic_played.payload.audio` de la dernière session iPhone.
+
 **Cinématiques : son sous la voix sur iPhone (22 novembre, code)** : en superposition, iOS (qui ignore `video.volume`) atténue la vidéo par un gain Web Audio (`videoGain.ts`) quand la lecture passe par hls.js ou un fichier même origine ; sinon la vidéo reste muette. Desktop et Android inchangés. Cause du « −15 dB non appliqué » non reproduite sur appareil ; recette iPhone réelle à faire. Accueil vertical, cadrage vidéo et micro : lots suivants de la tâche Notion. [Plan](plan_cinematiques_interruption_superposition.md).
 
 **Socle commun des réglages (19 novembre)** : sandbox et voix héritent de la production champ par champ ; migrations de copie Ulrich → Romed/Benoît/Julien et catalogue prod à faire appliquer par Lovable (prod : go requis). [Plan et reprise](plan_socle_commun_reglages.md).

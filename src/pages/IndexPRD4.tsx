@@ -47,6 +47,7 @@ import type { TTSProviderId } from "@/services/tts/types";
 import { derivePerformanceIntent, isHeatedIntent, logPerformanceIntent, type PerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import { getAudioContextState, installAudioGestureUnlock, unlockAudioPlayback } from "@/services/audioPlayback";
+import { disableScreenWakeLock, enableScreenWakeLock } from "@/services/screenWakeLock";
 import { describeMicStartError } from "@/services/micStartError";
 import {
   getGameplaySettings,
@@ -612,6 +613,7 @@ const IndexPRD4 = () => {
     async (reason: string) => {
       endedRef.current = true;
       timerRef.current.pause();
+      disableScreenWakeLock();
       cleanupAudio();
       const sid = sessionIdRef.current;
       const configuredDuration = configuredSessionDurationRef.current;
@@ -642,6 +644,8 @@ const IndexPRD4 = () => {
     // This callback runs on the initial pointer/touch gesture. It unlocks the
     // top-level audio context for the whole session and starts the preloaded
     // native cinematic player without any additional play button.
+    // Keep the screen on for the whole experience (a sleeping phone cuts audio and microphone).
+    enableScreenWakeLock();
     void unlockAudioPlayback()
       // iOS: attach the attenuation gain now, while the context runs (it is interrupted once the mic opens).
       .then(() => { if (videoTriggerSettingsRef.current.PRESENTATION === "overlay") cinematicPlayerRef.current?.prepareGain(); })

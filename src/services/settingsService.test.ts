@@ -55,7 +55,7 @@ describe("settingsService recent additions", () => {
 
   it("keeps the current cinematic presentation for existing configurations", () => {
     localStorage.setItem("ava_video_trigger_settings", JSON.stringify({ MIN_TURNS_BETWEEN: 4 }));
-    expect(getVideoTriggerSettings()).toMatchObject({ PRESENTATION: "interrupt", OVERLAY_VIDEO_GAIN_DB: -15, MIN_TURNS_BETWEEN: 4 });
+    expect(getVideoTriggerSettings()).toMatchObject({ PRESENTATION: "interrupt", OVERLAY_VIDEO_GAIN_DB: -24, MIN_TURNS_BETWEEN: 4 });
   });
 
   it("restores a saved overlay cinematic presentation", () => {

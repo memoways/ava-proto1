@@ -253,7 +253,7 @@ export function cinematicPresentationFrom(value: unknown): CinematicPresentation
 }
 
 /** Default attenuation of the video sound under the voice in overlay mode (to be validated by ear). */
-export const DEFAULT_OVERLAY_VIDEO_GAIN_DB = -15;
+export const DEFAULT_OVERLAY_VIDEO_GAIN_DB = -24;
 
 /** dB attenuation → media element volume (0..1). Clamped to [-60, 0] dB; invalid → default. */
 export function overlayVideoVolume(gainDb: unknown): number {
