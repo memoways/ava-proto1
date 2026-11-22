@@ -524,6 +524,8 @@ export interface PeriodCostReading {
   allowanceMissing: boolean;
   rateMissing: boolean;
   capped: boolean;
+  /** Next renewal the admin typed, `YYYY-MM-DD`. Empty for a prepaid balance. */
+  renewsOn: string | null;
 }
 
 export function requestedDays(periodId: string): number | null {
@@ -583,6 +585,7 @@ export function periodCostReading(
     allowanceMissing: false,
     rateMissing: false,
     capped,
+    renewsOn: plan.funding === "prepaid" ? null : plan.renewsOn,
   };
   if (!service.measured) return base;
 

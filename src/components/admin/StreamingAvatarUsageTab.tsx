@@ -13,10 +13,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
-import PeriodCostLines from "@/components/admin/PeriodCostLines";
+import PeriodCostLines, { PeriodCostHeadlines } from "@/components/admin/PeriodCostLines";
 import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
-import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById, sumPeriodTotals } from "@/services/servicePlans";
+import { emptyPlan, periodCostReading, requestedDays, serviceById } from "@/services/servicePlans";
 
 const PROVIDER_LABELS: Record<string, string> = {
   heygen: "HeyGen LiveAvatar",
@@ -183,8 +183,12 @@ export default function StreamingAvatarUsageTab() {
   const totalFallbacks = filtered.filter((r) => Boolean(r.streaming_avatar_fallback_reason)).length;
   const fallbackRate = totalSessions ? (totalFallbacks / totalSessions) * 100 : 0;
   const totalSeconds = providerStats.reduce((s, p) => s + p.seconds, 0);
-  const realCost = sumPeriodTotals(providerStats.map((provider) => provider.reading));
   const activeProviders = providerStats.filter((p) => p.total > 0).length;
+  const headlines = providerStats.flatMap((provider) =>
+    provider.reading && provider.service
+      ? [{ id: provider.id, label: provider.label, reading: provider.reading, service: provider.service }]
+      : [],
+  );
 
   const recentSessions = filtered.slice(0, 50);
 
@@ -210,7 +214,9 @@ export default function StreamingAvatarUsageTab() {
         refreshing={loading}
       />
 
-      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
+      <PeriodCostHeadlines items={headlines} />
+
+      <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-5 gap-3">
         <KPI label="Sessions avatar" value={String(totalSessions)} />
         <KPI label="Replis TTS" value={String(totalFallbacks)} tone={totalFallbacks > 0 ? "warn" : "ok"} />
         <KPI
@@ -220,11 +226,6 @@ export default function StreamingAvatarUsageTab() {
         />
         <KPI label="Fournisseurs actifs" value={String(activeProviders)} />
         <KPI label="Minutes streamées" value={fmtMinutes(totalSeconds)} />
-        <KPI
-          label={realCost.partial ? "Coût réel (partiel)" : "Coût réel"}
-          value={realCost.total == null ? "—" : formatUsd(realCost.total)}
-          tone="warn"
-        />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
         Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
@@ -248,12 +249,10 @@ export default function StreamingAvatarUsageTab() {
               <h3 className="font-semibold">{s.label}</h3>
               <span className="text-xs px-2 py-0.5 rounded bg-muted/50 font-mono">{s.id}</span>
             </div>
+            {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
 
             {s.total === 0 ? (
-              <>
-                <p className="text-sm text-muted-foreground">Aucune session sur la période.</p>
-                {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
-              </>
+              <p className="text-sm text-muted-foreground">Aucune session sur la période.</p>
             ) : (
               <>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -269,9 +268,7 @@ export default function StreamingAvatarUsageTab() {
                 <Metric label="Première image" p50={s.frameP50} p95={s.frameP95} />
                 <Metric label="Première parole" p50={s.speechP50} p95={s.speechP95} />
 
-                {s.reading && s.service ? (
-                  <PeriodCostLines reading={s.reading} service={s.service} />
-                ) : (
+                {!s.reading && (
                   <div className="border-t pt-2 flex justify-between text-xs">
                     <span className="text-muted-foreground">Minutes consommées</span>
                     <span className="font-mono">{fmtMinutes(s.seconds)}</span>

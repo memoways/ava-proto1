@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, lecture du coût (22 novembre, code)** : le coût de la période est en grand sur la carte et en haut de l'onglet, avec les minutes restantes et la date de renouvellement. Rien en production.
+
 **Consommation, coût de la période (22 novembre, code)** : sur Consommation Voix et Consommation Streaming Avatar, chaque carte indique les minutes consommées sur les jours choisis, la part de l'abonnement (1, 7 ou 30 jours sur 30), le reste du forfait et le coût de la période. « Tout » affiche le mois en cours, sans prorata. Un forfait vide n'est plus remplacé par un tarif à la minute. Rien en production. [Plan](plan_couts_forfaits_consommation.md).
 
 **Consommation, début d'abonnement (22 novembre, code)** : la fiche d'un abonnement demande le premier prélèvement et le prochain renouvellement. Le total depuis le début additionne les mensualités jusqu'à cette prochaine facture. La fin reste vide tant que l'abonnement continue. Rien en production.

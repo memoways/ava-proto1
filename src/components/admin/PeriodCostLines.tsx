@@ -1,53 +1,110 @@
 /**
- * Subscription share for the period the admin picked, the minutes used in it,
- * and the minutes still left on the plan.
+ * The period cost is the number to read first. It is shown large on the card
+ * and again in the headline, with the minutes still left and the renewal date.
  */
 
 import {
   formatAmount,
+  formatDay,
   formatMinutes,
   formatUsd,
   type PeriodCostReading,
   type ServiceDefinition,
 } from "@/services/servicePlans";
 
-export default function PeriodCostLines({ reading, service }: { reading: PeriodCostReading; service: ServiceDefinition }) {
+export interface PeriodCostItem {
+  id: string;
+  label: string;
+  reading: PeriodCostReading;
+  service: ServiceDefinition;
+}
+
+export function PeriodCostHeadlines({ items }: { items: PeriodCostItem[] }) {
+  if (items.length === 0) return null;
   return (
-    <div className="border-t pt-2 text-xs space-y-1">
-      <Line label="Minutes consommées" value={formatMinutes(reading.consumedMinutes, reading.minutesAreEstimate)} />
-      {service.unit !== "minutes" && (
-        <Line
-          label={`${unitTitle(service.unitLabel)} consommés`}
-          value={reading.consumedUnits == null ? "—" : formatAmount(reading.consumedUnits, service.unit)}
-        />
-      )}
-      {reading.kind === "prepaid" ? (
-        <>
-          <Line label="Consommé sur la période" value={reading.spentUsd == null ? "prix non saisi" : formatUsd(reading.spentUsd)} />
-          <Line label="Crédit restant" value={reading.remainingUsd == null ? "—" : formatUsd(reading.remainingUsd)} />
-        </>
-      ) : (
-        <>
-          <Line label={feeLabel(reading)} value={feeValue(reading)} />
-          <Line label="Reste du forfait" value={remainingValue(reading, service)} />
-          {reading.overageUnits != null && reading.overageUnits > 0 && (
-            <Line
-              label={reading.days == null ? "Dépassement du mois" : "Dépassement sur la période"}
-              value={overageValue(reading, service)}
-              warn
-            />
-          )}
-          <Line
-            label={reading.days == null ? "Coût du mois" : "Coût de la période"}
-            value={reading.totalUsd == null ? (reading.rateMissing ? "prix du dépassement manquant" : "—") : formatUsd(reading.totalUsd)}
-          />
-        </>
-      )}
-      {reading.capped && (
-        <p className="text-[11px] text-amber-500">Consommation du cycle tronquée : le reste est un maximum.</p>
-      )}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <article key={item.id} className="rounded-lg border bg-muted/20 p-4">
+          <p className="text-sm text-muted-foreground">{item.label}</p>
+          <p className="mt-1 text-3xl font-semibold tracking-tight">{costText(item.reading)}</p>
+          <p className="text-xs text-muted-foreground">{costCaption(item.reading)}</p>
+          <p className="mt-3 text-xl font-semibold">{remainingHeadline(item.reading, item.service)}</p>
+          <p className="text-sm text-muted-foreground">{renewalHeadline(item.reading)}</p>
+        </article>
+      ))}
     </div>
   );
+}
+
+export default function PeriodCostLines({ reading, service }: { reading: PeriodCostReading; service: ServiceDefinition }) {
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-2xl font-semibold tracking-tight">{costText(reading)}</p>
+        <p className="text-xs text-muted-foreground">{costCaption(reading)}</p>
+        <p className="mt-1 text-base font-semibold">{remainingHeadline(reading, service)}</p>
+        <p className="text-sm text-muted-foreground">{renewalHeadline(reading)}</p>
+      </div>
+      <div className="border-t pt-2 text-xs space-y-1">
+        <Line label="Minutes consommées" value={formatMinutes(reading.consumedMinutes, reading.minutesAreEstimate)} />
+        {service.unit !== "minutes" && (
+          <Line
+            label={`${unitTitle(service.unitLabel)} consommés`}
+            value={reading.consumedUnits == null ? "—" : formatAmount(reading.consumedUnits, service.unit)}
+          />
+        )}
+        {reading.kind === "prepaid" ? (
+          <Line label="Consommé sur la période" value={reading.spentUsd == null ? "prix non saisi" : formatUsd(reading.spentUsd)} />
+        ) : (
+          <>
+            <Line label={feeLabel(reading)} value={feeValue(reading)} />
+            {reading.overageUnits != null && reading.overageUnits > 0 && (
+              <Line
+                label={reading.days == null ? "Dépassement du mois" : "Dépassement sur la période"}
+                value={overageValue(reading, service)}
+                warn
+              />
+            )}
+          </>
+        )}
+        {reading.capped && (
+          <p className="text-[11px] text-amber-500">Consommation du cycle tronquée : le reste est un maximum.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function costText(reading: PeriodCostReading): string {
+  if (reading.kind === "prepaid") return reading.spentUsd == null ? "prix non saisi" : formatUsd(reading.spentUsd);
+  if (reading.kind === "stopped") return "arrêté";
+  if (reading.totalUsd == null) return reading.rateMissing ? "prix manquant" : "non saisi";
+  return formatUsd(reading.totalUsd);
+}
+
+function costCaption(reading: PeriodCostReading): string {
+  if (reading.kind === "prepaid") return "consommé sur la période";
+  if (reading.kind === "stopped") return "abonnement arrêté";
+  if (reading.days == null) return "coût du mois";
+  return "coût de la période";
+}
+
+function remainingHeadline(reading: PeriodCostReading, service: ServiceDefinition): string {
+  if (reading.kind === "prepaid") {
+    return reading.remainingUsd == null ? "crédit non chiffré" : `${formatUsd(reading.remainingUsd)} restants`;
+  }
+  if (reading.kind === "stopped" || reading.kind === "unset") return "minutes non disponibles";
+  if (reading.allowanceMissing || reading.remainingMinutes == null) return "quota non saisi";
+  const minutes = formatMinutes(reading.remainingMinutes, reading.minutesAreEstimate);
+  if (service.unit === "minutes" || reading.remainingUnits == null) return `${minutes} restantes`;
+  return `${minutes} restantes · ${formatAmount(reading.remainingUnits, service.unit)} ${service.unitLabel}`;
+}
+
+function renewalHeadline(reading: PeriodCostReading): string {
+  if (reading.kind === "prepaid") return "crédit, sans date de renouvellement";
+  if (reading.kind === "stopped") return "plus de renouvellement";
+  if (!reading.renewsOn) return "date de renouvellement non saisie";
+  return `renouvellement ${formatDay(new Date(`${reading.renewsOn}T00:00:00.000Z`))}`;
 }
 
 function unitTitle(label: string): string {
@@ -64,15 +121,6 @@ function feeValue(reading: PeriodCostReading): string {
   if (reading.kind === "stopped") return "arrêté";
   if (reading.subscriptionUsd == null) return "non saisi";
   return formatUsd(reading.subscriptionUsd);
-}
-
-function remainingValue(reading: PeriodCostReading, service: ServiceDefinition): string {
-  if (reading.kind === "stopped" || reading.kind === "unset") return "—";
-  if (reading.allowanceMissing || reading.remainingUnits == null) return "quota non saisi";
-  if (service.unit === "minutes") return formatMinutes(reading.remainingMinutes, false);
-  const units = `${formatAmount(reading.remainingUnits, service.unit)} ${service.unitLabel}`;
-  if (reading.remainingMinutes == null) return units;
-  return `${units} · ${formatMinutes(reading.remainingMinutes, reading.minutesAreEstimate)}`;
 }
 
 function overageValue(reading: PeriodCostReading, service: ServiceDefinition): string {
