@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { resolveNativeVideoSource } from "@/services/videoPlayback";
 import { attachVideoGain, getVideoGain, isIosWebKit, type VideoGain } from "@/services/videoGain";
 import GumletVideoPlayer from "./GumletVideoPlayer";
@@ -296,5 +296,82 @@ describe("GumletVideoPlayer", () => {
       active={false} onPlaying={onPlaying} />);
     fireEvent.playing(screen.getByLabelText("Video player"));
     expect(onPlaying).not.toHaveBeenCalled();
+  });
+
+  describe("smartphone presentation modes", () => {
+    const url = "https://video.gumlet.io/673f29f4a5e1bf70aa645cb7/6acc8341689a80cf2e4a427d/main.m3u8";
+    // jsdom has no PointerEvent: a MouseEvent carries the coordinates and the pointerId.
+    beforeAll(() => {
+      if (typeof window.PointerEvent === "undefined") {
+        class TestPointerEvent extends MouseEvent {
+          pointerId: number;
+          constructor(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+            super(type, init);
+            this.pointerId = init.pointerId ?? 0;
+          }
+        }
+        Object.defineProperty(window, "PointerEvent", { configurable: true, value: TestPointerEvent });
+      }
+    });
+    const setScreen = (width: number, height: number) => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+    };
+
+    it("current: whole frame, no pan, no rotation invite", () => {
+      setScreen(390, 844);
+      render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst />);
+      const player = screen.getByLabelText("Video player");
+      expect(player).toHaveAttribute("data-fit", "contain");
+      expect(screen.queryByTestId("rotate-invite")).not.toBeInTheDocument();
+    });
+
+    it("portrait: full height film, starts on the framed point, a finger drag pans it", () => {
+      setScreen(390, 844);
+      const { container } = render(
+        <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst videoMode="portrait" panStart={0.5} />,
+      );
+      const player = screen.getByLabelText("Video player");
+      const root = container.firstElementChild as HTMLElement;
+      expect(player).toHaveAttribute("data-fit", "pan");
+      const filmWidth = 844 * (16 / 9);
+      const start = Number(player.getAttribute("data-pan-offset"));
+      expect(start).toBe(Math.round(filmWidth / 2 - 195));
+      expect(player.style.width).toBe(`${filmWidth}px`);
+      expect(screen.queryByText("Plein écran ⤢")).not.toBeInTheDocument();
+
+      fireEvent.pointerDown(root, { pointerId: 1, clientX: 200, clientY: 400 });
+      fireEvent.pointerMove(root, { pointerId: 1, clientX: 100, clientY: 405 });
+      expect(Number(player.getAttribute("data-pan-offset"))).toBe(start + 100);
+      fireEvent.pointerUp(root, { pointerId: 1 });
+      fireEvent.pointerMove(root, { pointerId: 1, clientX: 0, clientY: 405 });
+      expect(Number(player.getAttribute("data-pan-offset"))).toBe(start + 100);
+    });
+
+    it("portrait: a short tap does not pan", () => {
+      setScreen(390, 844);
+      const { container } = render(
+        <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst videoMode="portrait" />,
+      );
+      const player = screen.getByLabelText("Video player");
+      const root = container.firstElementChild as HTMLElement;
+      const start = player.getAttribute("data-pan-offset");
+      fireEvent.pointerDown(root, { pointerId: 2, clientX: 200, clientY: 400 });
+      fireEvent.pointerMove(root, { pointerId: 2, clientX: 203, clientY: 400 });
+      expect(player.getAttribute("data-pan-offset")).toBe(start);
+    });
+
+    it("landscape: shows an icon-only rotation invite while upright, none once turned", () => {
+      setScreen(390, 844);
+      const { unmount } = render(
+        <GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst videoMode="landscape" />,
+      );
+      const invite = screen.getByTestId("rotate-invite");
+      expect(invite.textContent).toBe("");
+      unmount();
+      setScreen(844, 390);
+      render(<GumletVideoPlayer videoUrl={url} onComplete={() => {}} onSkip={() => {}} touchFirst videoMode="landscape" />);
+      expect(screen.queryByTestId("rotate-invite")).not.toBeInTheDocument();
+    });
   });
 });

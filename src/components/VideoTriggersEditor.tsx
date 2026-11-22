@@ -6,6 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cinematicPresentationFrom, type CinematicPresentation } from "@/services/cinematicTransition";
+import {
+  SMARTPHONE_VIDEO_MODES,
+  SMARTPHONE_VIDEO_MODE_LABELS,
+  smartphonePanStartFrom,
+  smartphoneVideoModeFrom,
+} from "@/services/videoFraming";
 import { toast } from "sonner";
 import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -280,6 +286,38 @@ function VideoTriggerRulesPanel() {
             Cinématiques sans son sur smartphone
           </label>
           <span className="text-[11px] text-muted-foreground">Fréquence commune aux deux modes.</span>
+        </div>
+      </fieldset>
+
+      <fieldset className="mt-2 border-0 p-0" data-testid="smartphone-video-mode" aria-label="Présentation sur smartphone">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-sm font-medium" title="Smartphone seulement (écran tactile de moins de 600 px). Desktop et tablette ne changent pas. Pour tester : ajouter ?ecran=telephone à l'adresse.">Smartphone</span>
+          <RadioGroup
+            value={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE)}
+            onValueChange={(value) => update({ SMARTPHONE_VIDEO_MODE: smartphoneVideoModeFrom(value) })}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1"
+          >
+            {SMARTPHONE_VIDEO_MODES.map((mode) => (
+              <label key={mode} htmlFor={`smartphone-video-mode-${mode}`} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                <RadioGroupItem id={`smartphone-video-mode-${mode}`} value={mode} />
+                {SMARTPHONE_VIDEO_MODE_LABELS[mode]}
+              </label>
+            ))}
+          </RadioGroup>
+          <label htmlFor="smartphone-pan-start" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Mode vertical : où le cadrage démarre, en % de la largeur du film (0 = gauche, 50 = centre, 100 = droite). Le doigt déplace ensuite l'image.">
+            Départ du cadrage (%)
+            <Input
+              id="smartphone-pan-start"
+              type="number"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(smartphonePanStartFrom(settings.SMARTPHONE_PAN_START) * 100)}
+              disabled={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE) !== "portrait"}
+              className="h-8 w-16"
+              onChange={(e) => update({ SMARTPHONE_PAN_START: smartphonePanStartFrom((Number(e.target.value) || 0) / 100) })}
+            />
+          </label>
         </div>
       </fieldset>
 

@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cinématique smartphone : trois présentations testables] — 2026-11-22
+
+- Nouveau réglage admin (onglet Cinématiques, ligne « Smartphone »), **smartphone seulement** : **Actuel** (image 16:9 entière, bandes noires — défaut, comportement inchangé), **Vertical 9:16 plein écran** (le film occupe toute la hauteur ; panoramique au doigt sur sa largeur, cadrage de départ réglable en %), **Horizontal 16:9 plein écran** (icône sans texte invitant à tourner le téléphone). S'applique au teaser, à l'interlude et à la superposition (même lecteur).
+- Calcul de cadrage pur et testé (`src/services/videoFraming.ts`) ; garde `getDeviceClass() === "smartphone"` : desktop et tablette restent sur « Actuel » quel que soit le réglage. Rien n'est écrit sur l'image. Test : `?ecran=telephone`.
+- **Limites** : le point de départ est global (pas par vidéo) ; le mode horizontal agit sur les cinématiques seulement, pas sur le reste de l'écran d'appel ; recette sur vrai iPhone à faire.
+
 ## [Cinématiques sans son sur smartphone] — 2026-11-22
 
 - Nouveau réglage admin (onglet Cinématiques, « Déclenchement des vidéos ») : **« Cinématiques sans son sur smartphone »**, désactivé par défaut. Activé, la cinématique (superposition ou interruption) est jouée sans aucun son sur smartphone ; le teaser d'accueil n'est pas concerné.
