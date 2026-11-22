@@ -4,6 +4,15 @@ import { cn } from "@/lib/utils";
 import { START_BUFFER_MAX_WAIT_MS, START_BUFFER_S, bufferedAheadSeconds, resolveNativeVideoSource } from "@/services/videoPlayback";
 import { attachVideoGain, canRouteThroughGain, getVideoGain, isIosWebKit, keepVideoGainAudible } from "@/services/videoGain";
 import { getAudioContextState } from "@/services/audioPlayback";
+import {
+  DEFAULT_VIDEO_ASPECT,
+  computePanFraming,
+  isPanDrag,
+  needsRotationInvite,
+  panOffsetAfterDrag,
+  type SmartphoneVideoMode,
+} from "@/services/videoFraming";
+import { Smartphone } from "lucide-react";
 
 /** Idle time before the pointer hides again over a playing video. */
 const POINTER_IDLE_HIDE_MS = 1_500;
@@ -76,6 +85,13 @@ interface GumletVideoPlayerProps {
   onPlaying?: () => void;
   /** Overlay: the video stands in for the character during a reply — no fullscreen button. */
   allowFullscreen?: boolean;
+  /**
+   * Smartphone presentation (back-office test): "current" keeps the whole 16:9 frame; "portrait" fills
+   * the full height and pans with a finger; "landscape" invites to turn the phone. Default "current".
+   */
+  videoMode?: SmartphoneVideoMode;
+  /** Portrait mode: where the pan starts, 0..1 of the film width (action point). Default centre. */
+  panStart?: number;
 }
 
 /**
@@ -97,6 +113,8 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   volume = 1,
   onPlaying,
   allowFullscreen = true,
+  videoMode = "current",
+  panStart,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,6 +145,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const playbackEngineRef = useRef(playbackEngine);
   playbackEngineRef.current = playbackEngine;
   const source = useMemo(() => resolveNativeVideoSource(videoUrl), [videoUrl]);
+  const panMode = videoMode === "portrait";
+  const [viewport, setViewport] = useState({ width: 0, height: 0, portrait: false });
+  const [videoAspect, setVideoAspect] = useState(DEFAULT_VIDEO_ASPECT);
+  /** Offset set by the finger; null = the framed starting point. Reset for every new film. */
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const dragRef = useRef<{ id: number; x: number; y: number; offset: number; panning: boolean } | null>(null);
   const sourceUrlRef = useRef(source.url);
   sourceUrlRef.current = source.url;
 
@@ -431,6 +455,52 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
     };
   }, [active]);
 
+  // Viewport size and orientation, only followed for the smartphone experiences.
+  useEffect(() => {
+    if (videoMode === "current" || typeof window === "undefined") return;
+    const measure = () => {
+      const box = containerRef.current?.getBoundingClientRect();
+      const width = box?.width || window.innerWidth;
+      const height = box?.height || window.innerHeight;
+      setViewport({ width, height, portrait: height >= width });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [videoMode]);
+
+  // Every new film starts again on the framed point.
+  useEffect(() => { setDragOffset(null); }, [source.url, videoMode, panStart]);
+
+  const framing = useMemo(
+    () => computePanFraming({ containerWidth: viewport.width, containerHeight: viewport.height, aspect: videoAspect, focus: panStart }),
+    [viewport.width, viewport.height, videoAspect, panStart],
+  );
+  const panOffset = Math.min(framing.maxOffset, dragOffset ?? framing.offset);
+
+  const onPanPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!panMode || !active) return;
+    dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, offset: panOffset, panning: false };
+  };
+  const onPanPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    if (!drag.panning) {
+      if (!isPanDrag(dx, event.clientY - drag.y)) return;
+      drag.panning = true;
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* capture unavailable */ }
+    }
+    setDragOffset(panOffsetAfterDrag(drag.offset, dx, framing.maxOffset));
+  };
+  const onPanPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.id === event.pointerId) dragRef.current = null;
+  };
+
   const revealPointer = useCallback(() => {
     if (!activeRef.current) return;
     setPointerVisible(true);
@@ -486,6 +556,12 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
       aria-hidden={!active}
       data-pointer={active && !pointerVisible ? "hidden" : "visible"}
       onMouseMove={revealPointer}
+      data-video-mode={videoMode}
+      style={panMode ? { touchAction: "none" } : undefined}
+      onPointerDown={panMode ? onPanPointerDown : undefined}
+      onPointerMove={panMode ? onPanPointerMove : undefined}
+      onPointerUp={panMode ? onPanPointerEnd : undefined}
+      onPointerCancel={panMode ? onPanPointerEnd : undefined}
     >
       {/* aria-label, not title: a title shows a "Video player" tooltip under the pointer. */}
       <video
@@ -495,13 +571,24 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         data-playback-engine={playbackEngine}
         // Whole frame on touch screens and portrait windows (no side crop);
         // desktop landscape keeps filling the screen.
-        className={cn("absolute inset-0 h-full w-full bg-black", touchFirst ? "object-contain" : "object-cover portrait:object-contain")}
-        data-fit={touchFirst ? "contain" : "cover"}
+        className={cn(
+          "bg-black",
+          panMode
+            ? "absolute left-0 top-0 h-full object-cover"
+            : cn("absolute inset-0 h-full w-full", touchFirst ? "object-contain" : "object-cover portrait:object-contain"),
+        )}
+        style={panMode ? { width: framing.filmWidth || "100%", transform: `translate3d(${-panOffset}px,0,0)` } : undefined}
+        data-fit={panMode ? "pan" : touchFirst ? "contain" : "cover"}
+        data-pan-offset={panMode ? Math.round(panOffset) : undefined}
         controls={false}
         playsInline
         preload="auto"
         autoPlay
         muted={false}
+        onLoadedMetadata={(event) => {
+          const { videoWidth, videoHeight } = event.currentTarget;
+          if (videoWidth > 0 && videoHeight > 0) setVideoAspect(videoWidth / videoHeight);
+        }}
         onCanPlay={() => {
           onReadyRef.current?.();
           if (activeRef.current || playbackRequestedRef.current) playWithAudio();
@@ -539,7 +626,19 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
 
       {active ? children : null}
 
-      {active && touchFirst && allowFullscreen ? (
+      {active && needsRotationInvite(videoMode, viewport.portrait) ? (
+        // Icon only: nothing is written over the image.
+        <div
+          data-testid="rotate-invite"
+          role="img"
+          aria-label="Tournez le téléphone en mode horizontal"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/45 p-5 text-white/90 backdrop-blur-sm"
+        >
+          <Smartphone className="h-10 w-10 animate-pulse" style={{ transform: "rotate(90deg)" }} aria-hidden="true" />
+        </div>
+      ) : null}
+
+      {active && touchFirst && allowFullscreen && !panMode ? (
         <button
           type="button"
           onClick={enterFullscreen}

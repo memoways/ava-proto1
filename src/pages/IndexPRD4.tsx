@@ -130,6 +130,7 @@ import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
 import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
 import { getDeviceClass } from "@/services/deviceClass";
+import { effectiveSmartphoneVideoMode, smartphonePanStartFrom } from "@/services/videoFraming";
 import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
 import { getCharacterVoices } from "@/services/tts/characterVoices";
 import { ensureExperienceSettings, startExperienceSettingsLoad } from "@/services/experienceSettings";
@@ -4307,6 +4308,8 @@ const IndexPRD4 = () => {
         allowFullscreen={!overlayActive}
         showSkip={teaserActive || (interludeActive && cinematic.phase === "playing")}
         touchFirst={touchFirst}
+        videoMode={effectiveSmartphoneVideoMode(getDeviceClass(), videoTriggerSettingsRef.current.SMARTPHONE_VIDEO_MODE)}
+        panStart={smartphonePanStartFrom(videoTriggerSettingsRef.current.SMARTPHONE_PAN_START)}
       />
       {screen}
       {/* Lot 3b: black veil for the fades between the character and the video. */}

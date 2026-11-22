@@ -6,6 +6,11 @@ import {
   DEFAULT_OVERLAY_VIDEO_GAIN_DB,
   type CinematicPresentation,
 } from "@/services/cinematicTransition";
+import {
+  DEFAULT_SMARTPHONE_PAN_START,
+  DEFAULT_SMARTPHONE_VIDEO_MODE,
+  type SmartphoneVideoMode,
+} from "@/services/videoFraming";
 import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { ELEVENLABS_EXPRESSIVE_MODEL, ELEVENLABS_MODEL_CAPABILITIES, normalizeElevenLabsModelId } from "../../supabase/functions/_shared/elevenLabsModels";
 import {
@@ -707,6 +712,14 @@ export interface VideoTriggerSettings {
   OVERLAY_VIDEO_GAIN_DB: number;
   /** Smartphone seulement : cinématiques sans aucun son (les deux modes). Desktop/tablette inchangés. */
   MUTE_CINEMATICS_ON_SMARTPHONE: boolean;
+  /**
+   * Smartphone seulement : présentation de la cinématique 16:9. « current » (défaut) image entière ;
+   * « portrait » plein écran vertical avec panoramique au doigt ; « landscape » plein écran horizontal
+   * (invite à tourner le téléphone). Desktop/tablette inchangés.
+   */
+  SMARTPHONE_VIDEO_MODE: SmartphoneVideoMode;
+  /** Mode « portrait » : point de départ du panoramique, 0 (gauche) à 1 (droite) de la largeur du film. */
+  SMARTPHONE_PAN_START: number;
 }
 
 const VIDEO_TRIGGER_STORAGE_KEY = "ava_video_trigger_settings";
@@ -721,6 +734,8 @@ export const videoTriggerDefaults: VideoTriggerSettings = {
   PRESENTATION: DEFAULT_CINEMATIC_PRESENTATION,
   OVERLAY_VIDEO_GAIN_DB: DEFAULT_OVERLAY_VIDEO_GAIN_DB,
   MUTE_CINEMATICS_ON_SMARTPHONE: false,
+  SMARTPHONE_VIDEO_MODE: DEFAULT_SMARTPHONE_VIDEO_MODE,
+  SMARTPHONE_PAN_START: DEFAULT_SMARTPHONE_PAN_START,
 };
 
 export function getVideoTriggerSettings(): VideoTriggerSettings {
