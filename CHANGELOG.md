@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : coût réel sur la période choisie] — 2026-11-22
+
+- Consommation Voix et Consommation Streaming Avatar : chaque carte indique les minutes consommées, la part de l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30), le reste du forfait et le coût de la période. Le dépassement ne compte que les unités de cette période qui sortent du forfait.
+- « Tout » affiche le mois en cours, sans prorata de tout l'historique. Un forfait non saisi reste vide : le tarif public à la minute ou aux 1 000 caractères ne le remplace plus.
+- **Inchangé** : le bloc Forfaits (cycle, facture, crédit prépayé). Rien en production.
+
 ## [Correctif : mode vertical noir] — 2026-11-22
 
 - Le mode « Vertical 9:16 plein écran » affichait du noir : la règle de base de Tailwind (`video { max-width: 100% }`) ramenait le film à la largeur de l'écran, puis le décalage du cadrage le sortait entièrement de l'écran. `max-w-none` sur la vidéo du mode vertical ; vérifié dans le navigateur (viewport 375×812) et test de non-régression.

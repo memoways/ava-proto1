@@ -3,7 +3,7 @@
  * One card per provider. The invoice amount is typed here; public tiers only prefill.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,14 +31,22 @@ export interface PlanUsageBatch {
   capped: boolean;
 }
 
+export interface MeasuredPlans {
+  plans: Record<string, SavedServicePlan>;
+  events: UsageEvent[];
+  capped: boolean;
+}
+
 interface Props {
   family: "voice" | "video" | "llm";
   serviceId: string;
   onServiceId: (id: string) => void;
   loadUsage: (fromIso: string) => Promise<PlanUsageBatch>;
+  /** Fired after a successful load, so the period cards can price the same plans. */
+  onReady?: (state: MeasuredPlans) => void;
 }
 
-export default function ServicePlanBoard({ family, serviceId, onServiceId, loadUsage }: Props) {
+export default function ServicePlanBoard({ family, serviceId, onServiceId, loadUsage, onReady }: Props) {
   const services = useMemo(() => servicesForFamily(family), [family]);
   const [plans, setPlans] = useState<Record<string, SavedServicePlan>>({});
   const [usage, setUsage] = useState<PlanUsageBatch>({ events: [], capped: false });
@@ -46,6 +54,8 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
   const [error, setError] = useState<string | null>(null);
   const [now] = useState(() => new Date());
   const [open, setOpen] = useState(() => readPlansOpen(family));
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -59,6 +69,7 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
       const from = starts.reduce((earliest, start) => (start < earliest ? start : earliest), starts[0] ?? now);
       const batch = await loadUsage(from.toISOString());
       setUsage(batch);
+      onReadyRef.current?.({ plans: loaded, events: batch.events, capped: batch.capped });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {

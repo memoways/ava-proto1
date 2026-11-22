@@ -9,11 +9,14 @@
 **Objectif.** Chiffrer le coût marginal d'une session, puis trois scénarios de diffusion (1 / 5 / 20 lieux),
 avec la part portée par les lieux. Le self-hosting se chiffre à part, sans achat ni nouvel abonnement.
 
-**État vérifié.** Technique avancée (Consommation LLM, Voix, Streaming Avatar) sépare désormais
-l'abonnement fixe, le quota inclus, la consommation du cycle et le dépassement. Les forfaits sont
-dans `admin_settings` (`billing.service_plans`, environnement `prod`). Le calcul est dans
-`src/services/servicePlans.ts`. Les minutes de voix sont une estimation (750 caractères). Voyage
-n'est pas mesuré appel par appel. Rien de ceci n'est en production tant que Lovable n'a pas publié.
+**État vérifié.** Technique avancée (Consommation LLM, Voix, Streaming Avatar) sépare
+l'abonnement fixe, le quota inclus, la consommation du cycle et le dépassement. Les cartes Voix
+et Streaming Avatar partagent en plus cet abonnement sur les jours choisis (1, 7 ou 30 sur 30),
+avec les minutes consommées, le reste du forfait et le coût de la période. « Tout » reste le mois
+en cours. Les forfaits sont dans `admin_settings` (`billing.service_plans`, environnement `prod`).
+Le calcul est dans `src/services/servicePlans.ts` (`planSnapshot`, `periodCostReading`). Les minutes
+de voix sont une estimation (750 caractères). Voyage n'est pas mesuré appel par appel. Rien de ceci
+n'est en production tant que Lovable n'a pas publié.
 
 **Avant de coder.** Lire `AGENTS.md`, `docs/etat_courant.md`, `git status`, les six derniers commits
 de `main` et le plan. Vérifier les branches et PR ouvertes. Préserver la PR #24 et toute PR étrangère

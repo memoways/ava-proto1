@@ -4,9 +4,12 @@ import {
   billingWindow,
   emptyPlan,
   parseServicePlans,
+  periodCostReading,
   planSnapshot,
+  requestedDays,
   serviceById,
   subscriptionSpend,
+  sumPeriodTotals,
   sumUsage,
   type UsageEvent,
 } from "./servicePlans";
@@ -232,6 +235,171 @@ describe("subscriptionSpend", () => {
     expect(spend?.totalUsd).toBe(118);
     expect(spend?.to).toBe("2026-11-15");
     expect(spend?.includesUpcoming).toBe(false);
+  });
+});
+
+describe("periodCostReading", () => {
+  const cycle: UsageEvent[] = [
+    { serviceId: "tavus", at: "2026-11-10T12:00:00.000Z", amount: 20 },
+    { serviceId: "tavus", at: "2026-11-20T12:00:00.000Z", amount: 10 },
+    { serviceId: "tavus", at: "2026-10-20T12:00:00.000Z", amount: 40 },
+  ];
+
+  it("names the three period buttons and leaves an open range unprorated", () => {
+    expect(requestedDays("24h")).toBe(1);
+    expect(requestedDays("7d")).toBe(7);
+    expect(requestedDays("30d")).toBe(30);
+    expect(requestedDays("all")).toBeNull();
+  });
+
+  it("shares the monthly fee across the requested days and keeps the allowance for the whole cycle", () => {
+    const service = serviceById("tavus")!;
+    const plan = applyTier(service, "builder", "monthly", { ...emptyPlan(), renewsOn: "2026-12-01" });
+    const reading = periodCostReading(service, plan, cycle, 10, NOW, 7);
+    expect(reading.kind).toBe("subscription");
+    expect(reading.consumedMinutes).toBe(10);
+    expect(reading.subscriptionUsd).toBeCloseTo(59 * 7 / 30);
+    expect(reading.remainingMinutes).toBe(145);
+    expect(reading.overageUnits).toBe(0);
+    expect(reading.totalUsd).toBeCloseTo(59 * 7 / 30);
+  });
+
+  it("prices only the minutes of this window that fall past the allowance", () => {
+    const service = serviceById("tavus")!;
+    const plan = applyTier(service, "builder", "monthly", { ...emptyPlan(), renewsOn: "2026-12-01" });
+    const heavy: UsageEvent[] = [{ serviceId: "tavus", at: "2026-11-18T12:00:00.000Z", amount: 200 }];
+    const reading = periodCostReading(service, plan, heavy, 40, NOW, 7);
+    expect(reading.overageUnits).toBe(25);
+    expect(reading.overageUsd).toBeCloseTo(8.75);
+    expect(reading.remainingMinutes).toBe(0);
+    expect(reading.totalUsd).toBeCloseTo((59 * 7) / 30 + 8.75);
+  });
+
+  it("does not turn minutes from the previous cycle into this month's overage", () => {
+    const service = serviceById("tavus")!;
+    const plan = applyTier(service, "builder", "monthly", { ...emptyPlan(), renewsOn: "2026-12-01" });
+    const reading = periodCostReading(service, plan, cycle, 50, NOW, 30);
+    expect(reading.consumedMinutes).toBe(50);
+    expect(reading.overageUnits).toBe(0);
+    expect(reading.subscriptionUsd).toBe(59);
+    expect(reading.totalUsd).toBe(59);
+  });
+
+  it("shows the current month when the range is the whole history", () => {
+    const service = serviceById("tavus")!;
+    const plan = applyTier(service, "builder", "monthly", { ...emptyPlan(), renewsOn: "2026-12-01" });
+    const over: UsageEvent[] = [{ serviceId: "tavus", at: "2026-11-18T12:00:00.000Z", amount: 200 }];
+    const reading = periodCostReading(service, plan, over, 200, NOW, null);
+    expect(reading.kind).toBe("month");
+    expect(reading.subscriptionUsd).toBe(59);
+    expect(reading.overageUsd).toBeCloseTo(8.75);
+    expect(reading.totalUsd).toBeCloseTo(67.75);
+  });
+
+  it("converts HeyGen minutes with the plan's credits per minute", () => {
+    const service = serviceById("heygen")!;
+    const plan = applyTier(service, "essential", "monthly", emptyPlan());
+    const reading = periodCostReading(
+      service,
+      plan,
+      [{ serviceId: "heygen", at: "2026-11-02T00:00:00.000Z", amount: 10 }],
+      10,
+      NOW,
+      7,
+    );
+    expect(reading.consumedUnits).toBe(20);
+    expect(reading.consumedMinutes).toBe(10);
+    expect(reading.minutesAreEstimate).toBe(false);
+    expect(reading.remainingUnits).toBe(1080);
+    expect(reading.remainingMinutes).toBe(540);
+    expect(reading.subscriptionUsd).toBeCloseTo(99 * 7 / 30);
+  });
+
+  it("estimates spoken minutes from voice characters", () => {
+    const service = serviceById("elevenlabs")!;
+    const plan = applyTier(service, "creator", "monthly", { ...emptyPlan(), renewsOn: "2026-12-05" });
+    const reading = periodCostReading(
+      service,
+      plan,
+      [{ serviceId: "elevenlabs", at: "2026-11-10T12:00:00.000Z", amount: 1500 }],
+      1500,
+      NOW,
+      1,
+    );
+    expect(reading.consumedMinutes).toBe(2);
+    expect(reading.minutesAreEstimate).toBe(true);
+    expect(reading.subscriptionUsd).toBeCloseTo(22 / 30);
+    expect(reading.remainingUnits).toBe(121000 - 1500);
+    expect(reading.totalUsd).toBeCloseTo(22 / 30);
+  });
+
+  it("stops the fee when the subscription is paused", () => {
+    const service = serviceById("tavus")!;
+    const plan = { ...applyTier(service, "builder", "monthly", emptyPlan()), account: "paused" as const };
+    const reading = periodCostReading(service, plan, cycle, 10, NOW, 7);
+    expect(reading.kind).toBe("stopped");
+    expect(reading.subscriptionUsd).toBe(0);
+    expect(reading.totalUsd).toBe(0);
+    expect(reading.consumedMinutes).toBe(10);
+  });
+
+  it("does not invent a price when no plan is saved", () => {
+    const service = serviceById("lemonslice")!;
+    const reading = periodCostReading(service, emptyPlan(), [], 4, NOW, 7);
+    expect(reading.kind).toBe("unset");
+    expect(reading.consumedMinutes).toBe(4);
+    expect(reading.subscriptionUsd).toBeNull();
+    expect(reading.totalUsd).toBeNull();
+  });
+
+  it("still shares a fee when the included minutes were not typed", () => {
+    const service = serviceById("anam")!;
+    const plan = { ...emptyPlan(), monthlyFeeUsd: 49, renewsOn: "2026-12-01" };
+    const reading = periodCostReading(service, plan, [], 3, NOW, 7);
+    expect(reading.allowanceMissing).toBe(true);
+    expect(reading.subscriptionUsd).toBeCloseTo(49 * 7 / 30);
+    expect(reading.totalUsd).toBeCloseTo(49 * 7 / 30);
+    expect(reading.remainingUnits).toBeNull();
+  });
+
+  it("spends a prepaid balance over the period and leaves the rest of the credit", () => {
+    const service = serviceById("inworld")!;
+    const plan = { ...emptyPlan(), funding: "prepaid" as const, balanceUsd: 10, creditedOn: "2026-11-01", usdPerUnit: 5 / 1000 };
+    const reading = periodCostReading(
+      service,
+      plan,
+      [
+        { serviceId: "inworld", at: "2026-10-20T00:00:00.000Z", amount: 9000 },
+        { serviceId: "inworld", at: "2026-11-10T00:00:00.000Z", amount: 1000 },
+      ],
+      1000,
+      NOW,
+      7,
+    );
+    expect(reading.kind).toBe("prepaid");
+    expect(reading.spentUsd).toBe(5);
+    expect(reading.remainingUsd).toBe(5);
+    expect(reading.consumedMinutes).toBeCloseTo(1000 / 750);
+  });
+
+  it("asks for the character price before spending a prepaid balance", () => {
+    const service = serviceById("inworld")!;
+    const plan = { ...emptyPlan(), funding: "prepaid" as const, balanceUsd: 10, creditedOn: "2026-11-01" };
+    const reading = periodCostReading(service, plan, [], 1000, NOW, 7);
+    expect(reading.rateMissing).toBe(true);
+    expect(reading.spentUsd).toBeNull();
+    expect(reading.remainingUsd).toBeNull();
+  });
+
+  it("keeps the headline complete when an unused service has no plan", () => {
+    const tavus = serviceById("tavus")!;
+    const lemon = serviceById("lemonslice")!;
+    const priced = periodCostReading(tavus, applyTier(tavus, "builder", "monthly", emptyPlan()), [], 0, NOW, 7);
+    const empty = periodCostReading(lemon, emptyPlan(), [], 0, NOW, 7);
+    const used = periodCostReading(lemon, emptyPlan(), [], 2, NOW, 7);
+    expect(sumPeriodTotals([priced, empty])).toEqual({ total: priced.totalUsd, partial: false });
+    expect(sumPeriodTotals([priced, used]).partial).toBe(true);
+    expect(sumPeriodTotals([empty]).total).toBeNull();
   });
 });
 

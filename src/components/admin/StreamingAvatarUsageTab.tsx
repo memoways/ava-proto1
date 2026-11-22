@@ -13,15 +13,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
-import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import PeriodCostLines from "@/components/admin/PeriodCostLines";
+import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
-
-/** Tarifs publics indicatifs (USD / minute de streaming). À ajuster selon le plan réel. */
-const COST_PER_MINUTE_USD: Record<string, number> = {
-  heygen: 0.12,
-  tavus: 0.25,
-};
-const DEFAULT_COST_PER_MINUTE_USD = 0.15;
+import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById, sumPeriodTotals } from "@/services/servicePlans";
 
 const PROVIDER_LABELS: Record<string, string> = {
   heygen: "HeyGen LiveAvatar",
@@ -46,8 +41,6 @@ interface SessionRow {
 }
 
 const fmtMs = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v)} ms`);
-const fmtUsd = (v: number) =>
-  v >= 1 ? `$${v.toFixed(2)}` : v >= 0.01 ? `$${v.toFixed(3)}` : `$${v.toFixed(4)}`;
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleString("fr-CH") : "—");
 const fmtMinutes = (s: number) => `${(s / 60).toFixed(1)} min`;
 
@@ -72,6 +65,9 @@ export default function StreamingAvatarUsageTab() {
   const [period, setPeriod] = useState("7d");
   const [includeSandbox, setIncludeSandbox] = useState(true);
   const [serviceId, setServiceId] = useState("all");
+  const [plans, setPlans] = useState<MeasuredPlans | null>(null);
+  const [now] = useState(() => new Date());
+  const onPlans = useCallback((state: MeasuredPlans) => setPlans(state), []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -153,7 +149,11 @@ export default function StreamingAvatarUsageTab() {
       const frameVals = provRows.map((r) => r.streaming_avatar_first_frame_ms).filter((v): v is number => v != null);
       const speechVals = provRows.map((r) => r.streaming_avatar_first_speech_ms).filter((v): v is number => v != null);
       const seconds = provRows.reduce((sum, r) => sum + sessionSeconds(r), 0);
-      const rate = COST_PER_MINUTE_USD[id] ?? DEFAULT_COST_PER_MINUTE_USD;
+      const service = serviceById(id);
+      const visible = serviceId === "all" || serviceId === id;
+      const reading = service && plans && visible
+        ? periodCostReading(service, plans.plans[id] ?? emptyPlan(), plans.events, seconds / 60, now, requestedDays(period), plans.capped)
+        : null;
       const lastFallback = fallbacks[0];
       return {
         id,
@@ -170,20 +170,20 @@ export default function StreamingAvatarUsageTab() {
         speechP50: percentile(speechVals, 50),
         speechP95: percentile(speechVals, 95),
         seconds,
-        ratePerMinute: rate,
-        costUsd: (seconds / 60) * rate,
+        service,
+        reading,
         lastFallback: lastFallback
           ? { when: lastFallback.started_at, reason: lastFallback.streaming_avatar_fallback_reason }
           : null,
       };
     });
-  }, [filtered, providerIds]);
+  }, [filtered, providerIds, plans, now, period, serviceId]);
 
   const totalSessions = filtered.length;
   const totalFallbacks = filtered.filter((r) => Boolean(r.streaming_avatar_fallback_reason)).length;
   const fallbackRate = totalSessions ? (totalFallbacks / totalSessions) * 100 : 0;
   const totalSeconds = providerStats.reduce((s, p) => s + p.seconds, 0);
-  const totalCost = providerStats.reduce((s, p) => s + p.costUsd, 0);
+  const realCost = sumPeriodTotals(providerStats.map((provider) => provider.reading));
   const activeProviders = providerStats.filter((p) => p.total > 0).length;
 
   const recentSessions = filtered.slice(0, 50);
@@ -199,7 +199,7 @@ export default function StreamingAvatarUsageTab() {
           </p>
         </div>
       </div>
-      <ServicePlanBoard family="video" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
+      <ServicePlanBoard family="video" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} onReady={onPlans} />
       <UsageRangeBar
         value={period}
         options={VOICE_VIDEO_RANGES}
@@ -220,13 +220,19 @@ export default function StreamingAvatarUsageTab() {
         />
         <KPI label="Fournisseurs actifs" value={String(activeProviders)} />
         <KPI label="Minutes streamées" value={fmtMinutes(totalSeconds)} />
-        <KPI label="Tarif public" value={fmtUsd(totalCost)} tone="warn" />
+        <KPI
+          label={realCost.partial ? "Coût réel (partiel)" : "Coût réel"}
+          value={realCost.total == null ? "—" : formatUsd(realCost.total)}
+          tone="warn"
+        />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
-        Le bloc Forfaits est le décompte qui compte : abonnement, minutes incluses, minutes au-dessus.
-        Le tarif public ci-dessous l'ignore (HeyGen {fmtUsd(COST_PER_MINUTE_USD.heygen)}/min, Tavus {fmtUsd(COST_PER_MINUTE_USD.tavus)}/min,
-        autres {fmtUsd(DEFAULT_COST_PER_MINUTE_USD)}/min). Les minutes sont la durée de session Ava, pas le compteur du fournisseur.
-        Le forfait et les statistiques incluent les sandboxes, tant que l'interrupteur reste activé.
+        Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
+        seulement les minutes de cette période qui dépassent le forfait. Les minutes consommées sont
+        celles de la période. Le reste est le forfait du cycle en cours. « Tout » affiche le mois, sans
+        prorata. Un forfait non saisi reste vide : il n'est pas remplacé par un tarif à la minute.
+        Les minutes sont la durée de session Ava, pas le compteur du fournisseur. Sandboxes comprises
+        dans le forfait ; les statistiques les suivent tant que l'interrupteur reste activé.
       </p>
 
       {fallbackRate > 20 && totalSessions >= 5 && (
@@ -244,7 +250,10 @@ export default function StreamingAvatarUsageTab() {
             </div>
 
             {s.total === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucune session sur la période.</p>
+              <>
+                <p className="text-sm text-muted-foreground">Aucune session sur la période.</p>
+                {s.reading && s.service && <PeriodCostLines reading={s.reading} service={s.service} />}
+              </>
             ) : (
               <>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -260,16 +269,14 @@ export default function StreamingAvatarUsageTab() {
                 <Metric label="Première image" p50={s.frameP50} p95={s.frameP95} />
                 <Metric label="Première parole" p50={s.speechP50} p95={s.speechP95} />
 
-                <div className="border-t pt-2 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Durée cumulée</span>
+                {s.reading && s.service ? (
+                  <PeriodCostLines reading={s.reading} service={s.service} />
+                ) : (
+                  <div className="border-t pt-2 flex justify-between text-xs">
+                    <span className="text-muted-foreground">Minutes consommées</span>
                     <span className="font-mono">{fmtMinutes(s.seconds)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Coût estimé ({fmtUsd(s.ratePerMinute)}/min)</span>
-                    <span className="font-mono">{fmtUsd(s.costUsd)}</span>
-                  </div>
-                </div>
+                )}
 
                 {Object.keys(s.fallbackReasons).length > 0 && (
                   <div className="text-[11px] space-y-0.5">

@@ -25,6 +25,8 @@ Pour chaque service, sur le cycle qui se termine à la date de renouvellement sa
 - seules les unités au-dessus du quota sont multipliées par le prix de dépassement ;
 - le total du cycle = fixe + dépassement.
 
+Sur les cartes, le bouton de période (24 heures, 7 jours, 30 jours) partage ce même abonnement : montant mensuel × jours / 30. Les minutes affichées sont celles de la période. Les minutes restantes sont celles du cycle, pas une part des jours choisis. Seules les minutes de la période qui dépassent le forfait s'ajoutent. « Tout » montre le mois en cours, sans prorata de tout l'historique. Un forfait vide reste vide.
+
 Les forfaits sont une seule ligne `billing.service_plans` dans `admin_settings` (environnement `prod`). Pas de nouvelle table. Sandboxes comprises dans le forfait, parce que la facture ne les sépare pas.
 
 ## Unités
