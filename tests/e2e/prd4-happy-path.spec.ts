@@ -145,7 +145,7 @@ async function installNetworkFakes(
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
       value() {
-        if (this instanceof HTMLVideoElement && testWindow.__e2eNativeVideoState) {
+        if (this instanceof HTMLVideoElement && !this.hasAttribute("data-wake-lock") && testWindow.__e2eNativeVideoState) {
           testWindow.__e2eNativeVideoState.playing = true;
           testWindow.__e2eNativeVideoState.playCount += 1;
           if (testWindow.__e2eVideoPlayingEvent) {
@@ -158,7 +158,7 @@ async function installNetworkFakes(
     Object.defineProperty(HTMLMediaElement.prototype, "pause", {
       configurable: true,
       value() {
-        if (this instanceof HTMLVideoElement && testWindow.__e2eNativeVideoState) {
+        if (this instanceof HTMLVideoElement && !this.hasAttribute("data-wake-lock") && testWindow.__e2eNativeVideoState) {
           testWindow.__e2eNativeVideoState.playing = false;
           testWindow.__e2eNativeVideoState.pauseCount += 1;
         }

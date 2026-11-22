@@ -65,6 +65,7 @@ function startFallback(): void {
     const video = document.createElement("video");
     video.setAttribute("playsinline", "");
     video.setAttribute("aria-hidden", "true");
+    video.setAttribute("data-wake-lock", "");
     video.muted = true;
     video.loop = true;
     video.srcObject = stream;
