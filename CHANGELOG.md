@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cinématiques : atténuation du son sur iPhone] — 2026-11-22
+
+- **Superposition sur iOS** : le réglage « Son sous la voix (dB) » passe par un gain Web Audio quand la lecture le permet (hls.js ou fichier même origine) ; sinon la vidéo reste muette plutôt que de couvrir le personnage. Desktop et Android gardent `video.volume`.
+- **Diagnostic** : l'élément vidéo expose `data-audio-mode`. Non vérifié sur iPhone réel : recette à faire.
+- **Inchangé** : mode interruption, accueil, cadrage, micro. Rien en production.
+
 ## [Admin vidéo : sync Notion repliée, règles plus denses] — 2026-11-21
 
 - **Synchronisation Notion** (Cinématiques et Extraits) : le bloc est fermé. Une ligne donne la date et le nombre de vidéos en ligne. L'ouvrir retrouve le bouton, les compteurs et les 3 derniers syncs.

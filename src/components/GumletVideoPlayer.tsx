@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import Hls from "hls.js";
 import { cn } from "@/lib/utils";
 import { START_BUFFER_MAX_WAIT_MS, START_BUFFER_S, bufferedAheadSeconds, resolveNativeVideoSource } from "@/services/videoPlayback";
+import { attachVideoGain, canRouteThroughGain, getVideoGain, keepVideoGainAudible } from "@/services/videoGain";
 
 /** Idle time before the pointer hides again over a playing video. */
 const POINTER_IDLE_HIDE_MS = 1_500;
@@ -53,8 +54,9 @@ interface GumletVideoPlayerProps {
   /** Keep the media silent while it plays (overlay mode: hidden until the voice is audible). Default false. */
   muted?: boolean;
   /**
-   * Media volume 0..1 (default 1). Where the browser ignores `volume` (iOS), a value below 1
-   * falls back to silence so the video never covers the character's voice.
+   * Media volume 0..1 (default 1). Where the browser ignores `volume` (iOS), a value below 1 is
+   * applied as a Web Audio gain when the source allows it (hls.js / same-origin file), and falls
+   * back to silence otherwise so the video never covers the character's voice.
    */
   volume?: number;
   /** The media really started playing while active. */
@@ -95,6 +97,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const volumeRef = useRef(volume);
   /** Set once the browser ignores `volume` (iOS): attenuated playback then stays silent. */
   const volumeUnsupportedRef = useRef(false);
+  const gainPendingRef = useRef(false);
   const sourceGenerationRef = useRef(0);
   const hasCompletedRef = useRef(false);
   const stoppingRef = useRef(false);
@@ -108,7 +111,11 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   const [pointerVisible, setPointerVisible] = useState(false);
   const pointerTimerRef = useRef<number | null>(null);
   const [playbackEngine, setPlaybackEngine] = useState<"pending" | "hls.js" | "native-hls" | "native-file" | "unsupported">("pending");
+  const playbackEngineRef = useRef(playbackEngine);
+  playbackEngineRef.current = playbackEngine;
   const source = useMemo(() => resolveNativeVideoSource(videoUrl), [videoUrl]);
+  const sourceUrlRef = useRef(source.url);
+  sourceUrlRef.current = source.url;
 
   onCompleteRef.current = onComplete;
   onReadyRef.current = onReady;
@@ -118,22 +125,59 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
   mutedRef.current = muted;
   volumeRef.current = Math.min(1, Math.max(0, Number.isFinite(volume) ? volume : 1));
 
-  /** Effective silence: requested, or an attenuation the browser cannot apply. */
-  const desiredMuted = () => mutedRef.current || (volumeRef.current < 1 && volumeUnsupportedRef.current);
+  /** Effective silence: requested, or an attenuation the browser cannot apply (no Web Audio gain). */
+  const desiredMuted = () =>
+    mutedRef.current
+    || (volumeRef.current < 1 && volumeUnsupportedRef.current && !(videoRef.current && getVideoGain(videoRef.current)));
+
+  const setAudioMode = (video: HTMLVideoElement, mode: "native-volume" | "web-audio-gain" | "muted-fallback") => {
+    video.dataset.audioMode = mode;
+  };
+
+  /**
+   * iOS ignores `volume`: route the element through a Web Audio gain instead. The video stays
+   * muted until the gain is in place, so it can never cover the voice in the meantime.
+   */
+  const requestGain = (video: HTMLVideoElement) => {
+    if (gainPendingRef.current || getVideoGain(video)) return;
+    if (!canRouteThroughGain(playbackEngineRef.current, sourceUrlRef.current)) return;
+    gainPendingRef.current = true;
+    void attachVideoGain(video).then((gain) => {
+      gainPendingRef.current = false;
+      if (gain && videoRef.current === video && !stoppingRef.current) applyAudioRef.current(video);
+    });
+  };
 
   /** Applies the requested sound (default: audible at full volume, as before). */
   const applyAudio = useCallback((video: HTMLVideoElement) => {
     const wanted = volumeRef.current;
+    const gain = getVideoGain(video);
+    if (gain) {
+      // Routed through Web Audio for good: attenuation is the gain, `volume` plays no part.
+      gain.setLinear(wanted);
+      keepVideoGainAudible(video);
+      video.defaultMuted = mutedRef.current;
+      video.muted = mutedRef.current;
+      setAudioMode(video, "web-audio-gain");
+      return;
+    }
     try { video.volume = wanted; } catch { /* read-only volume */ }
-    if (wanted < 1 && Math.abs(video.volume - wanted) > 0.01) volumeUnsupportedRef.current = true;
+    if (wanted < 1 && Math.abs(video.volume - wanted) > 0.01) {
+      volumeUnsupportedRef.current = true;
+      requestGain(video);
+    }
     const silent = desiredMuted();
     video.defaultMuted = silent;
     video.muted = silent;
+    setAudioMode(video, volumeUnsupportedRef.current && wanted < 1 ? "muted-fallback" : "native-volume");
   }, []);
+  const applyAudioRef = useRef(applyAudio);
+  applyAudioRef.current = applyAudio;
 
   /** The element drifted from the requested sound (autoplay policy, user agent). */
   const audioDrifted = (video: HTMLVideoElement) =>
-    video.muted !== desiredMuted() || (!volumeUnsupportedRef.current && Math.abs(video.volume - volumeRef.current) > 0.01);
+    video.muted !== desiredMuted()
+    || (!volumeUnsupportedRef.current && !getVideoGain(video) && Math.abs(video.volume - volumeRef.current) > 0.01);
 
   const pauseVideo = useCallback((video: HTMLVideoElement | null) => {
     if (video && canControlNativeMedia()) video.pause();
