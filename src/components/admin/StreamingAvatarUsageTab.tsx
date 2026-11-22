@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { listStreamingAvatarProviders } from "@/services/streamingAvatar/registry";
-import PeriodCostLines, { PeriodCostHeadlines } from "@/components/admin/PeriodCostLines";
+import PeriodCostLines from "@/components/admin/PeriodCostLines";
 import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
 import { emptyPlan, periodCostReading, requestedDays, serviceById } from "@/services/servicePlans";
@@ -179,18 +179,17 @@ export default function StreamingAvatarUsageTab() {
     });
   }, [filtered, providerIds, plans, now, period, serviceId]);
 
-  const totalSessions = filtered.length;
-  const totalFallbacks = filtered.filter((r) => Boolean(r.streaming_avatar_fallback_reason)).length;
-  const fallbackRate = totalSessions ? (totalFallbacks / totalSessions) * 100 : 0;
-  const totalSeconds = providerStats.reduce((s, p) => s + p.seconds, 0);
-  const activeProviders = providerStats.filter((p) => p.total > 0).length;
-  const headlines = providerStats.flatMap((provider) =>
-    provider.reading && provider.service
-      ? [{ id: provider.id, label: provider.label, reading: provider.reading, service: provider.service }]
-      : [],
+  const stoppedIds = new Set<string>(
+    providerStats.filter((provider) => serviceId === "all" && provider.reading?.kind === "stopped").map((provider) => provider.id),
   );
-
-  const recentSessions = filtered.slice(0, 50);
+  const shownStats = providerStats.filter((provider) => !stoppedIds.has(provider.id));
+  const counted = filtered.filter((row) => !stoppedIds.has(row.streaming_avatar_provider ?? ""));
+  const totalSessions = counted.length;
+  const totalFallbacks = counted.filter((row) => Boolean(row.streaming_avatar_fallback_reason)).length;
+  const fallbackRate = totalSessions ? (totalFallbacks / totalSessions) * 100 : 0;
+  const totalSeconds = shownStats.reduce((sum, provider) => sum + provider.seconds, 0);
+  const activeProviders = shownStats.filter((provider) => provider.total > 0).length;
+  const recentSessions = counted.slice(0, 50);
 
   return (
     <div className="space-y-6">
@@ -214,8 +213,7 @@ export default function StreamingAvatarUsageTab() {
         refreshing={loading}
       />
 
-      <PeriodCostHeadlines items={headlines} />
-
+      <p className="text-sm font-medium">Tous les services en cours</p>
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-5 gap-3">
         <KPI label="Sessions avatar" value={String(totalSessions)} />
         <KPI label="Replis TTS" value={String(totalFallbacks)} tone={totalFallbacks > 0 ? "warn" : "ok"} />
@@ -227,14 +225,6 @@ export default function StreamingAvatarUsageTab() {
         <KPI label="Fournisseurs actifs" value={String(activeProviders)} />
         <KPI label="Minutes streamées" value={fmtMinutes(totalSeconds)} />
       </div>
-      <p className="text-[11px] text-muted-foreground -mt-3">
-        Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
-        seulement les minutes de cette période qui dépassent le forfait. Les minutes consommées sont
-        celles de la période. Le reste est le forfait du cycle en cours. « Tout » affiche le mois, sans
-        prorata. Un forfait non saisi reste vide : il n'est pas remplacé par un tarif à la minute.
-        Les minutes sont la durée de session Ava, pas le compteur du fournisseur. Sandboxes comprises
-        dans le forfait ; les statistiques les suivent tant que l'interrupteur reste activé.
-      </p>
 
       {fallbackRate > 20 && totalSessions >= 5 && (
         <div className="border border-destructive/40 bg-destructive/10 rounded-lg p-3 text-sm">
@@ -243,7 +233,7 @@ export default function StreamingAvatarUsageTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {providerStats.map((s) => (
+        {shownStats.map((s) => (
           <div key={s.id} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">{s.label}</h3>

@@ -27,7 +27,7 @@ Pour chaque service, sur le cycle qui se termine à la date de renouvellement sa
 
 Sur les cartes, le bouton de période (24 heures, 7 jours, 30 jours) partage ce même abonnement : montant mensuel × jours / 30. Les minutes affichées sont celles de la période. Les minutes restantes sont celles du cycle, pas une part des jours choisis. Seules les minutes de la période qui dépassent le forfait s'ajoutent. « Tout » montre le mois en cours, sans prorata de tout l'historique. Un forfait vide reste vide.
 
-Le coût de la période, les minutes restantes et la date de renouvellement sont repris en grand en haut de l'onglet, puis à nouveau en tête de chaque carte.
+Le coût de la période, les minutes restantes et la date de renouvellement restent en tête de chaque carte. Le bandeau du haut n'est pas répété. Un service arrêté ou en pause n'a pas de carte ; la rangée du dessus additionne les autres.
 
 Les forfaits sont une seule ligne `billing.service_plans` dans `admin_settings` (environnement `prod`). Pas de nouvelle table. Sandboxes comprises dans le forfait, parce que la facture ne les sépare pas.
 

@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
-import PeriodCostLines, { PeriodCostHeadlines } from "@/components/admin/PeriodCostLines";
+import PeriodCostLines from "@/components/admin/PeriodCostLines";
 import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/ServicePlanBoard";
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
 import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById } from "@/services/servicePlans";
@@ -161,18 +161,18 @@ export default function VoiceUsageTab() {
     });
   }, [filtered, plans, now, period, serviceId]);
 
-  const totalReqs = filtered.length;
-  const totalErrors = filtered.filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok").length;
-  const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
-  const totalChars = providerStats.reduce((s, p) => s + p.charsTotal, 0);
-  const headlines = providerStats.flatMap((provider) =>
-    provider.reading && provider.service
-      ? [{ id: provider.id, label: provider.label, reading: provider.reading, service: provider.service }]
-      : [],
+  const stoppedIds = new Set<string>(
+    providerStats.filter((provider) => serviceId === "all" && provider.reading?.kind === "stopped").map((provider) => provider.id),
   );
+  const shownStats = providerStats.filter((provider) => !stoppedIds.has(provider.id));
+  const counted = filtered.filter((row) => !stoppedIds.has(row.metadata_json?.provider ?? ""));
+  const totalReqs = counted.length;
+  const totalErrors = counted.filter((row) => (row.metadata_json?.error_type ?? "ok") !== "ok").length;
+  const globalErrorRate = totalReqs ? (totalErrors / totalReqs) * 100 : 0;
+  const totalChars = shownStats.reduce((sum, provider) => sum + provider.charsTotal, 0);
 
-  const recentErrors = filtered
-    .filter((r) => (r.metadata_json?.error_type ?? "ok") !== "ok")
+  const recentErrors = counted
+    .filter((row) => (row.metadata_json?.error_type ?? "ok") !== "ok")
     .slice(0, 50);
 
   return (
@@ -187,7 +187,7 @@ export default function VoiceUsageTab() {
         onRefresh={loadData}
         refreshing={loading}
       />
-      <PeriodCostHeadlines items={headlines} />
+      <p className="text-sm font-medium">Tous les services en cours</p>
       {/* Header KPIs */}
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-5 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
@@ -197,17 +197,9 @@ export default function VoiceUsageTab() {
           value={`${globalErrorRate.toFixed(1)}%`}
           tone={globalErrorRate > 10 ? "err" : globalErrorRate > 2 ? "warn" : "ok"}
         />
-        <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
+        <KPI label="Providers actifs" value={String(shownStats.filter((provider) => provider.total > 0).length)} />
         <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
       </div>
-      <p className="text-[11px] text-muted-foreground -mt-3">
-        Le coût réel partage l'abonnement mensuel sur les jours choisis (1, 7 ou 30 sur 30) et ajoute
-        seulement ce qui dépasse le forfait sur cette période. Les minutes sont une estimation
-        (750 caractères ≈ 1 min). Le reste est le forfait du cycle en cours. « Tout » affiche le mois,
-        sans prorata. Un crédit prépayé montre le consommé de la période et ce qui reste du solde.
-        Un forfait non saisi reste vide. Le forfait inclut les sandboxes. Les statistiques aussi, tant
-        que l'interrupteur reste activé.
-      </p>
 
       {/* Alerte taux d'erreur */}
       {globalErrorRate > 10 && totalReqs >= 10 && (
@@ -218,7 +210,7 @@ export default function VoiceUsageTab() {
 
       {/* Provider cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {providerStats.map((s) => (
+        {shownStats.map((s) => (
           <div key={s.id} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">{s.label}</h3>
@@ -330,7 +322,7 @@ export default function VoiceUsageTab() {
             </tr>
           </thead>
           <tbody>
-            {providerStats.map((s) => (
+            {shownStats.map((s) => (
               <tr key={s.id} className="border-b hover:bg-accent/30">
                 <td className="p-2 font-medium">{s.label}</td>
                 <td className="p-2 text-right font-mono">{s.total}</td>
