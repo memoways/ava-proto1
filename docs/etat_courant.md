@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, services arrêtés (22 novembre, code)** : le bandeau du haut et le paragraphe d'explication sont retirés. La rangée « Tous les services en cours » additionne les services qui ne sont pas arrêtés. Rien en production.
+
 **Consommation, lecture du coût (22 novembre, code)** : le coût de la période est en grand sur la carte et en haut de l'onglet, avec les minutes restantes et la date de renouvellement. Rien en production.
 
 **Consommation, coût de la période (22 novembre, code)** : sur Consommation Voix et Consommation Streaming Avatar, chaque carte indique les minutes consommées sur les jours choisis, la part de l'abonnement (1, 7 ou 30 jours sur 30), le reste du forfait et le coût de la période. « Tout » affiche le mois en cours, sans prorata. Un forfait vide n'est plus remplacé par un tarif à la minute. Rien en production. [Plan](plan_couts_forfaits_consommation.md).

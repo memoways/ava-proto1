@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : services arrêtés masqués] — 2026-11-22
+
+- Le bandeau du haut et le paragraphe d'explication sont retirés. La rangée de chiffres est le total de tous les services en cours, pour la période choisie.
+- Une carte dont l'abonnement est arrêté ou en pause n'est plus affichée. Elle reste dans Forfaits, pour pouvoir la reprendre.
+
 ## [Consommation : coût et minutes restantes en tête] — 2026-11-22
 
 - Le coût de la période est le chiffre principal : grand sur chaque carte, et de nouveau en haut de Consommation Voix et Consommation Streaming Avatar.

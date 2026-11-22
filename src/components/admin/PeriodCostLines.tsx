@@ -1,6 +1,6 @@
 /**
- * The period cost is the number to read first. It is shown large on the card
- * and again in the headline, with the minutes still left and the renewal date.
+ * The period cost is the large figure at the top of a provider card, with the
+ * minutes still left and the renewal date. The smaller lines underneath are the breakdown.
  */
 
 import {
@@ -11,30 +11,6 @@ import {
   type PeriodCostReading,
   type ServiceDefinition,
 } from "@/services/servicePlans";
-
-export interface PeriodCostItem {
-  id: string;
-  label: string;
-  reading: PeriodCostReading;
-  service: ServiceDefinition;
-}
-
-export function PeriodCostHeadlines({ items }: { items: PeriodCostItem[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => (
-        <article key={item.id} className="rounded-lg border bg-muted/20 p-4">
-          <p className="text-sm text-muted-foreground">{item.label}</p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight">{costText(item.reading)}</p>
-          <p className="text-xs text-muted-foreground">{costCaption(item.reading)}</p>
-          <p className="mt-3 text-xl font-semibold">{remainingHeadline(item.reading, item.service)}</p>
-          <p className="text-sm text-muted-foreground">{renewalHeadline(item.reading)}</p>
-        </article>
-      ))}
-    </div>
-  );
-}
 
 export default function PeriodCostLines({ reading, service }: { reading: PeriodCostReading; service: ServiceDefinition }) {
   return (
