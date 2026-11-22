@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : forfaits repliés, période visible] — 2026-11-22
+
+- Le bloc Forfaits du mois se replie. Il s'ouvre fermé : les statistiques sont tout de suite accessibles. Le choix reste mémorisé. Le filtre de service reste sur la ligne, même repliée.
+- La période (24 heures, 7 jours, 30 jours, tout) est une rangée de boutons. Les sandboxes sont incluses par défaut ; l'interrupteur les retire seulement si on le coupe.
+- **Inchangé** : le calcul du forfait et le pipeline. Rien en production.
+
 ## [Consommation : forfait, quota, dépassement] — 2026-11-22
 
 - Technique avancée (LLM, Voix, Streaming Avatar) : pour chaque service, abonnement mensuel, quota inclus, consommation du cycle, unités au-dessus du forfait et date de renouvellement.

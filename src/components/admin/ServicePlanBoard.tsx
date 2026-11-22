@@ -4,7 +4,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -43,6 +45,7 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [now] = useState(() => new Date());
+  const [open, setOpen] = useState(() => readPlansOpen(family));
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -70,50 +73,80 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
     [services, plans, usage, now],
   );
   const visible = serviceId === "all" ? snapshots : snapshots.filter((snapshot) => snapshot.service.id === serviceId);
+  const filled = snapshots.filter((snapshot) => snapshot.plan.tierId != null || snapshot.plan.monthlyFeeUsd != null).length;
 
   return (
-    <section className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold">Forfaits du mois</h3>
-          <p className="text-xs text-muted-foreground">
-            Abonnement fixe, quota inclus, consommation de ce cycle, et ce qui est facturé en plus.
-            Les minutes déjà dans le forfait ne sont pas recomptées. Tarifs publics du {PLAN_CATALOG_CHECKED_ON} : à corriger selon la facture.
-          </p>
-        </div>
+    <Collapsible
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        writePlansOpen(family, next);
+      }}
+      className="rounded-lg border"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 text-left [&[data-state=open]>svg]:rotate-90">
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
+          <span className="font-semibold">Forfaits du mois</span>
+          <span className="truncate text-sm text-muted-foreground">
+            {filled === 0 ? "aucun forfait saisi" : `${filled} forfait${filled > 1 ? "s" : ""} saisi${filled > 1 ? "s" : ""}`}
+          </span>
+        </CollapsibleTrigger>
         <div className="flex items-center gap-2">
           <Select value={serviceId} onValueChange={onServiceId}>
-            <SelectTrigger className="h-9 w-[220px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-[220px] text-sm" aria-label="Service"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tous les services</SelectItem>
               {services.map((service) => <SelectItem key={service.id} value={service.id}>{service.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" onClick={() => void reload()} disabled={loading}>
+          <Button type="button" variant="outline" className="h-10" onClick={() => void reload()} disabled={loading}>
             {loading ? "…" : "Rafraîchir"}
           </Button>
         </div>
       </div>
-      {error && <p className="text-sm text-destructive">Forfaits non chargés : {error}</p>}
-      {usage.capped && (
-        <p className="text-xs text-amber-500">
-          Plus de 5 000 lignes sur la période : la consommation affichée est un minimum.
+      {error && <p className="px-3 pb-2 text-sm text-destructive">Forfaits non chargés : {error}</p>}
+      <CollapsibleContent className="space-y-3 border-t px-3 py-3">
+        <p className="text-xs text-muted-foreground">
+          Abonnement fixe, quota inclus, consommation de ce cycle, et ce qui est facturé en plus.
+          Les minutes déjà dans le forfait ne sont pas recomptées. Tarifs publics du {PLAN_CATALOG_CHECKED_ON} : à corriger selon la facture.
         </p>
-      )}
-      <div className="grid gap-3">
-        {visible.map((snapshot) => (
-          <PlanCard
-            key={snapshot.service.id}
-            snapshot={snapshot}
-            onSaved={(plan) => {
-              setPlans((current) => ({ ...current, [snapshot.service.id]: plan }));
-              void reload();
-            }}
-          />
-        ))}
-      </div>
-    </section>
+        {usage.capped && (
+          <p className="text-xs text-amber-500">
+            Plus de 5 000 lignes sur la période : la consommation affichée est un minimum.
+          </p>
+        )}
+        <div className="grid gap-3">
+          {visible.map((snapshot) => (
+            <PlanCard
+              key={snapshot.service.id}
+              snapshot={snapshot}
+              onSaved={(plan) => {
+                setPlans((current) => ({ ...current, [snapshot.service.id]: plan }));
+                void reload();
+              }}
+            />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
+}
+
+function readPlansOpen(family: string): boolean {
+  try {
+    return localStorage.getItem(`ava:admin:service-plans-open:${family}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writePlansOpen(family: string, open: boolean): void {
+  try {
+    localStorage.setItem(`ava:admin:service-plans-open:${family}`, open ? "1" : "0");
+  } catch {
+    // Private browsing: the panel simply starts closed on the next visit.
+  }
 }
 
 function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (plan: SavedServicePlan) => void }) {
