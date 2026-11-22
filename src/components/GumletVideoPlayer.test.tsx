@@ -334,6 +334,8 @@ describe("GumletVideoPlayer", () => {
       const player = screen.getByLabelText("Video player");
       const root = container.firstElementChild as HTMLElement;
       expect(player).toHaveAttribute("data-fit", "pan");
+      // Tailwind preflight sets video { max-width: 100% }, which would squash the wide film offscreen.
+      expect(player.className).toContain("max-w-none");
       const filmWidth = 844 * (16 / 9);
       const start = Number(player.getAttribute("data-pan-offset"));
       expect(start).toBe(Math.round(filmWidth / 2 - 195));

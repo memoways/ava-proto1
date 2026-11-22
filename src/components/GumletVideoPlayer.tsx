@@ -574,7 +574,7 @@ const GumletVideoPlayer = forwardRef<GumletVideoPlayerHandle, GumletVideoPlayerP
         className={cn(
           "bg-black",
           panMode
-            ? "absolute left-0 top-0 h-full object-cover"
+            ? "absolute left-0 top-0 h-full max-w-none object-cover"
             : cn("absolute inset-0 h-full w-full", touchFirst ? "object-contain" : "object-cover portrait:object-contain"),
         )}
         style={panMode ? { width: framing.filmWidth || "100%", transform: `translate3d(${-panOffset}px,0,0)` } : undefined}
