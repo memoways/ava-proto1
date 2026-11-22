@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, crédits (22 novembre, code)** : un service peut être actif, en pause ou résilié. Le crédit prépayé (OpenRouter, Inworld) suit le solde chargé, le consommé depuis la date, et le reste. Fish Audio résilié ne se recharge pas. Rien en production.
+
 **Consommation, lecture (22 novembre, code)** : Forfaits du mois est replié par défaut. La période est une rangée de boutons. Les sandboxes sont incluses, sauf si on coupe l'interrupteur. Rien en production.
 
 **Consommation, forfaits (22 novembre, code)** : Technique avancée distingue, par service, l'abonnement mensuel, le quota inclus, la consommation du cycle et le dépassement. Les minutes déjà dans le forfait ne sont plus facturées une seconde fois. Le montant et la date de renouvellement se saisissent dans l'onglet (préremplis par les tarifs publics du 22 novembre 2026). Une ligne `admin_settings`, pas de nouvelle table. Voyage (RAG) n'est pas mesuré appel par appel. OpenRouter reste le prix déjà renvoyé. **À faire par Ulrich** : choisir le forfait réel et la date de renouvellement. Rien en production. [Plan](plan_couts_forfaits_consommation.md) · [reprise scénarios](prompt_reprise_couts_scenarios_diffusion.md).

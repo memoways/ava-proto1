@@ -73,7 +73,6 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
     [services, plans, usage, now],
   );
   const visible = serviceId === "all" ? snapshots : snapshots.filter((snapshot) => snapshot.service.id === serviceId);
-  const filled = snapshots.filter((snapshot) => snapshot.plan.tierId != null || snapshot.plan.monthlyFeeUsd != null).length;
 
   return (
     <Collapsible
@@ -87,10 +86,8 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
       <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2 text-left [&[data-state=open]>svg]:rotate-90">
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform" />
-          <span className="font-semibold">Forfaits du mois</span>
-          <span className="truncate text-sm text-muted-foreground">
-            {filled === 0 ? "aucun forfait saisi" : `${filled} forfait${filled > 1 ? "s" : ""} saisi${filled > 1 ? "s" : ""}`}
-          </span>
+          <span className="font-semibold">Forfaits et crédits</span>
+          <span className="truncate text-sm text-muted-foreground">{plansSummary(snapshots)}</span>
         </CollapsibleTrigger>
         <div className="flex items-center gap-2">
           <Select value={serviceId} onValueChange={onServiceId}>
@@ -108,8 +105,8 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
       {error && <p className="px-3 pb-2 text-sm text-destructive">Forfaits non chargés : {error}</p>}
       <CollapsibleContent className="space-y-3 border-t px-3 py-3">
         <p className="text-xs text-muted-foreground">
-          Abonnement fixe, quota inclus, consommation de ce cycle, et ce qui est facturé en plus.
-          Les minutes déjà dans le forfait ne sont pas recomptées. Tarifs publics du {PLAN_CATALOG_CHECKED_ON} : à corriger selon la facture.
+          Abonnement mensuel ou crédit chargé jusqu'à épuisement. Un service en pause ne prélève plus de mensualité.
+          Un service résilié, comme Fish Audio sans portefeuille, ne se recharge pas. Tarifs publics du {PLAN_CATALOG_CHECKED_ON}.
         </p>
         {usage.capped && (
           <p className="text-xs text-amber-500">
@@ -141,6 +138,18 @@ function readPlansOpen(family: string): boolean {
   }
 }
 
+function plansSummary(snapshots: PlanSnapshot[]): string {
+  const noted = snapshots.filter((snapshot) =>
+    snapshot.plan.tierId != null
+    || snapshot.plan.monthlyFeeUsd != null
+    || snapshot.plan.balanceUsd != null
+    || snapshot.plan.account !== "active",
+  ).length;
+  const stopped = snapshots.filter((snapshot) => snapshot.plan.account !== "active").length;
+  const base = noted === 0 ? "rien de saisi" : `${noted} fiche${noted > 1 ? "s" : ""}`;
+  return stopped === 0 ? base : `${base} · ${stopped} arrêté${stopped > 1 ? "s" : ""}`;
+}
+
 function writePlansOpen(family: string, open: boolean): void {
   try {
     localStorage.setItem(`ava:admin:service-plans-open:${family}`, open ? "1" : "0");
@@ -155,9 +164,13 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
   const [seed, setSeed] = useState(0);
   const [saving, setSaving] = useState(false);
   const { service } = snapshot;
-  const cycle = snapshot.window.source === "renewal"
-    ? `${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)}`
-    : `mois calendaire (${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)}), date de renouvellement non saisie`;
+  const cycle = snapshot.window.source === "credit"
+    ? (snapshot.plan.creditedOn ? `crédit depuis le ${formatDay(snapshot.window.start)}` : "crédit depuis le début des mesures, date non saisie")
+    : snapshot.window.source === "renewal"
+      ? `${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)}`
+      : `mois calendaire (${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)})`;
+  const accountLabel = snapshot.plan.account === "cancelled" ? "Résilié" : snapshot.plan.account === "paused" ? "En pause" : "Actif";
+  const accountTone = snapshot.plan.account === "cancelled" ? "text-red-400" : snapshot.plan.account === "paused" ? "text-amber-400" : "text-emerald-400";
 
   useEffect(() => { setDraft(snapshot.plan); }, [snapshot.plan]);
 
@@ -179,13 +192,25 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
     <article className="space-y-3 rounded-md border border-border/70 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="font-medium">{service.label}</h4>
+        <span className={`text-xs font-medium ${accountTone}`}>{accountLabel}</span>
         <p className="text-xs text-muted-foreground">{cycle}</p>
       </div>
       <dl className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-        <Metric label="Abonnement / mois" value={formatUsd(snapshot.fixedUsd)} />
-        <Metric label="Inclus" value={allowance(snapshot)} />
-        <Metric label="Consommé" value={consumed(snapshot)} />
-        <Metric label="Au-dessus du forfait" value={overage(snapshot)} warn={snapshot.status === "over" || snapshot.status === "over-rate-missing"} />
+        {snapshot.plan.funding === "prepaid" ? (
+          <>
+            <Metric label="Crédit chargé" value={formatUsd(snapshot.balanceUsd)} />
+            <Metric label="Consommé depuis" value={prepaidSpent(snapshot)} />
+            <Metric label="Reste" value={formatUsd(snapshot.remainingUsd)} />
+            <Metric label="À recharger" value={snapshot.status === "topup" ? formatUsd(snapshot.overageUsd) : "0,00 $"} warn={snapshot.status === "topup"} />
+          </>
+        ) : (
+          <>
+            <Metric label="Abonnement / mois" value={snapshot.plan.account === "active" ? formatUsd(snapshot.fixedUsd) : "arrêté"} />
+            <Metric label="Inclus" value={allowance(snapshot)} />
+            <Metric label="Consommé" value={consumed(snapshot)} />
+            <Metric label="Au-dessus du forfait" value={snapshot.plan.account === "active" ? overage(snapshot) : "—"} warn={snapshot.status === "over" || snapshot.status === "over-rate-missing"} />
+          </>
+        )}
       </dl>
       <p className="text-sm">
         <span className="text-muted-foreground">Ce cycle : </span>
@@ -194,19 +219,65 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
       {service.unmeasuredReason && <p className="text-xs text-muted-foreground">{service.unmeasuredReason}</p>}
       <div className="flex justify-end">
         <Button size="sm" variant="outline" onClick={() => setOpen((value) => !value)}>
-          {open ? "Fermer" : "Saisir le forfait"}
+          {open ? "Fermer" : "Modifier"}
         </Button>
       </div>
       {open && (
         <div className="grid gap-3 border-t border-border/60 pt-3 md:grid-cols-2">
+          <label className="space-y-1 text-xs text-muted-foreground">
+            État
+            <Select value={draft.account} onValueChange={(account) => setDraft({ ...draft, account: account === "paused" || account === "cancelled" ? account : "active" })}>
+              <SelectTrigger className="h-9 text-xs text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Actif</SelectItem>
+                <SelectItem value="paused">En pause — plus de mensualité</SelectItem>
+                <SelectItem value="cancelled">Résilié</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="space-y-1 text-xs text-muted-foreground">
+            Mode
+            <Select value={draft.funding} onValueChange={(funding) => setDraft({ ...draft, funding: funding === "prepaid" ? "prepaid" : "subscription" })}>
+              <SelectTrigger className="h-9 text-xs text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="subscription">Abonnement</SelectItem>
+                <SelectItem value="prepaid">Crédit prépayé</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {draft.funding === "prepaid" ? (
+            <>
+              <NumberField key={`${seed}-balance`} label="Crédit chargé ($)" value={draft.balanceUsd} onChange={(balanceUsd) => setDraft({ ...draft, balanceUsd })} />
+              <label className="space-y-1 text-xs text-muted-foreground">
+                Valable depuis
+                <Input type="date" className="h-9 text-foreground" value={draft.creditedOn ?? ""} onChange={(event) => setDraft({ ...draft, creditedOn: event.target.value || null })} />
+              </label>
+              {service.unit === "credits" && (
+                <NumberField
+                  key={`${seed}-rate`}
+                  label="Prix pour 1 000 caractères ($)"
+                  value={draft.usdPerUnit == null ? null : draft.usdPerUnit * 1000}
+                  onChange={(value) => setDraft({ ...draft, usdPerUnit: value == null ? null : value / 1000 })}
+                />
+              )}
+              {service.unit === "minutes" && (
+                <NumberField key={`${seed}-rate`} label="Prix d'une minute ($)" value={draft.usdPerUnit} onChange={(usdPerUnit) => setDraft({ ...draft, usdPerUnit })} />
+              )}
+              <p className="text-xs text-muted-foreground md:col-span-2">
+                Au rechargement, inscris le nouveau solde (ce qui restait plus ce que tu ajoutes) et la date. La consommation d'avant ne réduit plus ce solde.
+              </p>
+            </>
+          ) : (
+            <>
           <label className="space-y-1 text-xs text-muted-foreground">
             Forfait publié
             <Select
               value={draft.tierId ?? "unset"}
               onValueChange={(tierId) => {
                 setSeed((value) => value + 1);
-                if (tierId === "unset") setDraft(emptyPlan());
-                else setDraft(applyTier(service, tierId, draft.cadence, draft));
+                if (tierId === "unset") {
+                  setDraft({ ...emptyPlan(), account: draft.account, funding: draft.funding, balanceUsd: draft.balanceUsd, creditedOn: draft.creditedOn, usdPerUnit: draft.usdPerUnit });
+                } else setDraft(applyTier(service, tierId, draft.cadence, draft));
               }}
             >
               <SelectTrigger className="h-9 text-xs text-foreground"><SelectValue /></SelectTrigger>
@@ -259,6 +330,8 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
                 </SelectContent>
               </Select>
             </label>
+          )}
+            </>
           )}
           <p className="text-xs text-muted-foreground md:col-span-2">{service.sourceNote}</p>
           <div className="md:col-span-2">
@@ -333,7 +406,18 @@ function overage(snapshot: PlanSnapshot): string {
   return `${units}${minutes}${price}`;
 }
 
+function prepaidSpent(snapshot: PlanSnapshot): string {
+  if (snapshot.spentUsd != null) return formatUsd(snapshot.spentUsd);
+  return consumed(snapshot);
+}
+
 function periodSentence(snapshot: PlanSnapshot): string {
+  if (snapshot.status === "cancelled") return "Résilié. Plus de mensualité. Sans portefeuille de crédits, le service ne répond plus.";
+  if (snapshot.status === "paused") return "En pause. La mensualité n'est plus prélevée.";
+  if (snapshot.status === "credit") return `${formatUsd(snapshot.remainingUsd)} encore sur ${formatUsd(snapshot.balanceUsd)} chargés`;
+  if (snapshot.status === "topup") return `crédit épuisé — ${formatUsd(snapshot.overageUsd)} à recharger, puis mets à jour le solde`;
+  if (snapshot.status === "rate-missing") return `${formatUsd(snapshot.balanceUsd)} chargés — indique le prix pour calculer le reste`;
+  if (snapshot.plan.funding === "prepaid" && snapshot.status === "unset") return "crédit non saisi";
   if (snapshot.status === "unset") return "forfait non saisi — la consommation est là, pas le prix";
   if (snapshot.status === "allowance-missing") return `${formatUsd(snapshot.fixedUsd)} d'abonnement, quota inclus manquant`;
   if (snapshot.status === "unmeasured") {

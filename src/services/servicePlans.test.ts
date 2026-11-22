@@ -134,6 +134,51 @@ describe("planSnapshot", () => {
     expect(snapshot.used).toBeNull();
     expect(snapshot.periodUsd).toBe(15);
   });
+
+  it("reduces a prepaid balance only with usage after the top-up", () => {
+    const service = serviceById("openrouter")!;
+    const plan = { ...emptyPlan(), funding: "prepaid" as const, balanceUsd: 25, creditedOn: "2026-11-01" };
+    const snapshot = planSnapshot(
+      service,
+      plan,
+      [
+        { serviceId: "openrouter", at: "2026-10-20T00:00:00.000Z", amount: 9 },
+        { serviceId: "openrouter", at: "2026-11-02T00:00:00.000Z", amount: 4.5 },
+      ],
+      NOW,
+      false,
+    );
+    expect(snapshot.status).toBe("credit");
+    expect(snapshot.spentUsd).toBe(4.5);
+    expect(snapshot.remainingUsd).toBe(20.5);
+    expect(snapshot.periodUsd).toBe(25);
+  });
+
+  it("asks for a top-up once the loaded credit is spent", () => {
+    const service = serviceById("inworld")!;
+    const plan = { ...emptyPlan(), funding: "prepaid" as const, balanceUsd: 25, creditedOn: "2026-11-01", usdPerUnit: 5 / 1000 };
+    const snapshot = planSnapshot(
+      service,
+      plan,
+      [{ serviceId: "inworld", at: "2026-11-10T00:00:00.000Z", amount: 6000 }],
+      NOW,
+      false,
+    );
+    expect(snapshot.spentUsd).toBe(30);
+    expect(snapshot.status).toBe("topup");
+    expect(snapshot.remainingUsd).toBe(0);
+    expect(snapshot.overageUsd).toBe(5);
+  });
+
+  it("stops the monthly fee when the subscription is cancelled", () => {
+    const service = serviceById("fish")!;
+    const plan = applyTier(service, "custom", "monthly", { ...emptyPlan(), account: "cancelled", monthlyFeeUsd: 11 });
+    const snapshot = planSnapshot(service, plan, [{ serviceId: "fish", at: "2026-11-10T00:00:00.000Z", amount: 100 }], NOW, false);
+    expect(snapshot.status).toBe("cancelled");
+    expect(snapshot.fixedUsd).toBe(0);
+    expect(snapshot.periodUsd).toBe(0);
+    expect(snapshot.used).toBe(100);
+  });
 });
 
 describe("parseServicePlans", () => {
@@ -147,6 +192,8 @@ describe("parseServicePlans", () => {
     });
     expect(parsed.elevenlabs?.monthlyFeeUsd).toBe(18.33);
     expect(parsed.elevenlabs?.cadence).toBe("yearly");
+    expect(parsed.elevenlabs?.funding).toBe("subscription");
+    expect(parsed.elevenlabs?.account).toBe("active");
     expect(parsed.other).toBeUndefined();
     expect(parsed.tavus?.monthlyFeeUsd).toBeNull();
   });
