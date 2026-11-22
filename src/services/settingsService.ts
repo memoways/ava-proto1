@@ -705,6 +705,8 @@ export interface VideoTriggerSettings {
   PRESENTATION: CinematicPresentation;
   /** Mode superposition : atténuation du son de la vidéo sous la voix, en dB (≤ 0). */
   OVERLAY_VIDEO_GAIN_DB: number;
+  /** Smartphone seulement : cinématiques sans aucun son (les deux modes). Desktop/tablette inchangés. */
+  MUTE_CINEMATICS_ON_SMARTPHONE: boolean;
 }
 
 const VIDEO_TRIGGER_STORAGE_KEY = "ava_video_trigger_settings";
@@ -718,6 +720,7 @@ export const videoTriggerDefaults: VideoTriggerSettings = {
   MIN_EXTRACTS_BEFORE_CINEMATIC: DEFAULT_MIN_EXTRACTS_BEFORE_CINEMATIC,
   PRESENTATION: DEFAULT_CINEMATIC_PRESENTATION,
   OVERLAY_VIDEO_GAIN_DB: DEFAULT_OVERLAY_VIDEO_GAIN_DB,
+  MUTE_CINEMATICS_ON_SMARTPHONE: false,
 };
 
 export function getVideoTriggerSettings(): VideoTriggerSettings {

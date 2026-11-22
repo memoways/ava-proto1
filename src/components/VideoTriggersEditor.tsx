@@ -270,6 +270,15 @@ function VideoTriggerRulesPanel() {
             onChange={(e) => update({ OVERLAY_VIDEO_GAIN_DB: Math.min(0, Math.max(-60, Number(e.target.value) || 0)) })}
           />
           </label>
+          <label htmlFor="cinematic-mute-smartphone" className="flex items-center gap-2 text-sm" title="Smartphone seulement, les deux modes : la cinématique est jouée sans son. Desktop et tablette ne changent pas. À activer si le son reste trop fort sur téléphone.">
+            <Switch
+              id="cinematic-mute-smartphone"
+              data-testid="cinematic-mute-smartphone"
+              checked={settings.MUTE_CINEMATICS_ON_SMARTPHONE === true}
+              onCheckedChange={(MUTE_CINEMATICS_ON_SMARTPHONE) => update({ MUTE_CINEMATICS_ON_SMARTPHONE })}
+            />
+            Cinématiques sans son sur smartphone
+          </label>
           <span className="text-[11px] text-muted-foreground">Fréquence commune aux deux modes.</span>
         </div>
       </fieldset>

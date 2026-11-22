@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cinématiques sans son sur smartphone] — 2026-11-22
+
+- Nouveau réglage admin (onglet Cinématiques, « Déclenchement des vidéos ») : **« Cinématiques sans son sur smartphone »**, désactivé par défaut. Activé, la cinématique (superposition ou interruption) est jouée sans aucun son sur smartphone ; le teaser d'accueil n'est pas concerné.
+- **Inchangé** : desktop et tablette (l'atténuation en dB reste leur réglage), pipeline voix. Rien en production.
+- À faire : activer le réglage dans l'admin si le son reste trop fort sur iPhone ; accueil vertical (vidéo 16:9 en pleine hauteur, panoramique au doigt) = lot suivant.
+
 ## [Écran allumé sur mobile, cinématiques plus basses] — 2026-11-22
 
 - Nouveau `screenWakeLock.ts` : au geste « Commencer », l'écran du téléphone reste allumé (Screen Wake Lock sur Android et iOS 16.4+, relancé au retour sur la page et à chaque geste ; repli par vidéo invisible sinon). Relâché à la fin de l'expérience. Une veille coupait la page, le micro et le son.

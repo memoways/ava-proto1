@@ -21,6 +21,7 @@ import {
   estimatedRemainingSpeechMs,
   overlayHasTimeToShow,
   overlayVideoVolume,
+  cinematicSilencedOnPhone,
   cinematicTransitionStep,
   cinematicVeilOpacity,
   cinematicVeilTransitionMs,
@@ -270,5 +271,16 @@ describe("overlay sound and timing", () => {
     expect(overlayHasTimeToShow(OVERLAY_MIN_REMAINING_SPEECH_MS - 1)).toBe(false);
     expect(overlayHasTimeToShow(null)).toBe(true);
     expect(CINEMATIC_OVERLAY_START_DEADLINE_MS).toBeLessThanOrEqual(3_000);
+  });
+});
+
+describe("smartphone cinematic mute", () => {
+  it("silences only a playing cinematic, on a smartphone, when the setting is on", () => {
+    expect(cinematicSilencedOnPhone("smartphone", true, true)).toBe(true);
+    expect(cinematicSilencedOnPhone("smartphone", true, false)).toBe(false); // teaser / nothing playing
+    expect(cinematicSilencedOnPhone("smartphone", false, true)).toBe(false);
+    expect(cinematicSilencedOnPhone("smartphone", undefined, true)).toBe(false);
+    expect(cinematicSilencedOnPhone("tablet", true, true)).toBe(false);
+    expect(cinematicSilencedOnPhone("desktop", true, true)).toBe(false);
   });
 });
