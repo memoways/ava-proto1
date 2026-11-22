@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Consommation, forfaits (22 novembre, code)** : Technique avancée distingue, par service, l'abonnement mensuel, le quota inclus, la consommation du cycle et le dépassement. Les minutes déjà dans le forfait ne sont plus facturées une seconde fois. Le montant et la date de renouvellement se saisissent dans l'onglet (préremplis par les tarifs publics du 22 novembre 2026). Une ligne `admin_settings`, pas de nouvelle table. Voyage (RAG) n'est pas mesuré appel par appel. OpenRouter reste le prix déjà renvoyé. **À faire par Ulrich** : choisir le forfait réel et la date de renouvellement. Rien en production. [Plan](plan_couts_forfaits_consommation.md) · [reprise scénarios](prompt_reprise_couts_scenarios_diffusion.md).
+
 **Admin vidéo, densité (21 novembre, code)** : Synchronisation Notion est repliée sur Cinématiques et Extraits. Les règles d'extraits et de déclenchement sont plus courtes ; les valeurs et le comportement en jeu sont inchangés. Rien en production.
 
 **Décisions vidéo, évolution (21 novembre, code)** : les blocs blancs « pas de vidéo suivante » ne sont plus dessinés. Seuls les flux vers la vidéo suivante restent. Rien en production.

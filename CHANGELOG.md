@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Consommation : forfait, quota, dépassement] — 2026-11-22
+
+- Technique avancée (LLM, Voix, Streaming Avatar) : pour chaque service, abonnement mensuel, quota inclus, consommation du cycle, unités au-dessus du forfait et date de renouvellement.
+- Le fixe et les minutes déjà payées ne sont plus recomptés. Seul le dépassement s'ajoute. Les tarifs publics du 22 novembre 2026 préremplissent un forfait ; le montant enregistré est celui de la facture.
+- Stockage : une ligne `admin_settings` (`billing.service_plans`), pas de nouvelle table. Voyage (RAG) reste un abonnement sans consommation mesurée. OpenRouter reste la somme déjà renvoyée.
+- **Inchangé** : le pipeline voix, vidéo et LLM. Rien en production.
+
 ## [Cinématiques : atténuation du son sur iPhone] — 2026-11-22
 
 - **Superposition sur iOS** : le réglage « Son sous la voix (dB) » passe par un gain Web Audio quand la lecture le permet (hls.js ou fichier même origine) ; sinon la vidéo reste muette plutôt que de couvrir le personnage. Desktop et Android gardent `video.volume`.

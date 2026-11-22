@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { TTS_PROVIDER_LIST } from "@/services/tts/registry";
 import type { TTSProviderId } from "@/services/tts/types";
+import ServicePlanBoard from "@/components/admin/ServicePlanBoard";
+import type { Json } from "@/integrations/supabase/types";
 
 /**
  * Coût estimé par 1000 caractères TTS (USD).
@@ -66,6 +68,7 @@ export default function VoiceUsageTab() {
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState("7d");
   const [includeSandbox, setIncludeSandbox] = useState(false);
+  const [serviceId, setServiceId] = useState("all");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -93,9 +96,31 @@ export default function VoiceUsageTab() {
   }, [period]);
 
   const filtered = useMemo(
-    () => rows.filter((r) => new Date(r.created_at) >= periodStart),
-    [rows, periodStart]
+    () => rows.filter((r) => new Date(r.created_at) >= periodStart && (serviceId === "all" || r.metadata_json?.provider === serviceId)),
+    [rows, periodStart, serviceId]
   );
+
+  const loadPlanUsage = useCallback(async (fromIso: string) => {
+    const { data, error } = await supabase
+      .from("audio_latencies" as never)
+      .select("created_at, tts_text_len, metadata_json")
+      .eq("direction", "out")
+      .gte("created_at", fromIso)
+      .limit(5000);
+    if (error) throw new Error(error.message);
+    const list = (data as unknown as { created_at: string; tts_text_len: number | null; metadata_json: Json | null }[]) ?? [];
+    return {
+      capped: list.length >= 5000,
+      events: list.flatMap((row) => {
+        const meta = row.metadata_json;
+        if (!meta || typeof meta !== "object" || Array.isArray(meta)) return [];
+        const record = meta as { provider?: unknown; error_type?: unknown };
+        if (typeof record.provider !== "string") return [];
+        if (typeof record.error_type === "string" && record.error_type !== "ok") return [];
+        return [{ serviceId: record.provider, at: row.created_at, amount: row.tts_text_len ?? 0 }];
+      }),
+    };
+  }, []);
 
   // Stats per provider
   const providerStats = useMemo(() => {
@@ -168,6 +193,7 @@ export default function VoiceUsageTab() {
           <Switch checked={includeSandbox} onCheckedChange={setIncludeSandbox} /> Inclure les sandboxes
         </label>
       </div>
+      <ServicePlanBoard family="voice" serviceId={serviceId} onServiceId={setServiceId} loadUsage={loadPlanUsage} />
       {/* Header KPIs */}
       <div className="grid grid-cols-2 tablet:grid-cols-3 tablet-lg:grid-cols-6 gap-3">
         <KPI label="Requêtes (période)" value={String(totalReqs)} />
@@ -179,12 +205,14 @@ export default function VoiceUsageTab() {
         />
         <KPI label="Providers actifs" value={String(providerStats.filter((p) => p.total > 0).length)} />
         <KPI label="Caractères TTS" value={totalChars.toLocaleString("fr-CH")} />
-        <KPI label="Coût estimé (succès)" value={fmtUsd(totalCostSuccessUsd)} tone="warn" />
+        <KPI label="Tarif public (succès)" value={fmtUsd(totalCostSuccessUsd)} tone="warn" />
       </div>
       <p className="text-[11px] text-muted-foreground -mt-3">
-        Coûts estimés à partir du nombre de caractères synthétisés et des tarifs publics indicatifs
-        (ElevenLabs {fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k · Fish Audio {fmtUsd(COST_PER_1K_CHARS_USD.fish)}/1k ·
-        Inworld {fmtUsd(COST_PER_1K_CHARS_USD.inworld)}/1k). Total période (tous appels) : {fmtUsd(totalCostUsd)}.
+        Le bloc Forfaits compte l'abonnement et seulement ce qui dépasse le quota. Les montants
+        « tarif public » plus bas ignorent le forfait ({fmtUsd(COST_PER_1K_CHARS_USD.elevenlabs)}/1k ElevenLabs,
+        {fmtUsd(COST_PER_1K_CHARS_USD.gradium)}/1k Gradium, total période {fmtUsd(totalCostUsd)}).
+        La voix se mesure en caractères : les minutes du forfait sont une estimation (750 caractères ≈ 1 min).
+        Le forfait inclut les sandboxes ; le tableau dessous suit l'interrupteur.
       </p>
 
       {/* Alerte taux d'erreur */}
