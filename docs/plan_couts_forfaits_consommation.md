@@ -5,7 +5,9 @@ Ce lot couvre la mesure dans Technique avancée. Les scénarios de diffusion et 
 
 ## Lecture
 
-Le bloc Forfaits du mois s'ouvre replié. La période des statistiques est une rangée de boutons. Les sandboxes sont incluses, sauf si on coupe l'interrupteur.
+Le bloc s'ouvre replié. La période est une rangée de boutons. Les sandboxes sont incluses, sauf si on coupe l'interrupteur.
+
+Un service est soit un abonnement mensuel, soit un crédit prépayé valable jusqu'à épuisement. L'état actif, en pause ou résilié dit si la mensualité court encore. Fish Audio n'a pas de solde à recharger.
 
 ## Ce qui faussait la lecture
 

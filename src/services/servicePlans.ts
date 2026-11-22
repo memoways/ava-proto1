@@ -14,6 +14,10 @@ export const PLAN_CATALOG_CHECKED_ON = "2026-11-22";
 export type PlanFamily = "voice" | "video" | "llm" | "rag";
 export type PlanUnit = "credits" | "minutes" | "usd";
 export type BillingCadence = "monthly" | "yearly";
+/** Monthly allowance, or a balance that lasts until it is spent. */
+export type PlanFunding = "subscription" | "prepaid";
+/** What is being paid right now. Paused stops the monthly fee. Cancelled ends the service. */
+export type PlanAccount = "active" | "paused" | "cancelled";
 
 export interface PublicTier {
   id: string;
@@ -46,12 +50,20 @@ export interface ServiceDefinition {
 export interface SavedServicePlan {
   tierId: string | null;
   cadence: BillingCadence;
+  funding: PlanFunding;
+  account: PlanAccount;
   monthlyFeeUsd: number | null;
   included: number | null;
   overagePerUnitUsd: number | null;
   /** Next renewal the admin typed, `YYYY-MM-DD`. */
   renewsOn: string | null;
   creditsPerMinute: number | null;
+  /** Dollars loaded at `creditedOn`. Replaced on the next top-up. */
+  balanceUsd: number | null;
+  /** Day the current balance starts. Usage before it does not reduce the balance. */
+  creditedOn: string | null;
+  /** Dollars per billed unit (one character, one minute). One for a dollar-priced service. */
+  usdPerUnit: number | null;
 }
 
 export interface UsageEvent {
@@ -63,7 +75,7 @@ export interface UsageEvent {
 export interface BillingWindow {
   start: Date;
   end: Date;
-  source: "renewal" | "calendar";
+  source: "renewal" | "calendar" | "credit";
 }
 
 export type PlanStatus =
@@ -73,7 +85,12 @@ export type PlanStatus =
   | "payg"
   | "unmeasured"
   | "allowance-missing"
-  | "over-rate-missing";
+  | "over-rate-missing"
+  | "credit"
+  | "topup"
+  | "rate-missing"
+  | "paused"
+  | "cancelled";
 
 export interface PlanSnapshot {
   service: ServiceDefinition;
@@ -94,6 +111,12 @@ export interface PlanSnapshot {
   overageUsd: number | null;
   /** Fixed plus overage, only when both pieces needed for that status are known. */
   periodUsd: number | null;
+  /** Prepaid deposit. Null on a subscription. */
+  balanceUsd: number | null;
+  /** Usage of a prepaid balance, in dollars. */
+  spentUsd: number | null;
+  /** Dollars still on a prepaid balance. */
+  remainingUsd: number | null;
   capped: boolean;
 }
 
@@ -173,7 +196,8 @@ export const SERVICE_CATALOG: readonly ServiceDefinition[] = [
     measured: true,
     unmeasuredReason: null,
     sourceUrl: "",
-    sourceNote: "Tarif public non relevé. Saisis le forfait depuis la facture.",
+    sourceNote:
+      "Pas de portefeuille de crédits. Une fois l'abonnement résilié, le service ne répond plus : indique Résilié. Il n'y a pas de solde à recharger.",
     tiers: [],
   },
   {
@@ -187,7 +211,8 @@ export const SERVICE_CATALOG: readonly ServiceDefinition[] = [
     measured: true,
     unmeasuredReason: null,
     sourceUrl: "",
-    sourceNote: "Tarif public non relevé. Saisis le forfait depuis la facture.",
+    sourceNote:
+      "Pas d'abonnement obligatoire : un crédit chargé sert jusqu'à épuisement. Au rechargement, inscris le nouveau solde (ce qui restait + ce que tu ajoutes) et la date. Le prix pour 1 000 caractères convertit la voix mesurée en dollars.",
     tiers: [],
   },
   {
@@ -277,7 +302,7 @@ export const SERVICE_CATALOG: readonly ServiceDefinition[] = [
     unmeasuredReason: null,
     sourceUrl: "https://openrouter.ai/docs",
     sourceNote:
-      "Pas d'abonnement mensuel public. Le montant est la somme des coûts déjà renvoyés par OpenRouter (llm_usage), sandboxes comprises. N'ajoute un fixe que si une facture existe en plus de ces appels.",
+      "Pas d'abonnement mensuel. Le crédit chargé (comme un solde OpenRouter) diminue des coûts déjà renvoyés depuis la date saisie. Au rechargement, inscris le nouveau solde et cette date : l'historique d'avant ne compte plus.",
     tiers: [],
   },
   {
@@ -310,11 +335,16 @@ export function emptyPlan(): SavedServicePlan {
   return {
     tierId: null,
     cadence: "monthly",
+    funding: "subscription",
+    account: "active",
     monthlyFeeUsd: null,
     included: null,
     overagePerUnitUsd: null,
     renewsOn: null,
     creditsPerMinute: null,
+    balanceUsd: null,
+    creditedOn: null,
+    usdPerUnit: null,
   };
 }
 
@@ -376,6 +406,15 @@ export function billingWindow(renewsOn: string | null, cadence: BillingCadence, 
   return calendar();
 }
 
+/** Usage that reduces a prepaid balance: from the top-up day through now. */
+export function prepaidWindow(creditedOn: string | null, now: Date): BillingWindow {
+  const end = new Date(now.getTime() + 86_400_000);
+  if (!creditedOn || !DATE_RE.test(creditedOn)) return { start: new Date(0), end, source: "credit" };
+  const [year, month, day] = creditedOn.split("-").map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return { start: new Date(0), end, source: "credit" };
+  return { start: utcDate(year, month - 1, day), end, source: "credit" };
+}
+
 export function sumUsage(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): number {
   let total = 0;
   for (const event of events) {
@@ -407,6 +446,13 @@ function asMinutes(service: ServiceDefinition, plan: SavedServicePlan, amount: n
   return { minutes: null, estimated: false };
 }
 
+function spentUsd(service: ServiceDefinition, plan: SavedServicePlan, used: number | null): number | null {
+  if (used == null) return null;
+  if (service.unit === "usd") return used;
+  if (plan.usdPerUnit == null) return null;
+  return used * plan.usdPerUnit;
+}
+
 export function planSnapshot(
   service: ServiceDefinition,
   plan: SavedServicePlan,
@@ -414,7 +460,9 @@ export function planSnapshot(
   now: Date,
   capped: boolean,
 ): PlanSnapshot {
-  const window = billingWindow(plan.renewsOn, plan.cadence, now);
+  const window = plan.funding === "prepaid"
+    ? prepaidWindow(plan.creditedOn, now)
+    : billingWindow(plan.renewsOn, plan.cadence, now);
   const perMinute = plan.creditsPerMinute ?? service.creditsPerMinute;
   const raw = service.measured ? sumUsage(events, service.id, window.start, window.end) : null;
   const used = raw == null ? null : service.creditsPerMinute && perMinute ? raw * perMinute : raw;
@@ -439,23 +487,53 @@ export function planSnapshot(
     fixedUsd,
     overageUsd: null,
     periodUsd: null,
+    balanceUsd: plan.funding === "prepaid" ? plan.balanceUsd : null,
+    spentUsd: null,
+    remainingUsd: null,
     capped,
   };
 
-  if (!service.measured) {
-    return { ...base, status: "unmeasured", periodUsd: fixedUsd };
+  const built = plan.funding === "prepaid"
+    ? prepaidSnapshot(base, service, plan, used)
+    : subscriptionSnapshot(base, service, plan, used, included);
+  if (plan.funding === "prepaid" || plan.account === "active") return built;
+  return {
+    ...built,
+    status: plan.account === "cancelled" ? "cancelled" : "paused",
+    fixedUsd: 0,
+    periodUsd: 0,
+    overageUsd: null,
+  };
+}
+
+function prepaidSnapshot(base: PlanSnapshot, service: ServiceDefinition, plan: SavedServicePlan, used: number | null): PlanSnapshot {
+  const balance = plan.balanceUsd;
+  const spent = spentUsd(service, plan, used);
+  const withMoney: PlanSnapshot = { ...base, balanceUsd: balance, spentUsd: spent, fixedUsd: 0 };
+  if (!service.measured) return { ...withMoney, status: "unmeasured", periodUsd: balance };
+  if (balance == null) return { ...withMoney, status: "unset" };
+  if (spent == null) return { ...withMoney, status: "rate-missing" };
+  const remainingUsd = balance - spent;
+  if (remainingUsd >= 0) {
+    return { ...withMoney, status: "credit", remainingUsd, overageUsd: 0, periodUsd: balance };
   }
+  return { ...withMoney, status: "topup", remainingUsd: 0, overageUsd: -remainingUsd, periodUsd: balance };
+}
+
+function subscriptionSnapshot(
+  base: PlanSnapshot,
+  service: ServiceDefinition,
+  plan: SavedServicePlan,
+  used: number | null,
+  included: number | null,
+): PlanSnapshot {
+  const fixedUsd = plan.monthlyFeeUsd;
+  if (!service.measured) return { ...base, status: "unmeasured", periodUsd: fixedUsd };
   if (used == null) return base;
 
   if (service.unit === "usd" && included == null) {
     const fixed = fixedUsd ?? 0;
-    return {
-      ...base,
-      status: "payg",
-      fixedUsd: fixed,
-      overageUsd: used,
-      periodUsd: fixed + used,
-    };
+    return { ...base, status: "payg", fixedUsd: fixed, overageUsd: used, periodUsd: fixed + used };
   }
 
   if (included == null && fixedUsd == null) return { ...base, status: "unset" };
@@ -464,7 +542,6 @@ export function planSnapshot(
   const overageUnits = Math.max(0, used - included);
   const remaining = Math.max(0, included - used);
   const overageMinutes = asMinutes(service, plan, overageUnits).minutes;
-  // A dollar past a dollar credit costs one dollar. Other units need a typed rate.
   const rate = service.unit === "usd" ? (plan.overagePerUnitUsd ?? 1) : plan.overagePerUnitUsd;
   if (overageUnits === 0) {
     return {
@@ -505,14 +582,22 @@ export function parseSavedPlan(value: unknown): SavedServicePlan | null {
   const cadence = record.cadence === "yearly" ? "yearly" : "monthly";
   const renewsOn = typeof record.renewsOn === "string" && DATE_RE.test(record.renewsOn) ? record.renewsOn : null;
   const tierId = typeof record.tierId === "string" && record.tierId.length > 0 && record.tierId.length < 40 ? record.tierId : null;
+  const funding = record.funding === "prepaid" ? "prepaid" : "subscription";
+  const account = record.account === "paused" || record.account === "cancelled" ? record.account : "active";
+  const creditedOn = typeof record.creditedOn === "string" && DATE_RE.test(record.creditedOn) ? record.creditedOn : null;
   return {
     tierId,
     cadence,
+    funding,
+    account,
     monthlyFeeUsd: finiteOrNull(record.monthlyFeeUsd),
     included: finiteOrNull(record.included),
     overagePerUnitUsd: finiteOrNull(record.overagePerUnitUsd),
     renewsOn,
     creditsPerMinute: finiteOrNull(record.creditsPerMinute),
+    balanceUsd: finiteOrNull(record.balanceUsd),
+    creditedOn,
+    usdPerUnit: finiteOrNull(record.usdPerUnit),
   };
 }
 

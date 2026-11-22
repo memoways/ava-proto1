@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-22 (Lecture des forfaits)
+> **Last Updated**: 2026-11-22 (Crédits prépayés)
 
 ---
+
+## Consommation — crédit chargé, ou abonnement arrêté (22 novembre 2026)
+
+Certains services ne sont pas un forfait du mois. Inworld et OpenRouter avancent sur un solde qu'on recharge : on note le montant et la date, et le reste est ce solde moins ce qui a été consommé depuis. Quand il est à zéro, on recharge et on met le nouveau chiffre. D'autres s'arrêtent. Fish Audio est de ceux-là : pas de portefeuille, l'abonnement résilié veut dire que le service ne répond plus. L'état — actif, en pause, résilié — est sur la fiche.
 
 ## Consommation — replier le forfait, voir la période (22 novembre 2026)
 
