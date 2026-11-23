@@ -17,9 +17,11 @@ import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical, Download, Loader2 } from "lucide-react";
 import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
 import {
+  MISSING_CHARACTER_REPLY,
   UNTRACED_CHUNKS_SENTENCE,
   formatModelRequest,
   indexTtsByTurn,
+  labelSummary,
   readTurnTrace,
   replyContextLine,
   tracesForTurn,
@@ -86,7 +88,13 @@ interface AdminConversationMessage {
     model?: string;
     error_excerpt?: string;
   };
-  pipeline?: { blocker?: string };
+  pipeline?: {
+    blocker?: string;
+    rag_ms?: number;
+    max_ms?: number;
+    gm_pre_ms?: number;
+    total_ms?: number;
+  };
   labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
 }
 
@@ -135,9 +143,7 @@ function TurnTraceBlock({
   traces: TurnTraceView[];
 }) {
   if (turn == null) return null;
-  if (status === "untraced") {
-    return <p className="mt-3 text-xs text-muted-foreground" data-testid="turn-trace-missing">{UNTRACED_CHUNKS_SENTENCE}</p>;
-  }
+  if (status === "untraced") return null;
   if (status === "loading" || status === "idle") {
     return <p className="mt-3 text-xs text-muted-foreground">Lecture des traces…</p>;
   }
@@ -151,6 +157,9 @@ function TurnTraceBlock({
       {rows.map((row) => (
         <div key={`${row.turnIndex}-${row.characterName || "personnage"}`}>
           {row.characterName && rows.length > 1 && <p className="text-xs font-semibold text-foreground">{row.characterName}</p>}
+          {row.search && (
+            <p className="break-words text-xs text-muted-foreground" data-testid="turn-search">Recherche : {row.search}</p>
+          )}
           {row.chunks.length === 0 && <p className="text-xs text-muted-foreground">Aucun chunk injecté pour ce tour.</p>}
           {row.chunks.map((chunk, index) => (
             <p key={`${chunk.sourceId}-${index}`} className="break-words text-xs text-muted-foreground" data-testid="turn-chunk">
@@ -172,6 +181,18 @@ function TurnTraceBlock({
       </Link>
     </div>
   );
+}
+
+function pipelineSummary(msg: AdminConversationMessage): string | null {
+  const timings = msg.pipeline;
+  if (!timings) return null;
+  const bits: string[] = [];
+  if (typeof timings.rag_ms === "number") bits.push(`RAG ${timings.rag_ms} ms`);
+  if (typeof timings.gm_pre_ms === "number") bits.push(`GM ${timings.gm_pre_ms} ms`);
+  if (typeof timings.max_ms === "number") bits.push(`modèle ${timings.max_ms} ms`);
+  if (typeof timings.total_ms === "number") bits.push(`total ${timings.total_ms} ms`);
+  if (timings.blocker) bits.push(`bloquant ${timings.blocker}`);
+  return bits.length ? bits.join(" · ") : null;
 }
 
 function ConversationColumn({
@@ -210,63 +231,47 @@ function ConversationColumn({
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-6">
-        {conversationGroups(log).map((group) => (
-          <article key={group.items[0]?.index ?? "ouverture"} data-testid={group.turn == null ? undefined : "conversation-turn"} className="border-b border-border/50 pb-5 last:border-b-0">
-            {group.turn != null && (
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tour {group.turn}</h3>
-            )}
-            {group.items.map(({ msg, index }) => {
-              const fb = msg.gmFallback;
-              const blocker = msg.pipeline?.blocker;
-              const turn = group.turn ?? 0;
-              const speaker = msg.role === "user" ? "User" : msg.role === "emma" ? "Emma" : "Max";
-              const color = msg.role === "user" ? "text-green-300" : msg.role === "emma" ? "text-fuchsia-300" : "text-blue-300";
-              const gmEntry = msg.role !== "user" && turn > 0 && gmLog.length
-                ? findGmEntryForReply(gmLog, turn, msg.role)
-                : null;
-              const context = msg.role === "user" ? null : replyContextLine({
-                speechState: gmEntry?.injected?.speechState ?? null,
-                playedState: gmEntry?.character_state_used ? describeStateLevels(gmEntry.character_state_used) : null,
-                gmToCharacter: gmEntry || (turn > 0 && gmLog.length) ? describeGmToCharacter(gmEntry) : null,
-                tts: turn > 0 ? ttsByTurn.get(turn) ?? null : null,
-                face: turn > 0 ? faceForReply(faceRows, turn, msg.role) : null,
-              });
-              return (
-                <div key={index} className="mb-4">
-                  <p className={`whitespace-pre-wrap text-base leading-relaxed ${color}`}>
-                    <span className="font-semibold">{speaker} :</span> {msg.content}
-                  </p>
-                  {msg.role === "user" && typeof msg.content === "string" && isQuestionLike(msg.content) && (
-                    <label className="mt-1 flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground/80">
-                      <Checkbox
-                        checked={pinnedMessageIndexes.has(index)}
-                        disabled={pinnedStorageReady !== true || pinningMessageIndexes.has(index)}
-                        onCheckedChange={(checked) => void onToggleRag(index, msg.content, checked === true)}
-                        aria-label="Envoyer question dans le laboratoire RAG"
-                      />
-                      <FlaskConical className="h-3 w-3" />
-                      <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
-                    </label>
-                  )}
-                  {context && (
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground" data-testid="gm-to-character-reply">{context}</p>
-                  )}
-                  {msg.role === "user" && msg.labels && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {(msg.labels.themes ?? []).map((theme: string, key: number) => (
-                        <span key={`th-${key}`} className="rounded border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary">{theme}</span>
-                      ))}
-                      {(msg.labels.topics ?? []).map((topic: string, key: number) => (
-                        <span key={`tp-${key}`} className="rounded border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">{topic}</span>
-                      ))}
-                      {(msg.labels.intentions ?? []).map((intention: string, key: number) => (
-                        <span key={`in-${key}`} className="rounded border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300">{intention}</span>
-                      ))}
-                    </div>
-                  )}
-                  {msg.role !== "user" && (fb || blocker) && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {fb && (
+        {traceStatus === "untraced" && (
+          <p className="text-xs leading-relaxed text-muted-foreground" data-testid="turn-trace-missing">{UNTRACED_CHUNKS_SENTENCE}</p>
+        )}
+        {conversationGroups(log).map((group) => {
+          const turn = group.turn;
+          const reply = group.items.find(({ msg }) => msg.role !== "user");
+          const userItem = group.items.find(({ msg }) => msg.role === "user");
+          const gmEntry = turn != null && turn > 0 && gmLog.length
+            ? findGmEntryForReply(gmLog, turn, reply?.msg.role ?? null)
+            : null;
+          const labels = labelSummary(userItem?.msg.labels ?? gmEntry?.labels ?? null);
+          const context = reply && turn != null && turn > 0 ? replyContextLine({
+            speechState: gmEntry?.injected?.speechState ?? null,
+            playedState: gmEntry?.character_state_used ? describeStateLevels(gmEntry.character_state_used) : null,
+            gmToCharacter: gmEntry || gmLog.length ? describeGmToCharacter(gmEntry) : null,
+            tts: ttsByTurn.get(turn) ?? null,
+            face: faceForReply(faceRows, turn, reply.msg.role),
+          }) : null;
+          const timings = reply ? pipelineSummary(reply.msg) : null;
+          const question = userItem && typeof userItem.msg.content === "string" && isQuestionLike(userItem.msg.content)
+            ? userItem
+            : null;
+          return (
+            <article key={group.items[0]?.index ?? "ouverture"} data-testid={turn == null ? undefined : "conversation-turn"} className="border-b border-border/50 pb-5 last:border-b-0">
+              {turn != null && (
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tour {turn}</h3>
+              )}
+              {group.items.map(({ msg, index }) => {
+                const fb = msg.gmFallback;
+                const speaker = msg.role === "user" ? "User" : msg.role === "emma" ? "Emma" : "Max";
+                const color = msg.role === "user" ? "text-green-300" : msg.role === "emma" ? "text-fuchsia-300" : "text-blue-300";
+                return (
+                  <div key={index} className="mb-3">
+                    <p className={`whitespace-pre-wrap text-base leading-relaxed ${color}`}>
+                      <span className="font-semibold">{speaker} :</span> {msg.content}
+                    </p>
+                    {msg.role === "user" && labels && (
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground" data-testid="turn-labels">{labels}</p>
+                    )}
+                    {msg.role !== "user" && fb && (
+                      <div className="mt-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="cursor-help rounded border border-destructive/40 bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
@@ -312,20 +317,47 @@ function ConversationColumn({
                             </div>
                           </TooltipContent>
                         </Tooltip>
-                      )}
-                      {blocker && (
-                        <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
-                          blocker · {blocker}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <TurnTraceBlock sessionId={session.id} turn={group.turn} status={traceStatus} traces={turnTraces} />
-          </article>
-        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {turn != null && !reply && (
+                <p className="mb-3 text-sm text-amber-200/90" data-testid="missing-character-reply">{MISSING_CHARACTER_REPLY}</p>
+              )}
+              {turn != null && (
+                <details className="text-xs text-muted-foreground" data-testid="turn-detail">
+                  <summary className="cursor-pointer font-medium text-foreground/80">Détail du tour</summary>
+                  <div className="mt-2 space-y-1.5">
+                    {context && <p data-testid="gm-to-character-reply">{context}</p>}
+                    {gmEntry?.execution_status && (
+                      <p>Game Master : {gmEntry.execution_status}{gmEntry.execution_reason ? ` / ${gmEntry.execution_reason}` : ""}{typeof gmEntry.latency_ms === "number" ? ` · ${gmEntry.latency_ms} ms` : ""}{gmEntry.model ? ` · ${gmEntry.model}` : ""}</p>
+                    )}
+                    {gmEntry?.next_turn_guidance && <p>Conseil pour la suite : {gmEntry.next_turn_guidance}</p>}
+                    {Array.isArray(gmEntry?.topics_covered) && gmEntry.topics_covered.length > 0 && (
+                      <p>Sujets couverts : {gmEntry.topics_covered.join(", ")}</p>
+                    )}
+                    {timings && <p data-testid="turn-pipeline">{timings}</p>}
+                    {!labels && <p>Aucun thème ni mot-clé enregistré pour ce tour.</p>}
+                    <TurnTraceBlock sessionId={session.id} turn={turn} status={traceStatus} traces={turnTraces} />
+                    {question && (
+                      <label className="flex w-fit items-center gap-1.5 pt-1 text-[11px] text-muted-foreground/80">
+                        <Checkbox
+                          checked={pinnedMessageIndexes.has(question.index)}
+                          disabled={pinnedStorageReady !== true || pinningMessageIndexes.has(question.index)}
+                          onCheckedChange={(checked) => void onToggleRag(question.index, question.msg.content, checked === true)}
+                          aria-label="Épingler pour le laboratoire RAG"
+                        />
+                        <FlaskConical className="h-3 w-3" />
+                        <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Épingler pour le laboratoire RAG"}</span>
+                      </label>
+                    )}
+                  </div>
+                </details>
+              )}
+            </article>
+          );
+        })}
       </div>
     </TooltipProvider>
   );
@@ -347,6 +379,8 @@ interface GmPostTurnEntry {
   speech_guidance?: "on" | "off";
   gm_mode?: import("@/types").GmMode;
   injected?: import("@/types").GmInjectedToCharacter;
+  model?: string;
+  labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
   character_state_used?: import("@/services/characterState").StateLevels | null;
   character_state_applied?: Partial<Record<import("@/services/characterState").StateAxis, number>> | null;
   character_key?: string;
@@ -748,7 +782,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
       });
     if (selected.diagnostic_trace_enabled) {
       void supabase.from("conversation_turn_traces" as never)
-        .select("turn_index,character_name,matches:trace->rag->matches,settings:trace->maxCall->requestedSettings")
+        .select("turn_index,character_name,matches:trace->rag->matches,settings:trace->maxCall->requestedSettings,search:trace->rag->request")
         .eq("session_id", sessionId)
         .order("turn_index", { ascending: true }).limit(200)
         .then(({ data, error }) => {
@@ -758,7 +792,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             setTraceStatus("error");
             return;
           }
-          setTurnTraces(((data ?? []) as Array<{ turn_index?: unknown; character_name?: unknown; matches?: unknown; settings?: unknown }>)
+          setTurnTraces(((data ?? []) as Array<{ turn_index?: unknown; character_name?: unknown; matches?: unknown; settings?: unknown; search?: unknown }>)
             .map(readTurnTrace)
             .filter((row): row is TurnTraceView => row != null));
           setTraceStatus("ready");
@@ -900,7 +934,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   }
 
   return (
-    <div data-testid="sessions-layout" className="grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:grid-cols-[13rem_minmax(0,1fr)_18rem]">
+    <div data-testid="sessions-layout" className="grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:grid-cols-[22rem_minmax(0,1fr)_18rem]">
       <section data-testid="session-list" className="flex h-[40vh] min-h-0 flex-col lg:h-full">
         <div className="mb-2 flex shrink-0 items-center justify-between">
           <h2 className="text-lg font-semibold">Sessions</h2>

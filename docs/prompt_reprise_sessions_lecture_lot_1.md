@@ -1,6 +1,6 @@
 # Prompt de reprise — Données › Sessions, la conversation au centre, lot 1
 
-**Lot livré le 23 novembre 2026.** Ne pas le refaire. La recette humaine (une session tracée, une session normale) reste à faire. Aucun lot suivant n'est écrit tant que cette recette n'a pas confirmé que le trou des sessions normales reste utile.
+**Lot livré le 23 novembre 2026.** Ne pas le refaire. La recette du 23 novembre a élargi la liste et rangé le détail dans un toggle ([état courant](etat_courant.md)). Le trou des répliques absentes est le lot suivant : [reprise](prompt_reprise_sessions_reponses_manquantes.md).
 
 À copier dans un nouvel agent sur Ava. Contexte : [état courant](etat_courant.md).
 Décrit le 23 novembre 2026 par Ulrich.

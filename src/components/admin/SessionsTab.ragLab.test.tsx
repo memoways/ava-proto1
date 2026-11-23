@@ -85,8 +85,9 @@ describe("SessionsTab — envoi vers le laboratoire RAG", () => {
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("Session test"));
+    fireEvent.click(screen.getByText("Détail du tour"));
 
-    const checkbox = await screen.findByRole("checkbox", { name: "Envoyer question dans le laboratoire RAG" });
+    const checkbox = await screen.findByRole("checkbox", { name: "Épingler pour le laboratoire RAG" });
     await waitFor(() => expect(checkbox).toBeEnabled());
     fireEvent.click(checkbox);
 

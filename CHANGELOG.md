@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sessions : liste plus large, détail par tour] — 2026-11-23
+
+- La liste des sessions passe de 13 rem à 22 rem. La conversation et les détails techniques restent les deux autres colonnes.
+- Sous chaque tour : phrase du joueur, thèmes, mots-clés et intentions lorsqu'ils sont dans le journal, puis la réplique. Une réplique absente du journal est écrite telle quelle, au lieu de laisser la phrase sur les chunks à sa place.
+- « Détail du tour » regroupe l'état de parole, le conseil du Game Master, les durées du tour, et, si la session est tracée, la recherche RAG, les chunks et le modèle. La phrase « chunks non enregistrés » n'apparaît plus qu'une fois, en tête d'une session non tracée.
+- L'épinglage vers le laboratoire RAG quitte la lecture et reste dans ce détail. Le laboratoire l'utilise toujours.
+- **Inchangé** : pipeline de jeu, enregistrement des réponses et des traces. Le trou des répliques absentes de la session Romed du 23 novembre 16:33 est diagnostiqué, pas corrigé.
+
 ## [Sessions : la conversation au centre] — 2026-11-23
 
 - Admin → Données → Sessions : trois colonnes sur la hauteur utile. Liste étroite à gauche (titre, date, personnages). Conversation au centre, texte plus grand qu'avant. À droite : statistiques, réglages effectifs, triggers, rôle, passages, émotion du visage, journal du Game Master, questionnaire.
