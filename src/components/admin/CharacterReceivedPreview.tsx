@@ -23,6 +23,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
   const [rows, setRows] = useState<CharacterLayerRow[] | null>(null);
   const [prompt, setPrompt] = useState("");
   const [error, setError] = useState("");
+  const [warnings, setWarnings] = useState<Array<{ code: string; message: string }>>([]);
 
   const toggle = async () => {
     if (open) { setOpen(false); return; }
@@ -41,6 +42,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
       });
       setRows(describeCharacterPromptLayers(trace));
       setPrompt(trace.finalSystemPrompt);
+      setWarnings(trace.budget?.warnings ?? []);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Aperçu indisponible.");
@@ -58,6 +60,9 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
       {open && error && <p className="text-xs text-amber-300/90">{error}</p>}
       {open && rows && (
         <>
+          {warnings.map((warning) => (
+            <p key={warning.code} role="alert" className="rounded border border-destructive/60 px-2 py-1 text-xs text-destructive">⚠ {warning.message}</p>
+          ))}
           <p className="text-[11px] text-muted-foreground">
             Ordre de priorité écrit en tête du prompt : 1 faits de la fiche › 2 cadre › 3 état de l'application › 4 parole du tour. Cadre, directive GM,
             mémoire et souvenirs s'ajoutent à chaque tour ; ici l'état initial du radar et aucun historique.
