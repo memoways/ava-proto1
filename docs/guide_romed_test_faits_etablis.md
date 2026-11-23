@@ -1,28 +1,28 @@
 # Guide Romed — tester Max et Emma depuis ta sandbox (faits établis)
 
-23 novembre 2026. Relevé fait en lecture seule sur `sandbox-romed` et `sandbox-ulrich` : **rien n'a été modifié dans ta
-sandbox**. Les réglages ci-dessous sont à changer par toi (Admin), ou à laisser tels quels en connaissance de cause.
+23 novembre 2026. Relevé fait en lecture seule sur `sandbox-romed` et `sandbox-ulrich` (mis à jour après la synchronisation des fiches) :
+**rien n'a été modifié dans ta sandbox**. Les réglages ci-dessous sont à changer par toi (Admin), ou à laisser tels quels en connaissance de cause.
 
 ## Message à copier pour Romed
 
 > Salut Romed. Le code qui envoyait une partie seulement de « Ce qui est vrai aujourd'hui » est corrigé : Max et Emma
 > reçoivent maintenant le paragraphe en entier (y compris « où ton père l'a mise » et qui a su quoi et quand). J'ai besoin
-> que tu écoutes quelques appels depuis **ta** sandbox. Avant de tester, il y a **une chose obligatoire** et quelques
+> que tu écoutes quelques appels depuis **ta** sandbox. Tes fiches sont déjà synchronisées dans ta sandbox ; il y a juste un contrôle à faire et quelques
 > écarts avec ma sandbox à connaître. Tout est dans « Guide Romed » ci-dessous. Ensuite : 4 questions par personnage, tu
 > notes juste / faux / ambigu, et tu me renvoies tes notes.
 
-## 1. À faire avant de tester (obligatoire)
+## 1. Avant de tester : contrôle (la synchronisation est déjà faite)
 
-**Ta sandbox n'a aucune fiche de Max ni d'Emma** (0 ligne `character_prompts`, la mienne et celle de Benoît en ont 2).
-Sans fiche, le personnage ne peut pas être généré. À faire :
+Les fiches de Max et d'Emma ont été synchronisées dans ta sandbox le **23 novembre à 12 h 50** (celle de Benoît à 12 h 51) :
+elles sont identiques à celles de la production (identité, timeline, manière de parler). **Tu n'as rien à resynchroniser.**
+Seule la synchronisation depuis Notion est à refaire si tu modifies une fiche dans Notion ensuite.
 
-1. Admin › Personnages › Max : bouton **« Resync depuis Notion »** (il apparaît tel quel quand la fiche manque). Pareil
-   pour Emma. Attendre le message vert « Champs éditoriaux resyncés ».
-2. **Recharger la page** (la fiche est gardée en mémoire du navigateur sans expiration).
-3. Contrôle : Admin › Personnages › Max › **« Voir ce que reçoit le personnage »**.
+1. **Recharger la page** de ta sandbox (la fiche est gardée en mémoire du navigateur sans expiration).
+2. Admin › Personnages › Max › **« Voir ce que reçoit le personnage »**.
    - Le bloc « FAITS ÉTABLIS » doit finir par « …maintenant elle sais que ce n'est pas possible. » (la faute y est encore,
      c'est ton texte Notion). S'il s'arrête avant « où ton père l'a mise », la page n'a pas la nouvelle version : me le dire.
    - Aucun encadré rouge « ⚠ » ne doit apparaître. S'il y en a un : capture d'écran, et arrêter là.
+3. Même contrôle pour Emma.
 
 ## 2. Écarts entre ta sandbox et la mienne (relevé du 23 novembre)
 
@@ -39,7 +39,7 @@ Sans fiche, le personnage ne peut pas être généré. À faire :
 | Avatar en streaming (Anam : voix et avatar) | vides | renseignés | si tu testes avec l'avatar : il manque l'identifiant de voix et d'avatar ; sinon ignorer |
 
 Ce que je n'ai pas pu vérifier : que l'adresse de test que tu utilises exécute bien la dernière version de l'application
-(la fusion est faite, la synchronisation Lovable de ce lot est à confirmer). Le contrôle du point 1.3 le prouve.
+(la fusion est faite, la synchronisation Lovable de ce lot est à confirmer). Le contrôle du point 1 le prouve.
 
 ## 3. Ce qu'il faut tester (4 questions par personnage, appel en texte ou en voix)
 
@@ -60,7 +60,7 @@ propre fiche. Note à chaque fois : **juste / faux / ambigu**, avec la phrase du
 
 ## 4. Ce que je te demande de me renvoyer
 
-- Le résultat du contrôle 1.3 (bloc complet, pas d'encadré rouge) ;
+- Le résultat du contrôle du point 1 (bloc complet, pas d'encadré rouge) ;
 - pour les 8 questions : la réponse copiée + juste / faux / ambigu ;
 - ton ressenti en une phrase par personnage : est-ce que cela sonne juste, ou « fiche récitée » ;
 - si tu as activé le cadre de l'appel ou changé autre chose, dis-le.
