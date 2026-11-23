@@ -16,6 +16,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { Trash2, Pencil, MessageSquare, Check, X, ExternalLink, Activity, ScanSearch, FlaskConical, Download, Loader2 } from "lucide-react";
 import { describeGmToCharacter, findGmEntryForReply, sessionGmModeLabel } from "@/services/gmInjectedView";
+import {
+  UNTRACED_CHUNKS_SENTENCE,
+  formatModelRequest,
+  indexTtsByTurn,
+  readTurnTrace,
+  replyContextLine,
+  tracesForTurn,
+  type TtsReading,
+  type TurnTraceView,
+} from "@/services/sessionTurnReading";
 import { CharacterStateHistory } from "@/components/admin/CharacterStateHistory";
 import { describeStateLevels } from "@/services/characterState";
 import { Link } from "react-router-dom";
@@ -78,6 +88,247 @@ interface AdminConversationMessage {
   };
   pipeline?: { blocker?: string };
   labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
+}
+
+type FaceCueRow = { turn_index: number | null; character: string | null; cue: AvatarCueObservation | null };
+type TraceStatus = "idle" | "untraced" | "loading" | "ready" | "error";
+
+interface ConversationGroup {
+  turn: number | null;
+  items: Array<{ msg: AdminConversationMessage; index: number }>;
+}
+
+function conversationGroups(log: AdminConversationMessage[]): ConversationGroup[] {
+  const groups: ConversationGroup[] = [];
+  let turn = 0;
+  for (let index = 0; index < log.length; index++) {
+    const msg = log[index];
+    if (msg.role === "user" || groups.length === 0) {
+      if (msg.role === "user") turn += 1;
+      groups.push({ turn: msg.role === "user" ? turn : null, items: [] });
+    }
+    groups[groups.length - 1].items.push({ msg, index });
+  }
+  return groups;
+}
+
+function faceForReply(rows: FaceCueRow[], turn: number, character: string): string | null {
+  const row = rows.find((item) => (
+    item.turn_index === turn
+    && (item.character ?? "").toLowerCase() === character.toLowerCase()
+    && item.cue
+    && typeof item.cue.cue === "string"
+  ));
+  if (!row?.cue) return null;
+  return row.cue.emotion ? `${row.cue.cue} · ${row.cue.emotion}` : row.cue.cue;
+}
+
+function TurnTraceBlock({
+  sessionId,
+  turn,
+  status,
+  traces,
+}: {
+  sessionId: string;
+  turn: number | null;
+  status: TraceStatus;
+  traces: TurnTraceView[];
+}) {
+  if (turn == null) return null;
+  if (status === "untraced") {
+    return <p className="mt-3 text-xs text-muted-foreground" data-testid="turn-trace-missing">{UNTRACED_CHUNKS_SENTENCE}</p>;
+  }
+  if (status === "loading" || status === "idle") {
+    return <p className="mt-3 text-xs text-muted-foreground">Lecture des traces…</p>;
+  }
+  if (status === "error") {
+    return <p className="mt-3 text-xs text-muted-foreground">Traces illisibles pour cette session.</p>;
+  }
+  const rows = tracesForTurn(traces, turn);
+  return (
+    <div className="mt-3 space-y-1" data-testid="turn-trace">
+      {rows.length === 0 && <p className="text-xs text-muted-foreground">Aucun enregistrement de trace pour ce tour.</p>}
+      {rows.map((row) => (
+        <div key={`${row.turnIndex}-${row.characterName || "personnage"}`}>
+          {row.characterName && rows.length > 1 && <p className="text-xs font-semibold text-foreground">{row.characterName}</p>}
+          {row.chunks.length === 0 && <p className="text-xs text-muted-foreground">Aucun chunk injecté pour ce tour.</p>}
+          {row.chunks.map((chunk, index) => (
+            <p key={`${chunk.sourceId}-${index}`} className="break-words text-xs text-muted-foreground" data-testid="turn-chunk">
+              <span className="font-mono">{chunk.sourceId}</span>
+              {` · ${chunk.scoreLabel}`}
+              {chunk.excerpt ? ` · ${chunk.excerpt}` : ""}
+            </p>
+          ))}
+          <p className="text-xs text-muted-foreground" data-testid="turn-model">
+            {formatModelRequest(row.model) ?? "Modèle demandé non enregistré pour ce tour."}
+          </p>
+        </div>
+      ))}
+      <Link
+        to={`${adminTabPath("pipeline")}?session=${encodeURIComponent(sessionId)}&turn=${turn}`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-violet-300 hover:underline"
+      >
+        <ScanSearch className="h-3 w-3" /> Analyser ce tour
+      </Link>
+    </div>
+  );
+}
+
+function ConversationColumn({
+  session,
+  pinnedMessageIndexes,
+  pinningMessageIndexes,
+  pinnedStorageReady,
+  onToggleRag,
+  traceStatus,
+  turnTraces,
+  ttsByTurn,
+  faceRows,
+}: {
+  session: SessionRow;
+  pinnedMessageIndexes: Set<number>;
+  pinningMessageIndexes: Set<number>;
+  pinnedStorageReady: boolean | null;
+  onToggleRag: (messageIndex: number, question: string, checked: boolean) => void;
+  traceStatus: TraceStatus;
+  turnTraces: TurnTraceView[];
+  ttsByTurn: Map<number, TtsReading>;
+  faceRows: FaceCueRow[];
+}) {
+  const log = Array.isArray(session.conversation_log) ? session.conversation_log : [];
+  if (!log.length) {
+    return (
+      <div>
+        <p className="text-sm text-muted-foreground">Aucun échange enregistré.</p>
+        {traceStatus === "untraced" && (
+          <p className="mt-3 text-xs text-muted-foreground" data-testid="turn-trace-missing">{UNTRACED_CHUNKS_SENTENCE}</p>
+        )}
+      </div>
+    );
+  }
+  const gmLog = Array.isArray(session.gm_post_turn_log) ? session.gm_post_turn_log : [];
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-6">
+        {conversationGroups(log).map((group) => (
+          <article key={group.items[0]?.index ?? "ouverture"} data-testid={group.turn == null ? undefined : "conversation-turn"} className="border-b border-border/50 pb-5 last:border-b-0">
+            {group.turn != null && (
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tour {group.turn}</h3>
+            )}
+            {group.items.map(({ msg, index }) => {
+              const fb = msg.gmFallback;
+              const blocker = msg.pipeline?.blocker;
+              const turn = group.turn ?? 0;
+              const speaker = msg.role === "user" ? "User" : msg.role === "emma" ? "Emma" : "Max";
+              const color = msg.role === "user" ? "text-green-300" : msg.role === "emma" ? "text-fuchsia-300" : "text-blue-300";
+              const gmEntry = msg.role !== "user" && turn > 0 && gmLog.length
+                ? findGmEntryForReply(gmLog, turn, msg.role)
+                : null;
+              const context = msg.role === "user" ? null : replyContextLine({
+                speechState: gmEntry?.injected?.speechState ?? null,
+                playedState: gmEntry?.character_state_used ? describeStateLevels(gmEntry.character_state_used) : null,
+                gmToCharacter: gmEntry || (turn > 0 && gmLog.length) ? describeGmToCharacter(gmEntry) : null,
+                tts: turn > 0 ? ttsByTurn.get(turn) ?? null : null,
+                face: turn > 0 ? faceForReply(faceRows, turn, msg.role) : null,
+              });
+              return (
+                <div key={index} className="mb-4">
+                  <p className={`whitespace-pre-wrap text-base leading-relaxed ${color}`}>
+                    <span className="font-semibold">{speaker} :</span> {msg.content}
+                  </p>
+                  {msg.role === "user" && typeof msg.content === "string" && isQuestionLike(msg.content) && (
+                    <label className="mt-1 flex w-fit items-center gap-1.5 text-[11px] text-muted-foreground/80">
+                      <Checkbox
+                        checked={pinnedMessageIndexes.has(index)}
+                        disabled={pinnedStorageReady !== true || pinningMessageIndexes.has(index)}
+                        onCheckedChange={(checked) => void onToggleRag(index, msg.content, checked === true)}
+                        aria-label="Envoyer question dans le laboratoire RAG"
+                      />
+                      <FlaskConical className="h-3 w-3" />
+                      <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
+                    </label>
+                  )}
+                  {context && (
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground" data-testid="gm-to-character-reply">{context}</p>
+                  )}
+                  {msg.role === "user" && msg.labels && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(msg.labels.themes ?? []).map((theme: string, key: number) => (
+                        <span key={`th-${key}`} className="rounded border border-primary/40 bg-primary/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary">{theme}</span>
+                      ))}
+                      {(msg.labels.topics ?? []).map((topic: string, key: number) => (
+                        <span key={`tp-${key}`} className="rounded border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">{topic}</span>
+                      ))}
+                      {(msg.labels.intentions ?? []).map((intention: string, key: number) => (
+                        <span key={`in-${key}`} className="rounded border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300">{intention}</span>
+                      ))}
+                    </div>
+                  )}
+                  {msg.role !== "user" && (fb || blocker) && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {fb && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help rounded border border-destructive/40 bg-destructive/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
+                              GM fallback · {fb.kind}
+                              {typeof fb.elapsed_ms === "number" ? ` · ${fb.elapsed_ms}ms` : ""}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" align="start" className="max-w-[420px] border bg-popover p-0 text-popover-foreground">
+                            <div className="space-y-1.5 p-2.5 text-xs">
+                              <div className="flex items-center justify-between gap-3 border-b border-border pb-1.5">
+                                <span className="font-semibold uppercase tracking-wide text-destructive">GM fallback · {fb.kind}</span>
+                                {typeof fb.elapsed_ms === "number" && (
+                                  <span className="font-mono text-[10px] text-muted-foreground">
+                                    {fb.elapsed_ms} ms
+                                    {typeof fb.timeout_ms === "number" ? ` / ${fb.timeout_ms} ms seuil` : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
+                                <span className="text-muted-foreground">Raison</span>
+                                <span className="break-words">{fb.reason || "—"}</span>
+                                <span className="text-muted-foreground">Modèle</span>
+                                <span className="break-all font-mono">{fb.model || "—"}</span>
+                                <span className="text-muted-foreground">Timeout</span>
+                                <span className="font-mono">{typeof fb.timeout_ms === "number" ? `${fb.timeout_ms} ms` : "—"}</span>
+                                <span className="text-muted-foreground">Écoulé</span>
+                                <span className="font-mono">{typeof fb.elapsed_ms === "number" ? `${fb.elapsed_ms} ms` : "—"}</span>
+                              </div>
+                              {fb.error_excerpt && (
+                                <div className="border-t border-border pt-1.5">
+                                  <p className="mb-1 text-muted-foreground">Extrait erreur (200 c.)</p>
+                                  <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-1.5 font-mono text-[10px]">{fb.error_excerpt}</pre>
+                                </div>
+                              )}
+                              {FALLBACK_TARGET_TAB[fb.kind ?? ""] && (
+                                <div className="border-t border-border pt-1.5">
+                                  <Link to={adminTabPath(FALLBACK_TARGET_TAB[fb.kind ?? ""].tab)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                                    <ExternalLink className="h-3 w-3" />
+                                    {FALLBACK_TARGET_TAB[fb.kind ?? ""].label}
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {blocker && (
+                        <span className="rounded border border-amber-500/40 bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-300">
+                          blocker · {blocker}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <TurnTraceBlock sessionId={session.id} turn={group.turn} status={traceStatus} traces={turnTraces} />
+          </article>
+        ))}
+      </div>
+    </TooltipProvider>
+  );
 }
 
 interface GmPostTurnEntry {
@@ -236,9 +487,9 @@ function EffectiveSettingsSummary({ deviceInfo }: { deviceInfo: unknown }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-medium">{value}</p>
+      <p className="break-all font-medium">{value}</p>
     </div>
   );
 }
@@ -413,6 +664,10 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [pinnedMessageIndexes, setPinnedMessageIndexes] = useState<Set<number>>(new Set());
   const [pinningMessageIndexes, setPinningMessageIndexes] = useState<Set<number>>(new Set());
   const [pinnedStorageReady, setPinnedStorageReady] = useState<boolean | null>(null);
+  const [faceRows, setFaceRows] = useState<FaceCueRow[]>([]);
+  const [ttsByTurn, setTtsByTurn] = useState<Map<number, TtsReading>>(new Map());
+  const [turnTraces, setTurnTraces] = useState<TurnTraceView[]>([]);
+  const [traceStatus, setTraceStatus] = useState<TraceStatus>("idle");
   const [environmentFilter, setEnvironmentFilter] = useState("all");
   const [contextFilter, setContextFilter] = useState("all");
   const [campaignFilter, setCampaignFilter] = useState("all");
@@ -462,6 +717,53 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
         setPinnedMessageIndexes(new Set((data || []).map((row) => row.message_index)));
         setPinnedStorageReady(true);
       });
+    return () => { active = false; };
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected) {
+      setFaceRows([]);
+      setTtsByTurn(new Map());
+      setTurnTraces([]);
+      setTraceStatus("idle");
+      return;
+    }
+    let active = true;
+    const sessionId = selected.id;
+    setFaceRows([]);
+    setTtsByTurn(new Map());
+    setTurnTraces([]);
+    setTraceStatus(selected.diagnostic_trace_enabled ? "loading" : "untraced");
+    void supabase.from("voice_turn_events" as never)
+      .select("turn_index,character:metadata_json->>character,cue:metadata_json->avatar_cue")
+      .eq("session_id", sessionId).eq("event_name", "voice_turn_finished")
+      .order("created_at", { ascending: true }).limit(500)
+      .then(({ data }) => { if (active) setFaceRows((data ?? []) as unknown as FaceCueRow[]); });
+    void supabase.from("audio_latencies" as never)
+      .select("turn_index,metadata_json")
+      .eq("session_id", sessionId).eq("direction", "out")
+      .order("created_at", { ascending: true }).limit(500)
+      .then(({ data }) => {
+        if (active) setTtsByTurn(indexTtsByTurn((data ?? []) as Array<{ turn_index?: unknown; metadata_json?: unknown }>));
+      });
+    if (selected.diagnostic_trace_enabled) {
+      void supabase.from("conversation_turn_traces" as never)
+        .select("turn_index,character_name,matches:trace->rag->matches,settings:trace->maxCall->requestedSettings")
+        .eq("session_id", sessionId)
+        .order("turn_index", { ascending: true }).limit(200)
+        .then(({ data, error }) => {
+          if (!active) return;
+          if (error) {
+            setTurnTraces([]);
+            setTraceStatus("error");
+            return;
+          }
+          setTurnTraces(((data ?? []) as Array<{ turn_index?: unknown; character_name?: unknown; matches?: unknown; settings?: unknown }>)
+            .map(readTurnTrace)
+            .filter((row): row is TurnTraceView => row != null));
+          setTraceStatus("ready");
+        });
+    }
     return () => { active = false; };
   }, [selected]);
 
@@ -598,13 +900,13 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div>
-        <div className="flex items-center justify-between mb-2">
+    <div data-testid="sessions-layout" className="grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:grid-cols-[13rem_minmax(0,1fr)_18rem]">
+      <section data-testid="session-list" className="flex h-[40vh] min-h-0 flex-col lg:h-full">
+        <div className="mb-2 flex shrink-0 items-center justify-between">
           <h2 className="text-lg font-semibold">Sessions</h2>
           <Button size="sm" variant="outline" onClick={onRefresh}>Rafraîchir</Button>
         </div>
-        <div className="mb-3 grid gap-2 sm:grid-cols-3">
+        <div className="mb-3 grid shrink-0 gap-2">
           <Select value={environmentFilter} onValueChange={setEnvironmentFilter}>
             <SelectTrigger aria-label="Filtrer par environnement"><SelectValue placeholder="Environnement" /></SelectTrigger>
             <SelectContent>
@@ -634,7 +936,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             </SelectContent>
           </Select>
         </div>
-        <div className="mb-2 flex items-center gap-3 text-sm">
+        <div className="mb-2 flex shrink-0 flex-col gap-2 text-sm">
           <Select value={characterFilter} onValueChange={setCharacterFilter}>
             <SelectTrigger aria-label="Filtrer les sessions par personnage"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -651,8 +953,8 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             </SelectContent>
           </Select>
         </div>
-        <p className="mb-2 text-xs text-muted-foreground">{visibleSessions.length} sessions affichées sur {sessions.length} chargées.</p>
-        <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+        <p className="mb-2 shrink-0 text-xs text-muted-foreground">{visibleSessions.length} sessions affichées sur {sessions.length} chargées.</p>
+        <div className="mb-2 flex shrink-0 flex-wrap items-center gap-3 text-sm">
           <Checkbox
             aria-label="Tout sélectionner"
             disabled={exporting}
@@ -674,7 +976,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             {armedBulk ? `Confirmer la suppression (${checkedIds.size})` : "Supprimer la sélection"}
           </Button>
         </div>
-        <ScrollArea className="h-[70vh] border rounded-lg">
+        <ScrollArea className="min-h-0 flex-1 rounded-lg border">
           {visibleSessions.map((s) => (
             <div
               key={s.id}
@@ -686,48 +988,21 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                 onSelectSession(s.id);
               }}
             >
-              <div className="flex justify-between items-start">
-                <div className="flex gap-2">
-                  <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
-                    <Checkbox
-                      aria-label="Sélectionner la session"
-                      disabled={exporting}
-                      checked={checkedIds.has(s.id)}
-                      onCheckedChange={(v) => toggleChecked(s.id, v === true)}
-                    />
-                  </div>
-                <div>
+              <div className="flex gap-2 pr-14">
+                <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                  <Checkbox
+                    aria-label="Sélectionner la session"
+                    disabled={exporting}
+                    checked={checkedIds.has(s.id)}
+                    onCheckedChange={(v) => toggleChecked(s.id, v === true)}
+                  />
+                </div>
+                <div className="min-w-0">
                   <span className="text-sm font-semibold">{s.name || autoSessionTitle(s)}</span>
+                  <p className="text-xs text-muted-foreground">{fmt(s.started_at)}</p>
                   <p className="text-xs text-muted-foreground">{sessionCharacterLabel(s)}</p>
-                  <p className="text-[10px] font-mono text-muted-foreground">{s.id.slice(0, 8)} · {fmt(s.started_at)}</p>
-                  <p className="mt-1 text-xs"><span className="text-muted-foreground">Compte :</span> {s.account_display_name ?? "public"}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {s.environment_id} · {s.test_invitation_id ? "test externe" : s.context_type} · {sessionDeviceLabel(s)}
-                    {s.campaign_id ? ` · ${s.campaign_id}` : ""}
-                    {s.tester_label ? ` · ${s.tester_label}` : ""}
-                  </p>
-                </div>
-                </div>
-                <div className="text-right text-xs flex items-center gap-2">
-                  <span className={`inline-block px-2 py-0.5 rounded-full ${
-                    s.ended_at ? "bg-green-900/40 text-green-300" : "bg-yellow-900/40 text-yellow-300"
-                  }`}>
-                    {s.ended_at ? "Terminée" : "En cours"}
-                  </span>
-                  {s.diagnostic_trace_enabled && (
-                    <span className="inline-block rounded-full bg-violet-500/20 px-2 py-0.5 text-violet-300">
-                      Tracée
-                    </span>
-                  )}
-                  <p className="mt-1">Trust: {s.trust_level ?? 0} | {s.duration_seconds ?? "—"}s</p>
                 </div>
               </div>
-              {s.admin_note && (
-                <p className="text-xs text-muted-foreground mt-1 italic">💬 {s.admin_note}</p>
-              )}
-              {s.game_over_reason && (
-                <p className="text-xs text-red-400 mt-1">Fin: {s.game_over_reason}</p>
-              )}
               {/* Action buttons on hover */}
               <div className="absolute right-2 top-2 hidden group-hover:flex gap-1">
                 <Link
@@ -800,11 +1075,41 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             <p className="p-4 text-muted-foreground text-sm">Aucune session</p>
           )}
         </ScrollArea>
-      </div>
+      </section>
 
-      <div>
+      <section data-testid="session-conversation" className="flex min-h-[24rem] min-w-0 flex-col lg:h-full lg:min-h-0">
         {selected ? (
-          <div className="border rounded-lg p-4">
+          <>
+            <div className="mb-2 flex shrink-0 items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold">{selected.name || autoSessionTitle(selected)}</h2>
+              <span className="text-xs text-muted-foreground">
+                {Array.isArray(selected.conversation_log) ? selected.conversation_log.length : 0} messages
+              </span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border p-4">
+              <ConversationColumn
+                session={selected}
+                pinnedMessageIndexes={pinnedMessageIndexes}
+                pinningMessageIndexes={pinningMessageIndexes}
+                pinnedStorageReady={pinnedStorageReady}
+                onToggleRag={(messageIndex, question, checked) => void toggleRAGLabQuestion(messageIndex, question, checked)}
+                traceStatus={traceStatus}
+                turnTraces={turnTraces}
+                ttsByTurn={ttsByTurn}
+                faceRows={faceRows}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-1 items-center justify-center rounded-lg border p-8 text-center text-muted-foreground">
+            Sélectionne une session pour lire la conversation
+          </div>
+        )}
+      </section>
+
+      <section data-testid="session-details" className="min-h-0 lg:h-full">
+        {selected ? (
+          <div className="rounded-lg border p-4 lg:h-full lg:overflow-y-auto">
             <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <h2 className="text-lg font-semibold">
                 {selected.name || autoSessionTitle(selected)}
@@ -854,6 +1159,9 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
               <Stat label="Campagne" value={selected.campaign_id || "—"} />
               <Stat label="Testeur" value={selected.tester_label || "—"} />
               <Stat label="Invitation" value={selected.test_invitation_id?.slice(0, 8) || "—"} />
+              <Stat label="Statut" value={selected.ended_at ? "Terminée" : "En cours"} />
+              <Stat label="Trace" value={selected.diagnostic_trace_enabled ? "Tracée" : "Non enregistrée"} />
+              <Stat label="Identifiant" value={selected.id} />
             </div>
 
             <EffectiveSettingsSummary deviceInfo={selected.device_info} />
@@ -910,8 +1218,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   {" · "}mode GM : {sessionGmModeLabel(selected.gm_post_turn_log)}
                 </p>
                 <CharacterStateHistory log={selected.gm_post_turn_log} />
-                <ScrollArea className="h-48">
-                  <div className="space-y-1.5">
+                <div className="space-y-1.5">
                     {selected.gm_post_turn_log.map((evalEntry, i) => (
                       <div
                         key={i}
@@ -979,159 +1286,12 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
               </div>
             )}
 
             {Array.isArray(selected.conversation_log) && selected.conversation_log.length > 0 && (
               <GmFallbackChart log={selected.conversation_log} />
             )}
-
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-muted-foreground mb-1">
-                Conversation ({Array.isArray(selected.conversation_log) ? selected.conversation_log.length : 0} messages)
-              </p>
-              <ScrollArea className="h-60 border rounded p-2">
-                <TooltipProvider delayDuration={150}>
-                  {Array.isArray(selected.conversation_log) &&
-                    selected.conversation_log.map((msg, i) => {
-                      const fb = msg.gmFallback;
-                      const blocker = msg.pipeline?.blocker;
-                      const causalTurn = selected.conversation_log
-                        .slice(0, i)
-                        .filter((previous) => previous?.role === "user").length;
-                      return (
-                        <div key={i} className={`mb-2 text-sm ${msg.role === "user" ? "text-green-300" : msg.role === "emma" ? "text-fuchsia-300" : "text-blue-300"}`}>
-                          <span className="font-bold">{msg.role === "user" ? "User" : msg.role === "emma" ? "Emma" : "Max"}:</span> {msg.content}
-                          {msg.role === "user" && typeof msg.content === "string" && isQuestionLike(msg.content) && (
-                            <label className="mt-1.5 flex w-fit cursor-pointer items-center gap-2 rounded border border-border/70 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
-                              <Checkbox
-                                checked={pinnedMessageIndexes.has(i)}
-                                disabled={pinnedStorageReady !== true || pinningMessageIndexes.has(i)}
-                                onCheckedChange={(checked) => void toggleRAGLabQuestion(i, msg.content, checked === true)}
-                                aria-label="Envoyer question dans le laboratoire RAG"
-                              />
-                              <FlaskConical className="h-3 w-3" />
-                              <span>{pinnedStorageReady === false ? "Migration Laboratoire RAG requise" : "Envoyer question dans le laboratoire RAG"}</span>
-                            </label>
-                          )}
-                          {msg.role !== "user" && causalTurn > 0 && Array.isArray(selected.gm_post_turn_log) && selected.gm_post_turn_log.length > 0 && (
-                            <p className="mt-1 rounded border border-border/60 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground" data-testid="gm-to-character-reply">
-                              <span className="font-semibold">GM → personnage :</span>{" "}
-                              {describeGmToCharacter(findGmEntryForReply(selected.gm_post_turn_log, causalTurn, msg.role))}
-                            </p>
-                          )}
-                          {msg.role !== "user" && selected.diagnostic_trace_enabled && causalTurn > 0 && (
-                            <div className="mt-1">
-                              <Link
-                                to={`${adminTabPath("pipeline")}?session=${encodeURIComponent(selected.id)}&turn=${causalTurn}`}
-                                className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-300 hover:underline"
-                              >
-                                <ScanSearch className="h-3 w-3" /> Analyser ce tour
-                              </Link>
-                            </div>
-                          )}
-                          {msg.role === "user" && msg.labels && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {(msg.labels.themes ?? []).map((t: string, k: number) => (
-                                <span key={`th-${k}`} className="text-[10px] uppercase tracking-wide bg-primary/15 text-primary border border-primary/40 px-1.5 py-0.5 rounded">
-                                  {t}
-                                </span>
-                              ))}
-                              {(msg.labels.topics ?? []).map((t: string, k: number) => (
-                                <span key={`tp-${k}`} className="text-[10px] uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
-                                  {t}
-                                </span>
-                              ))}
-                              {(msg.labels.intentions ?? []).map((t: string, k: number) => (
-                                <span key={`in-${k}`} className="text-[10px] uppercase tracking-wide bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded">
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {msg.role !== "user" && (fb || blocker) && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {fb && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="cursor-help text-[10px] uppercase tracking-wide bg-destructive/20 text-destructive border border-destructive/40 px-1.5 py-0.5 rounded">
-                                      GM fallback · {fb.kind}
-                                      {typeof fb.elapsed_ms === "number" ? ` · ${fb.elapsed_ms}ms` : ""}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    side="bottom"
-                                    align="start"
-                                    className="max-w-[420px] p-0 bg-popover text-popover-foreground border"
-                                  >
-                                    <div className="p-2.5 space-y-1.5 text-xs">
-                                      <div className="flex items-center justify-between gap-3 border-b border-border pb-1.5">
-                                        <span className="font-semibold uppercase tracking-wide text-destructive">
-                                          GM fallback · {fb.kind}
-                                        </span>
-                                        {typeof fb.elapsed_ms === "number" && (
-                                          <span className="font-mono text-[10px] text-muted-foreground">
-                                            {fb.elapsed_ms} ms
-                                            {typeof fb.timeout_ms === "number"
-                                              ? ` / ${fb.timeout_ms} ms seuil`
-                                              : ""}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1">
-                                        <span className="text-muted-foreground">Raison</span>
-                                        <span className="break-words">{fb.reason || "—"}</span>
-
-                                        <span className="text-muted-foreground">Modèle</span>
-                                        <span className="font-mono break-all">{fb.model || "—"}</span>
-
-                                        <span className="text-muted-foreground">Timeout</span>
-                                        <span className="font-mono">
-                                          {typeof fb.timeout_ms === "number" ? `${fb.timeout_ms} ms` : "—"}
-                                        </span>
-
-                                        <span className="text-muted-foreground">Écoulé</span>
-                                        <span className="font-mono">
-                                          {typeof fb.elapsed_ms === "number" ? `${fb.elapsed_ms} ms` : "—"}
-                                        </span>
-                                      </div>
-                                      {fb.error_excerpt && (
-                                        <div className="pt-1.5 border-t border-border">
-                                          <p className="text-muted-foreground mb-1">Extrait erreur (200 c.)</p>
-                                          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] bg-muted/40 rounded p-1.5 max-h-32 overflow-auto">
-{fb.error_excerpt}
-                                          </pre>
-                                        </div>
-                                      )}
-                                      {FALLBACK_TARGET_TAB[fb.kind] && (
-                                        <div className="pt-1.5 border-t border-border">
-                                          <Link
-                                            to={adminTabPath(FALLBACK_TARGET_TAB[fb.kind].tab)}
-                                            className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
-                                          >
-                                            <ExternalLink className="h-3 w-3" />
-                                            {FALLBACK_TARGET_TAB[fb.kind].label}
-                                          </Link>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                              {blocker && (
-                                <span className="text-[10px] uppercase tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
-                                  blocker · {blocker}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </TooltipProvider>
-              </ScrollArea>
-            </div>
 
             {selected.questionnaire_responses && (
               <div>
@@ -1148,7 +1308,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
             Sélectionne une session pour voir les détails
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
