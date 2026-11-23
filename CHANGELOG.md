@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sessions : la conversation au centre] — 2026-11-23
+
+- Admin → Données → Sessions : trois colonnes sur la hauteur utile. Liste étroite à gauche (titre, date, personnages). Conversation au centre, texte plus grand qu'avant. À droite : statistiques, réglages effectifs, triggers, rôle, passages, émotion du visage, journal du Game Master, questionnaire.
+- Chaque tour a son numéro, le même que « Analyser ce tour ». Sous la réplique : état de parole joué, « GM → personnage », émotion de jeu et modèle de voix TTS, émotion de visage, lorsqu'ils ont été enregistrés.
+- Session lancée en trace : chunks injectés (identifiant source, score, début du texte) et modèle + température demandés. Le lien vers le prompt complet reste. Session normale : « Chunks et paramètres du modèle non enregistrés pour cette session ». Rien n'est reconstruit.
+- La case « Envoyer question dans le laboratoire RAG » reste, en second plan.
+- **Inchangé** : pipeline de jeu, RAG, Game Master, enregistrement des traces, export Markdown (le numéro de tour y figurait déjà). Rien en production.
+- ESLint ignore les copies locales sous `.claude/` : elles ne font pas partie du dépôt livré, et elles faisaient échouer `npm run lint` sur cette machine.
+
 ## [Prompts : audio Tavus et lecture des sessions] — 2026-11-23
 
 - Point d'état, aucun code de jeu. Tavus n'a pas de modèle audio à choisir : la voix vient du TTS d'Ava (défaut) ou du PAL Tavus. L'emballement de Max vient des réglages d'émotion ElevenLabs sur la voie Ava.

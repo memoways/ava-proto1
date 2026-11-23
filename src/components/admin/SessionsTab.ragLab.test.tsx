@@ -33,7 +33,15 @@ vi.mock("@/integrations/supabase/client", () => ({
           })),
         };
       }
-      return {};
+      const result = Promise.resolve({ data: [], error: null });
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        order: vi.fn(() => query),
+        limit: vi.fn(() => result),
+        then: result.then.bind(result),
+      };
+      return query;
     }),
   },
 }));
