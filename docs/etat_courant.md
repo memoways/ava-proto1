@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Chaîne Notion → prompt, coupure des faits (23 novembre, diagnostic, aucun code de jeu)** : la coupe à 1 200 car. du paragraphe « Ce qui est vrai aujourd'hui » est destructrice : la fin (4 phrases, dont « où ton père l'a mise ») n'arrive nulle part dans le prompt de Max et Emma. Relever la limite seule ne suffit pas : au-delà de ≈ 1 600, le bloc d'Emma ne tient plus dans le noyau de 7 000 car. et disparaît en silence. Coût et latence quasi inchangés (budget constant). ≈ 13 % d'une fiche arrive au modèle par tour. Proposition : ne pas remplir « Ce que tu sais aujourd'hui » (décision Romed). Rien en production. [Rapport](audit_chaine_notion_prompt_20261123.md) · [reprise lot 2](prompt_reprise_coupure_faits_lot_2.md).
+
 **Consommation, services arrêtés (22 novembre, code)** : le bandeau du haut et le paragraphe d'explication sont retirés. La rangée « Tous les services en cours » additionne les services qui ne sont pas arrêtés. Rien en production.
 
 **Consommation, lecture du coût (22 novembre, code)** : le coût de la période est en grand sur la carte et en haut de l'onglet, avec les minutes restantes et la date de renouvellement. Rien en production.

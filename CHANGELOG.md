@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit : chaîne Notion → prompt, coupure des faits établis] — 2026-11-23
+
+- Rapport `docs/audit_chaine_notion_prompt_20261123.md` : chemin réel des données, coupures (faits établis à 1 200 car., retrait silencieux du bloc, budgets), simulation avant/après, doublons, propositions à Romed, recette.
+- **Inchangé** : code de jeu, fiches Notion, production. Correction au lot 2 ([reprise](docs/prompt_reprise_coupure_faits_lot_2.md)).
+
 ## [Consommation : services arrêtés masqués] — 2026-11-22
 
 - Le bandeau du haut et le paragraphe d'explication sont retirés. La rangée de chiffres est le total de tous les services en cours, pour la période choisie.
