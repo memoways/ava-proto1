@@ -78,4 +78,4 @@ propre fiche. Note à chaque fois : **juste / faux / ambigu**, avec la phrase du
 ## Ce que tu ne fais pas
 
 Pas de modification de la base Caractères pour ce test. Pas de test sur la production. Ne change aucun réglage qui n'est pas
-listé au point 1 (obligatoire) ou au point 2 (facultatif, à ta décision).
+listé au point 2 (facultatif, à ta décision).
