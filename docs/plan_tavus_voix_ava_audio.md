@@ -106,5 +106,8 @@ caractères) pour les avatars audio est le levier identifié ; à décider aprè
 
 ## Suite
 
-Aucun nouveau lot de code. La recette ci-dessus est intégrée au
-[prompt du lot 4 Tavus](prompt_reprise_tavus_face_emotion_lot_4.md) (recette réelle Tavus).
+La recette du 6 novembre est intégrée au
+[prompt du lot 4 Tavus](prompt_reprise_tavus_face_emotion_lot_4.md).
+La voie « Ava (audio) » reste le défaut. Le 23 novembre, Ulrich signale que Max s'emballe
+et que la qualité audio tombe : le levier est la tenue du TTS d'Ava sur cette voie.
+[Prompt](prompt_reprise_tavus_audio_tenue_lot_1.md).

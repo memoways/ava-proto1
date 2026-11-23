@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Prompts : audio Tavus et lecture des sessions] — 2026-11-23
+
+- Point d'état, aucun code de jeu. Tavus n'a pas de modèle audio à choisir : la voix vient du TTS d'Ava (défaut) ou du PAL Tavus. L'emballement de Max vient des réglages d'émotion ElevenLabs sur la voie Ava.
+- « Envoyer question dans le laboratoire RAG » épingle une question pour un essai de recherche. Les chunks et le modèle d'un tour ne sont là que sur une session tracée.
+- Deux lots préparés, non commencés : [tenue audio Tavus](docs/prompt_reprise_tavus_audio_tenue_lot_1.md), [lecture des sessions](docs/prompt_reprise_sessions_lecture_lot_1.md).
+
 ## [Faits établis sans coupure] — 2026-11-23
 
 - Le paragraphe « Ce qui est vrai aujourd'hui » n'est plus coupé à 1 200 car. : Max et Emma reçoivent « où ton père l'a mise » et la chronologie de qui a su quoi et quand.
