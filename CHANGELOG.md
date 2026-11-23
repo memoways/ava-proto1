@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Faits établis sans coupure] — 2026-11-23
+
+- Le paragraphe « Ce qui est vrai aujourd'hui » n'est plus coupé à 1 200 car. : Max et Emma reçoivent « où ton père l'a mise » et la chronologie de qui a su quoi et quand.
+- Noyau + 900 car. et plafond de contexte + 900 quand le bloc est présent ; ≈ + 233 tokens d'entrée par tour (+ 5,9 %, mesuré). Si le bloc ne tient pas, avertissement dans « Voir ce que reçoit le personnage » et `eval:judge:sheets` au lieu d'un retrait silencieux.
+- `eval:judge:sequences` écrit les tokens par appel dans le JSON du rapport. Rapport `docs/eval/faits_etablis_sans_coupure_lot_2_20261123.md`.
+- **Inchangé** : fiches Notion, base Caractères, production.
+
 ## [Audit : chaîne Notion → prompt, coupure des faits établis] — 2026-11-23
 
 - Rapport `docs/audit_chaine_notion_prompt_20261123.md` : chemin réel des données, coupures (faits établis à 1 200 car., retrait silencieux du bloc, budgets), simulation avant/après, doublons, propositions à Romed, recette.

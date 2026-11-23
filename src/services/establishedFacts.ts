@@ -8,9 +8,12 @@ import type { CharacterPrompt } from "./characterPromptService";
  * (b) otherwise the paragraph « Ce qui est vrai aujourd'hui » of the identity
  * field, the family ties named by the permanent timeline titles and, if room
  * remains, the sheet's own « chronologies » interdict.
+ *
+ * The facts are never cut: they come whole or, when the core cannot hold them,
+ * the compiler says so in the trace (a cut tail removed the sentence « où ton
+ * père l'a mise » and the chronology of who learned what, measured 23 Nov 2026).
  */
 export const ESTABLISHED_FACTS_TITLE = "FAITS ÉTABLIS — CE QUI EST VRAI AU MOMENT DE L'APPEL";
-export const ESTABLISHED_FACTS_MAX_CHARS = 1_200;
 /**
  * Usage line at the head of the block (no fact in it): the block is not a
  * closed list. Measured on 14 November 2026 (Max B1): Max still denies that
@@ -36,13 +39,6 @@ function paragraphs(text: string | undefined): string[] {
   return (text ?? "").replace(/\r\n?/g, "\n").split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
 }
 
-function capAtSentence(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  const slice = text.slice(0, maxChars);
-  const end = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf(".\n"));
-  return end > 0 ? slice.slice(0, end + 1).trim() : "";
-}
-
 /** The sheet paragraph the extraction reads, so the selection never pays it twice. */
 export function establishedFactsSourceParagraph(prompt: CharacterPrompt): string | null {
   return paragraphs(prompt.identite_fondamentale).find((block) => TRUE_TODAY_HEADING.test(block)) ?? null;
@@ -61,23 +57,14 @@ export function kinshipFromTimeline(timeline: string | undefined): string[] {
 export function characterEstablishedFacts(prompt: CharacterPrompt): EstablishedFacts | null {
   const field = prompt.ce_que_tu_sais_aujourdhui?.trim();
   // A filled field is the only source: the identity paragraph is never read next to it.
-  if (field) {
-    const content = capAtSentence(field, ESTABLISHED_FACTS_MAX_CHARS);
-    return content ? { content, source: "field" } : null;
-  }
-  const paragraph = establishedFactsSourceParagraph(prompt);
-  if (!paragraph) return null;
-  const ties = kinshipFromTimeline(prompt.timeline);
-  const tiesLine = ties.length ? `Les tiens : ${ties.join(" ; ")}.` : "";
-  const chronology = (prompt.ce_que_tu_ne_fais_jamais ?? "").match(CHRONOLOGY_SENTENCE)?.[0]?.trim() ?? "";
-  // The family ties are short and never stated elsewhere in the core: they go first in the budget.
-  const head = tiesLine.length < ESTABLISHED_FACTS_MAX_CHARS / 4 ? tiesLine : "";
-  const body = capAtSentence(paragraph, ESTABLISHED_FACTS_MAX_CHARS - (head ? head.length + 1 : 0));
+  if (field) return { content: field, source: "field" };
+  const body = establishedFactsSourceParagraph(prompt);
   if (!body) return null;
+  const ties = kinshipFromTimeline(prompt.timeline);
+  const head = ties.length ? `Les tiens : ${ties.join(" ; ")}.` : "";
+  const chronology = (prompt.ce_que_tu_ne_fais_jamais ?? "").match(CHRONOLOGY_SENTENCE)?.[0]?.trim() ?? "";
   let content = head ? `${body}\n${head}` : body;
-  if (chronology && !body.includes(chronology) && content.length + chronology.length + 1 <= ESTABLISHED_FACTS_MAX_CHARS) {
-    content = `${content}\n${chronology}`;
-  }
+  if (chronology && !body.includes(chronology)) content = `${content}\n${chronology}`;
   return { content, source: "extracted" };
 }
 
@@ -85,21 +72,17 @@ export interface EstablishedFactsBudget {
   source: "field" | "paragraph" | "none";
   /** Characters the sheet holds for the facts (the field, or the identity paragraph). */
   sourceChars: number;
-  max: number;
-  /** True when the end of the source does not reach the character (cut at the last full sentence). */
-  overBudget: boolean;
-  cutChars: number;
+  /** Characters of the block as sent (usage line, ties and chronology included); 0 without source. */
+  blockChars: number;
 }
 
-/** What the facts block keeps of the sheet: reported by `eval:judge:sheets` so an over-long source is seen, not silent. */
+/** Size of the facts block: reported by `eval:judge:sheets`. Whether it fits the core is the compiler's warning. */
 export function establishedFactsBudget(prompt: CharacterPrompt): EstablishedFactsBudget {
   const field = prompt.ce_que_tu_sais_aujourdhui?.trim() ?? "";
   const paragraph = field ? "" : establishedFactsSourceParagraph(prompt) ?? "";
   const source = field ? "field" : paragraph ? "paragraph" : "none";
-  const sourceChars = (field || paragraph).length;
-  // The ties line and the chronology sentence are added by the extraction: only the source text counts here.
-  const keptSource = source === "none" ? 0 : Math.min(sourceChars, capAtSentence(field || paragraph, ESTABLISHED_FACTS_MAX_CHARS - (source === "paragraph" ? kinshipFromTimeline(prompt.timeline).join(" ; ").length : 0)).length);
-  return { source, sourceChars, max: ESTABLISHED_FACTS_MAX_CHARS, overBudget: sourceChars > keptSource && sourceChars > 0, cutChars: Math.max(0, sourceChars - keptSource) };
+  const facts = characterEstablishedFacts(prompt);
+  return { source, sourceChars: (field || paragraph).length, blockChars: facts ? ESTABLISHED_FACTS_USAGE_LINE.length + 1 + facts.content.length : 0 };
 }
 
 /** Avoid paying twice for the extracted paragraph; the saved sheet is never rewritten. */

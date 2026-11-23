@@ -519,6 +519,12 @@ export default function PipelineTraceTab() {
                     {typeof promptBudget.contextLimitChars === "number" ? <Badge variant="outline">Plafond contexte : {formatChars(promptBudget.contextLimitChars)}</Badge> : null}
                     {typeof promptBudget.deduplicatedChars === "number" ? <Badge variant="outline">Doublons retirés : {formatChars(promptBudget.deduplicatedChars)}</Badge> : null}
                     {typeof promptBudget.memoryLastTurn === "number" ? <Badge variant="outline">Mémoire au tour {promptBudget.memoryLastTurn}</Badge> : null}
+                    {(promptBudget.warnings ?? []).map((warning) => (
+                      <Tooltip key={warning.code}>
+                        <TooltipTrigger asChild><span><Badge variant="destructive">⚠ {warning.code === "established_facts_dropped" ? "Faits établis retirés" : "Canon réduit"}</Badge></span></TooltipTrigger>
+                        <TooltipContent className="max-w-sm text-xs leading-relaxed">{warning.message}</TooltipContent>
+                      </Tooltip>
+                    ))}
                     {promptBudget.oversizedCurrentUser ? <Badge variant="destructive">Dépassement dû au message courant intact</Badge> : null}
                   </div>
                   <div className="grid gap-3 xl:grid-cols-2">

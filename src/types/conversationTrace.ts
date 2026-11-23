@@ -131,6 +131,8 @@ export interface MaxPromptAssemblyTrace {
       reason?: "included" | "merged_new_sentences" | "duplicate" | "lower_rank" | "budget";
     }>;
     memoryLastTurn?: number;
+    /** Budget decisions that removed or squeezed sheet content (e.g. the established facts block). */
+    warnings?: Array<{ code: string; message: string }>;
   };
 
   finalSystemPrompt: string;
