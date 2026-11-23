@@ -14,6 +14,8 @@ passe en entier ; noyau + 900 car., ≈ + 233 tokens d'entrée par tour (3 967 �
 tient pas. Mesuré : « son père a envoyé Mona au camp » et « qui a su quand » corrigés ; le fusil (« ce n'est pas Max
 qui l'a pris ») reste contredit dans les 4 runs ; le juge n'est pas calibré.
 
+**Avant tout :** `sandbox-romed` n'a aucune fiche Max/Emma (relevé du 23 novembre) et plusieurs réglages diffèrent de `sandbox-ulrich` ; Romed teste depuis SA sandbox. Lui transmettre `docs/guide_romed_test_faits_etablis.md` (message à copier en tête) et attendre son retour.
+
 **Périmètre.** (1) Dire à Ulrich quoi faire écouter à Romed (3 ou 4 appels, questions sur Mona, le fusil, qui a su
 quand). (2) Reporter ses réponses dans la tâche Notion. (3) Décisions à lui faire prendre : champ « Ce que tu sais
 aujourd'hui » (non rempli, ou paragraphe déplacé tel quel), ordre des faits, faute « elle sais », fait du fusil dans

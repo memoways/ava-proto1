@@ -9,6 +9,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Le paragraphe « Ce qui est vrai aujourd'hui » n'est plus coupé à 1 200 car. : Max et Emma reçoivent « où ton père l'a mise » et la chronologie de qui a su quoi et quand.
 - Noyau + 900 car. et plafond de contexte + 900 quand le bloc est présent ; ≈ + 233 tokens d'entrée par tour (+ 5,9 %, mesuré). Si le bloc ne tient pas, avertissement dans « Voir ce que reçoit le personnage » et `eval:judge:sheets` au lieu d'un retrait silencieux.
 - `eval:judge:sequences` écrit les tokens par appel dans le JSON du rapport. Rapport `docs/eval/faits_etablis_sans_coupure_lot_2_20261123.md`.
+- « Voir ce que reçoit le personnage » (Admin › Personnages) affiche aussi l'avertissement quand le bloc des faits ne tient pas.
+- Guide pour Romed (`docs/guide_romed_test_faits_etablis.md`) : sa sandbox n'a aucune fiche Max/Emma (à resynchroniser), écarts de réglages avec celle d'Ulrich, 8 questions à poser.
 - **Inchangé** : fiches Notion, base Caractères, production.
 
 ## [Audit : chaîne Notion → prompt, coupure des faits établis] — 2026-11-23
