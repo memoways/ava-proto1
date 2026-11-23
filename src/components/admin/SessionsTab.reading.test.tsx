@@ -61,7 +61,10 @@ function session(traced: boolean): SessionRow {
     duration_seconds: 600,
     branch: null,
     triggers_activated: [],
-    conversation_log: [{ role: "user", content: "Où est Mona ?" }, { role: "max", content: "Au camp." }],
+    conversation_log: [
+      { role: "user", content: "Où est Mona ?", labels: { themes: ["famille"], topics: ["Mona"], intentions: [] } },
+      { role: "max", content: "Au camp.", pipeline: { rag_ms: 120, max_ms: 800, total_ms: 1000 } },
+    ],
     questionnaire_responses: null,
     name: traced ? "Session tracée" : "Session normale",
     admin_note: null,
@@ -95,6 +98,7 @@ describe("SessionsTab — lecture d'une session", () => {
 
   it("met la liste, la conversation et les détails dans trois régions, avec le numéro de tour", async () => {
     open(session(false));
+    expect(screen.getByTestId("sessions-layout").className).toContain("22rem");
     expect(screen.getByTestId("session-list")).toBeInTheDocument();
     const conversation = screen.getByTestId("session-conversation");
     const details = screen.getByTestId("session-details");
@@ -102,10 +106,11 @@ describe("SessionsTab — lecture d'une session", () => {
     expect(details).toBeInTheDocument();
     expect(within(conversation).getByText("Tour 1")).toBeInTheDocument();
     expect(within(conversation).getByText(/Au camp\./)).toBeInTheDocument();
+    expect(within(conversation).getByTestId("turn-labels")).toHaveTextContent("Thèmes : famille · Mots-clés : Mona");
     expect(await within(conversation).findByText("Chunks et paramètres du modèle non enregistrés pour cette session")).toBeInTheDocument();
     expect(within(conversation).queryByTestId("turn-chunk")).not.toBeInTheDocument();
     expect(within(conversation).queryByText(/src-camp/)).not.toBeInTheDocument();
-    expect(await within(conversation).findByRole("checkbox", { name: "Envoyer question dans le laboratoire RAG" })).toBeInTheDocument();
+    expect(await within(conversation).findByRole("checkbox", { name: "Épingler pour le laboratoire RAG" })).toBeInTheDocument();
     expect(within(details).getByText("Non enregistrée")).toBeInTheDocument();
   });
 
@@ -120,9 +125,18 @@ describe("SessionsTab — lecture d'une session", () => {
     expect(within(conversation).getByTestId("turn-model")).toHaveTextContent("Modèle demandé : anthropic/claude-test · température 0.4");
     expect(within(conversation).queryByText("Chunks et paramètres du modèle non enregistrés pour cette session")).not.toBeInTheDocument();
     expect(within(conversation).getByRole("link", { name: "Analyser ce tour" })).toBeInTheDocument();
-    expect(await within(conversation).findByRole("checkbox", { name: "Envoyer question dans le laboratoire RAG" })).toBeInTheDocument();
+    expect(await within(conversation).findByRole("checkbox", { name: "Épingler pour le laboratoire RAG" })).toBeInTheDocument();
     expect(within(conversation).getByText(/État de parole : à vif/)).toBeInTheDocument();
     expect(within(conversation).getByText(/Émotion de jeu : tense/)).toBeInTheDocument();
     expect(within(conversation).getByText(/Visage : concerned · tense/)).toBeInTheDocument();
+    expect(within(conversation).getByTestId("turn-pipeline")).toHaveTextContent("RAG 120 ms · modèle 800 ms · total 1000 ms");
+  });
+
+  it("signale un tour joueur dont la réponse n'est pas dans le journal", async () => {
+    const row = session(false);
+    open({ ...row, conversation_log: [{ role: "user", content: "Tu es là ?" }] });
+    const conversation = screen.getByTestId("session-conversation");
+    expect(await within(conversation).findByTestId("missing-character-reply")).toHaveTextContent("Réponse du personnage non enregistrée pour ce tour.");
+    expect(within(conversation).getByText(/Aucun thème ni mot-clé enregistré/)).toBeInTheDocument();
   });
 });

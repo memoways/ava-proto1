@@ -6,6 +6,28 @@
 
 export const UNTRACED_CHUNKS_SENTENCE = "Chunks et paramètres du modèle non enregistrés pour cette session";
 
+/** A user turn whose journal has no character message after it. */
+export const MISSING_CHARACTER_REPLY = "Réponse du personnage non enregistrée pour ce tour.";
+
+export interface TurnLabelSource {
+  themes?: string[] | null;
+  topics?: string[] | null;
+  intentions?: string[] | null;
+}
+
+/** Themes, keywords and intentions actually stored on the turn. Empty lists stay silent. */
+export function labelSummary(labels: TurnLabelSource | null | undefined): string | null {
+  if (!labels) return null;
+  const parts: string[] = [];
+  const themes = (labels.themes ?? []).map((value) => value.trim()).filter(Boolean);
+  const topics = (labels.topics ?? []).map((value) => value.trim()).filter(Boolean);
+  const intentions = (labels.intentions ?? []).map((value) => value.trim()).filter(Boolean);
+  if (themes.length) parts.push(`Thèmes : ${themes.join(", ")}`);
+  if (topics.length) parts.push(`Mots-clés : ${topics.join(", ")}`);
+  if (intentions.length) parts.push(`Intentions : ${intentions.join(", ")}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 const EXCERPT_LENGTH = 160;
 
 export interface RagChunkView {
@@ -24,6 +46,8 @@ export interface TurnTraceView {
   characterName: string;
   chunks: RagChunkView[];
   model: ModelRequestView | null;
+  /** Rewritten RAG query when the trace stored one. Never invented. */
+  search: string | null;
 }
 
 export interface TtsReading {
@@ -102,11 +126,17 @@ export function formatModelRequest(model: ModelRequestView | null): string | nul
  * Accepts either the narrow admin select (`matches` / `settings` JSON paths)
  * or a full `trace` object. Never fills a missing field from somewhere else.
  */
+function searchFromRequest(request: unknown): string | null {
+  const record = asRecord(request);
+  return textOrNull(record?.rewrittenQuery) ?? textOrNull(record?.searchInput);
+}
+
 export function readTurnTrace(row: {
   turn_index?: unknown;
   character_name?: unknown;
   matches?: unknown;
   settings?: unknown;
+  search?: unknown;
   trace?: unknown;
 }): TurnTraceView | null {
   const turnIndex = finite(row.turn_index);
@@ -114,11 +144,13 @@ export function readTurnTrace(row: {
   const trace = asRecord(row.trace);
   const matches = row.matches !== undefined ? row.matches : asRecord(trace?.rag)?.matches;
   const settings = row.settings !== undefined ? row.settings : asRecord(trace?.maxCall)?.requestedSettings;
+  const request = row.search !== undefined ? row.search : asRecord(trace?.rag)?.request;
   return {
     turnIndex,
     characterName: typeof row.character_name === "string" ? row.character_name : "",
     chunks: chunksFromMatches(matches),
     model: modelFromSettings(settings),
+    search: searchFromRequest(request),
   };
 }
 
