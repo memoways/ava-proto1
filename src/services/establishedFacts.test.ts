@@ -6,11 +6,11 @@ import { buildOptimizedPromptAssembly, OPTIMIZED_V3_LIMITS } from "@/agents/maxO
 import type { CharacterPrompt } from "@/services/characterPromptService";
 import { buildExperienceFrame, DEFAULT_CALL_PRESENT_TEXT } from "@/services/experienceFrame";
 import {
-  ESTABLISHED_FACTS_MAX_CHARS,
   ESTABLISHED_FACTS_TITLE,
   ESTABLISHED_FACTS_USAGE_LINE,
   characterEstablishedFacts,
   establishedFactsBudget,
+  establishedFactsSourceParagraph,
   findAwaitedCallSentences,
   kinshipFromTimeline,
   withoutEstablishedFacts,
@@ -24,7 +24,8 @@ describe("established facts — source", () => {
   it.each(["Max", "Emma"] as const)("extrait de la fiche de %s, sans rien écrire", (name) => {
     const facts = characterEstablishedFacts(sheet(name))!;
     expect(facts.source).toBe("extracted");
-    expect(facts.content.length).toBeLessThanOrEqual(ESTABLISHED_FACTS_MAX_CHARS);
+    // Whole paragraph, last sentence included (it used to be cut at 1 200).
+    expect(facts.content).toContain(establishedFactsSourceParagraph(sheet(name))!);
     expect(facts.content.startsWith("Ce qui est vrai aujourd'hui")).toBe(true);
     expect(facts.content).toContain("Les tiens : Mona, ton aînée ; Léo, ton fils ; Ava, ta cadette.");
     // Every sentence comes from the sheet.
@@ -36,9 +37,8 @@ describe("established facts — source", () => {
     const field = "Tu sais aujourd'hui que c'était Lise. Elle s'était présentée comme Peter.";
     expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toEqual({ content: field, source: "field" });
     const long = `${"Une phrase établie. ".repeat(80)}`.trim();
-    const capped = characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: long })!.content;
-    expect(capped.length).toBeLessThanOrEqual(ESTABLISHED_FACTS_MAX_CHARS);
-    expect(capped.endsWith(".")).toBe(true);
+    // A long field is passed whole, never cut.
+    expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: long })!.content).toBe(long);
   });
 
   it("ne rend rien sans paragraphe source ni champ", () => {
@@ -95,28 +95,21 @@ describe("the sheet is the only logic: no rewrite of « tu attends l'appel » (l
   it("le champ rempli est la seule source : le paragraphe de l'identité n'est jamais lu à côté", () => {
     const field = "Tu sais aujourd'hui que c'était Lise.";
     expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toEqual({ content: field, source: "field" });
-    // A filled field with no complete sentence in budget yields nothing, never the paragraph.
-    expect(characterEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: "x".repeat(1_300) })).toBeNull();
     expect(withoutEstablishedFacts({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field }).identite_fondamentale).toContain("Ce qui est vrai aujourd'hui");
   });
 });
 
-describe("budget of the facts source (lot F follow-up)", () => {
-  it("signale le paragraphe de l'identité trop long (Max 1 399 car. pour 1 200)", () => {
+describe("budget of the facts source", () => {
+  it("rapporte la taille entière du paragraphe de l'identité (Max 1 399 car.), rien de coupé", () => {
     const budget = establishedFactsBudget(sheet("Max"));
-    expect(budget).toMatchObject({ source: "paragraph", sourceChars: 1399, max: 1200, overBudget: true });
-    expect(budget.cutChars).toBeGreaterThan(100);
+    expect(budget).toMatchObject({ source: "paragraph", sourceChars: 1399 });
+    expect(budget.blockChars).toBeGreaterThan(1399);
   });
 
-  it("un champ court rempli tient sans coupe, et devient la seule source", () => {
+  it("un champ rempli devient la seule source ; sans source, aucun fait protégé", () => {
     const field = "Mona est au camp : ton père l'y a envoyée. Léo a pris le fusil chez Papi, à la demande de ton père.";
-    expect(establishedFactsBudget({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toEqual({ source: "field", sourceChars: field.length, max: 1200, overBudget: false, cutChars: 0 });
-  });
-
-  it("un champ trop long est signalé aussi ; sans source, aucun fait protégé", () => {
-    const long = `${"Une phrase établie. ".repeat(80)}`.trim();
-    expect(establishedFactsBudget({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: long }).overBudget).toBe(true);
-    expect(establishedFactsBudget({ ...sheet("Max"), identite_fondamentale: "Tu es Max." }).source).toBe("none");
+    expect(establishedFactsBudget({ ...sheet("Max"), ce_que_tu_sais_aujourdhui: field })).toMatchObject({ source: "field", sourceChars: field.length });
+    expect(establishedFactsBudget({ ...sheet("Max"), identite_fondamentale: "Tu es Max." })).toEqual({ source: "none", sourceChars: 0, blockChars: 0 });
   });
 });
 
@@ -133,7 +126,7 @@ describe("optimized_v3 core with established facts", () => {
       expect(prompt).toContain(`## ${ESTABLISHED_FACTS_TITLE}\n${ESTABLISHED_FACTS_USAGE_LINE}\n${facts}`);
       expect(prompt.indexOf(ESTABLISHED_FACTS_TITLE)).toBeLessThan(prompt.indexOf("## MANIÈRE DE PARLER"));
       expect(prompt.split("Ce qui est vrai aujourd'hui").length - 1).toBe(1);
-      expect(result.budget?.staticChars).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.staticChars);
+      expect(result.budget?.staticChars).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars);
       expect(result.budget?.withinBudget).toBe(true);
       expect(AWAITED.test(prompt)).toBe(false);
     }
@@ -143,7 +136,7 @@ describe("optimized_v3 core with established facts", () => {
     const question = "Et aujourd'hui, là, à Lausanne, comment ça se passe ?";
     const withFacts = build(name, question);
     const without = build(name, question, false);
-    expect(withFacts.finalSystemPrompt.length).toBeLessThanOrEqual(without.finalSystemPrompt.length + 60);
+    expect(withFacts.finalSystemPrompt.length).toBeLessThanOrEqual(without.finalSystemPrompt.length + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars + 60);
     const manner = sheet(name).maniere_de_parler!;
     const states = manner.slice(manner.indexOf("Tes états de parole"), manner.indexOf("\n\n", manner.indexOf("Tes états de parole")));
     expect(states.split("\n").length).toBeGreaterThan(4);
@@ -162,11 +155,53 @@ describe("optimized_v3 core with established facts", () => {
     expect(reference).toContain(sheet("Max").maniere_de_parler!.trim());
   });
 
-  it("garde le noyau précédent si le bloc ne peut pas entrer", () => {
+  it.each(["Max", "Emma"] as const)("passe le paragraphe de %s en entier, dernière phrase comprise, sans avertissement", (name) => {
+    const result = build(name, "Où est Mona, et qui l'y a mise ?");
+    const paragraph = establishedFactsSourceParagraph(sheet(name))!;
+    expect(result.finalSystemPrompt).toContain(paragraph);
+    expect(result.finalSystemPrompt).toContain("où ");
+    expect(result.finalSystemPrompt).toContain("elle sais");
+    expect(result.budget?.warnings).toBeUndefined();
+  });
+
+  // The key fact is the LAST sentence of the paragraph, at every size around the old 1 200 cap.
+  const KEY = "Le fait décisif est ici, en toute dernière phrase.";
+  const withParagraph = (name: "Max" | "Emma", size: number): CharacterPrompt => {
+    const filler = "Une phrase établie de la fiche synchronisée, sans rien de particulier. ";
+    const head = "Ce qui est vrai aujourd'hui : ";
+    const body = head + filler.repeat(Math.ceil(size / filler.length)).slice(0, Math.max(0, size - head.length - KEY.length - 1)).replace(/\s+\S*$/, "").trim();
+    const paragraph = `${body.replace(/[^.]$/, "$&.")} ${KEY}`;
+    const base = sheet(name);
+    const identity = base.identite_fondamentale.replace(establishedFactsSourceParagraph(base)!, paragraph);
+    return { ...base, identite_fondamentale: identity };
+  };
+  it.each([800, 1_150, 1_250, 1_600, 2_000, 3_000, 5_500])("fait clé en dernière phrase à %i car. : dans le prompt, ou avertissement visible", (size) => {
+    for (const name of ["Max", "Emma"] as const) {
+      const character = withParagraph(name, size);
+      const result = buildOptimizedPromptAssembly({ character, characterName: character.name!, userMessage: "Et alors ?", historyChars: 0 });
+      const warned = result.budget?.warnings?.some((warning) => warning.code === "established_facts_dropped");
+      expect(result.finalSystemPrompt.includes(KEY) || warned).toBe(true);
+      // Never a silent drop: no key fact without a warning.
+      if (!result.finalSystemPrompt.includes(KEY)) expect(warned).toBe(true);
+      expect(result.budget?.staticChars).toBeLessThanOrEqual(OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars);
+      // Up to 2 000 characters the block fits whole for both characters.
+      if (size <= 2_000) expect(result.finalSystemPrompt).toContain(KEY);
+    }
+  });
+
+  it("annonce le retrait du bloc quand le noyau ne peut pas le tenir (jamais silencieux)", () => {
+    const huge = withParagraph("Emma", 9_000);
+    const result = buildOptimizedPromptAssembly({ character: huge, characterName: huge.name!, userMessage: "Allô ?", historyChars: 0 });
+    expect(result.finalSystemPrompt).not.toContain(KEY);
+    expect(result.budget?.warnings?.map((warning) => warning.code)).toContain("established_facts_dropped");
+  });
+
+  it("garde le noyau précédent si le bloc ne peut pas entrer, et le dit", () => {
     const tight = { ...sheet("Emma"), maniere_de_parler: `${"Phrase de voix sans liste. ".repeat(100)}`.trim() };
     const result = buildOptimizedPromptAssembly({ character: tight, characterName: tight.name!, userMessage: "Allô ?", historyChars: 0 });
     expect(result.finalSystemPrompt).not.toContain(ESTABLISHED_FACTS_TITLE);
     expect(result.finalSystemPrompt).toContain(tight.maniere_de_parler);
+    expect(result.budget?.warnings?.[0]?.code).toBe("established_facts_dropped");
   });
 });
 

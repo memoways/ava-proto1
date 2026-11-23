@@ -29,9 +29,16 @@ import {
 } from "@/services/watchedVideoMemory";
 
 export const OPTIMIZED_V3_LIMITS = {
-  generatedContextChars: 13_000, // +1 500 with the lived paragraph, +500 for the instruction hierarchy (lot H): nothing else loses room
-  normalTotalMessageChars: 13_500,
+  generatedContextChars: 13_900, // +1 500 with the lived paragraph, +500 for the instruction hierarchy (lot H), +900 for the whole established facts: nothing else loses room
+  normalTotalMessageChars: 14_400,
   staticChars: 7_000, // 5 500 + the protected lived paragraph (« Ce que ça te fait »)
+  /**
+   * Extra core room when the established facts block is present: the facts are sent whole
+   * (the old 1 200-character cut lost « où ton père l'a mise »), so the block no longer
+   * displaces the relevant canon alone. Measured on the 21 November sheets: Emma's block
+   * (≈ 1 850 characters with its usage line) overshot the 7 000 core by ≈ 600.
+   */
+  establishedFactsExtraChars: 900,
   runtimeChars: 800,
   memoryChars: 1_200,
   ragChars: MAX_MAX_RAG_CONTEXT_CHARS,
@@ -376,9 +383,13 @@ function timelineTitleUnits(timeline: string): Array<{ text: string; group?: str
   return out;
 }
 
+/** A budget decision the player-side trace must show: nothing the sheet holds leaves the prompt unannounced. */
+export interface PromptBudgetWarning { code: "established_facts_dropped" | "canon_squeezed"; message: string }
+
 function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? ""): {
   sections: ProtectedSection[];
   yielded: string[];
+  warnings: PromptBudgetWarning[];
 } {
   const present = character.situation_summary.trim();
   const lived = characterLivedImpact(character);
@@ -391,24 +402,38 @@ function protectedCharacterSections(character: CharacterPrompt, establishedFacts
   ];
   const extracted = establishedFacts ? characterEstablishedFacts(character)?.content ?? null : null;
   const facts = extracted ? `${ESTABLISHED_FACTS_USAGE_LINE}\n${extracted}` : null;
-  if (!facts) return { sections: base(null), yielded: [] };
-  const limit = OPTIMIZED_V3_LIMITS.staticChars;
+  if (!facts) return { sections: base(null), yielded: [], warnings: [] };
+  const limit = OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars;
   const fitsWith = (room: number) => (manner: string) => protectedSize(base(facts, manner), canonicalName) + room <= limit;
   const manner = character.maniere_de_parler?.trim() ?? "";
-  // First try to keep room for one relevant canon unit; then only require the core to fit.
+  // Priority: facts, then the relevant canon, then the speaking manner (which yields first).
   let bounded = boundSpeakingManner(manner, fitsWith(OPTIMIZED_V3_LIMITS.minCanonChars));
+  const warnings: PromptBudgetWarning[] = [];
   if (!fitsWith(0)(bounded.content)) bounded = boundSpeakingManner(manner, fitsWith(0));
-  // The facts never make a sheet unplayable: without room, the previous core is kept.
-  if (!fitsWith(0)(bounded.content)) return { sections: base(null), yielded: [] };
-  return { sections: base(facts, bounded.content), yielded: bounded.dropped };
+  if (!fitsWith(0)(bounded.content)) {
+    // The facts never make a sheet unplayable, but the removal is announced, never silent.
+    warnings.push({
+      code: "established_facts_dropped",
+      message: `Faits établis retirés : le bloc (${facts.length} car.) ne tient pas dans le noyau de ${limit} car., même après avoir cédé toute la manière de parler qui peut l'être. À resserrer dans Notion.`,
+    });
+    return { sections: base(null), yielded: [], warnings };
+  }
+  if (!fitsWith(OPTIMIZED_V3_LIMITS.minCanonChars)(bounded.content)) {
+    warnings.push({
+      code: "canon_squeezed",
+      message: `Les faits établis (${facts.length} car.) et la manière de parler restante ne laissent presque aucune place au canon pertinent (moins de ${OPTIMIZED_V3_LIMITS.minCanonChars} car.).`,
+    });
+  }
+  return { sections: base(facts, bounded.content), yielded: bounded.dropped, warnings };
 }
 
-function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string, establishedFacts: boolean): { selected: SelectedUnit[]; all: SelectedUnit[] } {
+function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string, establishedFacts: boolean): { selected: SelectedUnit[]; all: SelectedUnit[]; warnings: PromptBudgetWarning[]; limit: number } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
   const protectedCore = protectedCharacterSections(character, establishedFacts, canonicalName);
   const hasFacts = protectedCore.sections.some(section => section.key === 'faits_etablis');
   const withoutProtected = withoutCharacterLivedImpact(withoutCharacterEmbodiment(character));
+  const staticLimit = OPTIMIZED_V3_LIMITS.staticChars + (hasFacts ? OPTIMIZED_V3_LIMITS.establishedFactsExtraChars : 0);
   const selectable = hasFacts ? withoutEstablishedFacts(withoutProtected) : withoutProtected;
   FIELD_SPECS.forEach((spec, fieldIndex) => {
     // The current scene is one atomic editorial unit, never a relevance candidate.
@@ -483,7 +508,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     text: contract,
     score: 10_000,
   };
-  if (staticSize(selected, canonicalName) > OPTIMIZED_V3_LIMITS.staticChars) {
+  if (staticSize(selected, canonicalName) > staticLimit) {
     throw new Error('Présent canonique et parole éditoriale trop longs pour le noyau optimized_v3 : génération interdite');
   }
   const trySelect = (candidate: CandidateUnit) => {
@@ -506,7 +531,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       decisions.set(candidate.id, { ...effective, status: "duplicate_static", keptBy: duplicate.id, originalChars: candidate.text.length, removedChars: candidate.text.length, reason: "duplicate" });
       return;
     }
-    if (staticSize([...selected, effective], canonicalName) > OPTIMIZED_V3_LIMITS.staticChars) {
+    if (staticSize([...selected, effective], canonicalName) > staticLimit) {
       decisions.set(candidate.id, { ...effective, status: "budget", originalChars: candidate.text.length, removedChars: novelty.removedChars, reason: "budget" });
       return;
     }
@@ -546,7 +571,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     removedChars: 0,
     reason: "lower_rank" as const,
   })];
-  return { selected: selectedWithStatus, all };
+  return { selected: selectedWithStatus, all, warnings: protectedCore.warnings, limit: staticLimit };
 }
 
 function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", characterName: string): string {
@@ -685,7 +710,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     return bounded;
   };
 
-  append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, OPTIMIZED_V3_LIMITS.staticChars, "static");
+  append("character_core", `NOYAU DE ${canonicalName.toLocaleUpperCase("fr")}`, core, staticSelection.limit, "static");
   append("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame, OPTIMIZED_V3_LIMITS.frameChars, "runtime");
   append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
   append("speech_state", "PAROLE DU TOUR", input.speechState, 800, "runtime");
@@ -695,7 +720,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");
   const memoryText = formatConversationMemory(memory, OPTIMIZED_V3_LIMITS.memoryChars, canonicalName);
   append("conversation_memory", "HISTORIQUE DE LA CONVERSATION", memoryText, OPTIMIZED_V3_LIMITS.memoryChars, "memory");
-  append("character_canon", "CANON PERTINENT", canon, OPTIMIZED_V3_LIMITS.staticChars, "static");
+  append("character_canon", "CANON PERTINENT", canon, staticSelection.limit, "static");
 
   const ragSelected: CandidateUnit[] = [];
   let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
@@ -787,7 +812,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     budget: {
       variant: "optimized_v3",
       limitChars: systemLimit,
-      staticLimitChars: OPTIMIZED_V3_LIMITS.staticChars,
+      staticLimitChars: staticSelection.limit,
       staticChars,
       totalSystemChars: prompt.length,
       historyChars: input.historyChars,
@@ -820,6 +845,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
         ...(unit.reason ? { reason: unit.reason } : {}),
       })),
       memoryLastTurn: memory.lastTurn,
+      ...(staticSelection.warnings.length ? { warnings: staticSelection.warnings } : {}),
     },
     finalSystemPrompt: prompt,
   };

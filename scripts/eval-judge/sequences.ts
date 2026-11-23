@@ -220,6 +220,21 @@ async function main(): Promise<void> {
       .reduce((sum, row) => sum + (Number(row.cost_usd) || 0), 0).toFixed(4));
   }
 
+  // Measured tokens of the whole run, per feature key (character call, GM, judge): read-only, no session rows.
+  const usageByFeature: Record<string, { calls: number; promptTokens: number; completionTokens: number }> = {};
+  const { data: tokenRows } = await supabase
+    .from("llm_usage")
+    .select("feature_key,prompt_tokens,completion_tokens")
+    .gte("created_at", startedAt.toISOString())
+    .is("session_id", null);
+  for (const row of tokenRows ?? []) {
+    const entry = usageByFeature[row.feature_key] ??= { calls: 0, promptTokens: 0, completionTokens: 0 };
+    entry.calls += 1;
+    entry.promptTokens += row.prompt_tokens ?? 0;
+    entry.completionTokens += row.completion_tokens ?? 0;
+  }
+  for (const [feature, entry] of Object.entries(usageByFeature)) log(`• tokens ${feature} : ${entry.calls} appels · entrée ${entry.promptTokens} (moy. ${Math.round(entry.promptTokens / entry.calls)}) · sortie ${entry.completionTokens}`);
+
   const comparison = sequenceModule.compareSequenceRuns(results, sequences);
   const factualityReport = factualityFocus
     ? (await import("@/services/evalJudgeFactualityReport")).formatFactualityReportMarkdown({
@@ -252,7 +267,7 @@ async function main(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   const base = path.join(outDir, `eval-judge-sequences-${runId}`);
   writeFileSync(`${base}.md`, markdown, "utf8");
-  writeFileSync(`${base}.json`, `${JSON.stringify({ runId, environment: resolved.environment, configs, repeats, judgeModel, results, comparison, costBySequenceRun, actual }, null, 2)}\n`, "utf8");
+  writeFileSync(`${base}.json`, `${JSON.stringify({ runId, environment: resolved.environment, configs, repeats, judgeModel, results, comparison, costBySequenceRun, actual, usageByFeature }, null, 2)}\n`, "utf8");
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown, "utf8");
   process.stdout.write(markdown);
   log(`✓ Rapport : ${path.relative(process.cwd(), base)}.md (+ .json)`);

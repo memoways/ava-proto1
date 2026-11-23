@@ -57,8 +57,14 @@ async function main(): Promise<void> {
     log(`• ${sheet.name} · mise à jour ${sheet.updated_at}`);
     const budget = establishedFactsBudget(sheet);
     if (budget.source === "none") log(`  ⚠ ${sheet.name} : ni champ « Ce que tu sais aujourd'hui » ni paragraphe « Ce qui est vrai aujourd'hui » : aucun fait protégé.`);
-    else if (budget.overBudget) log(`  ⚠ ${sheet.name} : ${budget.source === "field" ? "le champ" : "le paragraphe « Ce qui est vrai aujourd'hui »"} fait ${budget.sourceChars} car. pour ${budget.max} : ${budget.cutChars} car. de fin coupés du bloc FAITS ÉTABLIS (à resserrer dans Notion).`);
-    else log(`  ✓ ${sheet.name} : faits établis (${budget.source === "field" ? "champ dédié" : "paragraphe de l'identité"}) ${budget.sourceChars}/${budget.max} car., rien de coupé.`);
+    else {
+      // The facts are sent whole; the compiler says when the core cannot hold them.
+      const { buildOptimizedPromptAssembly } = await import("@/agents/maxOptimizedPromptCompiler");
+      const trace = buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name ?? key, userMessage: "Qu'est-ce qui s'est passé ?", historyChars: 0 });
+      const warnings = trace.budget.warnings ?? [];
+      if (warnings.length) for (const warning of warnings) log(`  ⚠ ${sheet.name} : ${warning.message}`);
+      else log(`  ✓ ${sheet.name} : faits établis (${budget.source === "field" ? "champ dédié" : "paragraphe de l'identité"}) ${budget.sourceChars} car. (bloc ${budget.blockChars}), envoyés en entier.`);
+    }
     for (const hit of findAwaitedCallSentences(sheet)) {
       faulty += 1;
       log(`  ⚠ ${sheet.name} · ${hit.field} : « ${hit.excerpt} » (à corriger dans Notion, le code ne réécrit plus la fiche)`);
