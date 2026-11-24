@@ -1,3 +1,5 @@
+import { describePromptSections } from "@/services/promptSectionsDigest";
+import type { PromptSectionsDigest } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { readSessionEffectiveSettings } from "@/services/sessionEffectiveSettings";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,6 +96,7 @@ interface AdminConversationMessage {
     max_ms?: number;
     gm_pre_ms?: number;
     total_ms?: number;
+    prompt?: PromptSectionsDigest;
   };
   labels?: { themes?: string[]; topics?: string[]; intentions?: string[] };
 }
@@ -250,6 +253,7 @@ function ConversationColumn({
             face: faceForReply(faceRows, turn, reply.msg.role),
           }) : null;
           const timings = reply ? pipelineSummary(reply.msg) : null;
+          const received = reply ? describePromptSections(reply.msg.pipeline?.prompt) : null;
           const question = userItem && typeof userItem.msg.content === "string" && isQuestionLike(userItem.msg.content)
             ? userItem
             : null;
@@ -338,6 +342,13 @@ function ConversationColumn({
                       <p>Sujets couverts : {gmEntry.topics_covered.join(", ")}</p>
                     )}
                     {timings && <p data-testid="turn-pipeline">{timings}</p>}
+                    {received && (
+                      <div data-testid="turn-prompt-sections" className="space-y-0.5">
+                        <p>{received.sent}</p>
+                        {received.dropped && <p>{received.dropped}</p>}
+                        {received.warnings && <p role="alert" className="text-destructive">{received.warnings}</p>}
+                      </div>
+                    )}
                     {!labels && <p>Aucun thème ni mot-clé enregistré pour ce tour.</p>}
                     <TurnTraceBlock sessionId={session.id} turn={turn} status={traceStatus} traces={turnTraces} />
                     {question && (

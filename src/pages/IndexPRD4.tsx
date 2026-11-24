@@ -2194,6 +2194,7 @@ const IndexPRD4 = () => {
               rag_ms: ragService,
               max_ms: getConfiguredLLMServiceInfo(llmSettings?.LLM_MODEL),
             },
+            ...(result.promptSections ? { prompt: result.promptSections } : {}),
           },
         }, activeCharacterRef.current);
         responseMessage = maxMsg;

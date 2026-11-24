@@ -28,8 +28,36 @@ import {
   WATCHED_VIDEOS_SECTION_TITLE,
 } from "@/services/watchedVideoMemory";
 
+/**
+ * Souvenirs lot 1 (24 November): the turn sections that used to take « what was left »
+ * get a reserved room. Measured on the 23 November sessions, the rules and the core
+ * filled the whole 13 900 limit, so the memory, the relevant canon and the souvenirs
+ * fell in `budget_contexte_epuise` on every long turn. Each reserved section keeps up
+ * to this many characters (its own text, never more) against every section written
+ * before it; the order of the prompt is unchanged. Set `enabled: false` to go back
+ * to the previous assembly (limit 13 900, no reservation) in one edit.
+ */
+export const OPTIMIZED_V3_SECTION_RESERVATIONS = {
+  enabled: true,
+  /** Pre-lot-1 limit: rules + core + per-turn sections, without any reserved room. */
+  baseContextChars: 13_900, // +1 500 with the lived paragraph, +500 for the instruction hierarchy (lot H), +900 for the whole established facts
+  /**
+   * Added to the base limit when the reservations are on. Measured with
+   * `npm run eval:replay:souvenirs` on the real Max and Emma sheets (sandbox-romed,
+   * 23 November sessions): see docs/eval/souvenirs_lot1_mesures_20261124.md.
+   */
+  extraContextChars: 8_600,
+  sections: {
+    character_state: 900,
+    conversation_memory: 1_200,
+    character_canon: 650,
+    rag_context: MAX_MAX_RAG_CONTEXT_CHARS,
+  } as Record<string, number>,
+};
+
 export const OPTIMIZED_V3_LIMITS = {
-  generatedContextChars: 13_900, // +1 500 with the lived paragraph, +500 for the instruction hierarchy (lot H), +900 for the whole established facts: nothing else loses room
+  generatedContextChars: OPTIMIZED_V3_SECTION_RESERVATIONS.baseContextChars
+    + (OPTIMIZED_V3_SECTION_RESERVATIONS.enabled ? OPTIMIZED_V3_SECTION_RESERVATIONS.extraContextChars : 0),
   normalTotalMessageChars: 14_400,
   staticChars: 7_000, // 5 500 + the protected lived paragraph (« Ce que ça te fait »)
   /**
@@ -384,7 +412,10 @@ function timelineTitleUnits(timeline: string): Array<{ text: string; group?: str
 }
 
 /** A budget decision the player-side trace must show: nothing the sheet holds leaves the prompt unannounced. */
-export interface PromptBudgetWarning { code: "established_facts_dropped" | "canon_squeezed"; message: string }
+export interface PromptBudgetWarning {
+  code: "established_facts_dropped" | "canon_squeezed" | "souvenirs_evinces" | "memoire_evincee" | "canon_evince";
+  message: string;
+}
 
 function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? ""): {
   sections: ProtectedSection[];
@@ -649,7 +680,109 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     truncated: false,
   });
 
+  // Souvenirs lot 1: the souvenirs are chosen before any section is written, so their
+  // room can be reserved. The memory dedup below only shortens them, so this first
+  // pass (without memory) is an upper bound of what the section will need.
+  const selectRag = (memoryRefs: CandidateUnit[]) => {
+    const decisions: SelectedUnit[] = [];
+    const ragSelected: CandidateUnit[] = [];
+    let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
+    const blocks: string[] = [];
+    for (const candidate of input.ragCandidates ?? []) {
+      const clean = cleanRagContent(candidate.content);
+      const unit: CandidateUnit = {
+        id: candidate.id,
+        source: "rag",
+        sourceKey: "rag_candidate",
+        title: "Souvenir",
+        text: clean,
+        score: Math.max(0, 1_000 - candidate.rank),
+        rank: candidate.rank,
+      };
+      const afterStatic = retainNovelContent(clean, staticSelection.selected);
+      if (!afterStatic.text) {
+        decisions.push({ ...unit, status: "duplicate_static", keptBy: afterStatic.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "duplicate" });
+        continue;
+      }
+      const afterMemory = retainNovelContent(afterStatic.text, memoryRefs);
+      if (!afterMemory.text) {
+        decisions.push({ ...unit, status: "duplicate_memory", keptBy: afterMemory.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "duplicate" });
+        continue;
+      }
+      const afterRag = retainNovelContent(afterMemory.text, ragSelected);
+      if (!afterRag.text) {
+        decisions.push({ ...unit, status: "lower_rank", keptBy: afterRag.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "lower_rank" });
+        continue;
+      }
+      if (ragSelected.length >= OPTIMIZED_V3_LIMITS.ragItems) {
+        decisions.push({ ...unit, status: "lower_rank", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "lower_rank" });
+        continue;
+      }
+      const room = Math.min(OPTIMIZED_V3_LIMITS.ragItemChars, OPTIMIZED_V3_LIMITS.ragChars - ragUsed);
+      if (afterRag.text.length > room) {
+        decisions.push({ ...unit, status: "budget", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "budget" });
+        continue;
+      }
+      const removedChars = Math.max(0, clean.length - afterRag.text.length);
+      const selected = { ...unit, text: afterRag.text };
+      ragSelected.push(selected);
+      blocks.push(`Souvenir ${ragSelected.length}\n${afterRag.text}`);
+      ragUsed += afterRag.text.length;
+      decisions.push({
+        ...selected,
+        status: "selected",
+        originalChars: clean.length,
+        removedChars,
+        reason: removedChars ? "merged_new_sentences" : "included",
+        ...((afterStatic.keptBy || afterMemory.keptBy || afterRag.keptBy)
+          ? { keptBy: (afterStatic.keptBy || afterMemory.keptBy || afterRag.keptBy)?.id }
+          : {}),
+      });
+    }
+    return { decisions, selected: ragSelected, text: blocks.length ? [RAG_USAGE_LINE, ...blocks].join("\n\n") : "" };
+  };
+
+  const memoryText = formatConversationMemory(memory, OPTIMIZED_V3_LIMITS.memoryChars, canonicalName);
+  const reservation = OPTIMIZED_V3_SECTION_RESERVATIONS;
+  const sectionTitles: Record<string, string> = {
+    character_state: "ÉTAT DU PERSONNAGE À CE TOUR",
+    conversation_memory: "HISTORIQUE DE LA CONVERSATION",
+    character_canon: "CANON PERTINENT",
+    rag_context: "SOUVENIRS COMPLÉMENTAIRES",
+  };
+  const reservedText: Record<string, string> = {
+    character_state: input.characterState?.trim() ?? "",
+    conversation_memory: memoryText.trim(),
+    character_canon: canon.trim(),
+    rag_context: selectRag([]).text,
+  };
+  // Room still owed to the reserved sections not written yet: a section's own text,
+  // capped by its reservation, plus its heading. An empty section reserves nothing.
+  const pendingReservations = new Map<string, number>();
+  if (reservation.enabled) {
+    for (const [key, cap] of Object.entries(reservation.sections)) {
+      const text = reservedText[key];
+      if (text) pendingReservations.set(key, Math.min(cap, text.length) + `\n\n# ${sectionTitles[key]}\n`.length);
+    }
+  }
+  // Lot 5: what the player has just watched still comes before the souvenirs,
+  // so the two video sections may use the souvenirs' reserved room (never the reverse).
+  const mayUseRagReservation = new Set(["post_video", "watched_videos"]);
+  const owedAfter = (key: string) => {
+    let owed = 0;
+    pendingReservations.forEach((chars, owner) => {
+      if (owner === key) return;
+      if (owner === "rag_context" && mayUseRagReservation.has(key)) return;
+      owed += chars;
+    });
+    return owed;
+  };
+
   const append = (key: string, title: string, raw: string | undefined, cap: number, source: CandidateUnit["source"]) => {
+    // The core is never squeezed by a reservation (it throws rather than shrink).
+    // Whatever happens next, this section no longer holds room for itself.
+    const owed = key === "character_core" ? 0 : owedAfter(key);
+    pendingReservations.delete(key);
     const original = raw?.trim() ?? "";
     if (!original) {
       budgetSections.push({ key, title, chars: 0, originalChars: 0, included: false, truncated: false, omissionReason: "section_vide" });
@@ -678,7 +811,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     }
     const prefix = `\n\n# ${title}\n`;
     const systemLimit = Math.max(2_000, OPTIMIZED_V3_LIMITS.generatedContextChars - input.historyChars);
-    const remaining = systemLimit - prompt.length - prefix.length;
+    const remaining = systemLimit - prompt.length - prefix.length - owed;
     // All protected editorial units are in the core. Never normalize, shorten
     // or silently omit it, even when a long conversation consumes its room.
     if (key === 'character_core' && content.length > remaining) {
@@ -714,73 +847,41 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   append("experience_frame", "CADRE DE L'APPEL — PRIORITAIRE", input.experienceFrame, OPTIMIZED_V3_LIMITS.frameChars, "runtime");
   append("relationship_directive", "DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE", input.relationshipDirective, OPTIMIZED_V3_LIMITS.relationshipChars, "runtime");
   append("speech_state", "PAROLE DU TOUR", input.speechState, 800, "runtime");
-  append("character_state", "ÉTAT DU PERSONNAGE À CE TOUR", input.characterState, 900, "runtime");
+  append("character_state", sectionTitles.character_state, input.characterState, 900, "runtime");
   const runtime = [input.userRole ? `Interlocuteur : ${input.userRole}` : "", input.temporalContext || "", input.gmGuidance ? `Orientation de jeu : ${input.gmGuidance}` : "", input.guards || ""]
     .filter(Boolean).join("\n");
   append("runtime_context", "ÉTAT DU TOUR", runtime, OPTIMIZED_V3_LIMITS.runtimeChars, "runtime");
-  const memoryText = formatConversationMemory(memory, OPTIMIZED_V3_LIMITS.memoryChars, canonicalName);
-  append("conversation_memory", "HISTORIQUE DE LA CONVERSATION", memoryText, OPTIMIZED_V3_LIMITS.memoryChars, "memory");
-  append("character_canon", "CANON PERTINENT", canon, staticSelection.limit, "static");
+  const memorySent = append("conversation_memory", sectionTitles.conversation_memory, memoryText, OPTIMIZED_V3_LIMITS.memoryChars, "memory");
+  const canonSent = append("character_canon", sectionTitles.character_canon, canon, staticSelection.limit, "static");
 
-  const ragSelected: CandidateUnit[] = [];
-  let ragUsed = RAG_USAGE_LINE.length + 2; // the usage line shares the souvenirs budget
-  const ragBlocks: string[] = [];
-  for (const candidate of input.ragCandidates ?? []) {
-    const clean = cleanRagContent(candidate.content);
-    const unit: CandidateUnit = {
-      id: candidate.id,
-      source: "rag",
-      sourceKey: "rag_candidate",
-      title: "Souvenir",
-      text: clean,
-      score: Math.max(0, 1_000 - candidate.rank),
-      rank: candidate.rank,
-    };
-    const afterStatic = retainNovelContent(clean, staticSelection.selected);
-    if (!afterStatic.text) {
-      unitDecisions.push({ ...unit, status: "duplicate_static", keptBy: afterStatic.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "duplicate" });
-      continue;
-    }
-    const afterMemory = retainNovelContent(afterStatic.text, selectedForDedup.filter((selected) => selected.source === "memory"));
-    if (!afterMemory.text) {
-      unitDecisions.push({ ...unit, status: "duplicate_memory", keptBy: afterMemory.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "duplicate" });
-      continue;
-    }
-    const afterRag = retainNovelContent(afterMemory.text, ragSelected);
-    if (!afterRag.text) {
-      unitDecisions.push({ ...unit, status: "lower_rank", keptBy: afterRag.keptBy?.id, originalChars: clean.length, removedChars: clean.length, reason: "lower_rank" });
-      continue;
-    }
-    if (ragSelected.length >= OPTIMIZED_V3_LIMITS.ragItems) {
-      unitDecisions.push({ ...unit, status: "lower_rank", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "lower_rank" });
-      continue;
-    }
-    const room = Math.min(OPTIMIZED_V3_LIMITS.ragItemChars, OPTIMIZED_V3_LIMITS.ragChars - ragUsed);
-    if (afterRag.text.length > room) {
-      unitDecisions.push({ ...unit, status: "budget", originalChars: clean.length, removedChars: clean.length - afterRag.text.length, reason: "budget" });
-      continue;
-    }
-    const removedChars = Math.max(0, clean.length - afterRag.text.length);
-    const selected = { ...unit, text: afterRag.text };
-    ragSelected.push(selected);
-    ragBlocks.push(`Souvenir ${ragSelected.length}\n${afterRag.text}`);
-    ragUsed += afterRag.text.length;
-    unitDecisions.push({
-      ...selected,
-      status: "selected",
-      originalChars: clean.length,
-      removedChars,
-      reason: removedChars ? "merged_new_sentences" : "included",
-      ...((afterStatic.keptBy || afterMemory.keptBy || afterRag.keptBy)
-        ? { keptBy: (afterStatic.keptBy || afterMemory.keptBy || afterRag.keptBy)?.id }
-        : {}),
-    });
-  }
+  const rag = selectRag(selectedForDedup.filter((selected) => selected.source === "memory"));
+  unitDecisions.push(...rag.decisions);
   // Lot 5 : ce que le joueur vient de voir passe avant les souvenirs complémentaires,
   // qui cèdent la place quand le contexte est plein (jamais l'inverse).
   append("post_video", "CONTEXTE POST-VIDÉO", input.postVideoContext, OPTIMIZED_V3_LIMITS.postVideoChars, "runtime");
   append("watched_videos", WATCHED_VIDEOS_SECTION_TITLE, input.watchedVideos, OPTIMIZED_V3_LIMITS.watchedVideosChars, "runtime");
-  append("rag_context", "SOUVENIRS COMPLÉMENTAIRES", ragBlocks.length ? [RAG_USAGE_LINE, ...ragBlocks].join("\n\n") : "", OPTIMIZED_V3_LIMITS.ragChars, "rag");
+  const ragSent = append("rag_context", sectionTitles.rag_context, rag.text, OPTIMIZED_V3_LIMITS.ragChars, "rag");
+  // A souvenir is sent when its block made it into the final section, whole.
+  const sentRagIds = rag.selected
+    .filter((_, index) => ragSent.includes(`Souvenir ${index + 1}\n`))
+    .map((unit) => unit.id);
+
+  // Souvenirs lot 1: every removal of a turn section is announced, never silent.
+  const turnWarnings: PromptBudgetWarning[] = [];
+  if (rag.selected.length && sentRagIds.length < rag.selected.length) {
+    turnWarnings.push({
+      code: "souvenirs_evinces",
+      message: `Souvenirs retirés faute de place : ${rag.selected.length - sentRagIds.length} sur ${rag.selected.length} retenus ne sont pas envoyés au personnage.`,
+    });
+  }
+  if (memoryText.trim() && !memorySent) {
+    const why = budgetSections.find((section) => section.key === "conversation_memory")?.omissionReason;
+    if (why === "budget_contexte_epuise") turnWarnings.push({ code: "memoire_evincee", message: "Résumé de la conversation retiré faute de place : le personnage ne voit que les dernières répliques." });
+  }
+  if (canon.trim() && !canonSent) {
+    turnWarnings.push({ code: "canon_evince", message: "Canon pertinent retiré faute de place : les passages de la fiche liés à la question ne sont pas envoyés." });
+  }
+  const warnings = [...staticSelection.warnings, ...turnWarnings];
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
   if (protectedCharacterSections(character, establishedFacts, canonicalName).sections.some(section => !deliveredCore.includes(section.content))) {
@@ -845,7 +946,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
         ...(unit.reason ? { reason: unit.reason } : {}),
       })),
       memoryLastTurn: memory.lastTurn,
-      ...(staticSelection.warnings.length ? { warnings: staticSelection.warnings } : {}),
+      sentRagIds,
+      reservedSections: OPTIMIZED_V3_SECTION_RESERVATIONS.enabled ? { ...OPTIMIZED_V3_SECTION_RESERVATIONS.sections } : {},
+      ...(warnings.length ? { warnings } : {}),
     },
     finalSystemPrompt: prompt,
   };

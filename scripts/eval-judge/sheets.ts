@@ -65,6 +65,31 @@ async function main(): Promise<void> {
       if (warnings.length) for (const warning of warnings) log(`  ⚠ ${sheet.name} : ${warning.message}`);
       else log(`  ✓ ${sheet.name} : faits établis (${budget.source === "field" ? "champ dédié" : "paragraphe de l'identité"}) ${budget.sourceChars} car. (bloc ${budget.blockChars}), envoyés en entier.`);
     }
+    // Souvenirs lot 1: a long turn (transfer, full memory, three souvenirs of the
+    // longest real size) must still send memory, canon and souvenirs.
+    {
+      const { buildOptimizedPromptAssembly } = await import("@/agents/maxOptimizedPromptCompiler");
+      const { buildCharacterRulesInvariant, previewCharacterIdentity } = await import("@/agents/characterRulesInvariant");
+      const { buildLongTurnSimulation } = await import("@/services/characterReceivedSimulation");
+      const longSouvenir = (index: number) => `### SOUVENIR ${index} — un souvenir long de la fiche. ${"Ce que tu as vu ce jour-là et ce que ça t'a fait. ".repeat(33)}`.slice(0, 1_650);
+      const trace = buildOptimizedPromptAssembly({
+        character: sheet,
+        characterName: sheet.name ?? key,
+        identityInvariant: buildCharacterRulesInvariant(previewCharacterIdentity({
+          displayName: sheet.name ?? key, characterKey: key, characterId: sheet.character_id,
+          environmentId: session.environment, promptUpdatedAt: sheet.updated_at ?? null,
+        })),
+        characterState: "- état : ".padEnd(880, "."),
+        ...buildLongTurnSimulation({
+          sheet, characterKey: key, question: "Comment ce fusil est-il arrivé au chalet ?",
+          ragCandidates: [1, 2, 3].map((rank) => ({ id: `simulated-${rank}`, content: longSouvenir(rank), rank })),
+        }),
+      });
+      const budget = trace.budget;
+      const turnWarnings = (budget?.warnings ?? []).filter((warning) => ["souvenirs_evinces", "memoire_evincee", "canon_evince"].includes(warning.code));
+      if (turnWarnings.length) for (const warning of turnWarnings) log(`  ⚠ ${sheet.name} · tour long : ${warning.message}`);
+      else log(`  ✓ ${sheet.name} · tour long : ${budget?.totalSystemChars} / ${budget?.limitChars} car., mémoire, canon et ${budget?.sentRagIds?.length ?? 0} souvenirs envoyés.`);
+    }
     for (const hit of findAwaitedCallSentences(sheet)) {
       faulty += 1;
       log(`  ⚠ ${sheet.name} · ${hit.field} : « ${hit.excerpt} » (à corriger dans Notion, le code ne réécrit plus la fiche)`);

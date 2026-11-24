@@ -148,7 +148,21 @@ export interface PRD4TurnLabels {
   stakes?: string[];
 }
 
+/** Souvenirs lot 1 — what the character received at this turn, without any prompt text. */
+export interface PromptSectionsDigest {
+  variant: string;
+  systemChars: number;
+  limitChars: number;
+  sections: Array<{ key: string; chars: number; included: boolean; truncated?: boolean; reason?: string }>;
+  /** Ids of the souvenirs sent whole (optimized_v3). */
+  souvenirs?: string[];
+  /** Budget warning codes (souvenirs_evinces, memoire_evincee, canon_evince…). */
+  warnings?: string[];
+}
+
 export interface ConversationPipelineTimings {
+  /** Souvenirs lot 1 — sections and souvenirs actually sent to the character. */
+  prompt?: PromptSectionsDigest;
   stt_ms?: number;
   /** Explicit STT service finalization latency. Old Gamilab `stt_ms` values may include user speaking time. */
   stt_service_ms?: number;

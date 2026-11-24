@@ -3,7 +3,6 @@ import { CHARACTER_TIME_CUE_PHASES, CHARACTER_TIME_CUE_SUFFIX, CHARACTER_TIME_CU
 import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { buildResponseStreamContract, ResponseIntentParser, validateRecoverySpeech, type ResponseIntent, type ResponseStreamContractVariant } from "@/services/responseIntentStream";
 import { formatPrivateDeliveryContext } from "@/services/responseDelivery";
-import { CHARACTER_CALL_TRANSFER_INSTRUCTIONS } from "@/services/characterConversation";
 import { callLLM, callLLMWithUsage, LLMProxyRequestError, streamLLM, type LLMUsage } from "@/services/openRouterLLM";
 import { debugLogger } from "@/services/debugLogger";
 import type { ConversationMemoryV1, ConversationMessage, LLMCallDiagnosticTrace, MaxConstraintCheckResult, MaxPromptAssemblyTrace, MaxTurnKnowledgeContext, TraceMessage } from "@/types";
@@ -28,7 +27,8 @@ import {
 } from "@/agents/maxPromptCompiler";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
-import { GRAVITY_INVARIANT, enforceGravity } from "@/agents/gravity";
+import { enforceGravity } from "@/agents/gravity";
+import { buildCharacterRulesInvariant } from "@/agents/characterRulesInvariant";
 import { rugositySpeechDirective } from "@/services/speechRugosity";
 import { characterEmbodiment, withoutCharacterEmbodiment } from '@/services/characterEmbodiment';
 import {
@@ -626,7 +626,7 @@ export async function buildMaxSystemPrompt(
   const characterIdentity = characterContext
     ? buildCharacterIdentityInvariant(characterContext)
     : `# IDENTITÉ ACTIVE — INVARIANT PRIORITAIRE NON TRONQUABLE\n- Tu es ${canonicalName}. Tu ne te présentes jamais comme un autre personnage.`;
-  const identityInvariant = `${characterIdentity}\n\n${GRAVITY_INVARIANT}\n\n## PROCÉDURE DE PASSAGE TÉLÉPHONIQUE\n${CHARACTER_CALL_TRANSFER_INSTRUCTIONS}`;
+  const identityInvariant = buildCharacterRulesInvariant(characterIdentity);
 
   if (variant === "legacy") {
     const fieldsSections = buildCharacterPromptSections(withoutCharacterEmbodiment(characterFields));

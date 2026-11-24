@@ -131,6 +131,10 @@ export interface MaxPromptAssemblyTrace {
       reason?: "included" | "merged_new_sentences" | "duplicate" | "lower_rank" | "budget";
     }>;
     memoryLastTurn?: number;
+    /** optimized_v3 (souvenirs lot 1) — souvenirs whose whole block is in the final prompt. */
+    sentRagIds?: string[];
+    /** optimized_v3 (souvenirs lot 1) — reserved room per section; empty when the reservations are off. */
+    reservedSections?: Record<string, number>;
     /** Budget decisions that removed or squeezed sheet content (e.g. the established facts block). */
     warnings?: Array<{ code: string; message: string }>;
   };
