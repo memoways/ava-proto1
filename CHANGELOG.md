@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit : souvenirs absents du prompt de Max et Emma] — 2026-11-24
+
+- Diagnostic des sessions Romed du 23 novembre : les souvenirs RAG passent en dernier dans le prompt et n'ont plus de place une fois contrat, noyau, cadre, état et mémoire ajoutés ; un souvenir n'étant injecté qu'entier, il est évincé. Calcul vérifié dans le code, mesure au lot 1.
+- Cadre « bénévole » désactivé dans l'orchestration publiée (`frame.enabled = false`) : jamais envoyé au personnage.
+- « Absent (section_vide) » dans « Ce que reçoit le personnage » : l'aperçu ne simule pas de tour, ce n'est pas la cause.
+- Plan en trois lots (rendre visible et mesurer ; réserver la place des souvenirs ; cadre et consigne d'incertitude). Documents : `docs/audit_souvenirs_absents_20261124.md`, `docs/prompt_reprise_souvenirs_absents_lot_1.md`.
+- **Inchangé** : code de jeu, fiches, production.
+
 ## [Sessions : liste plus large, détail par tour] — 2026-11-23
 
 - La liste des sessions passe de 13 rem à 22 rem. La conversation et les détails techniques restent les deux autres colonnes.
