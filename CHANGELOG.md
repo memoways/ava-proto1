@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Mains libres : un bloc de parole = un tour] — 2026-11-24
+
+- Cause : Gamilab et AssemblyAI envoient un « final » sur leur propre silence (≈ 0,4 s). En mains libres, ce final lançait aussitôt le tour : une phrase à pauses devenait 8 tours (session Benoît 24.11.26 00:21), le tour suivant écartait la réplique du précédent (« Réponse du personnage non enregistrée »). Le délai de fin de parole (900 ms + 700 ms si la phrase est inachevée) était contourné.
+- Correctif (`IndexPRD4`, `handsFreeVoice.joinUtteranceParts`) : en mains libres, un final du fournisseur hors décision de l'application est mis de côté, affiché dans le sous-titre, et seul le minuteur de fin de parole lance le tour avec tout le texte. Si le fournisseur n'a plus rien à rendre au flush, le texte gardé est envoyé. Appuyer-pour-parler et Deepgram (finals seulement au flush) inchangés.
+- **Non vérifié en conditions réelles** (pas de micro ici) : recette mains libres avec Gamilab et AssemblyAI. Le fournisseur de la session Benoît n'est pas lu en base ; la colonne `trigger` (`silence` ou `ptt_flush`) de la latence audio le dira.
+
 ## [Souvenirs lot 1 : place réservée, trace par tour, alertes] — 2026-11-24
 
 - Le prompt de Max et Emma réserve une place à l'état du personnage (900 car.), au résumé de la conversation (1 200), au canon pertinent (650) et aux souvenirs (3 entiers, jusqu'à 6 100). L'ordre ne change pas, le noyau et les faits établis ne perdent rien. Limite du contexte 13 900 → 22 500 car. ; retour arrière par une seule constante (`OPTIMIZED_V3_SECTION_RESERVATIONS.enabled`).
