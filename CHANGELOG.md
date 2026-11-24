@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Souvenirs : guide de test Romed, lot 2 complété] — 2026-11-24
+
+- Nouveau `docs/guide_romed_test_souvenirs_lot1.md` : contrôle de la nouvelle version, appel long, les 8 questions du PDF, ce qu'il faut renvoyer, décision sur le fusil.
+- Prompt du lot 2 complété : directive relationnelle coupée par son plafond de 1 400 car. (ses 4 dernières consignes n'arrivent pas, débris « (closed, minimum link) »), faux « coupé » de l'historique dans l'aperçu et la trace.
+- **Inchangé** : code, fiches, production.
+
 ## [Souvenirs lot 1 : place réservée, trace par tour, alertes] — 2026-11-24
 
 - Le prompt de Max et Emma réserve une place à l'état du personnage (900 car.), au résumé de la conversation (1 200), au canon pertinent (650) et aux souvenirs (3 entiers, jusqu'à 6 100). L'ordre ne change pas, le noyau et les faits établis ne perdent rien. Limite du contexte 13 900 → 22 500 car. ; retour arrière par une seule constante (`OPTIMIZED_V3_SECTION_RESERVATIONS.enabled`).
