@@ -1,6 +1,7 @@
 import type { ConversationMessage, RuntimeCharacter } from "@/types";
 import { responseClaimsForeignIdentity } from "@/services/characterIdentityGuard";
 import { displayNameForCharacter } from "@/services/characterRegistry";
+import { combineTranscriptParts } from "@/services/stt/finalization";
 
 export type CharacterSwitchStance = "accept" | "object" | "defer";
 
@@ -113,6 +114,25 @@ export function playerUtteranceSinceLastReply(messages: ConversationMessage[], e
   }
   const joined = parts.join(" ");
   return joined.length > PLAYER_UTTERANCE_MAX_CHARS ? joined.slice(-PLAYER_UTTERANCE_MAX_CHARS) : joined;
+}
+
+/**
+ * One spoken block is one turn. The player kept talking after the application decided
+ * the end of speech: the turn in flight was cancelled before the character was heard,
+ * so its last user message has no reply. The next recognised text continues that
+ * message instead of opening another turn.
+ * Returns null when the last message is not that cancelled player message.
+ */
+export function continueCancelledPlayerTurn(
+  messages: ConversationMessage[],
+  cancelledTimestamp: number | null,
+  nextText: string,
+): { messages: ConversationMessage[]; removed: ConversationMessage; text: string } | null {
+  if (cancelledTimestamp == null) return null;
+  const last = messages.at(-1);
+  if (!last || last.role !== "user" || last.timestamp !== cancelledTimestamp) return null;
+  const text = combineTranscriptParts(last.content, nextText);
+  return { messages: messages.slice(0, -1), removed: last, text };
 }
 
 function normalizeSwitchText(value: string): string {

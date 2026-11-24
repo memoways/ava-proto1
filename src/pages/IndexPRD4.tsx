@@ -222,7 +222,7 @@ import {
   buildSwitchRequestGuidance,
   characterDisplayName,
   detectPlayerSwitchRequest,
-  playerUtteranceSinceLastReply,
+  continueCancelledPlayerTurn, playerUtteranceSinceLastReply,
   hasSpokenWithCharacter,
   inferSpokenWith,
   lastHandoffUserTurn,
@@ -300,6 +300,8 @@ const IndexPRD4 = () => {
   const handsFreeListeningRef = useRef(false);
   const handsFreeTimerRef = useRef<number | null>(null);
   const handsFreeFinalizingRef = useRef(false);
+  /** User message whose turn was cancelled by the player speaking on, before any reply was heard. */
+  const cancelledPlayerTurnRef = useRef<number | null>(null);
   const handsFreeBlockedRef = useRef(false);
   const handsFreeTranscriptRef = useRef<((text: string, isFinal: boolean) => void) | null>(null);
   const lastCharacterTextRef = useRef("");
@@ -1678,6 +1680,15 @@ const IndexPRD4 = () => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current
         || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)
         || cinematicHoldsInput(cinematicRef.current)) return;
+      // One spoken block is one turn: the player spoke on while the previous turn was still
+      // thinking (cancelled, nothing heard), so this text continues that message.
+      const continued = continueCancelledPlayerTurn(conversationRef.current, cancelledPlayerTurnRef.current, userText);
+      cancelledPlayerTurnRef.current = null;
+      if (continued) {
+        conversationRef.current = continued.messages;
+        removeLastMessage(continued.removed.timestamp);
+        userText = continued.text;
+      }
       // The request owns its offer; ordinary speech is not a revocation.
       isProcessingRef.current = true;
       dispatchCinematicRef.current({ type: "turn_started" });
@@ -3233,6 +3244,10 @@ const IndexPRD4 = () => {
       window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = null;
     }
+    // Nothing of the character was heard yet: the player is continuing, not interrupting.
+    const lastMessage = conversationRef.current.at(-1);
+    cancelledPlayerTurnRef.current = audioStateRef.current === "max_thinking" && lastMessage?.role === "user"
+      ? lastMessage.timestamp : null;
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("player-barge-in");
     activeTurnControllerRef.current = null;

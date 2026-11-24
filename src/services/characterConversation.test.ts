@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ConversationMessage } from "@/types";
 import {
   buildSwitchRequestGuidance,
+  continueCancelledPlayerTurn,
   detectPlayerSwitchRequest,
   hasSpokenWithCharacter,
   inferCharacterSwitchStance,
@@ -149,5 +150,25 @@ describe("characterConversation", () => {
     expect(sliceConversationForCharacter(unattributed, "emma")).toEqual([]);
     expect(hasSpokenWithCharacter(unattributed, "max")).toBe(false);
     expect(hasSpokenWithCharacter(unattributed, "emma")).toBe(false);
+  });
+});
+
+describe("continueCancelledPlayerTurn", () => {
+  const user = (content: string, timestamp: number): ConversationMessage => ({ role: "user", content, timestamp });
+  const opening: ConversationMessage = { role: "max", content: "Bonjour, qu'est-ce qui t'amène ?", timestamp: 1 };
+
+  it("continues the cancelled message instead of opening a second turn", () => {
+    const messages = [opening, user("Je sais pas peut-être que vous le savez, mais", 10)];
+    const result = continueCancelledPlayerTurn(messages, 10, "la police est débordée");
+    expect(result?.text).toBe("Je sais pas peut-être que vous le savez, mais la police est débordée");
+    expect(result?.messages).toEqual([opening]);
+  });
+
+  it("does nothing without a cancelled turn, or when a reply follows it", () => {
+    const messages = [opening, user("Bonjour", 10)];
+    expect(continueCancelledPlayerTurn(messages, null, "suite")).toBeNull();
+    expect(continueCancelledPlayerTurn(messages, 99, "suite")).toBeNull();
+    const answered = [...messages, { role: "max" as const, content: "Oui ?", timestamp: 11 }];
+    expect(continueCancelledPlayerTurn(answered, 10, "suite")).toBeNull();
   });
 });
