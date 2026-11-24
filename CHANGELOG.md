@@ -4,19 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-<<<<<<< HEAD
 ## [Mains libres : un bloc de parole = un tour] — 2026-11-24
 
 - Cause : Gamilab et AssemblyAI envoient un « final » sur leur propre silence (≈ 0,4 s). En mains libres, ce final lançait aussitôt le tour : une phrase à pauses devenait 8 tours (session Benoît 24.11.26 00:21), le tour suivant écartait la réplique du précédent (« Réponse du personnage non enregistrée »). Le délai de fin de parole (900 ms + 700 ms si la phrase est inachevée) était contourné.
 - Correctif (`IndexPRD4`, `handsFreeVoice.joinUtteranceParts`) : en mains libres, un final du fournisseur hors décision de l'application est mis de côté, affiché dans le sous-titre, et seul le minuteur de fin de parole lance le tour avec tout le texte. Si le fournisseur n'a plus rien à rendre au flush, le texte gardé est envoyé. Appuyer-pour-parler et Deepgram (finals seulement au flush) inchangés.
 - **Non vérifié en conditions réelles** (pas de micro ici) : recette mains libres avec Gamilab et AssemblyAI. Le fournisseur de la session Benoît n'est pas lu en base ; la colonne `trigger` (`silence` ou `ptt_flush`) de la latence audio le dira.
-=======
+
 ## [Souvenirs : guide de test Romed, lot 2 complété] — 2026-11-24
 
 - Nouveau `docs/guide_romed_test_souvenirs_lot1.md` : contrôle de la nouvelle version, appel long, les 8 questions du PDF, ce qu'il faut renvoyer, décision sur le fusil.
 - Prompt du lot 2 complété : directive relationnelle coupée par son plafond de 1 400 car. (ses 4 dernières consignes n'arrivent pas, débris « (closed, minimum link) »), faux « coupé » de l'historique dans l'aperçu et la trace.
 - **Inchangé** : code, fiches, production.
->>>>>>> origin/main
 
 ## [Souvenirs lot 1 : place réservée, trace par tour, alertes] — 2026-11-24
 
