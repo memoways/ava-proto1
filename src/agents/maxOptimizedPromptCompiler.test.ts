@@ -52,7 +52,7 @@ describe("optimized_v3 prompt compiler", () => {
 
   it('refuse de perdre le noyau lorsque l’historique épuise le budget global', () => {
     const sheet = makeCanonicalPresentFixture('emma');
-    expect(() => buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: 'Et ce matin ?', historyChars: 7_000 }))
+    expect(() => buildOptimizedPromptAssembly({ character: sheet, characterName: sheet.name!, userMessage: 'Et ce matin ?', historyChars: OPTIMIZED_V3_LIMITS.generatedContextChars - 6_900 }))
       .toThrow(/hors budget de contexte.*génération interdite/i);
   });
 

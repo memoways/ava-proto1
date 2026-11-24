@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Souvenirs lot 1 : place réservée, trace par tour, alertes] — 2026-11-24
+
+- Le prompt de Max et Emma réserve une place à l'état du personnage (900 car.), au résumé de la conversation (1 200), au canon pertinent (650) et aux souvenirs (3 entiers, jusqu'à 6 100). L'ordre ne change pas, le noyau et les faits établis ne perdent rien. Limite du contexte 13 900 → 22 500 car. ; retour arrière par une seule constante (`OPTIMIZED_V3_SECTION_RESERVATIONS.enabled`).
+- Chaque tour enregistre dans `conversation_log[].pipeline.prompt` les sections envoyées ou retirées (clé, taille, raison), les souvenirs envoyés et les alertes, sans texte de prompt. Lisible dans Admin › Sessions › « Détail du tour ».
+- Nouvelles alertes `souvenirs_evinces`, `memoire_evincee`, `canon_evince` dans l'aperçu et `eval:judge:sheets` (qui simule aussi un tour long).
+- « Ce que reçoit le personnage » compte les vraies règles (identité, gravité, transfert : ≈ 5 050 car. au lieu de 3 044) et propose « Simuler un tour long » (historique ≈ 1 000, mémoire, transfert, question saisie, vrais souvenirs).
+- Nouvel outil `npm run eval:replay:souvenirs` : rejoue des questions d'une session sandbox sans appel au modèle (option `--compare` avant/après). `AVA_SOUVENIR_RESERVATIONS=off` rejoue l'ancien assemblage dans `eval:judge:sequences`.
+- Tests sur une copie lecture seule des fiches réelles et des souvenirs retrouvés (`src/agents/__fixtures__/souvenirsSandboxRomed20261123.json`).
+- Mesures : 14 questions de Romed, souvenirs retirés 14 → 0 ; factualité 5,94 → 7,14/10 (Max + 1,9, signal ; Emma dans le bruit) ; latence dans le bruit ; tokens d'entrée estimés + 37 %. Rapport : `docs/eval/souvenirs_lot1_mesures_20261124.md`. Reprise : `docs/prompt_reprise_souvenirs_absents_lot_2.md`.
+- **Inchangé** : `query-rag`, consignes d'usage des souvenirs, cadre de l'expérience, GM, vidéos, voix, variantes `legacy` / `rich_v2` / `compact_v1`, fiches, production.
+
 ## [Audit souvenirs : mesure, comparaison Cursor, état des lieux] — 2026-11-24
 
 - Rejeu sans appel au modèle des questions de Romed sur `sandbox-romed` : le bon souvenir est trouvé (rang 1 dans 4 cas sur 5) puis évincé faute de place dans 5 cas sur 5, avec le résumé de la conversation et le canon pertinent.

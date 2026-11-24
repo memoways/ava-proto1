@@ -66,6 +66,8 @@ import { buildGmOffEvaluation, resolveCharacterGuidance, resolveGmMode, type GmG
 import type { GmMode, PriorityLevels } from "@/types";
 import type { ConversationMessage, ConversationTurnTraceV1, ExperienceDirectorConfig, PRD4PostTurnEvaluation, UserRoleProfile } from "@/types";
 import type { ConversationMemoryV1 } from "@/types/conversationMemory";
+import type { PromptSectionsDigest } from "@/types";
+import { buildPromptSectionsDigest } from "@/services/promptSectionsDigest";
 
 export interface PRD4TurnInput {
   /** Internal shared execution seam; batch callers omit it. */
@@ -190,6 +192,8 @@ export interface PRD4TurnResult {
     trace_write_ms?: number;
   };
   ragMatches: number;
+  /** Souvenirs lot 1 — sections and souvenirs actually sent, written in `conversation_log[].pipeline`. */
+  promptSections?: PromptSectionsDigest;
   memory: {
     totalMessages: number;
     recentMessages: number;
@@ -912,6 +916,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
       ...(diagnosticTraceEnabled ? { trace_write_ms: traceWriteMs } : {}),
     },
     ragMatches: matchesCount,
+    promptSections: buildPromptSectionsDigest(maxResult?.promptTrace ?? maxFailureDiagnostic?.promptTrace),
     memory: {
       totalMessages: input.conversationHistory.length,
       recentMessages: maxConversationHistory.length,

@@ -4,6 +4,9 @@
 Lectures faites : code `main` à `8cf58ee6`, base Lovable en lecture seule (`sessions`, `experience_orchestration_versions`).
 Version lisible sans jargon : [état des lieux](etat_des_lieux_souvenirs_max_emma.md). Suite : [prompt de reprise lot 1](prompt_reprise_souvenirs_absents_lot_1.md).
 
+**Lot 1 livré le 24 novembre** : place réservée, trace par tour, alertes ; souvenirs retirés 14 → 0 sur les questions de
+Romed, factualité 5,94 → 7,14/10. [Mesures](eval/souvenirs_lot1_mesures_20261124.md) · [reprise lot 2](prompt_reprise_souvenirs_absents_lot_2.md).
+
 **Mis à jour le 24 novembre (après-midi)** : la cause principale est désormais **mesurée** (rejeu, section « Mesure »), et l'audit est comparé à celui de Cursor (section « Comparaison »). Le plan de correction est révisé en conséquence.
 
 ## Contexte

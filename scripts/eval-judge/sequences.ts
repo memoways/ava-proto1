@@ -49,6 +49,14 @@ async function main(): Promise<void> {
     log(HEADLESS_SEQUENCE_USAGE);
     return;
   }
+  // Souvenirs lot 1: `AVA_SOUVENIR_RESERVATIONS=off` replays the previous assembly
+  // (no reserved room, limit 13 900) for the before/after measure, in memory only.
+  if (process.env.AVA_SOUVENIR_RESERVATIONS === "off") {
+    const { OPTIMIZED_V3_LIMITS, OPTIMIZED_V3_SECTION_RESERVATIONS } = await import("@/agents/maxOptimizedPromptCompiler");
+    OPTIMIZED_V3_SECTION_RESERVATIONS.enabled = false;
+    OPTIMIZED_V3_LIMITS.generatedContextChars = OPTIMIZED_V3_SECTION_RESERVATIONS.baseContextChars;
+    log(`ℹ Place réservée désactivée pour ce run (limite ${OPTIMIZED_V3_LIMITS.generatedContextChars} car.).`);
+  }
   const factualityFocus = options.focus === "factuality";
   if (!options.candidate && !factualityFocus) errors.push("--candidate est obligatoire");
   if (errors.length) fail(`${errors.join("\n  ")}\n\n${HEADLESS_SEQUENCE_USAGE}`);
