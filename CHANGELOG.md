@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Audit souvenirs : mesure, comparaison Cursor, état des lieux] — 2026-11-24
+
+- Rejeu sans appel au modèle des questions de Romed sur `sandbox-romed` : le bon souvenir est trouvé (rang 1 dans 4 cas sur 5) puis évincé faute de place dans 5 cas sur 5, avec le résumé de la conversation et le canon pertinent.
+- Comparaison avec l'audit Cursor : constats secondaires repris, cause principale et correctif écartés par la mesure.
+- Nouveau `docs/etat_des_lieux_souvenirs_max_emma.md`, en langage simple : ce qui s'est passé, pourquoi, quoi faire, comment éviter les régressions.
+- Audit et prompt de reprise du lot 1 révisés (place garantie par section, trace par tour, alertes, tests sur fiches réelles).
+- **Inchangé** : code de jeu, fiches, production.
+
 ## [Audit : souvenirs absents du prompt de Max et Emma] — 2026-11-24
 
 - Diagnostic des sessions Romed du 23 novembre : les souvenirs RAG passent en dernier dans le prompt et n'ont plus de place une fois contrat, noyau, cadre, état et mémoire ajoutés ; un souvenir n'étant injecté qu'entier, il est évincé. Calcul vérifié dans le code, mesure au lot 1.
