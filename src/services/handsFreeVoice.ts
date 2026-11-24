@@ -4,8 +4,6 @@
  * vocale : elle ne regarde que le texte reconnu et le temps écoulé.
  */
 
-import { combineTranscriptParts } from "@/services/stt/finalization";
-
 export interface HandsFreeVoiceSettings {
   /** Micro ouvert en continu : aucun bouton à presser pour parler ou finir. */
   enabled: boolean;
@@ -85,16 +83,6 @@ export function isHesitantEnding(text: string): boolean {
 /** Délai de silence à attendre avant de considérer que le joueur a fini de parler. */
 export function endOfSpeechDelayMs(text: string, settings: HandsFreeVoiceSettings): number {
   return settings.endOfSpeechMs + (isHesitantEnding(text) ? settings.hesitationExtraMs : 0);
-}
-
-/**
- * Some providers (Gamilab, AssemblyAI) emit a "final" on their own short silence
- * (≈ 0.4 s). In hands-free mode that is a pause, not the end of the player's turn:
- * the application timer alone decides. The provider's segments are chained here so
- * one spoken block stays one turn.
- */
-export function joinUtteranceParts(pending: string, next: string): string {
-  return combineTranscriptParts(pending, next);
 }
 
 /**

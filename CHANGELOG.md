@@ -4,11 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
-## [Mains libres : un bloc de parole = un tour] — 2026-11-24
+## [Un bloc de parole = un tour] — 2026-11-24
 
-- Cause : Gamilab et AssemblyAI envoient un « final » sur leur propre silence (≈ 0,4 s). En mains libres, ce final lançait aussitôt le tour : une phrase à pauses devenait 8 tours (session Benoît 24.11.26 00:21), le tour suivant écartait la réplique du précédent (« Réponse du personnage non enregistrée »). Le délai de fin de parole (900 ms + 700 ms si la phrase est inachevée) était contourné.
-- Correctif (`IndexPRD4`, `handsFreeVoice.joinUtteranceParts`) : en mains libres, un final du fournisseur hors décision de l'application est mis de côté, affiché dans le sous-titre, et seul le minuteur de fin de parole lance le tour avec tout le texte. Si le fournisseur n'a plus rien à rendre au flush, le texte gardé est envoyé. Appuyer-pour-parler et Deepgram (finals seulement au flush) inchangés.
-- **Non vérifié en conditions réelles** (pas de micro ici) : recette mains libres avec Gamilab et AssemblyAI. Le fournisseur de la session Benoît n'est pas lu en base ; la colonne `trigger` (`silence` ou `ptt_flush`) de la latence audio le dira.
+- Cause (mesurée, session Benoît 24.11.26 00:21, Deepgram, mains libres, `endOfSpeechMs` 800 + 550) : l'application décide la fin de parole à une pause naturelle (≥ 0,8 s, 1,35 s si phrase inachevée) et lance le tour ; la personne continue de parler pendant que le personnage « réfléchit » ; cette parole est prise pour une coupure (`acoustic_confirmed`), le tour est abandonné sans réponse, puis le texte suivant ouvre un nouveau tour. Résultat : 7 tours de 2 s sans réplique, puis un tour complet (RAG « over_budget » ≈ 20 s sur ce tour).
+- Correctif (`IndexPRD4`, `continueCancelledPlayerTurn`) : si la personne reprend la parole alors que le personnage n'a encore rien dit (état « réfléchit ») et que le dernier message est le sien, le texte suivant **continue** ce message : un seul tour, un seul message utilisateur, une seule réponse. Une vraie coupure pendant que le personnage parle est inchangée.
+- Non traité ici : le délai de fin de parole lui-même (réglage Admin, 800 ms pour Benoît contre 900 par défaut), et le RAG « over_budget » de 20 s qui allonge la fenêtre où la reprise de parole annule le tour.
+- **Non vérifié avec un vrai micro** : recette mains libres avec une phrase à pauses (Deepgram). Points à regarder : un seul « Tour N » dans Admin › Sessions, la réplique présente, pas de double avance du transfert Max/Emma.
 
 ## [Souvenirs : guide de test Romed, lot 2 complété] — 2026-11-24
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   endOfSpeechDelayMs,
   isHesitantEnding,
-  joinUtteranceParts,
   normalizeHandsFreeSettings,
   shouldBargeIn,
 } from "./handsFreeVoice";
@@ -31,14 +30,5 @@ describe("hands-free voice", () => {
     expect(shouldBargeIn("Attendez Max, une seconde", max, on)).toBe(true);
     expect(shouldBargeIn("où est Ava personne", max, on)).toBe(false);
     expect(shouldBargeIn("Attendez Max", max, { ...on, bargeInEnabled: false })).toBe(false);
-  });
-
-  it("chains provider segments cut on a short pause into one spoken block", () => {
-    const first = "Je sais pas peut-être que vous le savez, mais";
-    const second = "la police est débordée, donc ils n'ont pas vraiment le temps";
-    expect(joinUtteranceParts("", first)).toBe(first);
-    expect(joinUtteranceParts(first, second)).toBe(`${first} ${second}`);
-    expect(joinUtteranceParts(first, first)).toBe(first);
-    expect(endOfSpeechDelayMs(first, on)).toBe(1600);
   });
 });

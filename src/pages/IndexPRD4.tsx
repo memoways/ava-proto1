@@ -215,14 +215,14 @@ import {
 } from "@/services/characterIdentityGuard";
 import { appendExperienceEvent, applyTopicHandoffFallback, validateDirectorDecision, type GuardedDirectorDecision } from "@/services/experienceDirector";
 import type { ExperienceDirectorDecisionV1, PRD4PostTurnEvaluation, RuntimeCharacter } from "@/types";
-import { createAcousticInterruptionController, joinUtteranceParts, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
+import { createAcousticInterruptionController, recognizedWordsChanged, withoutRejectedPrefix, endOfSpeechDelayMs, normalizeHandsFreeSettings, shouldBargeIn, type HandsFreeVoiceSettings } from "@/services/handsFreeVoice";
 import { createMicRecoveryPolicy, isMicSilentlyDead, MIC_WATCHDOG_STRIKES } from "@/services/handsFreeRecovery";
 import { characterRecallGreeting, characterHandoffGreeting, characterRecoveryLine, createInitialGreetingSelector, greetingDelivery } from '@/services/characterConversationContinuity';
 import {
   buildSwitchRequestGuidance,
   characterDisplayName,
   detectPlayerSwitchRequest,
-  playerUtteranceSinceLastReply,
+  continueCancelledPlayerTurn, playerUtteranceSinceLastReply,
   hasSpokenWithCharacter,
   inferSpokenWith,
   lastHandoffUserTurn,
@@ -300,8 +300,8 @@ const IndexPRD4 = () => {
   const handsFreeListeningRef = useRef(false);
   const handsFreeTimerRef = useRef<number | null>(null);
   const handsFreeFinalizingRef = useRef(false);
-  /** Provider "finals" received on a pause, held until the end-of-speech timer decides the turn is over. */
-  const handsFreePendingRef = useRef("");
+  /** User message whose turn was cancelled by the player speaking on, before any reply was heard. */
+  const cancelledPlayerTurnRef = useRef<number | null>(null);
   const handsFreeBlockedRef = useRef(false);
   const handsFreeTranscriptRef = useRef<((text: string, isFinal: boolean) => void) | null>(null);
   const lastCharacterTextRef = useRef("");
@@ -595,7 +595,7 @@ const IndexPRD4 = () => {
     activeOutputControllerRef.current?.abort("experience-cleanup");
     activeOutputControllerRef.current = null;
     pttFinalizingRef.current = false;
-    handsFreeFinalizingRef.current = false; handsFreePendingRef.current = "";
+    handsFreeFinalizingRef.current = false;
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
     handsFreeTimerRef.current = null;
     handsFreeListeningRef.current = false;
@@ -1680,6 +1680,15 @@ const IndexPRD4 = () => {
       if (isProcessingRef.current || !userText.trim() || endedRef.current
         || ['validating', 'calling', 'switching'].includes(handoffPhaseRef.current)
         || cinematicHoldsInput(cinematicRef.current)) return;
+      // One spoken block is one turn: the player spoke on while the previous turn was still
+      // thinking (cancelled, nothing heard), so this text continues that message.
+      const continued = continueCancelledPlayerTurn(conversationRef.current, cancelledPlayerTurnRef.current, userText);
+      cancelledPlayerTurnRef.current = null;
+      if (continued) {
+        conversationRef.current = continued.messages;
+        removeLastMessage(continued.removed.timestamp);
+        userText = continued.text;
+      }
       // The request owns its offer; ordinary speech is not a revocation.
       isProcessingRef.current = true;
       dispatchCinematicRef.current({ type: "turn_started" });
@@ -2984,7 +2993,7 @@ const IndexPRD4 = () => {
   const teardownSTT = useCallback((preserveInputTelemetry = false) => {
     if (!preserveInputTelemetry) finishInputTelemetry("cancelled");
     pttFinalizingRef.current = false;
-    handsFreeFinalizingRef.current = false; handsFreePendingRef.current = "";
+    handsFreeFinalizingRef.current = false;
     detectorRef.current?.stop(); detectorRef.current = null;
     acousticRef.current?.reset(); acousticVoiceRef.current = false;
     lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
@@ -3235,6 +3244,10 @@ const IndexPRD4 = () => {
       window.clearTimeout(processingWatchdogRef.current);
       processingWatchdogRef.current = null;
     }
+    // Nothing of the character was heard yet: the player is continuing, not interrupting.
+    const lastMessage = conversationRef.current.at(-1);
+    cancelledPlayerTurnRef.current = audioStateRef.current === "max_thinking" && lastMessage?.role === "user"
+      ? lastMessage.timestamp : null;
     activeTurnSequenceRef.current += 1;
     activeTurnControllerRef.current?.abort("player-barge-in");
     activeTurnControllerRef.current = null;
@@ -3270,13 +3283,6 @@ const IndexPRD4 = () => {
     setAudioState("user_finalizing");
     try {
       await stt.flush(); // le callback final lance processTurn
-      // The provider already cut its own segments and had nothing left: send what we held.
-      const held = handsFreePendingRef.current.trim();
-      if (held && !isProcessingRef.current && sttRef.current === stt) {
-        handsFreePendingRef.current = "";
-        endLatencySegment(sttLatencySegmentRef.current); sttLatencySegmentRef.current = null;
-        setUserSubtitle(held); void processTurn(held);
-      }
     } catch (error) {
       if (sttRef.current !== stt) return;
       finishInputTelemetry("failed");
@@ -3288,7 +3294,7 @@ const IndexPRD4 = () => {
         if (!isProcessingRef.current) { finishInputTelemetry("no_audio"); setAudioState("idle"); }
       }
     }
-  }, [finishInputTelemetry, processTurn, setAudioState]);
+  }, [finishInputTelemetry, setAudioState]);
 
   if (!acousticRef.current) acousticRef.current = createAcousticInterruptionController({
     observe: event => activeVoiceTelemetryRef.current?.interruption(event),
@@ -3316,17 +3322,6 @@ const IndexPRD4 = () => {
       text = withoutRejectedPrefix(text, discardedPrefixRef.current);
       lastTranscriptRef.current = ""; discardedPrefixRef.current = "";
       if (!text.trim()) return;
-      if (!handsFreeFinalizingRef.current) {
-        // The provider ended a segment on its own short silence: a pause, not our decision.
-        // Keep the text and let the end-of-speech timer (with its hesitation extra) decide.
-        handsFreePendingRef.current = joinUtteranceParts(handsFreePendingRef.current, text);
-        if (!inputTelemetryRef.current) beginInputTelemetry("hands_free");
-        setUserSubtitle(handsFreePendingRef.current); setAudioState("user_speaking");
-        if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
-        handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), endOfSpeechDelayMs(handsFreePendingRef.current, settings));
-        return;
-      }
-      text = joinUtteranceParts(handsFreePendingRef.current, text); handsFreePendingRef.current = "";
       endLatencySegment(sttLatencySegmentRef.current); sttLatencySegmentRef.current = null;
       setUserSubtitle(text); void processTurn(text); return;
     }
@@ -3345,7 +3340,7 @@ const IndexPRD4 = () => {
     lastTranscriptRef.current = rawText;
     if (!changed || !text.trim()) return;
     if (!inputTelemetryRef.current) beginInputTelemetry("hands_free");
-    setUserSubtitle(joinUtteranceParts(handsFreePendingRef.current, text)); setAudioState("user_speaking");
+    setUserSubtitle(text); setAudioState("user_speaking");
     if (handsFreeTimerRef.current) window.clearTimeout(handsFreeTimerRef.current);
     handsFreeTimerRef.current = window.setTimeout(() => void finalizeHandsFreeUtterance(), endOfSpeechDelayMs(text, settings));
   };
