@@ -289,6 +289,7 @@ export default function CharacterRuntimeSettingsTab() {
                   return null;
                 })()}
                 <CharacterVideoLinkEditor
+                  characterKey={profile.character_key}
                   characterName={profile.display_name}
                   settings={avatarSettings}
                   choice={videoChoice}
