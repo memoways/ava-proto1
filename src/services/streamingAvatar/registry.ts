@@ -57,6 +57,15 @@ const avatarProviders: Record<StreamingAvatarProviderId, AvatarOutputFactory> = 
       settings.fallbackTimeoutMs,
     );
   },
+  nuance: async (settings, callbacks) => {
+    const { NuanceStreamingAvatarOutput } = await import("./providers/nuance");
+    return new NuanceStreamingAvatarOutput(
+      settings.nuance,
+      callbacks,
+      settings.connectionTimeoutMs,
+      settings.fallbackTimeoutMs,
+    );
+  },
 };
 
 /**

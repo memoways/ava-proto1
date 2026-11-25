@@ -93,6 +93,7 @@ export const AVATAR_LABELS: Record<StreamingAvatarProviderId, string> = {
   tavus: "Tavus",
   anam: "Anam",
   lemonslice: "LemonSlice",
+  nuance: "Nuance",
 };
 
 const VOICE_SOURCE_LABELS: Record<EffectiveVoiceSource, string> = {
@@ -277,6 +278,15 @@ export function describeEffectiveVoice(input: EffectiveVoiceInput): EffectiveVoi
       : avatarVoice("tavus", null, [], null, "voix de la source Tavus (PAL)");
   }
   if (provider === "lemonslice") return avaVoice(provider, "LemonSlice · voix Ava");
+  if (provider === "nuance") {
+    const persona = avatar.nuance.personaId;
+    const detail = avatar.nuance.drive === "native"
+      ? "conversation Nuance, voix de la persona"
+      : "consigne de lecture, voix de la persona";
+    return avatarVoice("nuance", persona, [
+      { label: "expressivité", value: String(avatar.nuance.expressiveness) },
+    ], null, detail);
+  }
   if (provider === "anam") {
     const voiceId = avatar.anam.voiceId || null;
     return avatarVoice("anam", null, [], voiceId, voiceId ? `voix de l'avatar ${shortVoiceId(voiceId)}` : "voix de l'avatar Anam");

@@ -23,6 +23,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   tavus: "Tavus",
   anam: "Anam",
   lemonslice: "LemonSlice",
+  nuance: "Nuance Labs",
 };
 
 interface SessionRow {
@@ -197,7 +198,7 @@ export default function StreamingAvatarUsageTab() {
         <div>
           <h2 className="text-lg font-semibold">Consommation Streaming Avatar</h2>
           <p className="text-sm text-muted-foreground">
-            Métriques des services vidéo temps réel (HeyGen, Tavus, Anam, LemonSlice) : connexion,
+            Métriques des services vidéo temps réel (HeyGen, Tavus, Anam, LemonSlice, Nuance) : connexion,
             première image, première parole, replis TTS et coût estimé.
           </p>
         </div>

@@ -266,4 +266,34 @@ describe("Tavus voice source (Ava audio or PAL voice)", () => {
     expect(resolveTavusCharacterSettings(tavus).voiceSource).toBe("tavus");
     expect(normalize({ tavus: { voiceSource: 42 } }).tavus.voiceSource).toBe("ava");
   });
+
+  it("reads settings saved before Nuance with the verbatim defaults", () => {
+    const value = normalize({ activeProvider: "heygen" });
+    expect(value.nuance).toMatchObject({
+      personaId: "sam",
+      expressiveness: 1,
+      drive: "verbatim",
+    });
+    expect(value.nuance.systemPrompt).toMatch(/Say only this/);
+  });
+
+  it("keeps a Nuance persona and drops an unknown one", () => {
+    const kept = normalize({
+      activeProvider: "nuance",
+      nuance: { personaId: "mira", expressiveness: 1.74, drive: "native", systemPrompt: "Answer briefly." },
+    });
+    expect(kept.activeProvider).toBe("nuance");
+    expect(kept.nuance).toMatchObject({
+      personaId: "mira",
+      expressiveness: 1.7,
+      drive: "native",
+      systemPrompt: "Answer briefly.",
+    });
+    const dropped = normalize({
+      nuance: { personaId: "emma", expressiveness: 9, drive: "echo", systemPrompt: "" },
+    });
+    expect(dropped.nuance.personaId).toBe("sam");
+    expect(dropped.nuance.expressiveness).toBe(2);
+    expect(dropped.nuance.drive).toBe("verbatim");
+  });
 });

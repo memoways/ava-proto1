@@ -6,6 +6,7 @@ import {
   normalizeAnamSettings,
   normalizeHeyGenVoiceSettings,
   normalizeLemonSliceSettings,
+  normalizeNuanceSettings,
   normalizeTavusLanguages,
   pickEnum,
   safeLanguageCode,
@@ -72,6 +73,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
   anam: normalizeAnamSettings(undefined),
   // Dejected speaking prompt and closed idle prompt; avatar id or image set in the admin.
   lemonslice: normalizeLemonSliceSettings(undefined),
+  nuance: normalizeNuanceSettings(undefined),
 };
 
 function readLocal<T>(key: string, defaults: T): T {
@@ -133,7 +135,7 @@ export async function saveStreamingAvatarSettingsToDB(
 
 /**
  * Tolerant normalization: older JSON (Tavus `language: "French"`, HeyGen without voice settings,
- * no `anam` or `lemonslice` block) is read without loss; unknown or out of bounds values return to their default.
+ * no `anam`, `lemonslice` or `nuance` block) is read without loss; unknown or out of bounds values return to their default.
  */
 export function normalizeStreamingAvatarSettings(
   value: Partial<StreamingAvatarSettings>,
@@ -192,6 +194,7 @@ export function normalizeStreamingAvatarSettings(
     },
     anam: normalizeAnamSettings(raw.anam),
     lemonslice: normalizeLemonSliceSettings(raw.lemonslice),
+    nuance: normalizeNuanceSettings(raw.nuance),
   };
 }
 
