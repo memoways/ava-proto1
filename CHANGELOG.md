@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Deepgram entend français, anglais et allemand] — 2026-11-25
+
+- L'écoute Deepgram (Nova-3) détecte toute seule le français, l'anglais et l'allemand (`language=multi`, indications `fr`, `en`, `de`). L'ancien réglage `fr` / `fr-FR` est relu comme cette détection. Un autre code dans Admin › STT force une seule langue.
+- Le reste est inchangé : fin de parole, dictionnaire, pipeline du personnage. Une phrase anglaise arrive en anglais dans le tour ; Max répond encore avec ses prompts français.
+- **À écouter** après que l'aperçu Lovable ait ce commit. Rien en production.
+
 ## [Nuance Labs — persona vidéo en essai] — 2026-11-25
 
 - Nuance Live devient sélectionnable à côté de HeyGen, Tavus, Anam et LemonSlice (Admin › Streaming Avatar Config, Appareils, consommation).

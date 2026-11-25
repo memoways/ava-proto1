@@ -8,6 +8,7 @@
  * `localStorage` for zero-flash reads.
  */
 
+import { resolveDeepgramLanguage } from "../../../supabase/functions/_shared/deepgramDefaults";
 import type { STTProviderId } from "./types";
 import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting, writeEnvironmentStorage } from "@/services/environmentContext";
 
@@ -15,7 +16,7 @@ import { loadEnvironmentSetting, readEnvironmentStorage, saveEnvironmentSetting,
 
 export interface DeepgramProviderSettings {
   model: string; // "nova-3" | "nova-2" | "nova-2-general" | free text
-  language: string; // "fr-FR" | "en-US" | "multi" | free text
+  language: string; // "multi" (fr, en, de) | "en-US" | other single code
   smartFormat: boolean;
   punctuate: boolean;
   interimResults: boolean;
@@ -59,7 +60,7 @@ export interface STTProviderSettingsMap {
 export const DEFAULT_STT_PROVIDER_SETTINGS: STTProviderSettingsMap = {
   deepgram: {
     model: "nova-3",
-    language: "fr-FR",
+    language: "multi",
     smartFormat: true,
     punctuate: true,
     interimResults: true,
@@ -95,7 +96,11 @@ let loadPromise: Promise<STTProviderSettingsMap> | null = null;
 function merge(input: unknown): STTProviderSettingsMap {
   const src = (input && typeof input === "object" ? input : {}) as Partial<STTProviderSettingsMap>;
   return {
-    deepgram: { ...DEFAULT_STT_PROVIDER_SETTINGS.deepgram, ...(src.deepgram ?? {}) },
+    deepgram: {
+      ...DEFAULT_STT_PROVIDER_SETTINGS.deepgram,
+      ...(src.deepgram ?? {}),
+      language: resolveDeepgramLanguage(src.deepgram?.language ?? DEFAULT_STT_PROVIDER_SETTINGS.deepgram.language),
+    },
     assemblyai: { ...DEFAULT_STT_PROVIDER_SETTINGS.assemblyai, ...(src.assemblyai ?? {}) },
     openai_whisper: { ...DEFAULT_STT_PROVIDER_SETTINGS.openai_whisper, ...(src.openai_whisper ?? {}) },
     gradium: { ...DEFAULT_STT_PROVIDER_SETTINGS.gradium, ...(src.gradium ?? {}) },

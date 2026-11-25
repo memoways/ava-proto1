@@ -77,7 +77,7 @@ describe("Deepgram token diagnostics", () => {
     await expect(getDeepgramToken()).resolves.toEqual({
       key: "temporary-jwt",
       model: "nova-3",
-      language: "fr",
+      language: "multi",
     });
   });
 
@@ -86,10 +86,17 @@ describe("Deepgram token diagnostics", () => {
 
     expect(url.origin + url.pathname).toBe("wss://api.deepgram.com/v1/listen");
     expect(url.searchParams.get("model")).toBe("nova-3");
-    expect(url.searchParams.get("language")).toBe("fr");
+    expect(url.searchParams.get("language")).toBe("multi");
+    expect(url.searchParams.getAll("language_hint")).toEqual(["fr", "en", "de"]);
     expect(url.searchParams.get("interim_results")).toBe("true");
     expect(url.searchParams.get("endpointing")).toBe("false");
     expect(url.searchParams.getAll("keyterm")).toEqual([]);
+  });
+
+  it("keeps an explicit single language and does not add hints", () => {
+    const url = new URL(buildDeepgramWebSocketUrl({ model: "nova-3", language: "en-US" }));
+    expect(url.searchParams.get("language")).toBe("en-US");
+    expect(url.searchParams.getAll("language_hint")).toEqual([]);
   });
 
   it("appends each dictionary term as a repeated keyterm query param", () => {

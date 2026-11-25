@@ -173,8 +173,8 @@ function renderBody<K extends STTProviderId>(
               ]}
             />
           </Row>
-          <Row label="language" hint="fr-FR, en-US, multi…">
-            <TextInput value={dg.language} onChange={(v) => set({ language: v })} placeholder="fr-FR" />
+          <Row label="language" hint="multi : français, anglais et allemand, détectés tout seuls. Un autre code force une seule langue.">
+            <TextInput value={dg.language} onChange={(v) => set({ language: v })} placeholder="multi" />
           </Row>
           <Row label="smart_format"><Toggle value={dg.smartFormat} onChange={(v) => set({ smartFormat: v })} /></Row>
           <Row label="punctuate"><Toggle value={dg.punctuate} onChange={(v) => set({ punctuate: v })} /></Row>
