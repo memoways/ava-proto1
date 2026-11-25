@@ -1,6 +1,6 @@
 # Plan — service vidéo par personnage
 
-Date : 25 novembre 2026. Statut : **proposition, non développée**. À auditer avant tout code.
+Date : 25 novembre 2026. Statut : **audité par Opus le 25 novembre 2026, non développé**. La section 9 (audit et réponses d’Ulrich) prime sur les sections 2 à 7.
 Rien n’est implémenté à partir de ce fichier. Pas de branche, pas de production.
 
 Auditeur attendu : Opus (Claude). Il doit juger si la proposition tient, si elle casse un comportement actuel, et s’il manque une question à poser à Ulrich. Le développement ne commence qu’après cet audit.
@@ -165,3 +165,48 @@ Opus les pose à Ulrich seulement si l’audit ne peut pas trancher :
 - Un avis clair : on peut coder ce lot tel quel, ou on corrige le plan d’abord.
 
 Aucun code tant que cet avis n’est pas là.
+
+## 9. Audit Opus — 25 novembre 2026
+
+Verdict : **le plan tient sur le fond** (lien optionnel dans `ava_streaming_avatar_settings`, pas de migration, résolution pure, branchement unique au décrochage). Il faut d’abord le corriger sur trois points avant de coder : deux constats faux sur le code actuel, et les réponses d’Ulrich ci-dessous.
+
+### 9.1 Réponses d’Ulrich (25 novembre 2026)
+
+1. **« M1 » = Emma**, pas Max ni le lot multilingue. Le premier essai visé est donc **Emma sur une persona Nuance**, en Texte d’Ava. Le lot M1 multilingue reste à part, inchangé.
+2. **Le lien ouvre la vidéo.** Un personnage lié passe en vidéo avec son fournisseur, même si l’interrupteur global est sur « Voix TTS ». L’interrupteur ne vaut que pour les personnages sans lien. Un appareil réglé sur « voix » (smartphone par défaut) bloque toujours la vidéo.
+3. **Garder la coupure au passage.** Seul le personnage qui ouvre l’appel a sa vidéo. Au changement de personnage, on passe en voix pour la fin de l’appel. Un comparatif = deux appels.
+4. **Le personnage gagne sur l’appareil** pour le choix du fournisseur. Le fournisseur fixé sur l’appareil sert aux personnages sans lien. L’appareil garde le droit de forcer la voix.
+
+### 9.2 Constats corrigés sur le code actuel
+
+- **§3.3 et risque 6 sont faux.** Un passage ne garde pas le visage ouvert : [IndexPRD4.tsx](../src/pages/IndexPRD4.tsx) appelle `activateTTSFallback('emma_handoff_tts_v1')` quand la cible est Emma, et `activateTTSFallback('grid_call')` pour tout appel depuis la grille. La vidéo s’arrête donc déjà pour la suite de l’appel. Emma ne « porte » jamais le visage de Max.
+- **Le vrai risque est l’inverse.** La coupure ne vise que `target === 'emma'`. Si Emma ouvre l’appel en vidéo (Nuance), un passage Emma → Max ne coupe rien : Max parlerait dans la salle d’Emma, avec la persona d’Emma. La condition doit devenir « la cible n’est pas le personnage dont la salle est ouverte » → repli voix.
+- **Tavus change déjà de visage en cours d’appel** (`switchCharacter` dans [providers/tavus.ts](../src/services/streamingAvatar/providers/tavus.ts) ferme et rouvre la conversation si le Face diffère). Ce chemin n’est atteint qu’en passage vers Max aujourd’hui. Avec la règle 3 ci-dessus il n’est plus nécessaire pour ce lot ; ne pas le casser, ne pas l’étendre.
+
+### 9.3 Priorité au décrochage, version corrigée
+
+1. Appareil en « voix » (ou smartphone par défaut) → voix, lien ou pas.
+2. Le personnage de départ a un lien → vidéo, fournisseur du lien, champs du lien par-dessus la config globale du même fournisseur. Gagne sur le fournisseur fixé par l’appareil et sur l’interrupteur global.
+3. Pas de lien, personnage Max → règle actuelle (appareil « avatar » ou interrupteur global ; fournisseur de l’appareil sinon `activeProvider`).
+4. Pas de lien, Emma → voix, raison `character_voice_only`.
+
+Ajouter une raison distincte (par exemple `character_link`) pour que la session et le bloc « Joué » disent pourquoi la vidéo s’est ouverte.
+
+### 9.4 Tests à ajouter à la liste du §4
+
+- Emma liée à Nuance, interrupteur global sur Voix, tablette : vidéo Nuance, persona d’Emma.
+- Max lié à Nuance, appareil avec fournisseur HeyGen fixé : Nuance (le personnage gagne).
+- Appel ouvert par Emma en vidéo, passage vers Max : repli voix, aucune réplique de Max dans la salle d’Emma.
+- Appel ouvert par Max en vidéo, passage vers Emma : repli voix (comportement d’aujourd’hui conservé).
+- Appel depuis la grille : repli voix, inchangé.
+- `describeEffectiveVoice` ([effectiveVoice.ts](../src/services/effectiveVoice.ts)) suit la même résolution : aujourd’hui il prend `deviceServices.avatarProvider ?? avatar.activeProvider` et la persona Nuance globale ; il doit lire le lien.
+
+### 9.5 Points à vérifier pendant le développement
+
+- Un appel vidéo qui **démarre avec Emma** n’a jamais existé. Vérifier l’écran vidéo (nom affiché, portrait, sous-titres, `CallingMaxScreen`, phases `*_max`) et la session enregistrée (`streaming_avatar_provider`, `active_character`).
+- Nuance anglais seulement : la recette sandbox se fait avec une réplique courte en anglais ; une réplique française refusée doit garder le repli voix déjà en place.
+- Tavus : si le lien dit Tavus, réutiliser `tavus.characters` et `resolveTavusCharacterSettings`, pas un second champ visage.
+
+### 9.6 Avis
+
+On peut coder ce lot **après** avoir intégré 9.1 à 9.4 dans les sections 2 à 7 (ou en les laissant ici comme règles qui priment). Aucune autre question ouverte pour Ulrich.

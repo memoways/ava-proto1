@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Plan vidéo par personnage : audit Opus] — 2026-11-25
+
+- `docs/plan_avatar_video_par_personnage.md` audité ; section 9 ajoutée, elle prime sur les sections 2 à 7.
+- Réponses d'Ulrich : « M1 » = Emma (premier essai : Emma sur une persona Nuance) ; le lien du personnage ouvre la vidéo même si l'interrupteur global est sur Voix ; le lien passe avant le fournisseur de l'appareil ; au changement de personnage, repli voix pour la fin de l'appel.
+- Constat corrigé : le passage vers Emma coupe déjà la vidéo ; le risque réel est un passage Emma → Max qui ne coupe rien (`target === 'emma'`).
+- Plan seulement, aucun code. Rien en production.
+
 ## [Deepgram entend français, anglais et allemand] — 2026-11-25
 
 - L'écoute Deepgram (Nova-3) détecte toute seule le français, l'anglais et l'allemand (`language=multi`, indications `fr`, `en`, `de`). L'ancien réglage `fr` / `fr-FR` est relu comme cette détection. Un autre code dans Admin › STT force une seule langue.
