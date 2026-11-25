@@ -1,6 +1,8 @@
 import type { Conversation } from "@nuancelabs/js-sdk";
 import { endAvatarSession, startAvatarSession } from "../api";
 import { withDeadline } from "../avatarAudioBridge";
+import { NUANCE_CONNECT_FLOOR_MS } from "../settings";
+import { isSpokenLine, spokenLineProgress } from "../spokenLineMatch";
 import { buildNuanceSpeakInstruction } from "../../../../supabase/functions/_shared/streamingAvatarRequest";
 import {
   AvatarRenderError,
@@ -12,8 +14,6 @@ import {
   type ResponseOutputTurnContext,
 } from "../types";
 
-/** Nuance can spend about half a minute getting a persona ready. */
-const CONNECT_FLOOR_MS = 35_000;
 /** A line that never starts is a failed send, not a hung call. */
 const SPEECH_START_FLOOR_MS = 12_000;
 const LINE_CAP_MS = 45_000;
@@ -23,8 +23,9 @@ const LINE_CAP_MS = 45_000;
  * Ava cannot send audio: `session.input_audio.append` is refused.
  *
  * `verbatim` mutes what the persona hears, then sends Ava's line as a one-time
- * instruction. Nuance may rephrase it or refuse it (`instructions_refused`),
- * in which case the call falls back to Ava's own voice.
+ * instruction. Nuance may refuse it (`instructions_refused`), rephrase it or
+ * improvise (it speaks English only): the transcript is compared with the line,
+ * and any other speech is cut so the call falls back to Ava's own voice.
  * `native` leaves the microphone open and does not send Ava's line: the persona
  * answers by itself.
  */
@@ -51,6 +52,10 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
   private lineFirstAt = 0;
   private line: {
     eventId: string;
+    expected: string;
+    spoken: string;
+    heard: boolean;
+    /** The transcript showed the persona reading Ava's line. */
     started: boolean;
     firstStartMs: number;
     finish: (error: Error | null) => void;
@@ -99,7 +104,7 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
       if (this.disposed) return;
       if (event.type === "tracks-changed") this.publishTracks();
       if (event.type === "speaking-changed" && event.participant === "avatar" && event.isSpeaking) {
-        this.noteSpeechStarted();
+        this.noteHeard();
       }
       if (event.type === "session-ended") {
         this.callbacks.onDisconnected?.(event.reason);
@@ -111,7 +116,7 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
     try {
       await withDeadline(
         conversation.connect().then(() => this.readyPromise),
-        Math.max(this.connectionTimeoutMs, CONNECT_FLOOR_MS),
+        Math.max(this.connectionTimeoutMs, NUANCE_CONNECT_FLOOR_MS),
         "Nuance connection timed out",
       );
     } catch (cause) {
@@ -142,7 +147,7 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
 
     const eventId = `line_${crypto.randomUUID()}`;
     const startedAt = performance.now();
-    const playback = this.waitForLine(eventId, startedAt, context?.signal);
+    const playback = this.waitForLine(eventId, line, startedAt, context?.signal);
     const settled: Promise<
       | { ok: true; value: { firstStartMs: number } }
       | { ok: false; error: unknown }
@@ -198,7 +203,7 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
   }
 
   interrupt(): void {
-    void this.send({ type: "session.output_audio.interrupt" }).catch(() => {});
+    this.interruptReply();
     this.line?.finish(new DOMException("Avatar turn aborted", "AbortError"));
   }
 
@@ -232,11 +237,17 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
       void this.silenceThenReady();
     }
     if (event.type === "session.output_transcript.delta" && typeof event.delta === "string") {
-      this.noteSpeechStarted();
       this.callbacks.onTranscript?.(event.delta);
+      this.checkTranscript(event.delta);
     }
     if (event.type === "session.output_audio.done") {
-      this.line?.finish(null);
+      const line = this.line;
+      if (line) {
+        // Any reply ends this way, including one that never read the line.
+        const read = event.reason !== "interrupted" && isSpokenLine(line.expected, line.spoken);
+        if (read) this.noteSpeechStarted();
+        line.finish(read ? null : notReadError(line.started));
+      }
     }
     if (event.type === "error") {
       const code = nuanceErrorCode(event);
@@ -261,15 +272,37 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
     this.readyResolve = null;
   }
 
+  private checkTranscript(delta: string): void {
+    const line = this.line;
+    if (!line) return;
+    this.noteHeard();
+    line.spoken += delta;
+    const progress = spokenLineProgress(line.expected, line.spoken);
+    if (progress === "reading") this.noteSpeechStarted();
+    if (progress !== "diverged") return;
+    this.interruptReply();
+    line.finish(notReadError(line.started));
+  }
+
+  private noteHeard(): void {
+    if (!this.line || this.line.heard) return;
+    this.line.heard = true;
+    this.line.firstStartMs = Math.round(performance.now() - this.lineFirstAt);
+  }
+
   private noteSpeechStarted(): void {
     if (!this.line || this.line.started) return;
     this.line.started = true;
-    this.line.firstStartMs = Math.round(performance.now() - this.lineFirstAt);
     this.callbacks.onSpeakStart?.();
+  }
+
+  private interruptReply(): void {
+    void this.send({ type: "session.output_audio.interrupt" }).catch(() => {});
   }
 
   private waitForLine(
     eventId: string,
+    expected: string,
     startedAt: number,
     signal?: AbortSignal,
   ): Promise<{ firstStartMs: number }> {
@@ -278,6 +311,9 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
       let settled = false;
       const entry = {
         eventId,
+        expected,
+        spoken: "",
+        heard: false,
         started: false,
         firstStartMs: 0,
         finish: (error: Error | null) => {
@@ -293,7 +329,7 @@ export class NuanceStreamingAvatarOutput implements ResponseOutput {
       };
       this.line = entry;
       const startTimer = setTimeout(() => {
-        if (!entry.started) {
+        if (!entry.heard) {
           entry.finish(new AvatarRenderError("Nuance n'a pas commencé à parler", false));
         }
       }, Math.max(this.speechStartTimeoutMs, SPEECH_START_FLOOR_MS));
@@ -355,6 +391,10 @@ function addTrack(stream: MediaStream, track: MediaStreamTrack): void {
   } catch {
     // A test double is not a real track. The element attach path still runs.
   }
+}
+
+function notReadError(started: boolean): AvatarRenderError {
+  return new AvatarRenderError("Nuance n'a pas lu la réplique d'Ava", started);
 }
 
 function nuanceErrorCode(event: Record<string, unknown>): string {

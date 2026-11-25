@@ -19,7 +19,7 @@ const fake = vi.hoisted(() => {
     sendInterfaceEvent: vi.fn(async (event: Record<string, unknown>) => {
       sent.push(event);
       if (event.type === "response.create") {
-        emit({ type: "session.output_transcript.delta", delta: "Hello" });
+        emit({ type: "session.output_transcript.delta", delta: "Bonjour Max." });
         emit({ type: "session.output_audio.done", reason: "completed" });
       }
     }),
@@ -59,7 +59,7 @@ const sessionId = "12345678-aaaa-bbbb-cccc-1234567890ab";
 function defaultSend(event: Record<string, unknown>): Promise<void> {
   fake.sent.push(event);
   if (event.type === "response.create") {
-    fake.emit({ type: "session.output_transcript.delta", delta: "Hello" });
+    fake.emit({ type: "session.output_transcript.delta", delta: "Bonjour Max." });
     fake.emit({ type: "session.output_audio.done", reason: "completed" });
   }
   return Promise.resolve();
@@ -123,5 +123,34 @@ describe("Nuance Live output", () => {
     const output = new NuanceStreamingAvatarOutput(settings, {}, 1_000, 1_000);
     await output.prepare({ sessionId });
     await expect(output.renderText("Bonjour.")).rejects.toThrow(/instructions_refused/);
+  });
+
+  it("cuts an improvised reply so Ava's voice can say the line", async () => {
+    fake.conversation.sendInterfaceEvent.mockImplementation(async (event: Record<string, unknown>) => {
+      fake.sent.push(event);
+      if (event.type === "response.create") {
+        fake.emit({ type: "session.output_transcript.delta", delta: "What got you calling " });
+      }
+    });
+    const onSpeakStart = vi.fn();
+    const output = new NuanceStreamingAvatarOutput(settings, { onSpeakStart }, 1_000, 1_000);
+    await output.prepare({ sessionId });
+    await expect(output.renderText("Allô… c’est Emma. À qui je parle ?"))
+      .rejects.toMatchObject({ name: "AvatarRenderError", started: false });
+    expect(fake.sent.at(-1)?.type).toBe("session.output_audio.interrupt");
+    expect(onSpeakStart).not.toHaveBeenCalled();
+  });
+
+  it("does not count another short reply as Ava's line", async () => {
+    fake.conversation.sendInterfaceEvent.mockImplementation(async (event: Record<string, unknown>) => {
+      fake.sent.push(event);
+      if (event.type === "response.create") {
+        fake.emit({ type: "session.output_transcript.delta", delta: "Hey there!" });
+        fake.emit({ type: "session.output_audio.done", reason: "completed" });
+      }
+    });
+    const output = new NuanceStreamingAvatarOutput(settings, {}, 1_000, 1_000);
+    await output.prepare({ sessionId });
+    await expect(output.renderText("Bonjour.")).rejects.toMatchObject({ started: false });
   });
 });

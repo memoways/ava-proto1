@@ -36,6 +36,18 @@ import {
 } from "./types";
 
 export const OUTPUT_SETTINGS_KEY = "ava_output_settings";
+/** Nuance can spend about half a minute getting a persona ready. */
+export const NUANCE_CONNECT_FLOOR_MS = 35_000;
+
+/** Longest the opened provider may take to connect; the call never gives up on it earlier. */
+export function avatarConnectBudgetMs(
+  settings: Pick<StreamingAvatarSettings, "activeProvider" | "connectionTimeoutMs">,
+): number {
+  return settings.activeProvider === "nuance"
+    ? Math.max(settings.connectionTimeoutMs, NUANCE_CONNECT_FLOOR_MS)
+    : settings.connectionTimeoutMs;
+}
+
 export const STREAMING_AVATAR_SETTINGS_KEY = "ava_streaming_avatar_settings";
 
 export const outputDefaults: OutputSettings = { mode: "tts" };
