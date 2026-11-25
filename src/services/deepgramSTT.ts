@@ -5,7 +5,12 @@ import { createTimeoutSignal, withTimeout } from "./asyncUtils";
 import { getBrowserDiagnostics, selectMediaRecorderMimeType } from "./browserCapabilities";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { STALE_TAIL_WINDOW_MS, classifyAfterAbandonedFlush, combineTranscriptParts, requestLatestRecorderData, waitForCondition } from "./stt/finalization";
-import { DEEPGRAM_DEFAULT_LANGUAGE, DEEPGRAM_DEFAULT_MODEL } from "../../supabase/functions/_shared/deepgramDefaults";
+import {
+  DEEPGRAM_DEFAULT_LANGUAGE,
+  DEEPGRAM_DEFAULT_MODEL,
+  DEEPGRAM_INPUT_LANGUAGE_HINTS,
+  resolveDeepgramLanguage,
+} from "../../supabase/functions/_shared/deepgramDefaults";
 import { getDictionaryTerms } from "./stt/dictionary";
 import { getSTTProviderSettings } from "./stt/providerSettings";
 
@@ -28,9 +33,7 @@ export function normalizeDeepgramConfig(payload: Partial<DeepgramConfig>): Deepg
     model: typeof payload.model === "string" && payload.model.trim()
       ? payload.model.trim()
       : DEEPGRAM_DEFAULT_MODEL,
-    language: typeof payload.language === "string" && payload.language.trim()
-      ? payload.language.trim()
-      : DEEPGRAM_DEFAULT_LANGUAGE,
+    language: resolveDeepgramLanguage(payload.language),
   };
 }
 
@@ -57,7 +60,7 @@ export function buildDeepgramWebSocketUrl(
   options?: DeepgramUrlOverrides,
 ): string {
   const model = options?.model?.trim() || config.model;
-  const language = options?.language?.trim() || config.language;
+  const language = resolveDeepgramLanguage(options?.language?.trim() || config.language);
   const params = new URLSearchParams({
     model,
     language,
@@ -80,6 +83,9 @@ export function buildDeepgramWebSocketUrl(
     .filter(Boolean)
     .slice(0, 100);
   for (const term of keyterms) params.append("keyterm", term);
+  if (language === "multi") {
+    for (const hint of DEEPGRAM_INPUT_LANGUAGE_HINTS) params.append("language_hint", hint);
+  }
   return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 }
 
@@ -157,6 +163,7 @@ export class DeepgramSTT {
   private flushAudio: Blob[] = [];
   private generation = 0;
   private config: DeepgramConfig | null = null;
+  private streamLanguage = DEEPGRAM_DEFAULT_LANGUAGE;
   private initialStream?: MediaStream | Promise<MediaStream>;
 
   /** Disable automatic silence-based finalization. Caller must invoke `flush()` to end an utterance. */
@@ -296,10 +303,11 @@ export class DeepgramSTT {
     // Connect to Deepgram WebSocket with project keyterm dictionary + admin overrides.
     const keyterms = getDictionaryTerms();
     const dg = getSTTProviderSettings("deepgram");
+    this.streamLanguage = resolveDeepgramLanguage(dg.language || config.language);
     const wsUrl = buildDeepgramWebSocketUrl(config, {
       keyterms,
       model: dg.model,
-      language: dg.language,
+      language: this.streamLanguage,
       smartFormat: dg.smartFormat,
       punctuate: dg.punctuate,
       interimResults: dg.interimResults,
@@ -435,7 +443,7 @@ export class DeepgramSTT {
       turn_id: context.turn_id,
       provider: "Deepgram",
       model: this.config?.model || DEEPGRAM_DEFAULT_MODEL,
-      language: this.config?.language || DEEPGRAM_DEFAULT_LANGUAGE,
+      language: this.streamLanguage,
     };
     recordAudioLatency({
       session_id: context.session_id ?? undefined,
@@ -448,7 +456,7 @@ export class DeepgramSTT {
         provider: "Deepgram",
         model: this.config?.model || DEEPGRAM_DEFAULT_MODEL,
         mode: "realtime",
-        language: this.config?.language || DEEPGRAM_DEFAULT_LANGUAGE,
+        language: this.streamLanguage,
         silence_window_ms: DeepgramSTT.SILENCE_DELAY_MS,
         trigger,
         selected_mime_type: this.selectedMimeType,

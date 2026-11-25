@@ -1,6 +1,6 @@
 # Plan — Ava multilingue (FR / EN / DE)
 
-Date : 12 novembre 2026. Statut : **plan, aucun code**. Tâche Notion (Gamilab) :
+Date : 12 novembre 2026. Statut : **plan**. Écoute seulement, 25 novembre 2026 : Deepgram détecte le français, l'anglais et l'allemand à la volée. Le reste de ce plan (langue de session, textes, voix, avatars) n'est pas commencé. Tâche Notion (Gamilab) :
 [Multilingue AVA (FR/EN/DE)](https://app.notion.com/p/521102f199d34abdade41f1b84cd97ac).
 Premier lot : [prompt de reprise M1](prompt_reprise_multilingue_lot_m1.md).
 
