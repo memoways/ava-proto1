@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Emma sur Anam ou Tavus : champs vides signalés] — 2026-11-25
+
+- Réglages personnages : pour un personnage autre que Max, la fiche signale un visage (et, pour Anam et HeyGen, une voix vidéo) encore vide, qui reprendrait le réglage global, celui de Max.
+- Décision d'Ulrich : Nuance n'est plus utilisé pour le moment (code conservé). La coupure et le repli sur la voix d'Ava sont confirmés à l'écoute.
+
 ## [Nuance coupé s'il ne lit pas la réplique] — 2026-11-25
 
 - Recette au micro (aperçu, `sandbox-ulrich`) : en « Texte d'Ava », la persona Nuance n'a pas lu la réplique française ; elle a improvisé en anglais, et la réplique était notée « jouée ».

@@ -19,7 +19,23 @@ const DRIVE_LABELS: Record<NuanceDriveMode, string> = {
   native: "Conversation Nuance",
 };
 
+/** Fields left empty follow the global settings, which carry Max's face and voice. */
+function inheritedFields({ link, tavus }: CharacterVideoChoice): string[] {
+  switch (link?.provider) {
+    case "anam":
+    case "heygen":
+      return [...(link.avatarId ? [] : ["Avatar ID"]), ...(link.voiceId ? [] : ["Voice ID vidéo"])];
+    case "tavus":
+      return tavus.faceId ? [] : ["Face ID"];
+    case "lemonslice":
+      return link.agentId || link.agentImageUrl ? [] : ["Agent ID ou image"];
+    default:
+      return [];
+  }
+}
+
 interface Props {
+  characterKey: string;
   characterName: string;
   settings: StreamingAvatarSettings;
   choice: CharacterVideoChoice;
@@ -27,8 +43,9 @@ interface Props {
 }
 
 /** Video service of one character: none (global rule) or a provider and its own fields. */
-export function CharacterVideoLinkEditor({ characterName, settings, choice, onChange }: Props) {
+export function CharacterVideoLinkEditor({ characterKey, characterName, settings, choice, onChange }: Props) {
   const { link } = choice;
+  const inherited = characterKey === "max" ? [] : inheritedFields(choice);
   const setLink = (next: CharacterVideoLink | null) => onChange({ ...choice, link: next });
   /** An emptied field is removed so the character follows the global value again. */
   const patch = (field: string, value: string | number | undefined) => {
@@ -131,6 +148,12 @@ export function CharacterVideoLinkEditor({ characterName, settings, choice, onCh
           override={choice.tavus}
           onChange={(tavus) => onChange({ ...choice, tavus })}
         />
+      )}
+
+      {inherited.length > 0 && (
+        <p role="alert" className="text-xs text-amber-300/90">
+          Encore vide : {inherited.join(", ")}. {characterName} prendrait alors le réglage global, celui de Max.
+        </p>
       )}
 
       <p className="text-xs text-muted-foreground">
