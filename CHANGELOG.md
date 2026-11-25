@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Nuance coupé s'il ne lit pas la réplique] — 2026-11-25
+
+- Recette au micro (aperçu, `sandbox-ulrich`) : en « Texte d'Ava », la persona Nuance n'a pas lu la réplique française ; elle a improvisé en anglais, et la réplique était notée « jouée ».
+- La transcription de la persona est maintenant comparée à la réplique d'Ava. Un autre texte, une réplique incomplète, ajoutée, interrompue ou sans transcription : la persona est coupée et l'appel passe sur la voix d'Ava. Si rien de la réplique n'avait été reconnu, la voix d'Ava la dit en entier. Le début de l'improvisation peut s'entendre.
+- La réplique n'est comptée comme commencée que lorsque la persona la lit.
+- Après les sonneries, l'appel attend au moins les 35 s du délai de connexion Nuance (avant : 12 s, repli voix pendant que la salle se connectait encore). Les autres fournisseurs sont inchangés.
+- Mode « Conversation Nuance » inchangé. Aucune migration. Rien en production.
+
 ## [Service vidéo par personnage] — 2026-11-25
 
 - Admin › Expérience › Réglages personnages : nouveau « Service vidéo » sous le provider TTS, pour chaque fiche (Max, Emma, Léo, Ava). « Suivre le réglage global », ou un fournisseur et ses champs : Nuance (persona, expressivité, mode), HeyGen et Anam (avatar, voix vidéo), LemonSlice (agent, image), Tavus (Face, émotions, source de voix, dans `tavus.characters`). Un champ vide suit le réglage global.

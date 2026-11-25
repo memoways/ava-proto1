@@ -80,3 +80,7 @@ La caméra du joueur n'est pas envoyée.
 ## Ce qui reste à mesurer
 
 Avec la clé et la migration en place, sur un bac à sable : une réplique française en mode Texte d'Ava (refus ou reformulation), une phrase anglaise courte (est-elle dite telle quelle), et une minute en mode Conversation Nuance. Rien de cela n'est fait. Rien n'est en production.
+
+## Écoute au micro (25 novembre 2026)
+
+Réplique française en Texte d'Ava : ni lue ni refusée, la persona a improvisé en anglais. Depuis, Ava compare la transcription à la réplique et coupe tout autre texte (repli sur la voix d'Ava). Le délai de connexion de 35 s est aussi respecté par l'écran d'appel.

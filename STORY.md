@@ -7,6 +7,10 @@
 
 ---
 
+## Un visage qui n'improvise pas (25 novembre 2026)
+
+Essai au micro : on appelle Emma, le visage apparaît, et il demande en anglais pourquoi on appelle si tard. Ce n'est pas Emma. Ce service ne lit pas un texte, il s'en inspire, et seulement en anglais. Désormais Ava écoute ce qu'il dit : s'il ne dit pas la réplique, il est coupé et Emma continue avec sa voix. Pour la voir et l'entendre en français, il faudra un autre service.
+
 ## Un visage par personnage (25 novembre 2026)
 
 Le son se choisissait déjà par personnage, la vidéo non : un seul service pour tout l'appel, et seulement pour Max. Ulrich veut comparer les services et donner à chacun le sien, Emma d'abord sur une persona Nuance. Chaque fiche peut maintenant avoir son service vidéo. Sans choix, rien ne bouge. La vidéo reste celle de la personne qu'on a appelée : au passage vers quelqu'un d'autre, l'appel continue en voix, pour ne jamais faire parler un personnage avec le visage d'un autre. Comparer deux services, c'est passer deux appels.

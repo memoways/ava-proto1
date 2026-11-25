@@ -130,6 +130,7 @@ import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
 import { conversationLayoutFor, touchFirstFor } from "@/services/callOutputMode";
 import { leavesAvatarRoom, resolveCallVideo } from "@/services/callVideoRouting";
+import { avatarConnectBudgetMs } from "@/services/streamingAvatar/settings";
 import { getDeviceClass } from "@/services/deviceClass";
 import { effectiveSmartphoneVideoMode, smartphonePanStartFrom } from "@/services/videoFraming";
 import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
@@ -1327,7 +1328,7 @@ const IndexPRD4 = () => {
         preparation,
         Math.max(
           avatarSettingsRef.current.fallbackTimeoutMs,
-          avatarSettingsRef.current.connectionTimeoutMs,
+          avatarConnectBudgetMs(avatarSettingsRef.current),
         ),
       );
     } catch (error) {

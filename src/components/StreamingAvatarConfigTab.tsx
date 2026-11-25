@@ -1124,7 +1124,7 @@ function NuanceFields({ value, onChange }: {
           label="Pilotage"
           hint={value.drive === "native"
             ? "Le micro est entendu par Nuance, qui répond avec ses mots. La réplique d'Ava s'affiche et n'est pas envoyée."
-            : "Chaque réplique d'Ava part comme une consigne (« Say only this »). Nuance peut reformuler ou refuser. Un refus bascule l'appel sur la voix d'Ava."}
+            : "Chaque réplique d'Ava part comme une consigne (« Say only this »). Nuance ne parle qu'anglais. S'il refuse, reformule ou improvise, il est coupé et l'appel passe sur la voix d'Ava."}
           value={value.drive}
           options={NUANCE_DRIVE_LABELS}
           onChange={(drive) => patch({ drive })}
