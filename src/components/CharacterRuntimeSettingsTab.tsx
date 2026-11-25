@@ -17,6 +17,15 @@ import { EffectiveVoiceBlock, useVoiceProfiles } from '@/components/admin/Effect
 import { DEVICE_CLASSES } from '@/services/deviceClass';
 import { CharacterStateEditor } from "@/components/admin/CharacterStateEditor";
 import { CharacterReceivedPreview } from "@/components/admin/CharacterReceivedPreview";
+import { CharacterVideoLinkEditor } from "@/components/admin/CharacterVideoLinkEditor";
+import {
+  characterVideoChoice,
+  getStreamingAvatarSettings,
+  loadStreamingAvatarSettingsFromDB,
+  saveCharacterVideoChoiceToDB,
+  withCharacterVideoChoice,
+  type CharacterVideoChoice,
+} from "@/services/streamingAvatar/settings";
 import { serializeStateProfile, normalizeStateProfile } from "@/services/characterState";
 import {
   fetchCharacterAutoReadiness,
@@ -98,6 +107,9 @@ export default function CharacterRuntimeSettingsTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploadingPortrait, setUploadingPortrait] = useState<string | null>(null);
   const [voices, setVoices] = useState<CharacterVoiceCatalogue>({});
+  const [avatarSettings, setAvatarSettings] = useState(getStreamingAvatarSettings);
+  /** Unsaved video choices; a character without one is not rewritten on save. */
+  const [videoDrafts, setVideoDrafts] = useState<Record<string, CharacterVideoChoice>>({});
 
   const load = async () => {
     setLoading(true);
@@ -109,6 +121,8 @@ export default function CharacterRuntimeSettingsTab() {
       setProfiles(nextProfiles);
       // Same prefill as TTS Config: a voice the game already uses counts until the catalogue has one.
       setVoices(seedFromProfiles(await loadCharacterVoicesFromDB(), nextProfiles));
+      setAvatarSettings(await loadStreamingAvatarSettingsFromDB());
+      setVideoDrafts({});
       try {
         setAutoReadiness(await fetchCharacterAutoReadiness(nextProfiles.map((profile) => profile.display_name)));
       } catch {
@@ -158,6 +172,8 @@ export default function CharacterRuntimeSettingsTab() {
         // Lot D: written only when the column exists (after the Lovable migration).
         ...("state_profile" in profile ? { state_profile: normalizeStateProfile(profile.state_profile) ? serializeStateProfile(normalizeStateProfile(profile.state_profile)!) : null } : {}),
       });
+      const videoDraft = videoDrafts[profile.character_key];
+      if (videoDraft) await saveCharacterVideoChoiceToDB(profile.character_key, videoDraft);
       toast.success(`Profil runtime ${profile.display_name} sauvegardé`);
       await load();
     } catch (error) {
@@ -175,7 +191,7 @@ export default function CharacterRuntimeSettingsTab() {
         <div>
           <h2 className="text-lg font-semibold">🧑‍🤝‍🧑 Réglages personnages</h2>
           <p className="text-sm text-muted-foreground">
-            Configurez ici le contenu, le portrait et la voix propres à chaque personnage. Leur activation pour une expérience
+            Configurez ici le contenu, le portrait, la voix et le service vidéo propres à chaque personnage. Leur activation pour une expérience
             se règle maintenant dans « Orchestration ».
           </p>
         </div>
@@ -194,6 +210,7 @@ export default function CharacterRuntimeSettingsTab() {
           const checks = readiness(profile, auto);
           const blockers = checks.filter((check) => !check.ok);
           const ready = blockers.length === 0;
+          const videoChoice = videoDrafts[profile.character_key] ?? characterVideoChoice(avatarSettings, profile.character_key);
           const greetings = profile.character_key === 'max' || profile.character_key === 'emma'
             ? initialGreetingLines(profile.character_key, profile.opening_line, getActiveEnvironment()) : [];
           return (
@@ -271,10 +288,17 @@ export default function CharacterRuntimeSettingsTab() {
                   if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; sauvegarder le profil applique l’ID de la configuration TTS.</p>;
                   return null;
                 })()}
+                <CharacterVideoLinkEditor
+                  characterName={profile.display_name}
+                  settings={avatarSettings}
+                  choice={videoChoice}
+                  onChange={(next) => setVideoDrafts((current) => ({ ...current, [profile.character_key]: next }))}
+                />
                 {profile.character_key === "max" || profile.character_key === "emma" ? (
                   <EffectiveVoiceBlock
                     devices={DEVICE_CLASSES}
                     characters={[profile.character_key]}
+                    overrides={() => ({ avatar: withCharacterVideoChoice(avatarSettings, profile.character_key, videoChoice) })}
                     profiles={{ max: null, emma: null, [profile.character_key]: { ttsProvider: profile.tts_provider, ttsVoiceId: profile.tts_voice_id } }}
                   />
                 ) : null}

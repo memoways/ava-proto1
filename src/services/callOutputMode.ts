@@ -12,14 +12,21 @@ import type { DeviceClass } from "./deviceClass";
 import type { DeviceOutputChoice } from "./deviceServices";
 import type { OutputMode } from "./streamingAvatar/types";
 
-export type OutputModeReason = "settings" | "character_voice_only" | "device_smartphone" | "device_settings";
+export type OutputModeReason =
+  | "settings"
+  | "character_link"
+  | "character_voice_only"
+  | "device_smartphone"
+  | "device_settings";
 
 export interface CallOutputModeInput {
-  startingCharacter: "max" | "emma";
+  startingCharacter: string;
   configuredMode: OutputMode;
   deviceClass: DeviceClass;
   /** Admin choice for this device; absent = historic rule (smartphone voice, others on the switch). */
   deviceOutput?: DeviceOutputChoice;
+  /** The starting character has its own video service (Réglages personnages). */
+  hasCharacterLink?: boolean;
 }
 
 export interface CallOutputModeDecision {
@@ -32,13 +39,16 @@ export function resolveCallOutputMode({
   configuredMode,
   deviceClass,
   deviceOutput,
+  hasCharacterLink,
 }: CallOutputModeInput): CallOutputModeDecision {
   const choice = deviceOutput ?? (deviceClass === "smartphone" ? "voice" : "settings");
   if (choice === "voice") {
     return { mode: "tts", reason: deviceClass === "smartphone" ? "device_smartphone" : "device_settings" };
   }
-  // The live video stream is Max's: another character (Emma) starts voice-only,
-  // with her portrait, so Max's stream is never shown for her.
+  // A linked character opens its own video, whatever the global switch says.
+  if (hasCharacterLink) return { mode: "streaming_avatar", reason: "character_link" };
+  // Without a link, the live video stream is Max's: another character (Emma) starts
+  // voice-only, with her portrait, so Max's stream is never shown for her.
   if (startingCharacter !== "max") return { mode: "tts", reason: "character_voice_only" };
   if (choice === "avatar") return { mode: "streaming_avatar", reason: "device_settings" };
   return { mode: configuredMode, reason: "settings" };

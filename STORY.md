@@ -7,6 +7,10 @@
 
 ---
 
+## Un visage par personnage (25 novembre 2026)
+
+Le son se choisissait déjà par personnage, la vidéo non : un seul service pour tout l'appel, et seulement pour Max. Ulrich veut comparer les services et donner à chacun le sien, Emma d'abord sur une persona Nuance. Chaque fiche peut maintenant avoir son service vidéo. Sans choix, rien ne bouge. La vidéo reste celle de la personne qu'on a appelée : au passage vers quelqu'un d'autre, l'appel continue en voix, pour ne jamais faire parler un personnage avec le visage d'un autre. Comparer deux services, c'est passer deux appels.
+
 ## Consommation — depuis le premier prélèvement (22 novembre 2026)
 
 Un abonnement mensuel a un début. Tavus pris en octobre, repris en novembre et renouvelé en décembre, ce sont trois fois le prix du mois, pas seulement le mois en cours. La fiche demande cette date et le prochain renouvellement. La fin reste vide tant que ça continue : une reprise plus tard sera une autre période, ajoutée à la première.

@@ -8,7 +8,8 @@
  * the current local copy of the settings (filled from the database by
  * `hydrateExperienceSettings()` for the player, and by the admin page).
  */
-import { resolveCallOutputMode, type OutputModeReason } from "./callOutputMode";
+import type { OutputModeReason } from "./callOutputMode";
+import { resolveCallVideo } from "./callVideoRouting";
 import type { DeviceClass } from "./deviceClass";
 import { deviceVoiceChoice, type DeviceServiceSettings } from "./deviceServices";
 import type { TTSProviderId } from "./tts/types";
@@ -231,13 +232,17 @@ function avaSummary(speech: ReturnType<typeof avaSpeech>): string {
 }
 
 export function describeEffectiveVoice(input: EffectiveVoiceInput): EffectiveVoice {
-  const { device, character, deviceServices, avatar } = input;
-  const decision = resolveCallOutputMode({
-    startingCharacter: character,
+  const { device, character, deviceServices } = input;
+  const decision = resolveCallVideo({
+    character,
     configuredMode: input.configuredOutput,
     deviceClass: device,
-    deviceOutput: deviceServices.output,
+    deviceServices,
+    avatar: input.avatar,
   });
+  // The settings the call opens with: the character link applied over the global blocks.
+  const avatar = decision.avatar;
+  const why = decision.reason === "character_link" ? " (lien personnage)" : "";
   const base = { device, character, output: decision.mode, outputReason: decision.reason };
   const avaVoice = (avatarProvider: StreamingAvatarProviderId | null, prefix?: string): EffectiveVoice => {
     const speech = avaSpeech(input);
@@ -251,12 +256,12 @@ export function describeEffectiveVoice(input: EffectiveVoiceInput): EffectiveVoi
       settings: speech.settings,
       voiceId: speech.voiceId,
       voiceSource: speech.voiceSource,
-      summary: prefix ? `${prefix} : ${summary}` : summary,
+      summary: prefix ? `${prefix}${why} : ${summary}` : summary,
     };
   };
   if (decision.mode !== "streaming_avatar") return avaVoice(null);
 
-  const provider: StreamingAvatarProviderId = deviceServices.avatarProvider ?? avatar.activeProvider;
+  const provider: StreamingAvatarProviderId = avatar.activeProvider;
   const label = AVATAR_LABELS[provider] ?? provider;
   const avatarVoice = (engine: string, model: string | null, settings: EffectiveVoiceSetting[], voiceId: string | null, detail: string): EffectiveVoice => ({
     ...base,
@@ -267,7 +272,7 @@ export function describeEffectiveVoice(input: EffectiveVoiceInput): EffectiveVoi
     settings,
     voiceId,
     voiceSource: "avatar",
-    summary: line([label, ...(model ? [model] : []), ...settings.map((s) => `${s.label} ${s.value}`), detail]),
+    summary: line([label, ...(model ? [model] : []), ...settings.map((s) => `${s.label} ${s.value}`), detail]) + why,
   });
 
   if (provider === "tavus") {
@@ -284,7 +289,7 @@ export function describeEffectiveVoice(input: EffectiveVoiceInput): EffectiveVoi
       ? "conversation Nuance, voix de la persona"
       : "consigne de lecture, voix de la persona";
     return avatarVoice("nuance", persona, [
-      { label: "expressivité", value: String(avatar.nuance.expressiveness) },
+      { label: "expressivité", value: num(avatar.nuance.expressiveness) },
     ], null, detail);
   }
   if (provider === "anam") {

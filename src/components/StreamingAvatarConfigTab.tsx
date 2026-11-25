@@ -542,6 +542,100 @@ function TavusFields({
 const TAVUS_GLOBAL_VALUE = "__global__";
 const TAVUS_CHARACTER_LABELS: Record<string, string> = { max: "Max", emma: "Emma" };
 
+/** One character's Tavus fields (`tavus.characters`), also edited in Réglages personnages. */
+export function TavusCharacterFields({
+  title,
+  value,
+  override,
+  onChange,
+}: {
+  title: string;
+  value: StreamingAvatarSettings["tavus"];
+  override: TavusCharacterOverride;
+  onChange: (override: TavusCharacterOverride) => void;
+}) {
+  const patch = (next: Partial<TavusCharacterOverride>) => {
+    const merged: TavusCharacterOverride = { ...override, ...next };
+    // An emptied field is removed so the character follows the global value again.
+    for (const field of Object.keys(merged) as (keyof TavusCharacterOverride)[]) {
+      if (merged[field] === undefined || merged[field] === "") delete merged[field];
+    }
+    onChange(merged);
+  };
+  const fromSelect = <T extends string>(selected: string) =>
+    selected === TAVUS_GLOBAL_VALUE ? undefined : (selected as T);
+  return (
+    <div className="grid gap-4 rounded-md border p-3 md:grid-cols-2">
+      <p className="text-sm font-medium md:col-span-2">{title}</p>
+      <TextField
+        label="Face ID"
+        value={override.faceId ?? ""}
+        onChange={(faceId) => patch({ faceId: faceId.trim() || undefined })}
+      />
+      <div className="space-y-2">
+        <Label>Source de la voix</Label>
+        <Select
+          value={override.voiceSource ?? TAVUS_GLOBAL_VALUE}
+          onValueChange={(selected) => patch({ voiceSource: fromSelect<TavusVoiceSource>(selected) })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_VOICE_SOURCE_LABELS[value.voiceSource]})</SelectItem>
+            {TAVUS_VOICE_SOURCES.map((source) => (
+              <SelectItem key={source} value={source}>{TAVUS_VOICE_SOURCE_LABELS[source]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Balise Echo en parlant</Label>
+        <Select
+          value={override.echoEmotion ?? TAVUS_GLOBAL_VALUE}
+          onValueChange={(selected) => patch({ echoEmotion: fromSelect<TavusEchoEmotion>(selected) })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({value.echoEmotion})</SelectItem>
+            {TAVUS_ECHO_EMOTIONS.map((emotion) => (
+              <SelectItem key={emotion} value={emotion}>{TAVUS_ECHO_EMOTION_LABELS[emotion]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Émotion en parlant</Label>
+        <Select
+          value={override.emotion ?? TAVUS_GLOBAL_VALUE}
+          onValueChange={(selected) => patch({ emotion: fromSelect<TavusEmotion>(selected) })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.emotion]})</SelectItem>
+            {TAVUS_EMOTIONS.map((emotion) => (
+              <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Émotion en écoutant</Label>
+        <Select
+          value={override.listeningEmotion ?? TAVUS_GLOBAL_VALUE}
+          onValueChange={(selected) => patch({ listeningEmotion: fromSelect<TavusEmotion>(selected) })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.listeningEmotion]})</SelectItem>
+            {TAVUS_EMOTIONS.map((emotion) => (
+              <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 /** Per-character Face and emotions; an empty field keeps the global value above. */
 function TavusCharacterOverrides({
   value,
@@ -550,95 +644,21 @@ function TavusCharacterOverrides({
   value: StreamingAvatarSettings["tavus"];
   onChange: (characters: StreamingAvatarSettings["tavus"]["characters"]) => void;
 }) {
-  const patchCharacter = (key: string, next: Partial<TavusCharacterOverride>) => {
-    const merged: TavusCharacterOverride = { ...(value.characters[key] ?? {}), ...next };
-    // An emptied field is removed so the character follows the global value again.
-    for (const field of Object.keys(merged) as (keyof TavusCharacterOverride)[]) {
-      if (merged[field] === undefined || merged[field] === "") delete merged[field];
-    }
-    onChange({ ...value.characters, [key]: merged });
-  };
-  const fromSelect = <T extends string>(selected: string) =>
-    selected === TAVUS_GLOBAL_VALUE ? undefined : (selected as T);
   return (
     <div className="space-y-3">
       <SectionTitle>Par personnage</SectionTitle>
       <p className="text-xs text-muted-foreground">
         Vide = réglage global. Le Face est fixé à l'ouverture de la conversation Tavus : un personnage avec un autre Face ouvre une nouvelle conversation à son entrée ; même Face, seules les émotions changent.
       </p>
-      {TAVUS_AVATAR_CHARACTERS.map((key) => {
-        const override = value.characters[key] ?? {};
-        return (
-          <div key={key} className="grid gap-4 rounded-md border p-3 md:grid-cols-2">
-            <p className="text-sm font-medium md:col-span-2">{TAVUS_CHARACTER_LABELS[key] ?? key}</p>
-            <TextField
-              label="Face ID"
-              value={override.faceId ?? ""}
-              onChange={(faceId) => patchCharacter(key, { faceId: faceId.trim() || undefined })}
-            />
-            <div className="space-y-2">
-              <Label>Source de la voix</Label>
-              <Select
-                value={override.voiceSource ?? TAVUS_GLOBAL_VALUE}
-                onValueChange={(selected) => patchCharacter(key, { voiceSource: fromSelect<TavusVoiceSource>(selected) })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_VOICE_SOURCE_LABELS[value.voiceSource]})</SelectItem>
-                  {TAVUS_VOICE_SOURCES.map((source) => (
-                    <SelectItem key={source} value={source}>{TAVUS_VOICE_SOURCE_LABELS[source]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Balise Echo en parlant</Label>
-              <Select
-                value={override.echoEmotion ?? TAVUS_GLOBAL_VALUE}
-                onValueChange={(selected) => patchCharacter(key, { echoEmotion: fromSelect<TavusEchoEmotion>(selected) })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({value.echoEmotion})</SelectItem>
-                  {TAVUS_ECHO_EMOTIONS.map((emotion) => (
-                    <SelectItem key={emotion} value={emotion}>{TAVUS_ECHO_EMOTION_LABELS[emotion]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Émotion en parlant</Label>
-              <Select
-                value={override.emotion ?? TAVUS_GLOBAL_VALUE}
-                onValueChange={(selected) => patchCharacter(key, { emotion: fromSelect<TavusEmotion>(selected) })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.emotion]})</SelectItem>
-                  {TAVUS_EMOTIONS.map((emotion) => (
-                    <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Émotion en écoutant</Label>
-              <Select
-                value={override.listeningEmotion ?? TAVUS_GLOBAL_VALUE}
-                onValueChange={(selected) => patchCharacter(key, { listeningEmotion: fromSelect<TavusEmotion>(selected) })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TAVUS_GLOBAL_VALUE}>Global ({TAVUS_EMOTION_LABELS[value.listeningEmotion]})</SelectItem>
-                  {TAVUS_EMOTIONS.map((emotion) => (
-                    <SelectItem key={emotion} value={emotion}>{TAVUS_EMOTION_LABELS[emotion]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        );
-      })}
+      {TAVUS_AVATAR_CHARACTERS.map((key) => (
+        <TavusCharacterFields
+          key={key}
+          title={TAVUS_CHARACTER_LABELS[key] ?? key}
+          value={value}
+          override={value.characters[key] ?? {}}
+          onChange={(override) => onChange({ ...value.characters, [key]: override })}
+        />
+      ))}
     </div>
   );
 }

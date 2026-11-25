@@ -40,6 +40,22 @@ function input(patch: Partial<EffectiveVoiceInput> = {}): EffectiveVoiceInput {
 }
 
 describe("describeEffectiveVoice", () => {
+  it("describes the character's own video service, whatever the device provider and global persona", () => {
+    const voice = describeEffectiveVoice(input({
+      device: "tablet",
+      character: "emma",
+      deviceServices: { ...followSwitch, avatarProvider: "heygen" },
+      avatar: {
+        ...streamingAvatarDefaults,
+        characterLinks: { emma: { provider: "nuance", personaId: "sonia", expressiveness: 1.2 } },
+      },
+    }));
+    expect(voice).toMatchObject({
+      output: "streaming_avatar", outputReason: "character_link", avatarProvider: "nuance", model: "sonia",
+    });
+    expect(voice.summary).toBe("Nuance · sonia · expressivité 1,2 · consigne de lecture, voix de la persona (lien personnage)");
+  });
+
   it("smartphone voice call: ElevenLabs model, main sliders and catalogue voice", () => {
     const voice = describeEffectiveVoice(input());
     expect(voice).toMatchObject({

@@ -4,6 +4,21 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Service vidéo par personnage] — 2026-11-25
+
+- Admin › Expérience › Réglages personnages : nouveau « Service vidéo » sous le provider TTS, pour chaque fiche (Max, Emma, Léo, Ava). « Suivre le réglage global », ou un fournisseur et ses champs : Nuance (persona, expressivité, mode), HeyGen et Anam (avatar, voix vidéo), LemonSlice (agent, image), Tavus (Face, émotions, source de voix, dans `tavus.characters`). Un champ vide suit le réglage global.
+- Le lien vit dans `ava_streaming_avatar_settings.characterLinks`, par environnement. Aucune migration ; les réglages déjà enregistrés se relisent comme avant.
+- Au décrochage : un appareil réglé sur « voix » (smartphone par défaut) reste en voix ; sinon un personnage lié ouvre sa vidéo, même interrupteur global sur Voix et quel que soit le fournisseur de l'appareil ; sans lien, rien ne change. Session et « Joué » disent « lien personnage » (`character_link`).
+- La salle vidéo appartient au personnage qui ouvre l'appel : tout passage vers un autre repasse en voix (avant : seulement vers Emma). L'écran vidéo s'ouvre aussi pour un appel démarré par Emma.
+- Recette sandbox (`sandbox-ulrich`, micro simulé silencieux) : Emma sur Nuance `sonia` en vidéo (connexion 7,2 s, parole à 8,3 s) ; rappel de Max depuis la grille en voix ; Max sans lien inchangé (Nuance global `sam`) ; phrase anglaise courte dite mot pour mot par la persona (début à 0,86 s, selon la transcription Nuance). Le SDK Nuance exige un micro : un micro refusé fait repasser l'appel en voix. **À faire** : écoute humaine au micro, passage proposé par le GM pendant un appel vidéo. Rien en production.
+
+## [Plan vidéo par personnage : audit Opus] — 2026-11-25
+
+- `docs/plan_avatar_video_par_personnage.md` audité ; section 9 ajoutée, elle prime sur les sections 2 à 7.
+- Réponses d'Ulrich : « M1 » = Emma (premier essai : Emma sur une persona Nuance) ; le lien du personnage ouvre la vidéo même si l'interrupteur global est sur Voix ; le lien passe avant le fournisseur de l'appareil ; au changement de personnage, repli voix pour la fin de l'appel.
+- Constat corrigé : le passage vers Emma coupe déjà la vidéo ; le risque réel est un passage Emma → Max qui ne coupe rien (`target === 'emma'`).
+- Plan seulement, aucun code. Rien en production.
+
 ## [Deepgram entend français, anglais et allemand] — 2026-11-25
 
 - L'écoute Deepgram (Nova-3) détecte toute seule le français, l'anglais et l'allemand (`language=multi`, indications `fr`, `en`, `de`). L'ancien réglage `fr` / `fr-FR` est relu comme cette détection. Un autre code dans Admin › STT force une seule langue.

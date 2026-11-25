@@ -107,6 +107,15 @@ describe("ConversationScreen streaming avatar", () => {
     expect(screen.getByText("Mode voix")).toBeInTheDocument();
   });
 
+  it("shows Emma's own room and never over Max", () => {
+    const props = { ...baseProps, streamingAvatarActive: true, streamingAvatarState: "ready" as const,
+      attachAvatarMedia: vi.fn(), avatarCharacter: "emma" as const };
+    const { rerender } = render(<ConversationScreen {...props} activeCharacter="emma" />);
+    expect(screen.getByLabelText("Flux vidéo en direct de Emma")).toBeInTheDocument();
+    rerender(<ConversationScreen {...props} activeCharacter="max" />);
+    expect(screen.queryByLabelText(/Flux vidéo en direct/)).not.toBeInTheDocument();
+  });
+
   it("never shows Max's live stream or frozen frame over Emma", () => {
     const attachAvatarMedia = vi.fn();
     const { container, rerender } = render(
