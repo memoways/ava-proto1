@@ -7,6 +7,8 @@ import type {
   KnownStreamingAvatarProvider,
   LemonSliceAvatarSettings,
   NuanceAvatarSettings,
+  NuanceDriveMode,
+  NuancePersonaId,
   SelectableStreamingAvatarProvider,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
@@ -150,6 +152,18 @@ export interface TavusAvatarSettings {
   characters: Record<string, TavusCharacterOverride>;
 }
 
+/**
+ * Video service of one character (`ava_streaming_avatar_settings.characterLinks`). A linked
+ * character opens its call on that provider; an absent field follows the same provider's global
+ * value. Tavus per-character fields stay in `tavus.characters`.
+ */
+export type CharacterVideoLink =
+  | { provider: "nuance"; personaId?: NuancePersonaId; expressiveness?: number; drive?: NuanceDriveMode }
+  | { provider: "tavus" }
+  | { provider: "heygen"; avatarId?: string; voiceId?: string }
+  | { provider: "anam"; avatarId?: string; voiceId?: string }
+  | { provider: "lemonslice"; agentId?: string; agentImageUrl?: string };
+
 export interface StreamingAvatarSettings {
   activeProvider: StreamingAvatarProviderId;
   connectionTimeoutMs: number;
@@ -159,6 +173,8 @@ export interface StreamingAvatarSettings {
   anam: AnamAvatarSettings;
   lemonslice: LemonSliceAvatarSettings;
   nuance: NuanceAvatarSettings;
+  /** Keyed by character (`max`, `emma`, later `leo`, `ava`); no entry = global rule. */
+  characterLinks: Record<string, CharacterVideoLink>;
 }
 
 export interface ResponseOutputPrepareContext {

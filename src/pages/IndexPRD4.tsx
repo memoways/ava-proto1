@@ -128,7 +128,8 @@ import TransitionScreen from "@/components/prd4/TransitionScreen";
 import CharacterSelectScreen from "@/components/prd4/CharacterSelectScreen";
 import CallingMaxScreen from "@/components/prd4/CallingMaxScreen";
 import ConversationScreen from "@/components/prd4/ConversationScreen";
-import { conversationLayoutFor, resolveCallOutputMode, touchFirstFor } from "@/services/callOutputMode";
+import { conversationLayoutFor, touchFirstFor } from "@/services/callOutputMode";
+import { leavesAvatarRoom, resolveCallVideo } from "@/services/callVideoRouting";
 import { getDeviceClass } from "@/services/deviceClass";
 import { effectiveSmartphoneVideoMode, smartphonePanStartFrom } from "@/services/videoFraming";
 import { deviceServicesReady, resolveDeviceVoice } from "@/services/deviceServices";
@@ -363,6 +364,9 @@ const IndexPRD4 = () => {
   const avatarFirstFrameAtRef = useRef<number | null>(null);
   const avatarFirstSpeechAtRef = useRef<number | null>(null);
   const [streamingAvatarActive, setStreamingAvatarActive] = useState(false);
+  /** Character the video room was opened for: only that one is shown and voiced in it. */
+  const [avatarRoomCharacter, setAvatarRoomCharacter] = useState<RuntimeCharacter>("max");
+  const avatarRoomCharacterRef = useRef<RuntimeCharacter>("max");
   const [streamingAvatarState, setStreamingAvatarState] =
     useState<StreamingAvatarConnectionState>("inactive");
   const [avatarVideoFit, setAvatarVideoFit] = useState<AvatarVideoFit>("cover");
@@ -933,10 +937,16 @@ const IndexPRD4 = () => {
     const deviceServices = await deviceServicesReady();
     const deviceClass = getDeviceClass();
     const deviceSettings = deviceServices[deviceClass];
-    // "Services par appareil" may pick another avatar provider for this screen.
-    const avatarSettings = deviceSettings.avatarProvider
-      ? { ...configuredAvatarSettings, activeProvider: deviceSettings.avatarProvider }
-      : configuredAvatarSettings;
+    // A linked character opens its own video service; otherwise Max follows the device
+    // or the global switch and the others stay voice-only. A device set to voice
+    // (smartphone by default) never connects a video room.
+    const { mode: outputMode, reason: outputModeReason, avatar: avatarSettings } = resolveCallVideo({
+      character: startingCharacter,
+      configuredMode: outputSettings.mode,
+      deviceClass,
+      deviceServices: deviceSettings,
+      avatar: configuredAvatarSettings,
+    });
     outputSettingsRef.current = outputSettings;
     avatarSettingsRef.current = avatarSettings;
 
@@ -950,15 +960,8 @@ const IndexPRD4 = () => {
     }
     diagnosticTraceEnabledRef.current = diagnosticTraceEnabled;
 
-    // Le flux vidéo en direct est celui de Max : un autre personnage (Emma) démarre
-    // en voix seule, avec sa photo, pour ne jamais afficher le flux de Max. Un
-    // smartphone reste en voix seule (appel vocal), sans connexion avatar.
-    const { mode: outputMode, reason: outputModeReason } = resolveCallOutputMode({
-      startingCharacter,
-      configuredMode: outputSettings.mode,
-      deviceClass,
-      deviceOutput: deviceSettings.output,
-    });
+    avatarRoomCharacterRef.current = startingCharacter;
+    setAvatarRoomCharacter(startingCharacter);
     setConversationLayout(conversationLayoutFor(deviceClass, outputMode));
     callModeRef.current = { mode: outputMode === "streaming_avatar" ? "streaming_avatar" : "tts", avatarFallback: false };
     rescueLifetimeRef.current = new AbortController();
@@ -972,8 +975,8 @@ const IndexPRD4 = () => {
     const recordStartedAt = new Date();
     const recordLlm = getLLMSettings();
     const describeVoices = ([maxProfile, emmaProfile]: Awaited<typeof recordProfiles>) => ({
-      max: describeCurrentEffectiveVoice(deviceClass, "max", maxProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
-      emma: describeCurrentEffectiveVoice(deviceClass, "emma", emmaProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: avatarSettings }),
+      max: describeCurrentEffectiveVoice(deviceClass, "max", maxProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: configuredAvatarSettings }),
+      emma: describeCurrentEffectiveVoice(deviceClass, "emma", emmaProfile, { deviceServices: deviceSettings, configuredOutput: outputSettings.mode, avatar: configuredAvatarSettings }),
     });
     const sid = await createPRD4Session(
       state.userRoleProfile,
@@ -3707,7 +3710,10 @@ const IndexPRD4 = () => {
       const { profile, snapshot, state: savedState } = validated;
       const characterContext = toCharacterExecutionContext(profile);
       if (!profile || !characterContext || !savedState) throw new HandoffConflictError();
-      if (target === 'emma') await activateTTSFallback('emma_handoff_tts_v1');
+      // The video room belongs to the character that opened the call: any other one is voice-only.
+      if (leavesAvatarRoom(responseOutputRef.current?.mode, avatarRoomCharacterRef.current, target)) {
+        await activateTTSFallback(`${target}_handoff_tts_v1`);
+      }
       if (!isSwitchCurrent()) return;
       const firstContact = !hasSpokenWithCharacter(conversationRef.current, target);
       // The CAS consumes this exact offer and increments the counter once.
@@ -4234,6 +4240,7 @@ const IndexPRD4 = () => {
               streamingAvatarState={streamingAvatarState}
               attachAvatarMedia={attachAvatarMedia}
               avatarVideoFit={avatarVideoFit}
+              avatarCharacter={avatarRoomCharacter}
               activeCharacter={state.selectedCharacter}
               portraitUrl={activePortraitUrl}
               handoffIssue={handoffIssue}

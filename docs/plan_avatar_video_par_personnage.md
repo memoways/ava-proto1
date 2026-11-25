@@ -1,7 +1,6 @@
 # Plan — service vidéo par personnage
 
-Date : 25 novembre 2026. Statut : **audité par Opus le 25 novembre 2026, non développé**. La section 9 (audit et réponses d’Ulrich) prime sur les sections 2 à 7.
-Rien n’est implémenté à partir de ce fichier. Pas de branche, pas de production.
+Date : 25 novembre 2026. Statut : **développé le 25 novembre 2026** selon la section 9 (audit et réponses d’Ulrich), qui prime sur les sections 2 à 7. Résolution : `src/services/callVideoRouting.ts` ; écran : Réglages personnages. Rien en production.
 
 Auditeur attendu : Opus (Claude). Il doit juger si la proposition tient, si elle casse un comportement actuel, et s’il manque une question à poser à Ulrich. Le développement ne commence qu’après cet audit.
 

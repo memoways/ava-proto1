@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { normalizeStreamingAvatarSettings, resolveTavusCharacterSettings, streamingAvatarDefaults } from "./settings";
+import {
+  applyCharacterVideoLink,
+  characterVideoChoice,
+  normalizeStreamingAvatarSettings,
+  resolveTavusCharacterSettings,
+  streamingAvatarDefaults,
+  withCharacterVideoChoice,
+} from "./settings";
 import type { StreamingAvatarSettings } from "./types";
 
 const normalize = (value: unknown) =>
@@ -295,5 +302,52 @@ describe("Tavus voice source (Ava audio or PAL voice)", () => {
     expect(dropped.nuance.personaId).toBe("sam");
     expect(dropped.nuance.expressiveness).toBe(2);
     expect(dropped.nuance.drive).toBe("verbatim");
+  });
+});
+
+describe("character video links", () => {
+  it("reads settings saved before the links without loss", () => {
+    const { characterLinks: _links, ...saved } = streamingAvatarDefaults;
+    expect(normalize(saved)).toEqual(streamingAvatarDefaults);
+  });
+
+  it("keeps valid links for any character and drops unknown values", () => {
+    expect(normalize({
+      characterLinks: {
+        emma: { provider: "nuance", personaId: "emma", expressiveness: 9, drive: "other", systemPrompt: "fiche" },
+        leo: { provider: "anam", avatarId: " a1 ", voiceId: "" },
+        max: { provider: "unknown" },
+        "Bad Key": { provider: "tavus" },
+      },
+    }).characterLinks).toEqual({
+      emma: { provider: "nuance", expressiveness: 2 },
+      leo: { provider: "anam", avatarId: "a1" },
+    });
+  });
+
+  it("lays the character fields over the same provider's global block", () => {
+    const base = normalize({
+      heygen: { avatarId: "global-a", voiceId: "global-v" },
+      lemonslice: { agentId: "global-agent" },
+    });
+    expect(applyCharacterVideoLink(base, { provider: "heygen", avatarId: "emma-a" }).heygen)
+      .toEqual({ ...base.heygen, avatarId: "emma-a" });
+    expect(applyCharacterVideoLink(base, { provider: "lemonslice", agentImageUrl: "https://x.test/e.png" }).lemonslice)
+      .toMatchObject({ agentId: "", agentImageUrl: "https://x.test/e.png" });
+    expect(applyCharacterVideoLink(base, { provider: "tavus" }).tavus).toBe(base.tavus);
+  });
+
+  it("takes the Nuance default instruction of the character's mode", () => {
+    const applied = applyCharacterVideoLink(streamingAvatarDefaults, { provider: "nuance", drive: "native" });
+    expect(applied.nuance.systemPrompt).toBe(normalize({ nuance: { drive: "native" } }).nuance.systemPrompt);
+  });
+
+  it("adds and removes one character's choice, Tavus fields in tavus.characters", () => {
+    const next = withCharacterVideoChoice(streamingAvatarDefaults, "emma", {
+      link: { provider: "tavus" }, tavus: { faceId: "face-emma" },
+    });
+    expect(characterVideoChoice(next, "emma")).toEqual({ link: { provider: "tavus" }, tavus: { faceId: "face-emma" } });
+    expect(next.tavus.characters.max).toEqual({});
+    expect(withCharacterVideoChoice(next, "emma", { link: null, tavus: {} }).characterLinks).toEqual({});
   });
 });

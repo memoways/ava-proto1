@@ -8,6 +8,10 @@ import {
   normalizeLemonSliceSettings,
   normalizeNuanceSettings,
   normalizeTavusLanguages,
+  NUANCE_DEFAULT_NATIVE_PROMPT,
+  NUANCE_DEFAULT_VERBATIM_PROMPT,
+  NUANCE_DRIVE_MODES,
+  NUANCE_PERSONAS,
   pickEnum,
   safeLanguageCode,
   SELECTABLE_STREAMING_AVATAR_PROVIDERS,
@@ -19,6 +23,7 @@ import {
   TAVUS_AVATAR_CHARACTERS,
   TAVUS_EMOTIONS,
   TAVUS_VOICE_SOURCES,
+  type CharacterVideoLink,
   type OutputSettings,
   type ResolvedTavusCharacterSettings,
   type StreamingAvatarProviderId,
@@ -74,6 +79,7 @@ export const streamingAvatarDefaults: StreamingAvatarSettings = {
   // Dejected speaking prompt and closed idle prompt; avatar id or image set in the admin.
   lemonslice: normalizeLemonSliceSettings(undefined),
   nuance: normalizeNuanceSettings(undefined),
+  characterLinks: {},
 };
 
 function readLocal<T>(key: string, defaults: T): T {
@@ -195,6 +201,7 @@ export function normalizeStreamingAvatarSettings(
     anam: normalizeAnamSettings(raw.anam),
     lemonslice: normalizeLemonSliceSettings(raw.lemonslice),
     nuance: normalizeNuanceSettings(raw.nuance),
+    characterLinks: normalizeCharacterVideoLinks(raw.characterLinks),
   };
 }
 
@@ -270,6 +277,135 @@ export function resolveTavusCharacterSettings(
     listeningEmotion: override.listeningEmotion ?? settings.listeningEmotion,
     voiceSource: override.voiceSource ?? settings.voiceSource ?? "ava",
   };
+}
+
+const LINK_TEXT_MAX_LENGTH = 2_000;
+
+function linkText<K extends string>(entry: Record<string, unknown>, key: K): Partial<Record<K, string>> {
+  const value = typeof entry[key] === "string" ? (entry[key] as string).trim() : "";
+  return value && value.length <= LINK_TEXT_MAX_LENGTH
+    ? ({ [key]: value } as Partial<Record<K, string>>)
+    : {};
+}
+
+/** An unknown provider drops the link; an unknown or empty field follows the global value. */
+function normalizeCharacterVideoLink(value: unknown): CharacterVideoLink | null {
+  const entry = asRecord(value);
+  const provider = SELECTABLE_STREAMING_AVATAR_PROVIDERS.find((id) => id === entry.provider);
+  if (!provider) return null;
+  switch (provider) {
+    case "tavus":
+      return { provider };
+    case "heygen":
+    case "anam":
+      return { provider, ...linkText(entry, "avatarId"), ...linkText(entry, "voiceId") };
+    case "lemonslice":
+      return { provider, ...linkText(entry, "agentId"), ...linkText(entry, "agentImageUrl") };
+    case "nuance": {
+      const personaId = NUANCE_PERSONAS.find((id) => id === entry.personaId);
+      const drive = NUANCE_DRIVE_MODES.find((mode) => mode === entry.drive);
+      const expressiveness = typeof entry.expressiveness === "number" && Number.isFinite(entry.expressiveness)
+        ? normalizeNuanceSettings({ expressiveness: entry.expressiveness }).expressiveness
+        : undefined;
+      return {
+        provider,
+        ...(personaId ? { personaId } : {}),
+        ...(expressiveness !== undefined ? { expressiveness } : {}),
+        ...(drive ? { drive } : {}),
+      };
+    }
+  }
+}
+
+function normalizeCharacterVideoLinks(value: unknown): Record<string, CharacterVideoLink> {
+  const links: Record<string, CharacterVideoLink> = {};
+  for (const [key, raw] of Object.entries(asRecord(value))) {
+    if (!CHARACTER_KEY_PATTERN.test(key)) continue;
+    const link = normalizeCharacterVideoLink(raw);
+    if (link) links[key] = link;
+  }
+  return links;
+}
+
+/**
+ * Settings of a call opened on a character link: the linked provider, with the character's
+ * fields over that provider's global block. Secrets, timeouts, room and quality stay global.
+ */
+export function applyCharacterVideoLink(
+  settings: StreamingAvatarSettings,
+  link: CharacterVideoLink,
+): StreamingAvatarSettings {
+  const base: StreamingAvatarSettings = { ...settings, activeProvider: link.provider };
+  switch (link.provider) {
+    case "tavus":
+      return base;
+    case "heygen": {
+      const { provider: _provider, ...fields } = link;
+      return { ...base, heygen: { ...settings.heygen, ...fields } };
+    }
+    case "anam": {
+      const { provider: _provider, ...fields } = link;
+      return { ...base, anam: { ...settings.anam, ...fields } };
+    }
+    case "lemonslice": {
+      // The agent id wins over the image in the request: a character image clears the global agent.
+      const face = link.agentId
+        ? { agentId: link.agentId, ...(link.agentImageUrl ? { agentImageUrl: link.agentImageUrl } : {}) }
+        : link.agentImageUrl
+        ? { agentId: "", agentImageUrl: link.agentImageUrl }
+        : {};
+      return { ...base, lemonslice: { ...settings.lemonslice, ...face } };
+    }
+    case "nuance": {
+      const { provider: _provider, ...fields } = link;
+      const drive = link.drive ?? settings.nuance.drive;
+      // The global instruction was written for the global mode.
+      const systemPrompt = drive === settings.nuance.drive
+        ? settings.nuance.systemPrompt
+        : drive === "native" ? NUANCE_DEFAULT_NATIVE_PROMPT : NUANCE_DEFAULT_VERBATIM_PROMPT;
+      return { ...base, nuance: { ...settings.nuance, ...fields, systemPrompt } };
+    }
+  }
+}
+
+/** What Réglages personnages edits for one character: its link and, for Tavus, its fields. */
+export interface CharacterVideoChoice {
+  link: CharacterVideoLink | null;
+  tavus: TavusCharacterOverride;
+}
+
+export function characterVideoChoice(
+  settings: StreamingAvatarSettings,
+  characterKey: string,
+): CharacterVideoChoice {
+  return {
+    link: settings.characterLinks[characterKey] ?? null,
+    tavus: settings.tavus.characters[characterKey] ?? {},
+  };
+}
+
+export function withCharacterVideoChoice(
+  settings: StreamingAvatarSettings,
+  characterKey: string,
+  choice: CharacterVideoChoice,
+): StreamingAvatarSettings {
+  const characterLinks = { ...settings.characterLinks };
+  if (choice.link) characterLinks[characterKey] = choice.link;
+  else delete characterLinks[characterKey];
+  return {
+    ...settings,
+    characterLinks,
+    tavus: { ...settings.tavus, characters: { ...settings.tavus.characters, [characterKey]: choice.tavus } },
+  };
+}
+
+/** Rewrites one character only, over the stored settings read just before. */
+export async function saveCharacterVideoChoiceToDB(
+  characterKey: string,
+  choice: CharacterVideoChoice,
+): Promise<void> {
+  const stored = await loadStreamingAvatarSettingsFromDB();
+  await saveStreamingAvatarSettingsToDB(withCharacterVideoChoice(stored, characterKey, choice));
 }
 
 export function isTavusVoiceSource(value: unknown): value is TavusVoiceSource {

@@ -43,6 +43,8 @@ interface Props {
   /** "contain" shows the whole provider frame (LemonSlice); default crops to fill the screen. */
   avatarVideoFit?: "cover" | "contain";
   activeCharacter: "max" | "emma";
+  /** Character the live video room was opened for (Max unless another one is linked). */
+  avatarCharacter?: "max" | "emma";
   portraitUrl?: string | null;
   handoffIssue?: { phase: 'preparing' | 'error'; reason: string; reload?: boolean } | null;
   onRetryHandoff?: () => void;
@@ -86,6 +88,7 @@ const ConversationScreen = ({
   attachAvatarMedia,
   avatarVideoFit = "cover",
   activeCharacter,
+  avatarCharacter = "max",
   portraitUrl = null,
   handoffIssue = null,
   handoffOffer = null,
@@ -101,12 +104,12 @@ const ConversationScreen = ({
   onRejectHandoff,
 }: Props) => {
   const handoffStatusId = useId();
-  // Le flux vidéo en direct est celui de Max. Pour tout autre personnage (Emma),
-  // on n'affiche ni le flux, ni sa dernière image figée : seulement sa photo.
+  // Le flux vidéo en direct est celui du personnage qui a ouvert l'appel. Pour tout
+  // autre personnage, on n'affiche ni le flux, ni sa dernière image figée : sa photo.
   const callLayout = layout === "call";
   const touchTargets = callLayout || touchFirst;
   // The call screen never shows the avatar stream, whatever the caller requests.
-  const streamingAvatarActive = streamingAvatarRequested && activeCharacter === "max" && !callLayout;
+  const streamingAvatarActive = streamingAvatarRequested && activeCharacter === avatarCharacter && !callLayout;
   const handoffInputBlocked = handoffCalling || handoffInputLocked;
   const disabled = handoffInputBlocked || inputHeld || audioState === "mic_starting" || audioState === "user_finalizing" || audioState === "max_thinking" || audioState === "max_speaking";
   const recording = audioState === "user_speaking";
