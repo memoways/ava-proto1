@@ -176,6 +176,13 @@
       "when": 1795305000001,
       "tag": "0024_video_triggers_label_vocabulary",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795616124566,
+      "tag": "0025_streaming_avatar_provider_nuance",
+      "breakpoints": true
     }
   ]
 }
