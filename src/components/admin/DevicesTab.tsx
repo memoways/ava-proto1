@@ -45,6 +45,7 @@ const AVATAR_LABELS: Record<SelectableStreamingAvatarProvider, string> = {
   tavus: "Tavus",
   anam: "Anam",
   lemonslice: "LemonSlice",
+  nuance: "Nuance Labs",
 };
 
 const CHARACTER_LABELS: Record<VoiceCharacter, string> = { max: "Max", emma: "Emma" };

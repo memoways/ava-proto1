@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Nuance Labs — persona vidéo en essai] — 2026-11-25
+
+- Nuance Live devient sélectionnable à côté de HeyGen, Tavus, Anam et LemonSlice (Admin › Streaming Avatar Config, Appareils, consommation).
+- Le texte d'Ava part comme une consigne (`response.create`), pas comme une réplique imposée. La voix d'Ava (ElevenLabs et les autres) ne peut pas être envoyée. Personas : Sam, Sonia, Mira. Anglais seulement.
+- Mode « Conversation Nuance » : la persona répond au micro, la réplique d'Ava n'est pas envoyée.
+- Secret serveur `NUANCE_API_KEY`, jamais dans le navigateur. Migration à appliquer avant un essai : `20261125140000_streaming_avatar_provider_nuance.sql`.
+- Rapport : `docs/plan_nuance_labs.md`. Essai réel non fait. Rien en production.
+
 ## [Un bloc de parole = un tour] — 2026-11-24
 
 - Cause (mesurée, session Benoît 24.11.26 00:21, Deepgram, mains libres, `endOfSpeechMs` 800 + 550) : l'application décide la fin de parole à une pause naturelle (≥ 0,8 s, 1,35 s si phrase inachevée) et lance le tour ; la personne continue de parler pendant que le personnage « réfléchit » ; cette parole est prise pour une coupure (`acoustic_confirmed`), le tour est abandonné sans réponse, puis le texte suivant ouvre un nouveau tour. Résultat : 7 tours de 2 s sans réplique, puis un tour complet (RAG « over_budget » ≈ 20 s sur ce tour).

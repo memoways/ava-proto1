@@ -13,8 +13,10 @@ import {
   buildTavusFaceTrainingRequest,
   checkTavusTrainingObject,
   lemonSliceRoomName,
+  buildNuanceSessionTokenRequest,
   normalizeLemonSliceSettings,
   normalizeTavusFace,
+  nuanceSessionToken,
   normalizeTavusFaceList,
   parseTavusTrainingStoragePath,
   redactTavusText,
@@ -168,6 +170,7 @@ serve(async (req) => {
         anam: Boolean(Deno.env.get("ANAM_API_KEY")),
         // LemonSlice publishes its video in a private Daily room created here.
         lemonslice: Boolean(Deno.env.get("LEMONSLICE_API_KEY") && Deno.env.get("DAILY_API_KEY")),
+        nuance: Boolean(Deno.env.get("NUANCE_API_KEY")),
       },
     });
   }
@@ -196,7 +199,7 @@ serve(async (req) => {
     // Admin configuration check: Tavus test_mode conversation or Anam token, no session, no binding.
     const auth = await requireAdmin(req, corsHeaders);
     if (!auth.ok) return auth.response!;
-    if (body.provider === "heygen" || body.provider === "lemonslice") {
+    if (body.provider === "heygen" || body.provider === "lemonslice" || body.provider === "nuance") {
       return jsonError(`${body.provider} has no configuration check`, 400);
     }
     try {
@@ -237,6 +240,8 @@ serve(async (req) => {
         ? await startAnam(body.config ?? {})
         : body.provider === "lemonslice"
         ? await startLemonSlice(body.config ?? {}, body.sessionId!)
+        : body.provider === "nuance"
+        ? await startNuance(body.config ?? {}, body.sessionId!)
         : await startTavus(body.config ?? {}, body.sessionId!);
       if (!response.ok) return response;
       const started = await response.clone().json() as {
@@ -284,8 +289,9 @@ serve(async (req) => {
     )) {
       return jsonError("External session ownership mismatch", 403);
     }
-    if (body.provider === "anam") {
-      // The client closes the Anam stream (stopStreaming); the token cannot start another session.
+    if (body.provider === "anam" || body.provider === "nuance") {
+      // Anam: the client closes the stream. Nuance: the browser sends session.close.
+      // Neither token can start another session.
       return json({ ok: true });
     }
     if (body.provider === "lemonslice") {
@@ -512,6 +518,52 @@ async function createDailyMeetingToken(
   const token = safeString(payload.token);
   if (!token) throw new Error("Daily returned no meeting token");
   return token;
+}
+
+const NUANCE_API = "https://api.nuancelabs.ai";
+
+/**
+ * Mints one Nuance Live session token. The API key never leaves this function.
+ * The browser SDK creates the conversation from the token. A failed bind simply
+ * lets the unused token expire (one conversation, about a minute).
+ */
+async function startNuance(
+  config: Record<string, unknown>,
+  avaSessionId: string,
+): Promise<Response> {
+  const apiKey = Deno.env.get("NUANCE_API_KEY");
+  if (!apiKey) return jsonError("Nuance is not configured", 503);
+  const request = buildNuanceSessionTokenRequest(config, avaSessionId);
+  if (!request.ok) return jsonError(request.error, 400);
+  const upstream = await fetch(`${NUANCE_API}/session-tokens`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request.body),
+  });
+  const text = await upstream.text();
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    payload = {};
+  }
+  if (!upstream.ok) {
+    const code = typeof payload.code === "string" ? payload.code : "";
+    const detail = typeof payload.detail === "string" ? payload.detail : "";
+    console.error(`[streaming-avatar-session] nuance mint ${upstream.status} ${code}`);
+    const message = detail || code || "Nuance session token failed";
+    throw new Error(`${message.slice(0, 240)} [${upstream.status}]`);
+  }
+  const sessionToken = nuanceSessionToken(payload.token);
+  if (!sessionToken) throw new Error("Nuance returned no session token");
+  return json({
+    provider: "nuance",
+    externalSessionId: crypto.randomUUID(),
+    sessionToken,
+  });
 }
 
 /**

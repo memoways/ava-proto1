@@ -18,6 +18,11 @@ import {
   stripAnamCueTags,
   summarizeTavusPalVoice,
   withAnamCue,
+  buildNuanceSessionTokenRequest,
+  buildNuanceSpeakInstruction,
+  nuanceSessionToken,
+  NUANCE_INSTRUCTION_MAX,
+  NUANCE_SPEAK_PREFIX,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 const heygenBase = { avatarId: "avatar-1", voiceId: "voice-1", language: "fr" };
@@ -524,5 +529,50 @@ describe("Tavus Face response", () => {
   it("removes links from any relayed Tavus text", () => {
     expect(redactTavusText("bad url http://x.io/a?token=1 end")).toBe("bad url [link] end");
     expect(redactTavusText(42)).toBe("");
+  });
+});
+
+describe("Nuance Live session token", () => {
+  const sessionId = "12345678-aaaa-bbbb-cccc-1234567890ab";
+
+  it("mints Sam without a persona id, camera off, and no hand-off", () => {
+    const result = buildNuanceSessionTokenRequest({ expressiveness: 0.4 }, sessionId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.body).toMatchObject({
+      interface: "nuance_live",
+      end_user_id: sessionId,
+      expressiveness: 0.4,
+      interface_setup: {
+        delegation: { type: "none" },
+        video: { input: { camera: false } },
+        runtime_tools: { stay_quiet: false, end_call: false },
+      },
+    });
+    expect(result.body.personality).toEqual({
+      system_prompt: expect.stringMatching(/Say only this/),
+    });
+  });
+
+  it("names Sonia or Mira and refuses an end user id Nuance would reject", () => {
+    const sonia = buildNuanceSessionTokenRequest({ personaId: "sonia", drive: "native" }, sessionId);
+    expect(sonia.ok).toBe(true);
+    if (sonia.ok) {
+      expect(sonia.body.personality).toMatchObject({ persona_id: "sonia" });
+    }
+    expect(buildNuanceSessionTokenRequest({}, "ulrich@example.com").ok).toBe(false);
+    expect(buildNuanceSessionTokenRequest({}, "").ok).toBe(false);
+  });
+
+  it("caps the spoken instruction at 2,000 characters", () => {
+    const instruction = buildNuanceSpeakInstruction("é".repeat(5_000));
+    expect(instruction.startsWith(NUANCE_SPEAK_PREFIX)).toBe(true);
+    expect(instruction.length).toBe(NUANCE_INSTRUCTION_MAX);
+  });
+
+  it("accepts only a session token", () => {
+    expect(nuanceSessionToken("st_abc12345")).toBe("st_abc12345");
+    expect(nuanceSessionToken("nk_secret")).toBe("");
+    expect(nuanceSessionToken("st_")).toBe("");
   });
 });

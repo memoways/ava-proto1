@@ -6,6 +6,7 @@ import type {
   HeyGenVoiceSettings,
   KnownStreamingAvatarProvider,
   LemonSliceAvatarSettings,
+  NuanceAvatarSettings,
   SelectableStreamingAvatarProvider,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
@@ -21,6 +22,9 @@ export type {
   HeyGenVoiceEngine,
   HeyGenVoiceSettings,
   LemonSliceAvatarSettings,
+  NuanceAvatarSettings,
+  NuanceDriveMode,
+  NuancePersonaId,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 export type OutputMode = "tts" | "streaming_avatar";
@@ -154,6 +158,7 @@ export interface StreamingAvatarSettings {
   tavus: TavusAvatarSettings;
   anam: AnamAvatarSettings;
   lemonslice: LemonSliceAvatarSettings;
+  nuance: NuanceAvatarSettings;
 }
 
 export interface ResponseOutputPrepareContext {

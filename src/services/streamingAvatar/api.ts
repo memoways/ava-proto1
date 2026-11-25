@@ -4,6 +4,7 @@ import type {
   AnamAvatarSettings,
   HeyGenAvatarSettings,
   LemonSliceAvatarSettings,
+  NuanceAvatarSettings,
   StreamingAvatarProviderId,
   TavusAvatarSettings,
 } from "./types";
@@ -38,6 +39,12 @@ export type AvatarSessionStartResponse =
       /** Capability URL for the audio bridge: never logged, never in diagnostics. */
       websocketAddress: string;
       audioSampleRate: number;
+    }
+  | {
+      provider: "nuance";
+      externalSessionId: string;
+      /** Single-use session token (`st_…`). The API key never reaches the browser. */
+      sessionToken: string;
     };
 
 export async function startAvatarSession(input: {
@@ -47,6 +54,7 @@ export async function startAvatarSession(input: {
   tavus?: TavusAvatarSettings;
   anam?: AnamAvatarSettings;
   lemonslice?: LemonSliceAvatarSettings;
+  nuance?: NuanceAvatarSettings;
   signal?: AbortSignal;
 }): Promise<AvatarSessionStartResponse> {
   const response = await authenticatedFunctionFetch(ENDPOINT, {
@@ -235,6 +243,7 @@ export async function getAvatarProviderStatus(): Promise<Record<StreamingAvatarP
     tavus: body.configured?.tavus === true,
     anam: body.configured?.anam === true,
     lemonslice: body.configured?.lemonslice === true,
+    nuance: body.configured?.nuance === true,
   };
 }
 

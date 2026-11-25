@@ -47,6 +47,9 @@ import {
   lemonSliceActionsAllowed,
   lemonSliceAspectRatioSent,
   lemonSliceEditImageRead,
+  NUANCE_DRIVE_MODES,
+  NUANCE_PERSONAS,
+  NUANCE_PROMPT_MAX,
   type LemonSliceAspectRatio,
   type LemonSliceEditImageMode,
   type LemonSliceEditImageVariant,
@@ -68,6 +71,9 @@ import {
   type HeyGenElevenLabsVoice,
   type HeyGenVoiceSettings,
   type LemonSliceAvatarSettings,
+  type NuanceAvatarSettings,
+  type NuanceDriveMode,
+  type NuancePersonaId,
   type StreamingAvatarProviderId,
   type StreamingAvatarSettings,
   type TavusCharacterOverride,
@@ -97,6 +103,10 @@ const providerCopy: Record<StreamingAvatarProviderId, { title: string; descripti
   lemonslice: {
     title: "LemonSlice",
     description: "La voix du personnage d'Ava (TTS actuel) anime le visage ; vidéo et son reviennent par une salle Daily privée.",
+  },
+  nuance: {
+    title: "Nuance Labs",
+    description: "Persona Nuance (Sam, Sonia ou Mira), en anglais, avec sa propre voix. Le texte d'Ava part comme une consigne, pas comme une réplique imposée. Aucun audio Ava ne peut être envoyé.",
   },
 };
 
@@ -163,7 +173,7 @@ export default function StreamingAvatarConfigTab() {
       </p>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {(["heygen", "tavus", "anam", "lemonslice"] as const).map((provider) => {
+        {(["heygen", "tavus", "anam", "lemonslice", "nuance"] as const).map((provider) => {
           const active = settings.activeProvider === provider;
           return (
             <button
@@ -224,10 +234,15 @@ export default function StreamingAvatarConfigTab() {
           value={settings.anam}
           onChange={(anam) => update({ anam })}
         />
-      ) : (
+      ) : settings.activeProvider === "lemonslice" ? (
         <LemonSliceFields
           value={settings.lemonslice}
           onChange={(lemonslice) => update({ lemonslice })}
+        />
+      ) : (
+        <NuanceFields
+          value={settings.nuance}
+          onChange={(nuance) => update({ nuance })}
         />
       )}
 
@@ -1051,6 +1066,71 @@ const LEMONSLICE_VARIANT_LABELS: Record<LemonSliceEditImageVariant, string> = {
   standing: "Debout",
   sitting: "Assis",
 };
+
+const NUANCE_PERSONA_LABELS: Record<NuancePersonaId, string> = {
+  sam: "Sam (défaut)",
+  sonia: "Sonia",
+  mira: "Mira",
+};
+
+const NUANCE_DRIVE_LABELS: Record<NuanceDriveMode, string> = {
+  verbatim: "Texte d'Ava — consigne de lecture (essai)",
+  native: "Conversation Nuance — elle répond elle-même",
+};
+
+function NuanceFields({ value, onChange }: {
+  value: NuanceAvatarSettings;
+  onChange: (value: NuanceAvatarSettings) => void;
+}) {
+  const patch = (next: Partial<NuanceAvatarSettings>) => onChange({ ...value, ...next });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Nuance Labs</CardTitle>
+        <CardDescription>
+          Anglais seulement. La voix est celle de la persona : ElevenLabs, Gradium et les autres voix d'Ava ne partent pas.
+          Une réplique en français peut être refusée. La clé <span className="font-mono">NUANCE_API_KEY</span> reste côté serveur.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <EnumField
+          label="Persona"
+          hint="Le visage et la voix. Max et Emma ne sont pas des personas Nuance."
+          value={value.personaId}
+          options={NUANCE_PERSONA_LABELS}
+          onChange={(personaId) => patch({ personaId })}
+        />
+        <EnumField
+          label="Pilotage"
+          hint={value.drive === "native"
+            ? "Le micro est entendu par Nuance, qui répond avec ses mots. La réplique d'Ava s'affiche et n'est pas envoyée."
+            : "Chaque réplique d'Ava part comme une consigne (« Say only this »). Nuance peut reformuler ou refuser. Un refus bascule l'appel sur la voix d'Ava."}
+          value={value.drive}
+          options={NUANCE_DRIVE_LABELS}
+          onChange={(drive) => patch({ drive })}
+        />
+        <NumberField
+          label="Expressivité du visage"
+          hint="0 calme, 1 niveau de la persona, 2 plus mobile."
+          value={value.expressiveness}
+          min={0}
+          max={2}
+          step={0.1}
+          onChange={(expressiveness) => patch({ expressiveness })}
+        />
+        <PromptField
+          label="Consigne de la persona"
+          value={value.systemPrompt}
+          max={NUANCE_PROMPT_MAX}
+          onChange={(systemPrompt) => patch({ systemPrompt })}
+        />
+        <p className="text-xs text-muted-foreground">
+          Personas proposées : {NUANCE_PERSONAS.join(", ")}. Modes : {NUANCE_DRIVE_MODES.join(", ")}.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 const HEYGEN_QUALITY_LABELS: Record<HeyGenAvatarSettings["quality"], string> = {
   very_high: "Très haute",

@@ -5,10 +5,10 @@
 // "Create conversation" + "Language support", Anam "Create session token" + "Director Notes",
 // LemonSlice "WebSocket" + "Control session" (see the LemonSlice section).
 
-export const STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice"] as const;
+export const STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice", "nuance"] as const;
 export type KnownStreamingAvatarProvider = (typeof STREAMING_AVATAR_PROVIDERS)[number];
 /** Providers with a client factory and a configured secret. */
-export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice"] as const;
+export const SELECTABLE_STREAMING_AVATAR_PROVIDERS = ["heygen", "tavus", "anam", "lemonslice", "nuance"] as const;
 export type SelectableStreamingAvatarProvider =
   (typeof SELECTABLE_STREAMING_AVATAR_PROVIDERS)[number];
 
@@ -1253,6 +1253,115 @@ export function buildDailyMeetingTokenRequest(
     properties.permissions = { canSend: false };
   }
   return { properties };
+}
+
+/**
+ * Nuance Live personas. The id chooses the face and the voice only.
+ * `"sam"` is the default and must be omitted from the token. Any other id,
+ * including an Ava character name, is refused at mint (`unknown_persona`).
+ */
+export const NUANCE_PERSONAS = ["sam", "sonia", "mira"] as const;
+export type NuancePersonaId = (typeof NUANCE_PERSONAS)[number];
+
+/**
+ * `verbatim`: Ava's line is sent as a one-time instruction. Nuance may rephrase
+ * it, refuse it, or stay silent. `native`: the persona hears the microphone and
+ * answers with its own words; Ava's line is not sent.
+ */
+export const NUANCE_DRIVE_MODES = ["verbatim", "native"] as const;
+export type NuanceDriveMode = (typeof NUANCE_DRIVE_MODES)[number];
+
+/** Nuance caps an append and a `response.create` instruction at 2,000 characters. */
+export const NUANCE_PROMPT_MAX = 2_000;
+export const NUANCE_INSTRUCTION_MAX = 2_000;
+export const NUANCE_SPEAK_PREFIX = "Say only this, with no extra words:\n";
+
+export const NUANCE_DEFAULT_VERBATIM_PROMPT =
+  "You read lines you are given. When an instruction starts with \"Say only this\", speak that line and nothing else. Do not greet anyone on your own. Do not answer questions.";
+
+export const NUANCE_DEFAULT_NATIVE_PROMPT =
+  "You are a brief conversational partner. Answer in one or two short sentences. Do not claim to be a human.";
+
+export interface NuanceAvatarSettings {
+  personaId: NuancePersonaId;
+  /** 0 is calmer, 2 moves more. Nuance's own default is 1. */
+  expressiveness: number;
+  drive: NuanceDriveMode;
+  systemPrompt: string;
+}
+
+export function normalizeNuanceSettings(value: unknown): NuanceAvatarSettings {
+  const raw = asRecord(value);
+  const drive = pickEnum(raw.drive, NUANCE_DRIVE_MODES, "verbatim");
+  const fallbackPrompt = drive === "native"
+    ? NUANCE_DEFAULT_NATIVE_PROMPT
+    : NUANCE_DEFAULT_VERBATIM_PROMPT;
+  return {
+    personaId: pickEnum(raw.personaId, NUANCE_PERSONAS, "sam"),
+    expressiveness: clampNuanceExpressiveness(raw.expressiveness),
+    drive,
+    systemPrompt: boundedNuanceText(raw.systemPrompt, fallbackPrompt, NUANCE_PROMPT_MAX),
+  };
+}
+
+/** One-time note asking the persona to speak Ava's line. Capped at Nuance's 2,000 characters. */
+export function buildNuanceSpeakInstruction(text: string): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  const room = NUANCE_INSTRUCTION_MAX - NUANCE_SPEAK_PREFIX.length;
+  return NUANCE_SPEAK_PREFIX + (line.length > room ? line.slice(0, room) : line);
+}
+
+const NUANCE_END_USER_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+/**
+ * Body of `POST /session-tokens`. The API key stays on the server.
+ * Camera off, no hand-off, `stay_quiet` off so a test line is not swallowed.
+ * `"sam"` is left out: sending it is not how the default persona is selected.
+ */
+export function buildNuanceSessionTokenRequest(config: unknown, endUserId: string): BuildResult {
+  if (!NUANCE_END_USER_ID.test(endUserId)) {
+    return { ok: false, error: "Nuance end_user_id is missing or not allowed" };
+  }
+  const settings = normalizeNuanceSettings(config);
+  const personality: Record<string, unknown> = { system_prompt: settings.systemPrompt };
+  if (settings.personaId !== "sam") personality.persona_id = settings.personaId;
+  return {
+    ok: true,
+    body: {
+      interface: "nuance_live",
+      end_user_id: endUserId,
+      expressiveness: settings.expressiveness,
+      personality,
+      interface_setup: {
+        delegation: { type: "none" },
+        video: { input: { camera: false } },
+        runtime_tools: { stay_quiet: false, end_call: false, call_time: false },
+      },
+    },
+  };
+}
+
+/** Session token (`st_…`) from a mint response. Anything else is refused, and never logged. */
+export function nuanceSessionToken(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("st_")) return "";
+  if (value.length < 8 || value.length > 500) return "";
+  return value;
+}
+
+function clampNuanceExpressiveness(value: unknown): number {
+  const parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : Number.NaN;
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.round(Math.min(2, Math.max(0, parsed)) * 10) / 10;
+}
+
+function boundedNuanceText(value: unknown, fallback: string, max: number): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  const chosen = text || fallback;
+  return chosen.length > max ? chosen.slice(0, max) : chosen;
 }
 
 /** WebSocket address issued by LemonSlice; it carries the capability and is never logged. */
