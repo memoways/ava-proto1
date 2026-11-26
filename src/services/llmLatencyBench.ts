@@ -34,6 +34,8 @@ export interface BenchCandidate {
   provider?: { sort?: "latency" | "throughput" | "price"; only?: string[]; order?: string[]; allow_fallbacks?: boolean };
   /** proxy-llm `disable_reasoning` (Gemini 2.5 Flash / Flash-Lite only). */
   disableReasoning?: boolean;
+  /** proxy-llm `reasoning_effort` (gpt-oss: reasoning cannot be turned off, only lowered). */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
   direct?: DirectEndpoint;
   /** Public OpenRouter price, USD per million tokens (26 Nov. 2026), for the estimate and direct calls. */
   price: { input: number; output: number; cachedInput?: number };
@@ -58,9 +60,9 @@ export const BENCH_CANDIDATES: BenchCandidate[] = [
     disableReasoning: true, price: { input: 0.1, output: 0.4, cachedInput: 0.01 } },
   { id: "gemini-35-flash-lite", label: "Gemini 3.5 Flash-Lite (raisonnement par défaut)", model: "google/gemini-3.5-flash-lite", transport: "proxy",
     price: { input: 0.3, output: 2.5, cachedInput: 0.03 }, note: "proxy-llm ne coupe pas la réflexion des Gemini 3.x" },
-  { id: "oss-cerebras", label: "gpt-oss-120b · Cerebras", model: "openai/gpt-oss-120b", transport: "proxy",
+  { id: "oss-cerebras", reasoningEffort: "low", label: "gpt-oss-120b · Cerebras", model: "openai/gpt-oss-120b", transport: "proxy",
     provider: { only: ["cerebras"], allow_fallbacks: false }, price: { input: 0.05, output: 0.25, cachedInput: 0.05 } },
-  { id: "oss-groq", label: "gpt-oss-120b · Groq", model: "openai/gpt-oss-120b", transport: "proxy",
+  { id: "oss-groq", reasoningEffort: "low", label: "gpt-oss-120b · Groq", model: "openai/gpt-oss-120b", transport: "proxy",
     provider: { only: ["groq"], allow_fallbacks: false }, price: { input: 0.05, output: 0.25, cachedInput: 0.05 } },
   { id: "llama4-scout", label: "Llama 4 Scout (DeepInfra)", model: "meta-llama/llama-4-scout", transport: "proxy",
     price: { input: 0.1, output: 0.3 }, note: "plus servi par Cerebras ni Groq sur OpenRouter" },
@@ -118,6 +120,7 @@ export function buildProxyBenchBody(messages: BenchMessage[], candidate: BenchCa
     timeout_ms: timeoutMs,
     reasoning: false,
     ...(candidate.disableReasoning ? { disable_reasoning: true } : {}),
+    ...(candidate.reasoningEffort ? { reasoning_effort: candidate.reasoningEffort } : {}),
     ...(candidate.provider ? { provider: candidate.provider } : {}),
   };
 }
@@ -394,7 +397,8 @@ export function summarizeCandidate(candidate: BenchCandidate, all: BenchCallReco
   const usageOf = (key: keyof StreamUsage) =>
     ok.map((r) => r.metrics.usage?.[key]).filter((v): v is number => typeof v === "number");
   const costs = ok.map((r) => r.costUsd).filter((v): v is number => typeof v === "number");
-  const providers = [...new Set(ok.map((r) => r.metrics.provider).filter((p): p is string => Boolean(p)))];
+  // Every call that reached a provider counts: a pinned provider that answered with errors only still shows the routing.
+  const providers = [...new Set(records.map((r) => r.metrics.provider).filter((p): p is string => Boolean(p)))];
   const pinned = candidate.provider?.only?.map((p) => p.toLowerCase()) ?? [];
   return {
     candidateId: candidate.id,

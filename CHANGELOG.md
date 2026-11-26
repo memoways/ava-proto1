@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 2 : correctifs du banc] — 2026-11-26
+
+- `proxy-llm` : champ `reasoning_effort` facultatif et filtré, envoyé par le banc seulement pour gpt-oss-120b, qui sinon épuise ses tokens à réfléchir et rend une réponse vide. Payload inchangé pour Ava. À redéployer par Lovable, avec `provider`.
+- Banc : l'alerte « routage non appliqué » compte aussi les appels en erreur.
+
 ## [Latence lot 2 : banc d'essai LLM et test de rappel long] — 2026-11-26
 
 - `npm run eval:llm-latency` : compile les vrais prompts de Max et Emma (corpus `eval:judge`, `optimized_v3`, appel au personnage intercepté avant l'envoi), puis les rejoue en flux via `proxy-llm` pour 14 candidats OpenRouter (et Cerebras, Groq, Google en direct si leurs clés sont fournies) : premier token, première phrase sûre, fin, intent valide, tokens en cache et de raisonnement, coût ; médiane et p90, stabilité du préfixe. Coût annoncé et plafonné avant tout appel.
