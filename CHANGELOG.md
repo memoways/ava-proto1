@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Importation vidéo depuis Gumlet] — 2026-11-26
+
+- Admin › Expérience › **Importation vidéo** : liste les vidéos Gumlet absentes de « Vidéos AVA » (vignette, durée, date, dimensions, dossier, tags), sélection multiple, recherche, filtre par dossier, valeurs communes Nature / Dialogue / Personnages.
+- Chaque import crée une fiche « A vérifier » (titre, lien `gumlet.tv/watch/…`, vignette en couverture, métadonnées). Aucune fiche existante n'est modifiée, aucun doublon.
+- Notion « Vidéos AVA » : nouveaux champs ID Gumlet, Durée (s), Uploadée sur Gumlet, Dimensions, Poids (Mo), Dossier Gumlet, Tags Gumlet, Description Gumlet. La synchronisation ne les lit pas.
+- Nouvelle Edge Function `import-gumlet-videos` (admin), secret `GUMLET_API_KEY` requis dans Lovable Cloud. Aucune migration.
+- « Comment ça marche » passe d'Expérience à **Mon compte** ; l'ancienne adresse redirige.
+
 ## [Recette : Emma sur Anam validée à l'écoute] — 2026-11-26
 
 - `sandbox-ulrich` : Emma en vidéo Anam avec sa voix importée dans Anam, confirmée à l'oreille (connexion 1,6 s, parole à 7,5 s, sans repli).

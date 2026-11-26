@@ -4,6 +4,7 @@ import {
   TAB_GROUPS,
   adminSessionPath,
   adminTabPath,
+  movedAdminPath,
   resolveAdminPath,
 } from "@/services/adminNavigation";
 
@@ -12,7 +13,7 @@ describe("Admin navigation invariants", () => {
     const account = TAB_GROUPS[0];
     expect(account?.id).toBe("account");
     expect(account?.path).toBe("mon-compte");
-    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide", "test-invitations"]);
+    expect(account?.tabs.map((tab) => tab.id)).toEqual(["sandbox-guide", "test-invitations", "architecture"]);
   });
 
   it("keeps every protected Technique avancée page visible", () => {
@@ -40,7 +41,7 @@ describe("Admin navigation invariants", () => {
       "video-triggers",
       "extracts",
       "video-decisions",
-      "architecture",
+      "video-import",
     ]);
     expect(TAB_GROUPS.find((group) => group.id === "quality")?.tabs.map((tab) => tab.id)).toEqual([
       "alerts",
@@ -70,6 +71,13 @@ describe("Admin navigation invariants", () => {
     expect(adminTabPath("eval-judge")).toBe("/admin/qualite/llm-as-judge");
     expect(adminTabPath("sandbox-guide")).toBe("/admin/mon-compte/mode-emploi");
     expect(adminTabPath("test-invitations")).toBe("/admin/mon-compte/invitations-de-test");
+  });
+
+  it("keeps the old address of a moved page working", () => {
+    expect(movedAdminPath("/admin/experience/fonctionnement")).toBe(adminTabPath("architecture"));
+    expect(movedAdminPath("/admin/experience/fonctionnement/")).toBe("/admin/mon-compte/fonctionnement");
+    expect(movedAdminPath("/admin/experience/extraits")).toBeNull();
+    expect(adminTabPath("video-import")).toBe("/admin/experience/importation-video");
   });
 
   it("resolves canonical pages and session detail URLs", () => {

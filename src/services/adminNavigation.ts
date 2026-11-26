@@ -6,11 +6,11 @@ export interface AdminTabGroup {
 }
 
 export const TAB_GROUPS: AdminTabGroup[] = [
-  { id: "account", path: "mon-compte", label: "👤 Mon compte", tabs: [{ id: "sandbox-guide", path: "mode-emploi", label: "Mode d'emploi" }, { id: "test-invitations", path: "invitations-de-test", label: "Invitations de test" }] },
+  { id: "account", path: "mon-compte", label: "👤 Mon compte", tabs: [{ id: "sandbox-guide", path: "mode-emploi", label: "Mode d'emploi" }, { id: "test-invitations", path: "invitations-de-test", label: "Invitations de test" }, { id: "architecture", path: "fonctionnement", label: "Comment ça marche" }] },
   { id: "data", path: "donnees", label: "📊 Données", tabs: [{ id: "sessions", path: "sessions", label: "Sessions" }, { id: "questionnaires", path: "questionnaires", label: "Questionnaires" }] },
   { id: "content", path: "contenu", label: "📚 Contenu Notion", tabs: [{ id: "sync", path: "synchronisation-notion", label: "Sync Notion" }, { id: "videos", path: "videos", label: "Vidéos" }, { id: "embeddings", path: "embeddings", label: "Embeddings" }] },
   { id: "characters", path: "personnages", label: "🎭 Personnages", tabs: [{ id: "character-editor", path: "editeur", label: "Éditeur personnage" }] },
-  { id: "experience", path: "experience", label: "🧭 Expérience", tabs: [{ id: "speech-workshop", path: "atelier-de-parole", label: "Atelier de parole" }, { id: "gamemaster", path: "orchestration", label: "Orchestration" }, { id: "gm-settings", path: "reglages-game-master", label: "Réglages GM" }, { id: "character-runtime", path: "reglages-personnages", label: "Réglages personnages" }, { id: "devices", path: "appareils", label: "Appareils" }, { id: "video-triggers", path: "cinematiques", label: "Cinématiques" }, { id: "extracts", path: "extraits", label: "Extraits" }, { id: "video-decisions", path: "decisions-video", label: "Décisions vidéo" }, { id: "architecture", path: "fonctionnement", label: "Comment ça marche" }] },
+  { id: "experience", path: "experience", label: "🧭 Expérience", tabs: [{ id: "speech-workshop", path: "atelier-de-parole", label: "Atelier de parole" }, { id: "gamemaster", path: "orchestration", label: "Orchestration" }, { id: "gm-settings", path: "reglages-game-master", label: "Réglages GM" }, { id: "character-runtime", path: "reglages-personnages", label: "Réglages personnages" }, { id: "devices", path: "appareils", label: "Appareils" }, { id: "video-triggers", path: "cinematiques", label: "Cinématiques" }, { id: "extracts", path: "extraits", label: "Extraits" }, { id: "video-decisions", path: "decisions-video", label: "Décisions vidéo" }, { id: "video-import", path: "importation-video", label: "Importation vidéo" }] },
   { id: "quality", path: "qualite", label: "📈 Qualité", tabs: [{ id: "alerts", path: "alertes", label: "Alertes" }, { id: "latency", path: "latence-et-blocages", label: "Latence & blocage" }, { id: "latency-telemetry", path: "latences-posthog", label: "Latences PostHog" }, { id: "max-test", path: "laboratoire-rag", label: "Laboratoire RAG" }, { id: "eval-judge", path: "llm-as-judge", label: "LLM as judge" }, { id: "pipeline", path: "traces-max", label: "Traces Max" }] },
   { id: "tech", path: "technique", label: "🔧 Technique avancée", tabs: [{ id: "stt", path: "configuration-stt", label: "STT Config" }, { id: "rag", path: "configuration-rag", label: "RAG Config" }, { id: "llm", path: "configuration-llm", label: "LLM Config" }, { id: "voice", path: "configuration-tts", label: "TTS Config" }, { id: "streaming-avatar", path: "configuration-avatar", label: "Streaming Avatar Config" }, { id: "usage", path: "consommation-llm", label: "Consommation LLM" }, { id: "voice-usage", path: "consommation-voix", label: "Consommation Voix" }, { id: "avatar-usage", path: "consommation-avatar", label: "Consommation Streaming Avatar" }] },
 ];
@@ -30,6 +30,11 @@ export interface AdminLocation {
 
 export const DEFAULT_ADMIN_TAB = "sessions";
 
+/** Pages that moved: their old address still opens them. */
+const MOVED_ADMIN_PATHS: Record<string, string> = {
+  "/admin/experience/fonctionnement": "/admin/mon-compte/fonctionnement",
+};
+
 export function findAdminTab(tabId: string) {
   for (const group of [...TAB_GROUPS, LEGACY_GROUP]) {
     const tab = group.tabs.find((candidate) => candidate.id === tabId);
@@ -46,6 +51,11 @@ export function adminTabPath(tabId: string): string {
 
 export function adminSessionPath(sessionId: string): string {
   return `${adminTabPath("sessions")}/${encodeURIComponent(sessionId)}`;
+}
+
+/** New address of a moved page, or null. */
+export function movedAdminPath(pathname: string): string | null {
+  return MOVED_ADMIN_PATHS[pathname.replace(/\/+$/, "")] ?? null;
 }
 
 export function resolveAdminPath(pathname: string): AdminLocation | null {

@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-22 (Début d'abonnement)
+> **Last Updated**: 2026-11-26 (Importation vidéo)
 
 ---
+
+## Les vidéos arrivent toutes seules (26 novembre 2026)
+
+Les extraits envoyés sur Gumlet devaient être recopiés un à un dans Notion : lien, titre, puis le reste. Un onglet de l'admin montre maintenant ce qui manque, avec les vignettes ; on coche, et les fiches se créent avec durée, date d'envoi et dimensions. Elles arrivent « A vérifier » : le classement et le choix de les mettre dans le jeu restent dans Notion, à la main. « Comment ça marche », peu consulté, est rangé dans Mon compte.
 
 ## Un visage qui n'improvise pas (25 novembre 2026)
 
