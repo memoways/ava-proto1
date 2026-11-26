@@ -68,7 +68,7 @@ export const BENCH_CANDIDATES: BenchCandidate[] = [
     price: { input: 0.1, output: 0.3 }, note: "plus servi par Cerebras ni Groq sur OpenRouter" },
   { id: "llama4-maverick", label: "Llama 4 Maverick (Parasail)", model: "meta-llama/llama-4-maverick", transport: "proxy",
     price: { input: 0.35, output: 1, cachedInput: 0.17 }, note: "plus servi par Cerebras ni Groq sur OpenRouter" },
-  { id: "haiku-55", label: "Claude Haiku 5.5", model: "anthropic/claude-haiku-5.5", transport: "proxy",
+  { id: "haiku-55", reasoningEffort: "none", label: "Claude Haiku 5.5", model: "anthropic/claude-haiku-5.5", transport: "proxy",
     price: { input: 0.1, output: 0.5, cachedInput: 0.01 } },
   { id: "gpt5-mini", label: "GPT-5 mini (raisonnement minimal)", model: "openai/gpt-5-mini", transport: "proxy",
     price: { input: 0.25, output: 2, cachedInput: 0.025 } },

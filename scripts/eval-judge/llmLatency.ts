@@ -16,7 +16,7 @@
  * Same session rules as the judge: sandbox only, `admin_settings` read-only,
  * cost announced before any paid call and capped (--max-cost-usd).
  */
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fail, log, openEvalSession, readArgs } from "./session";
 
@@ -32,6 +32,8 @@ const USAGE = `npm run eval:llm-latency -- [options]
   --repeats N              répétitions par prompt et par candidat (défaut 3)
   --warmup N               appels de chauffe par candidat, hors mesures (défaut 1)
   --max-cost-usd X         plafond du run (défaut 3)
+  --resume @JOURNAL        reprend un run interrompu (journal .jsonl rappelé au départ) :
+                           les appels déjà faits ne sont ni refaits ni repayés
   --dry-run                estimation seule, aucun appel payant
   --out DOSSIER            défaut output/eval-judge`;
 
@@ -67,13 +69,26 @@ async function main(): Promise<void> {
   ]);
   const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-llm`;
 
+  // A journal records every call as it ends: a crash or Ctrl-C loses nothing, `--resume` continues it.
+  const resumeArg = args.get("resume");
+  const journalFile = resumeArg
+    ? path.resolve(process.cwd(), resumeArg.replace(/^@/, ""))
+    : path.join(outDir, `llm-latency-${stamp}.jsonl`);
+  const journal = resumeArg && existsSync(journalFile)
+    ? readFileSync(journalFile, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as { type: string; promptsFile?: string; record?: import("@/services/llmLatencyBench").BenchCallRecord })
+    : [];
+  if (resumeArg && !journal.length) fail(`Journal introuvable ou vide : ${journalFile}`);
+  const journalPrompts = journal.find((entry) => entry.type === "header")?.promptsFile;
+
   // ------------------------------------------------------------- prompts
+  let promptsFile: string | null = null;
   let prompts: import("@/services/llmLatencyBench").CompiledBenchPrompt[] = [];
-  const promptsArg = args.get("prompts");
+  const promptsArg = args.get("prompts") ?? (journalPrompts ? `@${journalPrompts}` : undefined);
   if (promptsArg) {
     const file = path.resolve(process.cwd(), promptsArg.replace(/^@/, ""));
     if (!existsSync(file)) fail(`Prompts introuvables : ${file}`);
     prompts = JSON.parse(readFileSync(file, "utf8")).prompts;
+    promptsFile = file;
     log(`• ${prompts.length} prompts relus (${path.relative(process.cwd(), file)})`);
   } else {
     const live = pipeline.snapshotLiveSettings();
@@ -126,6 +141,7 @@ async function main(): Promise<void> {
       }
       mkdirSync(outDir, { recursive: true });
       const file = path.join(outDir, `llm-latency-prompts-${stamp}.json`);
+      promptsFile = file;
       writeFileSync(file, `${JSON.stringify({ environment: session.environment, model: config.model, promptVariant: config.promptVariant, prompts }, null, 2)}\n`, "utf8");
       log(`✓ Prompts enregistrés : --prompts @${path.relative(process.cwd(), file)}`);
     }
@@ -147,7 +163,13 @@ async function main(): Promise<void> {
     return false;
   });
   const promptTokens = Math.round(prompts.reduce((sum, p) => sum + bench.approxTokens(p.messages), 0) / prompts.length);
-  const estimate = bench.estimateBenchRunUsd({ candidates: runnable, prompts: prompts.length, repeats, warmup, promptTokens, completionTokens: 150 });
+  const previous = journal.flatMap((entry) => (entry.type === "record" && entry.record ? [entry.record] : []));
+  const callKey = (candidateId: string, promptId: string, repeat: number) => `${candidateId}|${promptId}|${repeat}`;
+  const done = new Set(previous.map((r) => callKey(r.candidateId, r.promptId, r.repeat)));
+  const fullEstimate = bench.estimateBenchRunUsd({ candidates: runnable, prompts: prompts.length, repeats, warmup, promptTokens, completionTokens: 150 });
+  const totalCalls = runnable.length * (prompts.length * repeats + warmup);
+  const estimate = Number((fullEstimate * Math.max(0, totalCalls - done.size) / Math.max(1, totalCalls)).toFixed(4));
+  if (previous.length) log(`• Reprise : ${previous.length} appels déjà mesurés (${journalFile}), ni refaits ni repayés`);
   log(`• ${runnable.length} candidats × ${prompts.length} prompts × ${repeats} répétitions (+ ${warmup} chauffe) = ${runnable.length * (prompts.length * repeats + warmup)} appels · ≈ ${promptTokens} tokens d'entrée`);
   for (const c of runnable) log(`  - ${c.id} · ${c.label}`);
   for (const s of skipped) log(`  ⤼ ${s}`);
@@ -160,30 +182,45 @@ async function main(): Promise<void> {
   for (const key of new Set(prompts.map((p) => p.character))) {
     contexts.set(key, (await pipeline.resolveEvalCharacterContext(key === "emma" ? "Emma" : "Max")).characterContext);
   }
-  const records: import("@/services/llmLatencyBench").BenchCallRecord[] = [];
-  let spent = 0;
+  const records: import("@/services/llmLatencyBench").BenchCallRecord[] = [...previous];
+  let spent = previous.reduce((sum, r) => sum + (r.costUsd ?? 0), 0);
+  mkdirSync(path.dirname(journalFile), { recursive: true });
+  if (!journal.length) appendFileSync(journalFile, `${JSON.stringify({ type: "header", promptsFile: promptsFile ? path.relative(process.cwd(), promptsFile) : null, environment: session.environment })}\n`, "utf8");
+  log(`• Journal : ${path.relative(process.cwd(), journalFile)} (si le run s'arrête : --resume @${path.relative(process.cwd(), journalFile)})`);
   let stop = false;
   process.on("SIGINT", () => { if (stop) process.exit(130); stop = true; log("\n⏸ Arrêt demandé : fin de l'appel en cours."); });
 
   const callOnce = async (candidate: import("@/services/llmLatencyBench").BenchCandidate, prompt: typeof prompts[number]) => {
     const sampling = { ...getSupportedSamplingParameters(candidate.model, prompt.sampling.temperature, prompt.sampling.top_p), max_tokens: prompt.sampling.max_tokens };
+    const failed = (error: unknown, headersMs: number | null = null): import("@/services/llmLatencyBench").BenchCallMetrics => ({
+      ok: false, error: error instanceof Error ? error.message : String(error), headersMs, firstTokenMs: null, firstSentenceMs: null, totalMs: null,
+      intentValid: false, parserError: null, finishReason: null, speech: "", provider: null, resolvedModel: null, usage: null,
+    });
     for (let attempt = 1; ; attempt += 1) {
       const startedAt = performance.now();
+      // Hard bound per call (a sleeping laptop or a stalled provider must not hang the run).
+      const signal = AbortSignal.timeout(45_000);
       let response: Response;
+      try {
       if (candidate.transport === "direct") {
         const request = bench.buildDirectBenchRequest(prompt.messages, candidate, sampling, env)!;
-        response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
+        response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body), signal });
       } else {
         response = await authenticatedFunctionFetch(proxyUrl, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" }, signal,
           body: JSON.stringify(bench.buildProxyBenchBody(prompt.messages, candidate, sampling, 18_000)),
         });
+      }
+      } catch (error) {
+        // Network failure: recorded as a failed call, the run goes on.
+        if (attempt <= 2) { log(`  ⏳ ${error instanceof Error ? error.message : String(error)} : nouvel essai dans 10 s`); await sleep(10_000); continue; }
+        return failed(error);
       }
       const headersAt = performance.now();
       if (response.status === 429 && attempt <= 3) { log("  ⏳ 429 : attente 20 s"); await sleep(20_000); continue; }
       if (!response.ok || !response.body) {
         const detail = (await response.text().catch(() => "")).slice(0, 200);
-        return { ok: false, error: `HTTP ${response.status} ${detail}`, headersMs: Math.round(headersAt - startedAt), firstTokenMs: null, firstSentenceMs: null, totalMs: null, intentValid: false, parserError: null, finishReason: null, speech: "", provider: null, resolvedModel: null, usage: null } satisfies import("@/services/llmLatencyBench").BenchCallMetrics;
+        return failed(`HTTP ${response.status} ${detail}`, Math.round(headersAt - startedAt));
       }
       const metrics = await bench.measureLlmStream({
         body: response.body, startedAt, headersAt, now: () => performance.now(), chunkTimeoutMs: 20_000,
@@ -200,14 +237,19 @@ async function main(): Promise<void> {
     const costUsd = billed ?? (usage?.promptTokens != null
       ? bench.estimateCallCostUsd(candidate.price, usage.promptTokens, usage.completionTokens ?? 0, usage.cachedTokens ?? 0) : null);
     spent += costUsd ?? 0;
-    records.push({ candidateId: candidate.id, promptId: prompt.id, character: prompt.character, repeat, warmup: isWarmup || undefined, metrics, costUsd, costEstimated: billed === null });
+    const entry = { candidateId: candidate.id, promptId: prompt.id, character: prompt.character, repeat, warmup: isWarmup || undefined, metrics, costUsd, costEstimated: billed === null };
+    records.push(entry);
+    appendFileSync(journalFile, `${JSON.stringify({ type: "record", record: entry })}\n`, "utf8");
     const t = (v: number | null) => (v === null ? "–" : `${(v / 1000).toFixed(2)}s`);
     log(`  ${isWarmup ? "chauffe" : `r${repeat}`} ${candidate.id} ${prompt.id.slice(0, 8)} · 1er token ${t(metrics.firstTokenMs)} · phrase ${t(metrics.firstSentenceMs)} · fin ${t(metrics.totalMs)}${metrics.intentValid ? "" : " · intent ✗"}${usage?.cachedTokens ? ` · cache ${usage.cachedTokens}` : ""}${metrics.error ? ` · ✖ ${metrics.error}` : ""}`);
     if (spent > capUsd) { stop = true; log(`✖ Plafond atteint (${spent.toFixed(3)} $) : arrêt.`); }
   };
 
   for (const candidate of runnable) {
-    for (let w = 0; w < warmup && !stop; w += 1) await record(candidate, prompts[w % prompts.length], 0, true);
+    for (let w = 0; w < warmup && !stop; w += 1) {
+      const prompt = prompts[w % prompts.length];
+      if (!done.has(callKey(candidate.id, prompt.id, 0))) await record(candidate, prompt, 0, true);
+    }
   }
   // Repeat-major order: for one candidate, its first repeat walks every question
   // of a character in a row (realistic cross-question cache), later repeats replay them.
@@ -215,6 +257,7 @@ async function main(): Promise<void> {
     for (const candidate of runnable) {
       for (const prompt of prompts) {
         if (stop) break;
+        if (done.has(callKey(candidate.id, prompt.id, repeat))) continue;
         await record(candidate, prompt, repeat, false);
       }
     }
@@ -227,7 +270,7 @@ async function main(): Promise<void> {
   writeFileSync(rawFile, `${JSON.stringify({ environment: session.environment, repeats, warmup, candidates: runnable, records, summaries, stability }, null, 2)}\n`, "utf8");
   writeFileSync(path.join(outDir, `llm-latency-${stamp}.md`), report, "utf8");
   process.stdout.write(report);
-  log(`✓ ${records.length} appels · ${spent.toFixed(3)} $ · ${path.relative(process.cwd(), rawFile)}`);
+  log(`${stop ? "⏸ Run incomplet" : "✓ Terminé"} · ${records.length} appels · ${spent.toFixed(3)} $ · ${path.relative(process.cwd(), rawFile)}${stop ? ` · reprise : --resume @${path.relative(process.cwd(), journalFile)}` : ""}`);
   if (session.blockedSettingsWrites.length) log(`ℹ ${session.blockedSettingsWrites.length} écriture(s) admin_settings refusée(s)`);
   await session.close();
 }
