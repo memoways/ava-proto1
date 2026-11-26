@@ -9,6 +9,11 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Premier appel réel : 103 vidéos Gumlet, 17 déjà dans Notion, 86 à importer. Aucune fiche créée.
 - Lot 2 cadré (toutes les vidéos, importées grisées, nombre de lectures), non commencé. Documentation seulement.
 
+## [Plan : latence conversationnelle] — 2026-11-26
+
+- Documentation seulement : plan en 5 lots pour réduire le délai entre la fin de parole et la réponse de l'avatar (voix seule en flux, banc d'essai LLM, adoption du modèle, LLM streamé sur toutes les sorties, fin de parole plus courte), avec mesures de référence et garde-fous (interruption, mémoire longue, qualité).
+- Prompt de reprise du lot 1. Aucun code, aucun réglage modifié.
+
 ## [Importation vidéo depuis Gumlet] — 2026-11-26
 
 - Admin › Expérience › **Importation vidéo** : liste les vidéos Gumlet absentes de « Vidéos AVA » (vignette, durée, date, dimensions, dossier, tags), sélection multiple, recherche, filtre par dossier, valeurs communes Nature / Dialogue / Personnages.
