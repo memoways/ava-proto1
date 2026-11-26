@@ -18,6 +18,9 @@ import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
 import { createElevenLabsStreamingPlayback, resolveMp3MediaSource } from "@/services/tts/elevenLabsStreamPlayer";
+import { createElevenLabsPcmPlayback } from "@/services/tts/elevenLabsPcmPlayer";
+import { openElevenLabsPcmStream } from "@/services/tts/elevenLabsPcmStream";
+import { getSharedAudioContext, isMediaElementAutoplayBlocked } from "@/services/audioPlayback";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -157,14 +160,25 @@ export const elevenLabsProvider: TTSProvider = {
   },
 
   /**
-   * Progressive MP3 playback (L1.1). Workshop auditions keep the blob path (they
-   * capture the exact audio), the scripted opening keeps its blob cache, and
-   * non-MP3 formats or engines without MediaSource MP3 return null.
+   * Progressive playback. Workshop auditions keep the blob path (they capture the
+   * exact audio), the scripted opening keeps its blob cache, non-MP3 formats return
+   * null. MP3 streams into a MediaSource (L1.1); where that cannot play (no
+   * MediaSource MP3, or iPhone once `<audio>` was refused), raw PCM streams into
+   * the shared AudioContext instead of waiting for the whole MP3 (latency lot 1).
    */
   createStreamingPlayback(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null {
     if (ctx?.speechAudition || ctx?.auditionModelId || ctx?.onAuditionRequest
       || (ctx as { cacheOpening?: boolean } | undefined)?.cacheOpening) return null;
-    if (!getTTSSettings().outputFormat.startsWith("mp3_") || !resolveMp3MediaSource()) return null;
+    if (!getTTSSettings().outputFormat.startsWith("mp3_")) return null;
+    if (!resolveMp3MediaSource() || isMediaElementAutoplayBlocked()) {
+      if (!getSharedAudioContext() || typeof ReadableStream === "undefined") return null;
+      const { modelId } = buildElevenLabsRequest(text, ctx);
+      return createElevenLabsPcmPlayback(ctx, {
+        model: modelId,
+        openStream: (signal) => openElevenLabsPcmStream(text, ctx ?? {}, signal, { recordTelemetry: false }),
+        generateBlob: () => elevenLabsProvider.generate(text, ctx),
+      });
+    }
     const { body, modelId, label } = buildElevenLabsRequest(text, ctx);
     return createElevenLabsStreamingPlayback(ctx, {
       model: modelId,
