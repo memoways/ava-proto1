@@ -36,6 +36,7 @@ import LLMUsageTab from "@/components/admin/LLMUsageTab";
 import VoiceUsageTab from "@/components/admin/VoiceUsageTab";
 import StreamingAvatarUsageTab from "@/components/admin/StreamingAvatarUsageTab";
 import VideosListTab from "@/components/admin/VideosListTab";
+import VideoImportTab from "@/components/admin/VideoImportTab";
 import StreamingAvatarConfigTab from "@/components/StreamingAvatarConfigTab";
 import AlertsTab from "@/components/admin/AlertsTab";
 import SandboxGuideTab from "@/components/admin/SandboxGuideTab";
@@ -58,6 +59,7 @@ import {
   adminSessionPath,
   adminTabPath,
   findAdminTab,
+  movedAdminPath,
   resolveAdminPath,
 } from "@/services/adminNavigation";
 import {
@@ -177,7 +179,8 @@ export default function Admin() {
       return;
     }
     if (!pathLocation) {
-      navigate({ pathname: adminTabPath(DEFAULT_ADMIN_TAB), search: searchParams.toString() }, { replace: true });
+      const pathname = movedAdminPath(location.pathname) ?? adminTabPath(DEFAULT_ADMIN_TAB);
+      navigate({ pathname, search: searchParams.toString() }, { replace: true });
     }
   }, [legacyTab, location.pathname, navigate, pathLocation, requestedLocation, searchParams]);
 
@@ -537,6 +540,10 @@ export default function Admin() {
             <TestInvitationsTab />
           </TabsContent>
 
+          <TabsContent value="architecture">
+            <ExperienceArchitectureTab />
+          </TabsContent>
+
           {/* ==================== SESSIONS ==================== */}
           <TabsContent value="sessions">
             {sessionLoadError && <p role="alert" className="text-sm text-destructive">{sessionLoadError}. L’historique affiché peut être incomplet.</p>}
@@ -624,10 +631,6 @@ export default function Admin() {
             {activeTab === "speech-workshop" && <SpeechIntentWorkshop />}
           </TabsContent>
 
-          <TabsContent value="architecture">
-            <ExperienceArchitectureTab />
-          </TabsContent>
-
           <TabsContent value="gamemaster">
             <GameMasterConfigTab />
           </TabsContent>
@@ -654,6 +657,10 @@ export default function Admin() {
 
           <TabsContent value="video-decisions">
             {activeTab === "video-decisions" && <VideoDecisionsTab />}
+          </TabsContent>
+
+          <TabsContent value="video-import">
+            {activeTab === "video-import" && <VideoImportTab />}
           </TabsContent>
 
 
