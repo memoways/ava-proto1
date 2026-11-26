@@ -275,6 +275,13 @@ export type MaxLlmOverrides = {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+} & {
+  /** OpenRouter provider preference sent to proxy-llm (`provider`); evaluation only. */
+  provider?: { sort?: "latency" | "throughput" | "price"; only?: string[]; order?: string[]; allow_fallbacks?: boolean };
+  /** proxy-llm `reasoning_effort` (gpt-oss, Claude Haiku 5.5…); evaluation only. */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+  /** proxy-llm `disable_reasoning` (Gemini 2.5 Flash / Flash-Lite); evaluation only. */
+  disableReasoning?: boolean;
 };
 
 type MaxPromptVariant = ReturnType<typeof getGameplaySettings>["MAX_PROMPT_VARIANT"];
@@ -360,6 +367,10 @@ export async function simulateMaxResponse(
       top_p: topP,
       timeoutMs: opts?.timeoutMs,
       signal: opts?.signal,
+      // Latency lot 2: evaluation-only routing and reasoning levers; absent in play.
+      ...(opts?.llmOverrides?.provider ? { provider: opts.llmOverrides.provider } : {}),
+      ...(opts?.llmOverrides?.reasoningEffort ? { reasoningEffort: opts.llmOverrides.reasoningEffort } : {}),
+      ...(opts?.llmOverrides?.disableReasoning ? { disableReasoning: true } : {}),
       feature_key: opts?.featureKey || "max_prompt_test",
       session_id: input.session_id,
       diagnostic_trace: opts?.diagnosticTrace === true,
