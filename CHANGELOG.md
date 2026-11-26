@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 1 : voix seule en flux PCM là où le MP3 ne peut pas] — 2026-11-26
+
+- Voix seule ElevenLabs : sur un navigateur sans MediaSource MP3, ou sur iPhone une fois `<audio>` refusé hors geste, la réponse ne s'entend plus seulement après réception du MP3 complet (≈ 2 s mesurées). Le flux `pcm_24000` déjà utilisé pour Tavus est joué au fil de l'arrivée sur l'AudioContext partagé.
+- Repli sur le chemin actuel (requête REST ou PCM reçu lu en WAV) si rien n'a encore été joué ; interruption immédiate (fetch abandonné, sources arrêtées). Le flux MP3 MediaSource reste inchangé là où il marche.
+- Télémétrie : transport `http_stream_pcm`, `first_audio_chunk` et `audio_scheduled` sur ce chemin. Aucune migration, aucun réglage modifié.
+
 ## [Importation Gumlet : liste réelle et lot 2 préparé] — 2026-11-26
 
 - Premier appel réel : 103 vidéos Gumlet, 17 déjà dans Notion, 86 à importer. Aucune fiche créée.

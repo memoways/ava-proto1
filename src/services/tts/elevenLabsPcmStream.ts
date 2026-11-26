@@ -71,7 +71,10 @@ export async function openElevenLabsPcmStream(
   text: string,
   ctx: ElevenLabsPcmStreamContext,
   signal: AbortSignal,
+  options: { recordTelemetry?: boolean } = {},
 ): Promise<AsyncGenerator<Uint8Array, void, void> | null> {
+  // Local playback (lot 1) reports through `tryCreateStreamingPlayback` instead.
+  const recordTelemetry = options.recordTelemetry ?? true;
   const { body, modelId, label } = buildElevenLabsRequest(text, ctx);
   const pcmBody = { ...body, outputFormat: ELEVENLABS_PCM_STREAM_FORMAT };
   const startTime = Date.now();
@@ -83,6 +86,7 @@ export async function openElevenLabsPcmStream(
   if (!reader) return null;
   const tFirstByte = performance.now();
   const record = (error: unknown) => {
+    if (!recordTelemetry) return;
     const statusCode = (error as { statusCode?: number } | null)?.statusCode;
     const message = error instanceof Error ? error.message : String(error ?? "");
     recordAudioLatency({
@@ -126,7 +130,7 @@ export async function openElevenLabsPcmStream(
       }
       completed = true;
       observeVoice(ctx.onVoiceObservation, "audio_blob_ready");
-      observeService(ctx.onServiceObserved, {
+      if (recordTelemetry) observeService(ctx.onServiceObserved, {
         service: "tts", requested_provider: ctx.providerId ?? "elevenlabs", requested_model: modelId,
         resolved_provider: "elevenlabs", resolved_model: modelId,
         effective_provider: "elevenlabs", effective_model: modelId,

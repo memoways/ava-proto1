@@ -1,7 +1,7 @@
 # Plan — Réduire la latence conversationnelle d'Ava (LLM, TTS, orchestration)
 
 Tâche Notion : [Réduire la latence conversationnelle AVA — LLM, TTS et orchestration](https://app.notion.com/p/18662322e59582878b6381b14558d632) (Gamilab, 🔥🔥🔥🔥).
-Statut (26 novembre 2026) : **plan enregistré, aucun lot commencé.** Reprise : [prompt du lot 1](prompt_reprise_latence_conversationnelle_lot_1.md).
+Statut (26 novembre 2026) : **lot 1 livré (code), mesure après synchro Lovable à faire par Ulrich ; lot 2 non commencé.** Reprise : [prompt du lot 2](prompt_reprise_latence_conversationnelle_lot_2.md).
 Règle : **un lot à la fois**. Chaque lot est livré selon le contrat d'Ava, puis s'arrête avec le prompt de reprise du lot suivant ; le lot suivant ne commence que sur nouvelle demande d'Ulrich.
 Historique utile : [analyse Tavus T1-T9](analyse_latence_tavus_20261119.md), [évaluation du LLM streamé](evaluation_llm_streame_vers_tts.md).
 
@@ -52,6 +52,25 @@ Le chronomètre ne compte pas la fin de parole avant la décision : 0,9 s de sil
 2. Correction : la première ligne part en flux comme pour Tavus en T1. On réutilise `elevenLabsPcmStream.ts` (`pcm_24000`, déjà éprouvé) ou le flux MP3 MediaSource existant. La réponse est découpée en phrases pour que la première phrase parte seule, en réutilisant `chunkTextForTTS` avec une première tranche courte. Les lignes suivantes sont préchargées. Repli sur le chemin actuel si le flux échoue avant le premier octet. `abort` en cas d'interruption.
 3. Tests : flux et repli, interruption pendant le flux, ordre des lignes, Gradium et autres fournisseurs inchangés (`tts/queue.test.ts`, `elevenLabsStreamPlayer.test.ts`, `textChunking.test.ts`, `localTtsOutput`).
 4. Mesure sandbox-ulrich, au moins 10 tours en voix seule. Visé : écart réponse → son ≤ 0,6 s, premier son médian ≤ 3,8 s, aucun repli supplémentaire, écoute d'Ulrich (pas de coupure entre phrases).
+
+**Résultat du lot 1 (26 nov., livré en code, mesure réelle à faire)**
+
+Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, écart = `output_estimated` − `llm_response`) :
+
+| Environnement, appareil | Transport TTS | n | Écart réponse → son | Premier son |
+|---|---|---|---|---|
+| sandbox-ulrich, ordinateur | `http_stream` (MP3 MediaSource) | 22 | 0,42 s | 3,47 s |
+| sandbox-benoit, ordinateur | `http_stream` | 10 | 0,43 s | 3,34 s |
+| sandbox-romed, ordinateur | `rest` (blob complet) | 70 | **2,35 s** | 5,34 s |
+| sandbox-ulrich, iPhone | `rest_fallback` (blob complet) | 18 | **1,94 s** | 5,00 s |
+
+- Le flux MP3 MediaSource (L1.1) marche déjà où il est possible : 0,42 s d'écart, premier octet à 0,37 s. La médiane de 2,0 s venait de deux cas où il ne l'est pas : un navigateur sans MediaSource MP3 (`createStreamingPlayback` rend null, donc blob REST), et l'iPhone une fois `<audio>` refusé hors geste (le blob passe par Web Audio après la réception complète).
+- Correctif : `src/services/tts/elevenLabsPcmPlayer.ts` lit le flux `pcm_24000` de T1 (`openElevenLabsPcmStream`) et le programme sur l'AudioContext partagé au fil de l'arrivée (pré-tampon 200 ms, re-tampon 120 ms, tranches de 100 ms contiguës). `providers/elevenlabs.ts` le choisit seulement quand le MP3 MediaSource n'est pas utilisable ; ailleurs, rien ne change. Aucun troisième mécanisme réseau : même flux PCM que Tavus.
+- Repli : échec avant tout son (requête, flux coupé, flux vide), alors une requête REST et la lecture du blob actuel ; AudioContext refusé, alors le PCM reçu est lu en un WAV. Après le premier son, une coupure est signalée, jamais rejouée. `cancel()` abandonne le fetch et arrête les sources (barge-in, `TTSQueue.cancel`).
+- Télémétrie : `first_audio_chunk`, `audio_scheduled`, `audio_blob_ready` et transport `http_stream_pcm` (service et `audio_latency`), visibles dans Qualité › Latence.
+- Première tranche courte **non appliquée** : avec le flux, le premier son ne dépend pas de la longueur de la ligne (0,42 s mesuré en MSE avec les lignes actuelles jusqu'à 900 car.). Couper davantage aurait changé la prosodie et l'enchaînement sans gain mesurable.
+- Tests : `elevenLabsPcmPlayer.test.ts` (11 cas : flux contigu, pré-tampon, ouverture différée, repli avant premier octet, pas de repli sur erreur client, coupure après le son, annulation, signal parent, contexte suspendu, flux vide) et `providers/elevenlabs.streaming.test.ts` (choix MSE ou PCM ou blob).
+- À mesurer après fusion et synchro Lovable (Ulrich) : au moins 10 tours voix seule sur iPhone (sandbox-ulrich) et sur le poste de sandbox-romed. Visé : transport `http_stream_pcm`, écart ≤ 0,6 s, premier son médian ≤ 3,8 s, aucun repli supplémentaire, aucune coupure entendue entre phrases.
 
 ### Lot 2 — Banc d'essai LLM (mesure seule, aucun changement de réglage)
 
