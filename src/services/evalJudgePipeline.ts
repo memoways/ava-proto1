@@ -81,6 +81,12 @@ export interface EvalTurnExtras {
   gmMode?: GmMode;
   /** Lot B: analysis priority levels of the replay (merged over the pinned ones); absent = as pinned. */
   priorityLevels?: PriorityLevels;
+  /** Latency lot 2: OpenRouter provider preference of the character call (e.g. { only: ["cerebras"] }). */
+  provider?: { sort?: "latency" | "throughput" | "price"; only?: string[]; order?: string[]; allow_fallbacks?: boolean };
+  /** Latency lot 2: reasoning effort of the character call (gpt-oss, Claude Haiku 5.5 think by default). */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+  /** Latency lot 2: reasoning off for Gemini 2.5 Flash / Flash-Lite, as in the bench. */
+  disableReasoning?: boolean;
 }
 
 export interface EvalTurnConfig extends EvalLiveSnapshot, EvalTurnExtras {
@@ -231,6 +237,26 @@ export function parseSnapshotOverrides(raw: string): { overrides: EvalSnapshotOv
     if (invalid) errors.push("priorityLevels doit être un objet { narrative_continuity, player_engagement, safety, pace } de niveaux entiers 0 à 3");
     else overrides.priorityLevels = normalizePriorityLevels(rawLevels, undefined);
   }
+  if ("provider" in value) {
+    const raw = value.provider;
+    const provider = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    const slugs = (list: unknown) => Array.isArray(list) && list.every((item) => typeof item === "string" && /^[a-z0-9][a-z0-9._/-]{0,63}$/i.test(item));
+    const valid = provider && Object.keys(provider).every((key) => ["sort", "only", "order", "allow_fallbacks"].includes(key))
+      && (provider.sort === undefined || ["latency", "throughput", "price"].includes(provider.sort as string))
+      && (provider.only === undefined || slugs(provider.only)) && (provider.order === undefined || slugs(provider.order))
+      && (provider.allow_fallbacks === undefined || typeof provider.allow_fallbacks === "boolean");
+    if (valid) overrides.provider = provider as EvalSnapshotOverrides["provider"];
+    else errors.push("provider doit être { sort?, only?, order?, allow_fallbacks? } (préférence OpenRouter)");
+  }
+  if ("reasoningEffort" in value) {
+    if (typeof value.reasoningEffort === "string" && ["none", "minimal", "low", "medium", "high"].includes(value.reasoningEffort)) {
+      overrides.reasoningEffort = value.reasoningEffort as EvalSnapshotOverrides["reasoningEffort"];
+    } else errors.push("reasoningEffort doit être none, minimal, low, medium ou high");
+  }
+  if ("disableReasoning" in value) {
+    if (typeof value.disableReasoning === "boolean") overrides.disableReasoning = value.disableReasoning;
+    else errors.push("disableReasoning doit être true ou false");
+  }
   if ("situationSummarySource" in value && typeof value.situationSummarySource === "string" && value.situationSummarySource.trim()) {
     overrides.situationSummarySource = value.situationSummarySource.trim().slice(0, 80);
   }
@@ -264,7 +290,7 @@ function describeOverrides(live: EvalSnapshotWithExtras, snapshot: EvalSnapshotW
   const changed = (Object.keys(snapshot) as Array<keyof EvalSnapshotWithExtras>)
     .filter((key) => key !== "promptVariant" && key !== "situationSummaries" && key !== "situationSummarySource"
       && key !== "priorityLevels" && snapshot[key] !== live[key])
-    .map((key) => `${key}=${String(snapshot[key])}`);
+    .map((key) => `${key}=${typeof snapshot[key] === "object" ? JSON.stringify(snapshot[key]) : String(snapshot[key])}`);
   if (snapshot.priorityLevels && JSON.stringify(snapshot.priorityLevels) !== JSON.stringify(live.priorityLevels)) {
     changed.push(`priorités ${PRIORITY_KEYS.map((key) => snapshot.priorityLevels![key]).join("/")}`);
   }
@@ -779,6 +805,9 @@ export function buildEvalTurnOverrides(config: EvalTurnConfig, characterKey: Run
       temperature: config.temperature,
       maxTokens: config.maxTokens,
       topP: config.topP,
+      ...(config.provider ? { provider: config.provider } : {}),
+      ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
+      ...(config.disableReasoning ? { disableReasoning: true } : {}),
     },
   };
 }

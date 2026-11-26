@@ -174,7 +174,7 @@ export interface PRD4TurnInput {
       temperature: number;
       maxTokens: number;
       topP: number;
-    };
+    } & import("@/agents/maxAgent").MaxLlmOverrides;
   };
 }
 

@@ -15,7 +15,8 @@ import path from "node:path";
 import { fail, log, openEvalSession, readArgs } from "./session";
 
 const USAGE = `npm run eval:llm-recall -- --models a,b [options]
-  --models a,b             modèles OpenRouter du personnage (défaut : modèle réglé)
+  --models a,b             modèles OpenRouter, ou candidats du banc (oss-cerebras, gemini-25-flash,
+                           luna-latency…) joués avec leur routage et leur raisonnement (défaut : modèle réglé)
   --character all|max|emma conversations jouées (défaut all)
   --scenario FICHIER       défaut docs/eval/rappel_long_v1.json
   --env SANDBOX            défaut sandbox-ulrich (prod refusé)
@@ -57,20 +58,27 @@ async function main(): Promise<void> {
   const topP = Number(args.get("top-p") ?? 0.95);
   if (!Number.isFinite(temperature) || !Number.isFinite(topP)) fail("--temperature et --top-p doivent être des nombres");
   const models = (args.get("models")?.split(",").map((m) => m.trim()).filter(Boolean)) ?? [liveSnapshot.model];
-  const configs = models.map((model) => {
-    const compare = runner.buildCompareConfigs(liveSnapshot, { variant: "optimized_v3", snapshotJson: "" }, { variant: "optimized_v3", snapshotJson: JSON.stringify({ model, temperature, topP }) });
+  const configs = models.map((name) => {
+    // A bench candidate id (oss-cerebras, gemini-25-flash…) plays the model the way the bench measured it.
+    const bench = BENCH_CANDIDATES.find((c) => c.id === name && c.transport === "proxy");
+    const model = bench?.model ?? name;
+    const snapshot = { model, temperature, topP,
+      ...(bench?.provider ? { provider: bench.provider } : {}),
+      ...(bench?.reasoningEffort ? { reasoningEffort: bench.reasoningEffort } : {}),
+      ...(bench?.disableReasoning ? { disableReasoning: true } : {}) };
+    const compare = runner.buildCompareConfigs(liveSnapshot, { variant: "optimized_v3", snapshotJson: "" }, { variant: "optimized_v3", snapshotJson: JSON.stringify(snapshot) });
     if (compare.errors.length) fail(`Modèle invalide ${model} : ${compare.errors.join(" ; ")}`);
-    return { model, config: compare.configs[1] };
+    return { model: bench ? `${model} (${bench.id})` : model, config: compare.configs[1] };
   });
 
   const turns = conversations.reduce((sum, c) => sum + c.turns.length, 0);
   let estimate = 0;
   for (const { model } of configs) {
-    const price = BENCH_CANDIDATES.find((c) => c.model === model)?.price ?? { input: 1, output: 3 };
+    const price = BENCH_CANDIDATES.find((c) => model.startsWith(c.model))?.price ?? { input: 1, output: 3 };
     estimate += recall.estimateRecallRunUsd(turns, price);
   }
   log(`• ${configs.length} modèles × ${conversations.length} conversations (${turns} tours) · estimation ${estimate.toFixed(2)} $ (personnage + GM, sans juge) · plafond ${capUsd.toFixed(2)} $`);
-  for (const { model, config } of configs) log(`  - ${model} · ${config.promptVariant} · T=${config.temperature} · ${config.maxTokens} tokens`);
+  for (const { model, config } of configs) log(`  - ${model} · ${config.label}`);
   if (estimate > capUsd) fail("Estimation au-dessus du plafond.", 2);
   if (args.has("dry-run")) { log("✓ --dry-run : aucun appel payant."); await session.close(); return; }
 

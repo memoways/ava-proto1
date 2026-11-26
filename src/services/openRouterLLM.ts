@@ -37,6 +37,10 @@ interface LLMOptions {
   reasoning?: boolean;
   /** Opt-in: reasoning off even for models that think by default (latency-bound calls only). */
   disableReasoning?: boolean;
+  /** Latency lot 2, evaluation only: OpenRouter provider preference forwarded to proxy-llm. */
+  provider?: Record<string, unknown>;
+  /** Latency lot 2, evaluation only: proxy-llm `reasoning_effort`. */
+  reasoningEffort?: string;
   /** Return the exact sanitized proxy/upstream payload for an admin diagnostic session. */
   diagnostic_trace?: boolean;
 }
@@ -126,7 +130,10 @@ export async function streamLLM(
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
         body: JSON.stringify({ messages, stream: true, model, ...samplingParameters,
           max_tokens: options?.max_tokens, timeout_ms: timeoutMs,
-          reasoning: options?.reasoning ?? isReasoningEnabledForModel(model) }),
+          reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
+          ...(options?.disableReasoning === true ? { disable_reasoning: true } : {}),
+          ...(options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+          ...(options?.provider ? { provider: options.provider } : {}) }),
       }), timeoutMs, () => controller.abort());
     observeVoice(options?.onVoiceObservation, "llm_headers");
     if (!response.ok) throw new Error(`LLM error: ${response.status}`);
@@ -224,6 +231,8 @@ export async function callLLMWithUsage(
         timeout_ms: timeoutMs,
         reasoning: options?.reasoning ?? isReasoningEnabledForModel(model),
         ...(options?.disableReasoning === true ? { disable_reasoning: true } : {}),
+        ...(options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+        ...(options?.provider ? { provider: options.provider } : {}),
         diagnostic_trace: options?.diagnostic_trace === true,
       },
       timeoutMs,
