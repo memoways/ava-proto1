@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 2 : résultats du banc] — 2026-11-26
+
+- Documentation seulement : résultats du banc complet (434 appels, 0 erreur, 0,71 $) dans `docs/eval/banc_llm_latence_20261126.md`, le plan et l'état courant.
+
 ## [Latence lot 2 : banc robuste et Claude Haiku] — 2026-11-26
 
 - Banc : chaque appel est écrit dans un journal ; `--resume @journal` reprend un run interrompu sans refaire ni repayer ; une erreur réseau compte comme un échec au lieu d'arrêter le run ; délai maximal de 45 s par appel.
