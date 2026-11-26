@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Importation Gumlet : liste réelle et lot 2 préparé] — 2026-11-26
+
+- Premier appel réel : 103 vidéos Gumlet, 17 déjà dans Notion, 86 à importer. Aucune fiche créée.
+- Lot 2 cadré (toutes les vidéos, importées grisées, nombre de lectures), non commencé. Documentation seulement.
+
 ## [Importation vidéo depuis Gumlet] — 2026-11-26
 
 - Admin › Expérience › **Importation vidéo** : liste les vidéos Gumlet absentes de « Vidéos AVA » (vignette, durée, date, dimensions, dossier, tags), sélection multiple, recherche, filtre par dossier, valeurs communes Nature / Dialogue / Personnages.
