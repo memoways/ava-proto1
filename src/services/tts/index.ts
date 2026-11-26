@@ -244,6 +244,7 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           status_code: stats.statusCode ?? 200,
           error_type: "ok",
           transport: stats.transport,
+          fallback_reason: stats.fallbackReason ?? null,
           performance_emotion: opts?.performance?.emotion ?? null,
           performance_source: opts?.performance?.source ?? null,
           performance_speech_state: opts?.performance?.speechState ?? null,

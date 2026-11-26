@@ -119,7 +119,7 @@ describe("ElevenLabs PCM playback through Web Audio (latency lot 1)", () => {
     handle.open();
     await handle.started;
     await handle.finished;
-    expect((await handle.generationDone).transport).toBe("rest_fallback");
+    expect(await handle.generationDone).toMatchObject({ transport: "rest_fallback", fallbackReason: "pcm: Error: 502" });
     expect(generateBlob).toHaveBeenCalledTimes(1);
     expect(playBlob).toHaveBeenCalledTimes(1);
     expect(audio.sources).toHaveLength(0);
