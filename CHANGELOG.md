@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 2 : banc d'essai LLM et test de rappel long] — 2026-11-26
+
+- `npm run eval:llm-latency` : compile les vrais prompts de Max et Emma (corpus `eval:judge`, `optimized_v3`, appel au personnage intercepté avant l'envoi), puis les rejoue en flux via `proxy-llm` pour 14 candidats OpenRouter (et Cerebras, Groq, Google en direct si leurs clés sont fournies) : premier token, première phrase sûre, fin, intent valide, tokens en cache et de raisonnement, coût ; médiane et p90, stabilité du préfixe. Coût annoncé et plafonné avant tout appel.
+- `npm run eval:llm-recall` : scénario de 40 tours par personnage (`docs/eval/rappel_long_v1.json`), faits donnés tôt et redemandés tard, rejoué avec la vraie mémoire structurée ; notation lexicale, sans juge.
+- `proxy-llm` : champ `provider` facultatif et filtré (préférence de fournisseur OpenRouter), envoyé par le banc seulement ; payload inchangé pour Ava. À redéployer par Lovable.
+- Rapport `docs/eval/banc_llm_latence_20261126.md` (échantillon mesuré, runs complets à lancer). Aucun réglage modifié, aucune migration.
+
 ## [Latence lot 1 : voix seule en flux PCM là où le MP3 ne peut pas] — 2026-11-26
 
 - Voix seule ElevenLabs : sur un navigateur sans MediaSource MP3, ou sur iPhone une fois `<audio>` refusé hors geste, la réponse ne s'entend plus seulement après réception du MP3 complet (≈ 2 s mesurées). Le flux `pcm_24000` déjà utilisé pour Tavus est joué au fil de l'arrivée sur l'AudioContext partagé.

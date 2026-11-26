@@ -12,6 +12,30 @@ export interface OpenRouterPayloadInput {
    * payload is unchanged for every other caller.
    */
   disable_reasoning?: boolean;
+  /**
+   * Opt-in OpenRouter provider preference (latency bench, lot 2). Sanitized by
+   * `sanitizeProviderPreference`; absent for every Ava caller, so their payload is unchanged.
+   */
+  provider?: unknown;
+}
+
+const PROVIDER_SORTS = new Set(["latency", "throughput", "price"]);
+const PROVIDER_SLUG = /^[a-z0-9][a-z0-9._/-]{0,63}$/i;
+
+/** Keeps only `sort`, `only`, `order` and `allow_fallbacks`, with bounded values; null when nothing valid. */
+export function sanitizeProviderPreference(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof value.sort === "string" && PROVIDER_SORTS.has(value.sort)) out.sort = value.sort;
+  for (const key of ["only", "order"] as const) {
+    const list = value[key];
+    if (!Array.isArray(list)) continue;
+    const slugs = list.filter((item): item is string => typeof item === "string" && PROVIDER_SLUG.test(item)).slice(0, 8);
+    if (slugs.length) out[key] = slugs;
+  }
+  if (typeof value.allow_fallbacks === "boolean") out.allow_fallbacks = value.allow_fallbacks;
+  return Object.keys(out).length ? out : null;
 }
 
 /** Gemini 2.5 Flash / Flash-Lite think by default and can turn it off; Pro cannot (left untouched). */
@@ -56,7 +80,8 @@ export function buildOpenRouterPayload(body: OpenRouterPayloadInput) {
   } else if (forceReasoningOff && GEMINI_FLASH_THINKING.test(model)) {
     upstreamBody.reasoning = { enabled: false, exclude: true };
   }
-
+  const provider = sanitizeProviderPreference(body.provider);
+  if (provider) upstreamBody.provider = provider;
 
   return { model, temperature, max_tokens, top_p, stream, upstreamBody };
 }
