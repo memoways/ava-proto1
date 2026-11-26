@@ -40,6 +40,43 @@ export function resolveMp3MediaSource(): MediaSourceCtor | null {
   return null;
 }
 
+/**
+ * True when only ManagedMediaSource can stream MP3 (iPhone: no classic
+ * MediaSource). The iPhone measurement of 26 Nov. 2026 never played a single
+ * MP3 line progressively there, so the PCM path is preferred (latency lot 1 bis).
+ */
+export function isManagedMediaSourceOnly(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as unknown as { ManagedMediaSource?: MediaSourceCtor; MediaSource?: MediaSourceCtor };
+  const supports = (ctor?: MediaSourceCtor) => {
+    try { return !!ctor && typeof ctor.isTypeSupported === "function" && ctor.isTypeSupported(MP3_MIME); } catch { return false; }
+  };
+  return supports(w.ManagedMediaSource) && !supports(w.MediaSource);
+}
+
+// Once progressive MP3 failed before any sound, it will fail again on this
+// engine: the following lines stream PCM instead (kept for the page lifetime).
+let mp3StreamPlaybackFailed = false;
+
+/** Records that MediaSource MP3 playback failed before audio (see hasMp3StreamPlaybackFailed). */
+export function noteMp3StreamPlaybackFailed(): void {
+  mp3StreamPlaybackFailed = true;
+}
+
+export function hasMp3StreamPlaybackFailed(): boolean {
+  return mp3StreamPlaybackFailed;
+}
+
+export function resetMp3StreamPlaybackFailureForTests(): void {
+  mp3StreamPlaybackFailed = false;
+}
+
+/** Short, non-sensitive reason for the telemetry `fallback_reason` field. */
+function describeFallbackReason(err: unknown): string {
+  if (err instanceof Error) return `${err.name}: ${err.message}`.slice(0, 160);
+  return String(err).slice(0, 160);
+}
+
 export interface ElevenLabsStreamDeps {
   /** Opens the HTTP stream; rejects on HTTP error or header timeout. */
   request: (signal: AbortSignal, debugId: string, startTime: number) => Promise<Response>;
@@ -54,6 +91,8 @@ export interface ElevenLabsStreamDeps {
   /** Shared autoplay-refusal state (defaults to the audioPlayback module). */
   autoplayBlocked?: () => boolean;
   onAutoplayBlocked?: () => void;
+  /** Called once when MediaSource playback fails before audio (defaults to the module memo). */
+  onMsePlaybackFailed?: () => void;
 }
 
 function abortError(reason?: unknown): Error {
@@ -94,6 +133,7 @@ export function createElevenLabsStreamingPlayback(
   let streamFailed: unknown = null;
   let statusCode: number | undefined;
   let firstByteMs: number | undefined;
+  let fallbackReason: string | null = null;
   // Network chunks are ArrayBuffer-backed at runtime; the narrow generic keeps
   // appendBuffer/Blob happy under TS 5.9's ArrayBufferLike widening.
   const chunks: Uint8Array<ArrayBuffer>[] = [];
@@ -228,6 +268,8 @@ export function createElevenLabsStreamingPlayback(
       return;
     }
     console.warn(`[TTS-EL] Progressive playback unavailable (${err instanceof Error ? err.message.slice(0, 120) : String(err)}); playing the full MP3`);
+    fallbackReason = `mse: ${describeFallbackReason(err)}`;
+    (deps.onMsePlaybackFailed ?? noteMp3StreamPlaybackFailed)();
     mode = "fallback";
     teardownMse();
     if (streamDone && openRequested) launchBlobPlayback();
@@ -267,6 +309,7 @@ export function createElevenLabsStreamingPlayback(
   const stats = (transport: TTSStreamGenerationStats["transport"]): TTSStreamGenerationStats => ({
     provider: "elevenlabs", model: deps.model, transport, statusCode: statusCode ?? 200,
     firstByteMs, totalMs: Math.round(performance.now() - t0),
+    ...(transport === "rest_fallback" ? { fallbackReason } : {}),
   });
 
   async function generate() {
@@ -278,6 +321,7 @@ export function createElevenLabsStreamingPlayback(
       if (cancelled || isAbort(err) || ctx?.signal?.aborted) { failAll(abortError(err)); return; }
       if (!canRetryOverRest(err)) { failAll(err); return; }
       console.warn(`[TTS-EL] Stream request failed (${err instanceof Error ? err.message.slice(0, 120) : String(err)}); retrying over REST`);
+      fallbackReason = `request: ${describeFallbackReason(err)}`;
       mode = "fallback";
       teardownMse();
       try {
@@ -297,6 +341,7 @@ export function createElevenLabsStreamingPlayback(
     statusCode = response.status;
     if (!response.body) {
       // No readable stream (old engine): the whole body is the blob path.
+      fallbackReason = "no_readable_body";
       mode = "fallback";
       teardownMse();
       try {

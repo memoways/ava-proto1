@@ -17,7 +17,12 @@ import { debugLogger } from "@/services/debugLogger";
 import { prepareTextForTTS } from "@/services/tts/textPrep";
 import { createTimeoutSignal, withTimeout } from "@/services/asyncUtils";
 import { authenticatedFunctionFetch } from "@/services/gameAuth";
-import { createElevenLabsStreamingPlayback, resolveMp3MediaSource } from "@/services/tts/elevenLabsStreamPlayer";
+import {
+  createElevenLabsStreamingPlayback,
+  hasMp3StreamPlaybackFailed,
+  isManagedMediaSourceOnly,
+  resolveMp3MediaSource,
+} from "@/services/tts/elevenLabsStreamPlayer";
 import { createElevenLabsPcmPlayback } from "@/services/tts/elevenLabsPcmPlayer";
 import { openElevenLabsPcmStream } from "@/services/tts/elevenLabsPcmStream";
 import { getSharedAudioContext, isMediaElementAutoplayBlocked } from "@/services/audioPlayback";
@@ -165,12 +170,15 @@ export const elevenLabsProvider: TTSProvider = {
    * null. MP3 streams into a MediaSource (L1.1); where that cannot play (no
    * MediaSource MP3, or iPhone once `<audio>` was refused), raw PCM streams into
    * the shared AudioContext instead of waiting for the whole MP3 (latency lot 1).
+   * PCM is also chosen where only ManagedMediaSource exists (iPhone) and once an
+   * MP3 stream failed before any sound on this page (latency lot 1 bis).
    */
   createStreamingPlayback(text: string, ctx?: TTSGenerateContext): TTSStreamPlaybackHandle | null {
     if (ctx?.speechAudition || ctx?.auditionModelId || ctx?.onAuditionRequest
       || (ctx as { cacheOpening?: boolean } | undefined)?.cacheOpening) return null;
     if (!getTTSSettings().outputFormat.startsWith("mp3_")) return null;
-    if (!resolveMp3MediaSource() || isMediaElementAutoplayBlocked()) {
+    if (!resolveMp3MediaSource() || isMediaElementAutoplayBlocked()
+      || isManagedMediaSourceOnly() || hasMp3StreamPlaybackFailed()) {
       if (!getSharedAudioContext() || typeof ReadableStream === "undefined") return null;
       const { modelId } = buildElevenLabsRequest(text, ctx);
       return createElevenLabsPcmPlayback(ctx, {

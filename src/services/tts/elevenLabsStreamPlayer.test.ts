@@ -91,6 +91,7 @@ function setup(overrides: Partial<ElevenLabsStreamDeps> = {}, ctx: Parameters<ty
     stallTimeoutMs: 1000,
     autoplayBlocked: () => false,
     onAutoplayBlocked: vi.fn(),
+    onMsePlaybackFailed: vi.fn(),
     ...overrides,
   };
   const handle = createElevenLabsStreamingPlayback(ctx, deps);
@@ -178,6 +179,33 @@ describe("ElevenLabs progressive playback (L1.1)", () => {
     failNextAppend = false;
   });
 
+  it("remembers an MSE failure before audio and records why (latency lot 1 bis)", async () => {
+    failNextAppend = true;
+    const { handle, deps } = setup();
+    handle.open();
+    await handle.finished;
+    expect(deps.onMsePlaybackFailed).toHaveBeenCalledTimes(1);
+    expect((await handle.generationDone).fallbackReason).toBe("mse: NotSupportedError: bad mp3");
+    failNextAppend = false;
+  });
+
+  it("does not mark MSE as failed when the stream plays, nor on a request failure", async () => {
+    const ok = setup();
+    ok.handle.open();
+    await ok.handle.started;
+    ok.audio.end();
+    await ok.handle.finished;
+    expect(ok.deps.onMsePlaybackFailed).not.toHaveBeenCalled();
+    expect((await ok.handle.generationDone).fallbackReason).toBeUndefined();
+
+    const serverError = Object.assign(new Error("ElevenLabs TTS error: 503"), { statusCode: 503 });
+    const down = setup({ request: vi.fn(async () => { throw serverError; }) });
+    down.handle.open();
+    await down.handle.finished;
+    expect(down.deps.onMsePlaybackFailed).not.toHaveBeenCalled();
+    expect((await down.handle.generationDone).fallbackReason).toBe("request: Error: ElevenLabs TTS error: 503");
+  });
+
   it("plays the blob path without MediaSource support", async () => {
     const { handle, playBlob } = setup({ mediaSource: null });
     handle.open();
@@ -226,5 +254,32 @@ describe("ElevenLabs progressive playback (L1.1)", () => {
     release();
     await expect(handle.finished).rejects.toThrow("network lost");
     expect(playBlob).not.toHaveBeenCalled();
+  });
+});
+
+describe("MP3 stream engine detection (latency lot 1 bis)", () => {
+  it("flags ManagedMediaSource-only engines and keeps the failure memo per page", async () => {
+    const mod = await import("./elevenLabsStreamPlayer");
+    const w = window as unknown as Record<string, unknown>;
+    const saved = { m: w.ManagedMediaSource, c: w.MediaSource };
+    const yes = { isTypeSupported: () => true };
+    const no = { isTypeSupported: () => false };
+    try {
+      Object.assign(w, { ManagedMediaSource: yes, MediaSource: undefined });
+      expect(mod.isManagedMediaSourceOnly()).toBe(true);
+      Object.assign(w, { MediaSource: no });
+      expect(mod.isManagedMediaSourceOnly()).toBe(true);
+      Object.assign(w, { MediaSource: yes });
+      expect(mod.isManagedMediaSourceOnly()).toBe(false);
+      Object.assign(w, { ManagedMediaSource: undefined });
+      expect(mod.isManagedMediaSourceOnly()).toBe(false);
+    } finally {
+      Object.assign(w, { ManagedMediaSource: saved.m, MediaSource: saved.c });
+    }
+    mod.resetMp3StreamPlaybackFailureForTests();
+    expect(mod.hasMp3StreamPlaybackFailed()).toBe(false);
+    mod.noteMp3StreamPlaybackFailed();
+    expect(mod.hasMp3StreamPlaybackFailed()).toBe(true);
+    mod.resetMp3StreamPlaybackFailureForTests();
   });
 });

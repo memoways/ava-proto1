@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ mse: true, blocked: false, context: true, format: "mp3_44100_128" }));
+const state = vi.hoisted(() => ({ mse: true, blocked: false, context: true, format: "mp3_44100_128", managedOnly: false, mseFailed: false }));
 vi.mock("@/services/settingsService", () => ({
   getTTSSettings: () => ({ modelId: "eleven_v4_turbo", style: 0.3, stability: 0.4, speed: 1, outputFormat: state.format }),
 }));
@@ -16,6 +16,8 @@ const pcm = vi.hoisted(() => vi.fn(() => ({ kind: "pcm" })));
 vi.mock("@/services/tts/elevenLabsStreamPlayer", () => ({
   createElevenLabsStreamingPlayback: mp3,
   resolveMp3MediaSource: () => (state.mse ? MediaSource : null),
+  isManagedMediaSourceOnly: () => state.managedOnly,
+  hasMp3StreamPlaybackFailed: () => state.mseFailed,
 }));
 vi.mock("@/services/tts/elevenLabsPcmPlayer", () => ({ createElevenLabsPcmPlayback: pcm }));
 
@@ -25,7 +27,7 @@ class MediaSource {}
 
 describe("ElevenLabs streaming route (latency lot 1)", () => {
   beforeEach(() => {
-    Object.assign(state, { mse: true, blocked: false, context: true, format: "mp3_44100_128" });
+    Object.assign(state, { mse: true, blocked: false, context: true, format: "mp3_44100_128", managedOnly: false, mseFailed: false });
     mp3.mockClear();
     pcm.mockClear();
   });
@@ -44,6 +46,19 @@ describe("ElevenLabs streaming route (latency lot 1)", () => {
   it("streams PCM once <audio> was refused outside a gesture (iPhone hands-free)", () => {
     state.blocked = true;
     expect(elevenLabsProvider.createStreamingPlayback!("Bonjour.", {})).toEqual({ kind: "pcm" });
+  });
+
+  it("routes the next lines to PCM once an MP3 stream failed before any sound (lot 1 bis)", () => {
+    expect(elevenLabsProvider.createStreamingPlayback!("Bonjour.", {})).toEqual({ kind: "mse" });
+    state.mseFailed = true;
+    expect(elevenLabsProvider.createStreamingPlayback!("Suite.", {})).toEqual({ kind: "pcm" });
+    expect(mp3).toHaveBeenCalledTimes(1);
+  });
+
+  it("prefers PCM where only ManagedMediaSource streams MP3 (iPhone)", () => {
+    state.managedOnly = true;
+    expect(elevenLabsProvider.createStreamingPlayback!("Bonjour.", {})).toEqual({ kind: "pcm" });
+    expect(mp3).not.toHaveBeenCalled();
   });
 
   it("keeps the blob path without any AudioContext, for auditions, the opening cache and non-MP3 formats", () => {

@@ -76,6 +76,8 @@ export interface TTSStreamGenerationStats {
    *  when the blob path took over. */
   transport: "websocket" | "http_stream" | "http_stream_pcm" | "rest_fallback";
   statusCode?: number;
+  /** Why the blob path took over (`rest_fallback` only), e.g. "mse: NotSupportedError: …". */
+  fallbackReason?: string | null;
   /** Time to first audio chunk (ms since handle creation). */
   firstByteMs?: number;
   /** Time until all audio was generated/received (ms since handle creation). */

@@ -1,7 +1,7 @@
 # Plan — Réduire la latence conversationnelle d'Ava (LLM, TTS, orchestration)
 
 Tâche Notion : [Réduire la latence conversationnelle AVA — LLM, TTS et orchestration](https://app.notion.com/p/18662322e59582878b6381b14558d632) (Gamilab, 🔥🔥🔥🔥).
-Statut (26 novembre 2026) : **lot 1 livré (code), mesure après synchro Lovable à faire par Ulrich ; lot 2 livré (outils de mesure), runs payants à lancer par Ulrich, puis choix du modèle (lot 3).** Rapport : [banc LLM latence](eval/banc_llm_latence_20261126.md). Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
+Statut (26 novembre 2026) : **lot 1 et lot 1 bis (iPhone) livrés (code), mesure iPhone après synchro Lovable à faire par Ulrich ; lot 2 livré (outils de mesure), runs payants à lancer par Ulrich, puis choix du modèle (lot 3).** Rapport : [banc LLM latence](eval/banc_llm_latence_20261126.md). Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
 Règle : **un lot à la fois**. Chaque lot est livré selon le contrat d'Ava, puis s'arrête avec le prompt de reprise du lot suivant ; le lot suivant ne commence que sur nouvelle demande d'Ulrich.
 Historique utile : [analyse Tavus T1-T9](analyse_latence_tavus_20261119.md), [évaluation du LLM streamé](evaluation_llm_streame_vers_tts.md).
 
@@ -71,6 +71,16 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Première tranche courte **non appliquée** : avec le flux, le premier son ne dépend pas de la longueur de la ligne (0,42 s mesuré en MSE avec les lignes actuelles jusqu'à 900 car.). Couper davantage aurait changé la prosodie et l'enchaînement sans gain mesurable.
 - Tests : `elevenLabsPcmPlayer.test.ts` (11 cas : flux contigu, pré-tampon, ouverture différée, repli avant premier octet, pas de repli sur erreur client, coupure après le son, annulation, signal parent, contexte suspendu, flux vide) et `providers/elevenlabs.streaming.test.ts` (choix MSE ou PCM ou blob).
 - À mesurer après fusion et synchro Lovable (Ulrich) : au moins 10 tours voix seule sur iPhone (sandbox-ulrich) et sur le poste de sandbox-romed. Visé : transport `http_stream_pcm`, écart ≤ 0,6 s, premier son médian ≤ 3,8 s, aucun repli supplémentaire, aucune coupure entendue entre phrases.
+
+**Lot 1 bis (26 nov., iPhone encore lent, correctif livré en code)**
+
+- Mesure d'Ulrich après fusion (sandbox-ulrich, iPhone, mains libres, 19:16-19:24 UTC, 16 tours) : transport `rest_fallback` sur tous les tours, aucun `http_stream_pcm`, écart 2,27 s.
+- Lecture SQL (`audio_latencies`, `voice_turn_events`, session `91680ea9…`) : le premier octet du flux MP3 arrive ≈ 0,35 s après `llm_response`, le MP3 complet ≈ 2 s ; `audio_scheduled` suit `audio_blob_ready` de ≈ 40 ms à chaque tour. Le handle MP3 MediaSource a donc échoué vite et avant tout son (le délai de blocage est de 15 s), puis a lu le blob complet. Ce n'est pas un refus de lecture `NotAllowedError` : il aurait basculé les tours suivants en PCM. Même essai sur ordinateur (session `122d6a1a…`, 19:27) : son ≈ 25 ms après le premier octet, `http_stream`.
+- Hypothèse d'un ancien bundle : non nécessaire. Le code du lot 1 donne exactement ce résultat, car sa condition (pas de MediaSource MP3, ou `<audio>` refusé) n'était jamais vraie sur cet iPhone, qui expose ManagedMediaSource. `code_version` est une constante et ne permet pas de dater le bundle.
+- La cause exacte de l'échec MSE (erreur `<audio>`, SourceBuffer, `appendBuffer` ou `play()`) n'était pas enregistrée : elle l'est maintenant dans `audio_latencies.metadata_json.fallback_reason` (`mse: …`, `request: …`, `pcm: …`, `no_readable_body`).
+- Correctif (`elevenLabsStreamPlayer.ts`, `providers/elevenlabs.ts`) : le PCM est choisi d'emblée quand seul ManagedMediaSource lit le MP3 (iPhone ; Safari macOS et iPad gardent MediaSource). Un échec MSE avant tout son est mémorisé pour la page, et les lignes suivantes passent en PCM. Le chemin MSE des ordinateurs reste inchangé. Le lecteur PCM garde son propre repli REST.
+- Tests : routage après échec MSE et sur moteur ManagedMediaSource seul, mémoire d'échec non déclenchée par un flux qui joue ni par une panne réseau, raison du repli (MP3 et PCM), détection du moteur.
+- À mesurer (Ulrich, après synchro Lovable) : au moins 10 tours voix seule sur iPhone. Visé : transport `http_stream_pcm`, écart ≤ 0,6 s, aucune coupure entendue. Si le PCM lui-même se replie, `fallback_reason` dira pourquoi.
 
 ### Lot 2 — Banc d'essai LLM (mesure seule, aucun changement de réglage)
 

@@ -237,7 +237,10 @@ export function createElevenLabsPcmPlayback(
       statusCode = result.meta.statusCode;
       firstByteMs ??= Math.round(performance.now() - t0);
       streamDone = true;
-      resolveGeneration(stats("rest_fallback"));
+      resolveGeneration({
+        ...stats("rest_fallback"),
+        fallbackReason: `pcm: ${(reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason)).slice(0, 160)}`,
+      });
       launchBlobPlayback();
     } catch (err) {
       failAll(cancelled ? abortError(err) : err);
