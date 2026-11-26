@@ -99,6 +99,7 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Préfixe : commun sur 2,7 k tokens (Max, le noyau choisit « VOIX ET POSTURE » selon la question) et 3,6 k tokens (Emma, directive relationnelle du tour). Le contrat de flux est en fin, donc jamais en cache. 0 token en cache sur l'échantillon. Rien n'a été modifié.
 - Constats : Llama 4 n'est plus sur Cerebras ni Groq ; `LLM_TEMPERATURE = 1,4` est ignoré par luna mais s'appliquerait à un autre modèle (le banc envoie 0,8 / 0,95) ; gpt-oss et Gemini 3.x réfléchissent par défaut via le proxy.
 - Appel de contrôle après fusion : gpt-oss-120b via le proxy rendait 4 réponses vides sur 4 (tokens de sortie épuisés à réfléchir), servi par Google faute de redéploiement. Correctif : `reasoning_effort` facultatif (banc seulement), et l'alerte de routage compte aussi les appels en erreur.
+- Banc complet (run d'Ulrich, 434 appels, 0 erreur, 0,71 $) : 1re phrase sûre en médiane, gpt-5.6-luna 1,25 s ; **même modèle avec `provider.sort: "latency"` 0,82 s** ; gpt-oss-120b sur Cerebras 0,60 s ; Gemini 2.5 Flash 0,78 s. Gemini 2.5 Flash-Lite est écarté (intent valide 13 %). Restent à mesurer : la qualité (`eval:judge`) et le rappel long sur les finalistes.
 - Tests : `llmLatencyBench.test.ts` (13), `llmRecallScenario.test.ts` (6), `proxyLLMPayload.test.ts` (+2).
 
 ### Lot 3 — Adoption du LLM et du routage (selon la décision d'Ulrich sur le lot 2)

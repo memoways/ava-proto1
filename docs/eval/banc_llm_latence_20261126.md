@@ -1,7 +1,7 @@
 # Banc LLM latence — 26 novembre 2026 (lot 2, mesure seule)
 
 Plan : [plan_latence_conversationnelle_llm_tts.md](../plan_latence_conversationnelle_llm_tts.md), section « Lot 2 ».
-Statut : **outils livrés et vérifiés sur un petit échantillon réel ; runs complets à lancer par Ulrich, puis ce rapport est complété.** Aucun réglage d'Ava modifié, rien en production.
+Statut : **banc de latence complet mesuré (run d'Ulrich, 26 novembre, 434 appels, 0 erreur, 0,71 $) ; qualité (`eval:judge`) et rappel long restent à mesurer sur les finalistes.** Aucun réglage d'Ava modifié, rien en production.
 
 ## Ce qui est livré
 
@@ -54,7 +54,7 @@ Comparaison des prompts système entre deux questions du même personnage :
 
 ## Runs à lancer par Ulrich (ordre conseillé)
 
-1. Après le redéploiement de `proxy-llm` par Lovable, compiler 10 prompts (5 Max, 5 Emma), puis lancer le banc sur tous les candidats du proxy (≈ 0,5 $, ≈ 15-20 min). Le fichier de prompts est rappelé à la fin de la première commande :
+1. **Fait le 26 novembre** (résultats ci-dessous). Pour un nouveau run : compiler 10 prompts (5 Max, 5 Emma), puis lancer le banc sur tous les candidats du proxy (≈ 0,5 $, ≈ 15-20 min). Le fichier de prompts est rappelé à la fin de la première commande :
    ```bash
    npm run eval:llm-latency -- --compile-only
    ```
@@ -71,11 +71,43 @@ Comparaison des prompts système entre deux questions du même personnage :
    npm run eval:llm-recall -- --models openai/gpt-5.6-luna,MODELE_1,MODELE_2
    ```
 
-## Résultats complets (à remplir après les runs)
+## Résultats complets
 
 ### Latence (banc complet)
 
-_Tableau de `npm run eval:llm-latency` (sortie Markdown, aussi dans `output/eval-judge/llm-latency-*.md`)._
+Run d'Ulrich du 26 novembre 2026 (sandbox-ulrich, après le redéploiement de `proxy-llm`) : 10 prompts réels (5 Max, 5 Emma, 17,1 à 21,7 k car.) × 3 répétitions × 14 candidats, + 1 appel de chauffe par candidat, hors mesures. **434 appels, 0 erreur, 0,705 $.** Temps depuis l'envoi de la requête, sans le RAG. Classement par première phrase sûre (médiane).
+
+| Candidat | n | erreurs | 1er token méd. / p90 | 1re phrase sûre méd. / p90 | fin méd. / p90 | intent valide | cache (rép. 1 / suivantes) | tokens in / out / raison. | coût moyen | fournisseur |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gpt-oss-120b · Cerebras | 30 | 0 | 0.57 s / 0.75 s | 0.60 s / 0.77 s | 0.62 s / 0.80 s | 100 % | 68 % / 99 % | 4929 / 185 / 90 | 0.00186 $ | Cerebras |
+| Gemini 2.5 Flash-Lite · sans raisonnement | 30 | 0 | 0.44 s / 0.56 s | 0.65 s / 0.79 s | 0.78 s / 0.94 s | 13 % | 20 % / 85 % | 5121 / 101 / 0 | 0.00026 $ | Google AI Studio |
+| gpt-oss-120b · Groq | 30 | 0 | 0.58 s / 0.88 s | 0.70 s / 0.91 s | 0.72 s / 0.96 s | 97 % | 33 % / 54 % | 4997 / 175 / 85 | 0.00068 $ | Groq |
+| Gemini 2.5 Flash · sans raisonnement | 30 | 0 | 0.48 s / 0.58 s | 0.78 s / 0.91 s | 1.04 s / 1.26 s | 100 % | 14 % / 4 % | 5121 / 117 / 0 | 0.00173 $ | Google AI Studio |
+| gpt-5.6-luna · provider.sort latency | 30 | 0 | 0.65 s / 0.72 s | 0.82 s / 1.01 s | 1.07 s / 1.33 s | 100 % | 11 % / 100 % | 4865 / 110 / 0 | 0.00056 $ | Amazon Bedrock |
+| Mistral Small 2603 | 30 | 0 | 0.51 s / 0.69 s | 0.91 s / 1.11 s | 1.36 s / 1.59 s | 90 % | 26 % / 44 % | 4969 / 105 / 0 | 0.00059 $ | Mistral |
+| Gemini 3.5 Flash-Lite (raisonnement par défaut) | 30 | 0 | 0.71 s / 0.85 s | 0.96 s / 1.22 s | 1.22 s / 1.41 s | 100 % | 8 % / 64 % | 5119 / 107 / 0 | 0.00118 $ | Google |
+| Mistral Medium 3.5 | 30 | 0 | 0.59 s / 1.01 s | 1.02 s / 1.56 s | 1.22 s / 1.90 s | 100 % | 96 % / 96 % | 4969 / 73 / 0 | 0.00827 $ | Mistral |
+| Llama 4 Scout (DeepInfra) | 30 | 0 | 0.67 s / 0.94 s | 1.09 s / 1.50 s | 1.89 s / 2.76 s | 83 % | 0 % / 0 % | 4929 / 105 / 0 | 0.00061 $ | DeepInfra |
+| Claude Haiku 5.5 | 30 | 0 | 0.75 s / 0.89 s | 1.19 s / 1.37 s | 1.75 s / 1.90 s | 100 % | 0 % / 0 % | 8563 / 190 / 0 | 0.00095 $ | Claude Platform on AWS |
+| gpt-5.6-luna (référence) | 30 | 0 | 0.76 s / 1.09 s | 1.25 s / 1.60 s | 1.85 s / 2.06 s | 100 % | 11 % / 100 % | 4865 / 112 / 0 | 0.00056 $ | OpenAI |
+| GPT-5 mini (raisonnement minimal) | 30 | 0 | 0.79 s / 0.91 s | 1.26 s / 1.53 s | 1.75 s / 2.20 s | 100 % | 98 % / 98 % | 4865 / 119 / 0 | 0.00038 $ | OpenAI |
+| Llama 4 Maverick (Parasail) | 30 | 0 | 0.86 s / 1.09 s | 1.30 s / 1.76 s | 1.97 s / 2.82 s | 100 % | 35 % / 34 % | 4929 / 106 / 0 | 0.00153 $ | Parasail |
+| GPT-5.4 mini (raisonnement minimal) | 30 | 0 | 1.26 s / 1.54 s | 1.59 s / 1.87 s | 2.06 s / 2.44 s | 100 % | 32 % / 32 % | 4865 / 174 / 71 | 0.00340 $ | OpenAI |
+
+Lecture :
+
+- **Gain sans changer de modèle** : gpt-5.6-luna avec `provider.sort: "latency"` (servi par Amazon Bedrock) donne la 1re phrase à **0,82 s, contre 1,25 s** par le routage par défaut (OpenAI), soit **− 0,43 s en médiane et − 0,59 s en p90**, sans changer le modèle, le coût ni le format (intent 100 %). C'est le levier le moins risqué.
+- **Plus rapides, à valider en qualité et en mémoire** : gpt-oss-120b sur Cerebras (**0,60 s**, intent 100 %, 0,0019 $ par appel) et Gemini 2.5 Flash sans raisonnement (**0,78 s**, intent 100 %, 0,0017 $). gpt-oss sur Groq : 0,70 s, mais intent 97 % et moins de cache.
+- **Écartés** : Gemini 2.5 Flash-Lite (intent valide 13 % : il ne respecte presque jamais l'en-tête privé), Mistral Small (90 %), Llama 4 Scout (83 %). Mistral Medium est 15 × plus cher que luna. GPT-5.4 mini et Llama 4 Maverick sont plus lents que la référence.
+- **Cache** : il marche sur un prompt identique (répétitions 2 et 3 : 99-100 % pour luna, Cerebras, GPT-5 mini). Entre deux questions différentes, la part en cache reste faible (11 % pour luna), car le préfixe stable ne couvre que ≈ la moitié du prompt (tableau ci-dessous). Le gain de latence du cache n'est pas visible à cette taille.
+- Claude Haiku 5.5 compte ≈ 8,6 k tokens d'entrée pour le même prompt (tokeniseur différent).
+
+Stabilité du préfixe sur les 10 prompts :
+
+| Personnage | prompts | préfixe commun min / méd. | longueur méd. | fin commune | première différence |
+|---|---|---|---|---|---|
+| max | 5 | 9787 / 12305 car. | 19116 car. | 2174 car. | ## VOIX ET POSTURE (4) ; ## MOTEUR DE L'APPEL (3) ; # CADRE DE L'APPEL — PRIORITAIRE (2) |
+| emma | 5 | 10420 / 10420 car. | 20045 car. | 2174 car. | ## IDENTITÉ ET CONTRADICTION (6) ; # DIRECTIVE RELATIONNELLE DU TOUR — PRIORITAIRE (2) ; ## MANIÈRE DE PARLER (2) |
 
 ### Surcoût OpenRouter
 
