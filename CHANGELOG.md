@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Recette : Emma sur Anam validée à l'écoute] — 2026-11-26
+
+- `sandbox-ulrich` : Emma en vidéo Anam avec sa voix importée dans Anam, confirmée à l'oreille (connexion 1,6 s, parole à 7,5 s, sans repli).
+- Documentation seulement : état courant et prompt de reprise. Tavus pour Emma non essayé.
+
 ## [Emma sur Anam ou Tavus : champs vides signalés] — 2026-11-25
 
 - Réglages personnages : pour un personnage autre que Max, la fiche signale un visage (et, pour Anam et HeyGen, une voix vidéo) encore vide, qui reprendrait le réglage global, celui de Max.
