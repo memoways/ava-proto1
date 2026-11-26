@@ -175,6 +175,8 @@ describe("requêtes du banc", () => {
   it("envoie la préférence de fournisseur et la coupure de réflexion au proxy, seulement si le candidat les demande", () => {
     const cerebras = BENCH_CANDIDATES.find((c) => c.id === "oss-cerebras")!;
     expect(buildProxyBenchBody(messages, cerebras, { max_tokens: 360 }, 18_000)).toMatchObject({ stream: true, model: "openai/gpt-oss-120b", reasoning_effort: "low", provider: { only: ["cerebras"], allow_fallbacks: false } });
+    // Claude Haiku 5.5 thinks by default and spends the whole 360-token budget before speaking.
+    expect(buildProxyBenchBody(messages, BENCH_CANDIDATES.find((c) => c.id === "haiku-55")!, { max_tokens: 360 }, 18_000)).toMatchObject({ reasoning_effort: "none" });
     const luna = BENCH_CANDIDATES.find((c) => c.id === "luna")!;
     expect(buildProxyBenchBody(messages, luna, { max_tokens: 360 }, 18_000)).not.toHaveProperty("provider");
     const flash = BENCH_CANDIDATES.find((c) => c.id === "gemini-25-flash")!;

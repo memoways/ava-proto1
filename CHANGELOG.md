@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 2 : banc robuste et Claude Haiku] — 2026-11-26
+
+- Banc : chaque appel est écrit dans un journal ; `--resume @journal` reprend un run interrompu sans refaire ni repayer ; une erreur réseau compte comme un échec au lieu d'arrêter le run ; délai maximal de 45 s par appel.
+- Claude Haiku 5.5 mesuré avec `reasoning_effort: "none"` : sans cela, il épuisait ses 360 tokens à réfléchir et rendait une réponse vide.
+
 ## [Latence lot 2 : correctifs du banc] — 2026-11-26
 
 - `proxy-llm` : champ `reasoning_effort` facultatif et filtré, envoyé par le banc seulement pour gpt-oss-120b, qui sinon épuise ses tokens à réfléchir et rend une réponse vide. Payload inchangé pour Ava. À redéployer par Lovable, avec `provider`.
