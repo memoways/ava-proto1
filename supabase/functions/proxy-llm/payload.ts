@@ -17,7 +17,14 @@ export interface OpenRouterPayloadInput {
    * `sanitizeProviderPreference`; absent for every Ava caller, so their payload is unchanged.
    */
   provider?: unknown;
+  /**
+   * Opt-in reasoning effort (latency bench, lot 2), for models the defaults below leave
+   * thinking (gpt-oss, Gemini 3.x). Ignored when reasoning is requested; absent for Ava callers.
+   */
+  reasoning_effort?: unknown;
 }
+
+const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high"]);
 
 const PROVIDER_SORTS = new Set(["latency", "throughput", "price"]);
 const PROVIDER_SLUG = /^[a-z0-9][a-z0-9._/-]{0,63}$/i;
@@ -79,6 +86,9 @@ export function buildOpenRouterPayload(body: OpenRouterPayloadInput) {
         : { enabled: false, exclude: true };
   } else if (forceReasoningOff && GEMINI_FLASH_THINKING.test(model)) {
     upstreamBody.reasoning = { enabled: false, exclude: true };
+  }
+  if (!reasoningRequested && typeof body.reasoning_effort === "string" && REASONING_EFFORTS.has(body.reasoning_effort)) {
+    upstreamBody.reasoning = { effort: body.reasoning_effort, exclude: true };
   }
   const provider = sanitizeProviderPreference(body.provider);
   if (provider) upstreamBody.provider = provider;

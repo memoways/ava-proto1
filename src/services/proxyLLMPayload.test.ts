@@ -104,3 +104,14 @@ describe("préférence de fournisseur OpenRouter (banc de latence, lot 2)", () =
     expect(result.upstreamBody.provider).toEqual({ sort: "latency", only: ["cerebras"], order: ["groq"], allow_fallbacks: false });
   });
 });
+
+describe("effort de raisonnement facultatif (banc de latence, lot 2)", () => {
+  it("abaisse la réflexion de gpt-oss sur demande, et ignore une valeur inconnue ou une réflexion demandée", () => {
+    expect(buildOpenRouterPayload({ model: "openai/gpt-oss-120b" }).upstreamBody).not.toHaveProperty("reasoning");
+    expect(buildOpenRouterPayload({ model: "openai/gpt-oss-120b", reasoning_effort: "low" }).upstreamBody.reasoning)
+      .toEqual({ effort: "low", exclude: true });
+    expect(buildOpenRouterPayload({ model: "openai/gpt-oss-120b", reasoning_effort: "max" }).upstreamBody).not.toHaveProperty("reasoning");
+    expect(buildOpenRouterPayload({ model: "openai/gpt-oss-120b", reasoning: true, reasoning_effort: "low" }).upstreamBody.reasoning)
+      .toEqual({ enabled: true, exclude: false });
+  });
+});

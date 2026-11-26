@@ -160,6 +160,12 @@ describe("médiane et p90", () => {
     expect(summary.cacheRateFirstRepeat).toBe(0.2);
     expect(summary.cacheRateRepeats).toBe(1);
     expect(summary.routingMismatch).toBe(true);
+    // All calls in error (gpt-oss with its token budget spent thinking): the routing is still checked.
+    const failed = (repeat: number) => ({ ...record(repeat, 0, 0), metrics: { ...record(repeat, 0, 0).metrics, ok: false, error: "réponse vide", provider: "Google" } });
+    const allFailed = summarizeCandidate(candidate, [failed(1), failed(2)]);
+    expect(allFailed.errors).toBe(2);
+    expect(allFailed.providers).toEqual(["Google"]);
+    expect(allFailed.routingMismatch).toBe(true);
   });
 });
 
@@ -168,7 +174,7 @@ describe("requêtes du banc", () => {
 
   it("envoie la préférence de fournisseur et la coupure de réflexion au proxy, seulement si le candidat les demande", () => {
     const cerebras = BENCH_CANDIDATES.find((c) => c.id === "oss-cerebras")!;
-    expect(buildProxyBenchBody(messages, cerebras, { max_tokens: 360 }, 18_000)).toMatchObject({ stream: true, model: "openai/gpt-oss-120b", provider: { only: ["cerebras"], allow_fallbacks: false } });
+    expect(buildProxyBenchBody(messages, cerebras, { max_tokens: 360 }, 18_000)).toMatchObject({ stream: true, model: "openai/gpt-oss-120b", reasoning_effort: "low", provider: { only: ["cerebras"], allow_fallbacks: false } });
     const luna = BENCH_CANDIDATES.find((c) => c.id === "luna")!;
     expect(buildProxyBenchBody(messages, luna, { max_tokens: 360 }, 18_000)).not.toHaveProperty("provider");
     const flash = BENCH_CANDIDATES.find((c) => c.id === "gemini-25-flash")!;
