@@ -88,3 +88,19 @@ describe("proxy-llm — payload OpenRouter exact", () => {
       .toEqual({ effort: "minimal", exclude: true });
   });
 });
+
+describe("préférence de fournisseur OpenRouter (banc de latence, lot 2)", () => {
+  it("n'ajoute rien sans demande : les appelants d'Ava gardent le même payload", () => {
+    expect(buildOpenRouterPayload({ model: "openai/gpt-5.6-luna" }).upstreamBody).not.toHaveProperty("provider");
+    expect(buildOpenRouterPayload({ model: "openai/gpt-5.6-luna", provider: "latency" }).upstreamBody).not.toHaveProperty("provider");
+    expect(buildOpenRouterPayload({ model: "openai/gpt-5.6-luna", provider: { sort: "fastest", only: [42] } }).upstreamBody).not.toHaveProperty("provider");
+  });
+
+  it("transmet seulement les champs connus et bornés", () => {
+    const result = buildOpenRouterPayload({
+      model: "openai/gpt-oss-120b",
+      provider: { sort: "latency", only: ["cerebras", "bad slug!", 3], order: ["groq"], allow_fallbacks: false, data_collection: "allow" },
+    });
+    expect(result.upstreamBody.provider).toEqual({ sort: "latency", only: ["cerebras"], order: ["groq"], allow_fallbacks: false });
+  });
+});

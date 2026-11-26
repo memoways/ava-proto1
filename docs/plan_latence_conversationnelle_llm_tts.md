@@ -1,7 +1,7 @@
 # Plan — Réduire la latence conversationnelle d'Ava (LLM, TTS, orchestration)
 
 Tâche Notion : [Réduire la latence conversationnelle AVA — LLM, TTS et orchestration](https://app.notion.com/p/18662322e59582878b6381b14558d632) (Gamilab, 🔥🔥🔥🔥).
-Statut (26 novembre 2026) : **lot 1 livré (code), mesure après synchro Lovable à faire par Ulrich ; lot 2 non commencé.** Reprise : [prompt du lot 2](prompt_reprise_latence_conversationnelle_lot_2.md).
+Statut (26 novembre 2026) : **lot 1 livré (code), mesure après synchro Lovable à faire par Ulrich ; lot 2 livré (outils de mesure), runs payants à lancer par Ulrich, puis choix du modèle (lot 3).** Rapport : [banc LLM latence](eval/banc_llm_latence_20261126.md). Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
 Règle : **un lot à la fois**. Chaque lot est livré selon le contrat d'Ava, puis s'arrête avec le prompt de reprise du lot suivant ; le lot suivant ne commence que sur nouvelle demande d'Ulrich.
 Historique utile : [analyse Tavus T1-T9](analyse_latence_tavus_20261119.md), [évaluation du LLM streamé](evaluation_llm_streame_vers_tts.md).
 
@@ -89,6 +89,16 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 4. Fournisseurs hors OpenRouter : comparer l'appel direct, par exemple Cerebras, Groq ou Gemini en direct, pour mesurer le surcoût OpenRouter (≈ 30-100 ms attendus). Signaler seulement, pas d'intégration.
 5. Qualité : `eval:judge --candidate-json` sur les 2 à 3 meilleurs en latence. Coût annoncé avant lancement (≈ 3 $ par run de 126 tours). S'y ajoute le nouveau test de rappel en conversation longue : un scénario scripté de ≈ 40 tours avec des faits donnés tôt et redemandés tard. Il est rejoué par modèle avec la vraie mémoire structurée.
 6. Livrable : rapport `docs/eval/banc_llm_latence_<date>.md` avec une recommandation chiffrée (latence, qualité, mémoire, coût).
+
+**Résultat du lot 2 (26 nov., outils livrés, runs complets à faire par Ulrich)** — [rapport](eval/banc_llm_latence_20261126.md)
+
+- `npm run eval:llm-latency` : `--compile-only` assemble les vrais prompts (chaîne `processPRD4Turn`, appel au personnage intercepté avant l'envoi, RAG seul), puis `--prompts @…` les rejoue en flux via `proxy-llm` pour 14 candidats : premier token, première phrase sûre (`ResponseIntentParser`), fin, intent valide, cache, raisonnement, coût facturé ; médiane et p90. ≈ 0,5 $ le run complet.
+- `npm run eval:llm-recall` : scénario de 40 tours par personnage ([rappel_long_v1.json](eval/rappel_long_v1.json)), 7 faits donnés aux tours 1-9 et redemandés aux tours 30-40, chaîne réelle avec la mémoire structurée. Notation lexicale. ≈ 0,15 $ par modèle et par personnage.
+- `proxy-llm` accepte un champ `provider` filtré (`sort`, `only`, `order`, `allow_fallbacks`), envoyé par le banc seulement. Le payload d'Ava est inchangé. Il est actif après redéploiement par Lovable.
+- Échantillon réel (4 prompts, gpt-5.6-luna en flux) : 1er token 0,77 s, **1re phrase sûre 1,28 s**, fin 1,91 s, intent 100 %. Prompts réels de 4,6 à 5,5 k tokens (et non 2,8 k).
+- Préfixe : commun sur 2,7 k tokens (Max, le noyau choisit « VOIX ET POSTURE » selon la question) et 3,6 k tokens (Emma, directive relationnelle du tour). Le contrat de flux est en fin, donc jamais en cache. 0 token en cache sur l'échantillon. Rien n'a été modifié.
+- Constats : Llama 4 n'est plus sur Cerebras ni Groq ; `LLM_TEMPERATURE = 1,4` est ignoré par luna mais s'appliquerait à un autre modèle (le banc envoie 0,8 / 0,95) ; gpt-oss et Gemini 3.x réfléchissent par défaut via le proxy.
+- Tests : `llmLatencyBench.test.ts` (13), `llmRecallScenario.test.ts` (6), `proxyLLMPayload.test.ts` (+2).
 
 ### Lot 3 — Adoption du LLM et du routage (selon la décision d'Ulrich sur le lot 2)
 

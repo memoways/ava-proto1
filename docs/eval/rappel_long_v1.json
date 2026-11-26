@@ -1,0 +1,498 @@
+{
+  "format": "ava-eval-recall",
+  "version": 1,
+  "status": "brouillon agent (26 novembre 2026), à relire par Ulrich",
+  "statusNote": "Rappel en conversation longue, latence conversationnelle lot 2. Les faits portent sur la bénévole (prénom, métier, ville, fils, frère, rendez-vous), donnés aux tours 1 à 9 et redemandés aux tours 30 à 40, au-delà des 1 200 car. d'historique mot pour mot de optimized_v3 : seule la mémoire structurée (deltas du GM) peut répondre. Les questions intermédiaires restent générales pour ne rien affirmer du canon. Notation lexicale (llmRecallScenario.ts).",
+  "conversations": [
+    {
+      "id": "rappel-max",
+      "character": "Max",
+      "filmSeen": true,
+      "title": "Max — bénévole Claire, rappel après 30 tours",
+      "facts": [
+        {
+          "id": "prenom",
+          "label": "Prénom de la bénévole : Claire"
+        },
+        {
+          "id": "metier",
+          "label": "Métier : infirmière"
+        },
+        {
+          "id": "ville",
+          "label": "Ville : Sion"
+        },
+        {
+          "id": "fils",
+          "label": "Fils : Noé"
+        },
+        {
+          "id": "age_fils",
+          "label": "Âge du fils : sept ans"
+        },
+        {
+          "id": "frere",
+          "label": "Frère qui vit à Montréal"
+        },
+        {
+          "id": "rappel",
+          "label": "Prochain appel promis : jeudi à dix-huit heures"
+        }
+      ],
+      "turns": [
+        {
+          "question": "Bonjour, je m'appelle Claire. J'appelle de la cellule de bénévoles, on m'a donné votre numéro."
+        },
+        {
+          "question": "Comment ça va, là, aujourd'hui ?"
+        },
+        {
+          "question": "Je vous dis un peu qui je suis : je suis infirmière, à Sion. Je fais ces appels en plus de mon travail."
+        },
+        {
+          "question": "Où est-ce que vous êtes, en ce moment ?"
+        },
+        {
+          "question": "Moi aussi j'ai un enfant, un fils de sept ans. Il s'appelle Noé. Alors je comprends un peu l'inquiétude."
+        },
+        {
+          "question": "Vous avez pu dormir un peu, cette nuit ?"
+        },
+        {
+          "question": "Ma famille est loin aussi : mon frère vit à Montréal, je ne le vois presque jamais."
+        },
+        {
+          "question": "Racontez-moi votre arrivée au chalet, le premier soir."
+        },
+        {
+          "question": "Je vous propose une chose : je vous rappelle jeudi à dix-huit heures, ça vous va ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous a le plus marqué, là-haut ?"
+        },
+        {
+          "question": "Comment va Ava, en ce moment ?"
+        },
+        {
+          "question": "Et Emma, vous lui parlez encore ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous aide à tenir, ces jours-ci ?"
+        },
+        {
+          "question": "Vous avez mangé quelque chose aujourd'hui ?"
+        },
+        {
+          "question": "Il y a quelqu'un avec vous, là, ou vous êtes seul ?"
+        },
+        {
+          "question": "Qu'est-ce que vous auriez fait autrement, si c'était à refaire ?"
+        },
+        {
+          "question": "Vous avez des nouvelles de votre père ?"
+        },
+        {
+          "question": "Et Lausanne, comment ça se passe, en ce moment ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous fait le plus peur, pour la suite ?"
+        },
+        {
+          "question": "Vous arrivez à parler de tout ça avec quelqu'un d'autre que moi ?"
+        },
+        {
+          "question": "Il y a un moment de la journée plus dur que les autres ?"
+        },
+        {
+          "question": "Qu'est-ce que vous aimeriez qu'on fasse pour vous, concrètement ?"
+        },
+        {
+          "question": "Vous pensez souvent au chalet ?"
+        },
+        {
+          "question": "Qu'est-ce qu'Ava vous a dit, la dernière fois que vous l'avez vue ?"
+        },
+        {
+          "question": "Vous avez gardé quelque chose de là-haut, un objet ?"
+        },
+        {
+          "question": "Qu'est-ce que vous diriez à quelqu'un qui vit la même chose que vous ?"
+        },
+        {
+          "question": "Vous vous sentez en colère, parfois ?"
+        },
+        {
+          "question": "Il y a une chose qui vous a fait du bien, cette semaine ?"
+        },
+        {
+          "question": "Vous voulez qu'on parle d'autre chose, un moment ?"
+        },
+        {
+          "question": "Vous vous souvenez de ce que je fais comme métier ? Je vous l'avais dit au début.",
+          "recall": {
+            "fact": "metier",
+            "accept": [
+              "infirmi"
+            ],
+            "forbid": [
+              "medecin",
+              "pompier",
+              "enseignante",
+              "policiere"
+            ]
+          }
+        },
+        {
+          "question": "Qu'est-ce qui vous manque le plus, d'avant ?"
+        },
+        {
+          "question": "Et je vous avais dit dans quelle ville j'habite, vous vous rappelez ?",
+          "recall": {
+            "fact": "ville",
+            "accept": [
+              "sion"
+            ],
+            "forbid": [
+              "lausanne",
+              "geneve",
+              "martigny",
+              "sierre"
+            ]
+          }
+        },
+        {
+          "question": "Vous voyez encore des gens, des amis ?"
+        },
+        {
+          "question": "Au fait, vous vous rappelez mon prénom ?",
+          "recall": {
+            "fact": "prenom",
+            "accept": [
+              "claire"
+            ],
+            "forbid": [
+              "nadia",
+              "sam",
+              "sophie",
+              "julie"
+            ]
+          }
+        },
+        {
+          "question": "Est-ce que vous avez besoin de quelque chose avant jeudi ?"
+        },
+        {
+          "question": "Je vous avais parlé de mon frère, au début. Il vit où, déjà ?",
+          "recall": {
+            "fact": "frere",
+            "accept": [
+              "montreal"
+            ],
+            "forbid": [
+              "paris",
+              "quebec",
+              "toronto",
+              "new york"
+            ]
+          }
+        },
+        {
+          "question": "Vous me racontez un bon souvenir, n'importe lequel ?"
+        },
+        {
+          "question": "Et mon fils, vous vous souvenez comment il s'appelle ?",
+          "recall": {
+            "fact": "fils",
+            "accept": [
+              "noe"
+            ],
+            "forbid": [
+              "leo",
+              "lucas",
+              "louis",
+              "theo"
+            ]
+          }
+        },
+        {
+          "question": "Il a quel âge, Noé, je vous l'avais dit ?",
+          "recall": {
+            "fact": "age_fils",
+            "accept": [
+              "sept",
+              "7"
+            ],
+            "forbid": [
+              "six",
+              "huit",
+              "cinq",
+              "dix"
+            ]
+          }
+        },
+        {
+          "question": "Dernière chose avant de raccrocher : on avait dit quand, pour le prochain appel ?",
+          "recall": {
+            "fact": "rappel",
+            "accept": [
+              "jeudi"
+            ],
+            "forbid": [
+              "lundi",
+              "mardi",
+              "mercredi",
+              "vendredi",
+              "samedi",
+              "dimanche"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "rappel-emma",
+      "character": "Emma",
+      "filmSeen": true,
+      "title": "Emma — bénévole Claire, rappel après 30 tours",
+      "facts": [
+        {
+          "id": "prenom",
+          "label": "Prénom de la bénévole : Claire"
+        },
+        {
+          "id": "metier",
+          "label": "Métier : infirmière"
+        },
+        {
+          "id": "ville",
+          "label": "Ville : Sion"
+        },
+        {
+          "id": "fils",
+          "label": "Fils : Noé"
+        },
+        {
+          "id": "age_fils",
+          "label": "Âge du fils : sept ans"
+        },
+        {
+          "id": "frere",
+          "label": "Frère qui vit à Montréal"
+        },
+        {
+          "id": "rappel",
+          "label": "Prochain appel promis : jeudi à dix-huit heures"
+        }
+      ],
+      "turns": [
+        {
+          "question": "Bonjour, je m'appelle Claire. J'appelle de la cellule de bénévoles, on m'a donné votre numéro."
+        },
+        {
+          "question": "Comment ça va, là, aujourd'hui ?"
+        },
+        {
+          "question": "Je vous dis un peu qui je suis : je suis infirmière, à Sion. Je fais ces appels en plus de mon travail."
+        },
+        {
+          "question": "Où est-ce que vous êtes, en ce moment ?"
+        },
+        {
+          "question": "Moi aussi j'ai un enfant, un fils de sept ans. Il s'appelle Noé. Alors je comprends un peu l'inquiétude."
+        },
+        {
+          "question": "Vous avez pu dormir un peu, cette nuit ?"
+        },
+        {
+          "question": "Ma famille est loin aussi : mon frère vit à Montréal, je ne le vois presque jamais."
+        },
+        {
+          "question": "Qu'est-ce qui s'est passé, hier, quand Ava est revenue de la forêt ?"
+        },
+        {
+          "question": "Je vous propose une chose : je vous rappelle jeudi à dix-huit heures, ça vous va ?"
+        },
+        {
+          "question": "Comment va Ava, en ce moment ?"
+        },
+        {
+          "question": "Et Léo, comment il va, lui ?"
+        },
+        {
+          "question": "Et Max, vous lui parlez encore ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous aide à tenir, ces jours-ci ?"
+        },
+        {
+          "question": "Vous avez mangé quelque chose aujourd'hui ?"
+        },
+        {
+          "question": "Il y a quelqu'un avec vous, là, ou vous êtes seule ?"
+        },
+        {
+          "question": "Qu'est-ce que vous auriez fait autrement, si c'était à refaire ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous fait le plus peur, pour la suite ?"
+        },
+        {
+          "question": "Vous arrivez à parler de tout ça avec quelqu'un d'autre que moi ?"
+        },
+        {
+          "question": "Il y a un moment de la journée plus dur que les autres ?"
+        },
+        {
+          "question": "Qu'est-ce que vous aimeriez qu'on fasse pour vous, concrètement ?"
+        },
+        {
+          "question": "Vous pensez souvent au chalet ?"
+        },
+        {
+          "question": "Qu'est-ce qu'Ava vous a dit, la dernière fois ?"
+        },
+        {
+          "question": "Vous avez gardé quelque chose de là-haut, un objet ?"
+        },
+        {
+          "question": "Qu'est-ce que vous diriez à une mère qui vit la même chose que vous ?"
+        },
+        {
+          "question": "Vous vous sentez en colère, parfois ?"
+        },
+        {
+          "question": "Il y a une chose qui vous a fait du bien, cette semaine ?"
+        },
+        {
+          "question": "Vous voulez qu'on parle d'autre chose, un moment ?"
+        },
+        {
+          "question": "Qu'est-ce qui vous manque le plus, d'avant ?"
+        },
+        {
+          "question": "Vous voyez encore des gens, des amis ?"
+        },
+        {
+          "question": "Vous vous souvenez de ce que je fais comme métier ? Je vous l'avais dit au début.",
+          "recall": {
+            "fact": "metier",
+            "accept": [
+              "infirmi"
+            ],
+            "forbid": [
+              "medecin",
+              "pompier",
+              "enseignante",
+              "policiere"
+            ]
+          }
+        },
+        {
+          "question": "Est-ce que vous avez besoin de quelque chose avant jeudi ?"
+        },
+        {
+          "question": "Et je vous avais dit dans quelle ville j'habite, vous vous rappelez ?",
+          "recall": {
+            "fact": "ville",
+            "accept": [
+              "sion"
+            ],
+            "forbid": [
+              "lausanne",
+              "geneve",
+              "martigny",
+              "sierre"
+            ]
+          }
+        },
+        {
+          "question": "Vous me racontez un bon souvenir, n'importe lequel ?"
+        },
+        {
+          "question": "Au fait, vous vous rappelez mon prénom ?",
+          "recall": {
+            "fact": "prenom",
+            "accept": [
+              "claire"
+            ],
+            "forbid": [
+              "nadia",
+              "sam",
+              "sophie",
+              "julie"
+            ]
+          }
+        },
+        {
+          "question": "Comment vous vous sentez, maintenant qu'on a parlé un moment ?"
+        },
+        {
+          "question": "Je vous avais parlé de mon frère, au début. Il vit où, déjà ?",
+          "recall": {
+            "fact": "frere",
+            "accept": [
+              "montreal"
+            ],
+            "forbid": [
+              "paris",
+              "quebec",
+              "toronto",
+              "new york"
+            ]
+          }
+        },
+        {
+          "question": "Qu'est-ce que vous allez faire, ce soir ?"
+        },
+        {
+          "question": "Et mon fils, vous vous souvenez comment il s'appelle ?",
+          "recall": {
+            "fact": "fils",
+            "accept": [
+              "noe"
+            ],
+            "forbid": [
+              "leo",
+              "lucas",
+              "louis",
+              "theo"
+            ]
+          }
+        },
+        {
+          "question": "Il a quel âge, Noé, je vous l'avais dit ?",
+          "recall": {
+            "fact": "age_fils",
+            "accept": [
+              "sept",
+              "7"
+            ],
+            "forbid": [
+              "six",
+              "huit",
+              "cinq",
+              "dix"
+            ]
+          }
+        },
+        {
+          "question": "Dernière chose avant de raccrocher : on avait dit quand, pour le prochain appel ?",
+          "recall": {
+            "fact": "rappel",
+            "accept": [
+              "jeudi"
+            ],
+            "forbid": [
+              "lundi",
+              "mardi",
+              "mercredi",
+              "vendredi",
+              "samedi",
+              "dimanche"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
