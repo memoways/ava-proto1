@@ -17,6 +17,7 @@ const fake = vi.hoisted(() => {
       return {
         getCorrelationId: () => talk.correlationId,
         streamMessageChunk: vi.fn(async (text: string, end: boolean) => { talk.chunks.push([text, end]); }),
+        endMessage: vi.fn(async () => { talk.chunks.push(["<end>", true]); }),
       };
     }),
   };
@@ -42,6 +43,7 @@ import { AnamStreamingAvatarOutput } from "./anam";
 import { endAvatarSession, startAvatarSession } from "../api";
 import { streamingAvatarDefaults } from "../settings";
 import { DEFAULT_AV_SYNC as avSync } from "../avSync";
+import { createAvatarLineFeed } from "../avatarAudioBridge";
 
 class Stream {
   tracks: MediaStreamTrack[] = [];
@@ -409,6 +411,71 @@ describe("Anam text-mode lifecycle", () => {
     await next;
     expect(onConnectionStateChange.mock.calls.map(([state]) => state)).toEqual(["connecting", "warming", "ready", "speaking", "ready", "speaking", "ready"]);
     await output.dispose();
+  });
+
+  describe("streamed reply (latency lot 4)", () => {
+    async function streaming() {
+      const output = anam({ streamedLlm: true });
+      await output.prepare({ sessionId: "ava" });
+      sessionReady();
+      output.attachMedia(videoWithFrame());
+      return output;
+    }
+
+    it("streams only when its switch is on", async () => {
+      expect(anam().canStreamText()).toBe(false);
+      expect(anam({ streamedLlm: true }).canStreamText()).toBe(true);
+      const output = await ready();
+      await expect(output.renderTextStream(createAvatarLineFeed())).rejects.toThrow(/not enabled/);
+      await output.dispose();
+    });
+
+    it("sends each segment as it arrives, in order, in one talk stream closed by endMessage", async () => {
+      const output = await streaming();
+      const feed = createAvatarLineFeed();
+      const onPlaybackStart = vi.fn();
+      const speech = output.renderTextStream(feed, { turnId: "turn", onPlaybackStart });
+      feed.push("Première phrase.");
+      await vi.waitFor(() => expect(fake.talks[0]?.chunks).toEqual([["Première phrase.", false]]));
+      persona("Première ");
+      await vi.waitFor(() => expect(onPlaybackStart).toHaveBeenCalledOnce());
+      feed.push("Deuxième phrase.");
+      await vi.waitFor(() => expect(fake.talks[0].chunks).toHaveLength(2));
+      feed.end();
+      await vi.waitFor(() => expect(fake.talks[0].chunks).toEqual([["Première phrase.", false], ["Deuxième phrase.", false], ["<end>", true]]));
+      persona("phrase. Deuxième phrase.", { endOfSpeech: true });
+      await expect(speech).resolves.toMatchObject({ status: "played", started: true, playedSegments: 2 });
+      expect(fake.talks).toHaveLength(1);
+      await output.dispose();
+    });
+
+    it("stops a started line when the generation fails, and reports it started", async () => {
+      const output = await streaming();
+      const feed = createAvatarLineFeed();
+      const speech = output.renderTextStream(feed);
+      feed.push("Début.");
+      await vi.waitFor(() => expect(fake.talks[0]?.chunks).toHaveLength(1));
+      persona("Début.");
+      feed.fail(new Error("llm stream failed"));
+      await expect(speech).rejects.toMatchObject({ started: true });
+      expect(fake.client.interruptPersona).toHaveBeenCalledOnce();
+      await output.dispose();
+    });
+
+    it("is interrupted while the reply is still generated", async () => {
+      const output = await streaming();
+      const feed = createAvatarLineFeed();
+      const controller = new AbortController();
+      const speech = output.renderTextStream(feed, { signal: controller.signal });
+      feed.push("Une phrase.");
+      await vi.waitFor(() => expect(fake.talks[0]?.chunks).toHaveLength(1));
+      persona("Une");
+      controller.abort("player-barge-in");
+      await expect(speech).rejects.toMatchObject({ started: true });
+      feed.push("Jamais dite.");
+      expect(fake.talks[0].chunks).toEqual([["Une phrase.", false]]);
+      await output.dispose();
+    });
   });
 
   it("interrupts mid-line through interruptPersona and reports a started render", async () => {

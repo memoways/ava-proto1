@@ -742,6 +742,11 @@ export interface AnamAvatarSettings {
   voiceGenerationOptions: AnamVoiceGenerationOptions;
   sessionOptions: AnamSessionOptions;
   lipSync: { mode: AnamLipSyncMode; manualShiftMs: number };
+  /**
+   * Latency lot 4 (client only): speak the first safe phrase while the LLM still answers, through
+   * one talk stream fed segment by segment. Off by default during the measurement.
+   */
+  streamedLlm: boolean;
 }
 
 function boundedText(value: unknown, fallback: string, max: number): string {
@@ -813,6 +818,7 @@ export function normalizeAnamSettings(value: unknown): AnamAvatarSettings {
       mode: pickEnum(asRecord(raw.lipSync).mode, ANAM_LIP_SYNC_MODES, "initial"),
       manualShiftMs: boundedInteger(asRecord(raw.lipSync).manualShiftMs, b.anamLipSyncShiftMs),
     },
+    streamedLlm: raw.streamedLlm === true,
   };
 }
 

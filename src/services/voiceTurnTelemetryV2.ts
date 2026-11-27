@@ -84,8 +84,20 @@ export interface VoiceTurnV2 {
   interruptions_capped?: boolean;
   capture_dsp?: { echoCancellation: boolean; noiseSuppression: boolean | null; autoGainControl: boolean | null; trackSampleRate: number | null; contextSampleRate: number };
   avatar_cue?: AvatarCueObservation;
+  /**
+   * Latency lot 4: how the reply reached the output. `feed` and `gradium_incremental` speak while the
+   * LLM streams (`sse`); `batch` and `held_batch` (open passage request) wait for the whole reply.
+   * The first spoken phrase is `durations.origin_to_output_estimated_ms`.
+   */
+  output_stream?: OutputStreamObservation;
   /** Why the microphone did not start (name and message only, no audio, no content). */
   capture_error?: { kind: string; name: string; message: string };
+}
+export interface OutputStreamObservation {
+  /** `tts` (voice only) or the avatar provider (`tavus`, `anam`, …). */
+  output: string;
+  mode: "feed" | "batch" | "held_batch" | "gradium_incremental";
+  llm_transport: "sse" | "http_batch";
 }
 export type VoiceObserver = (name: VoiceMilestone, at?: number) => void;
 export function observeVoice(observer: VoiceObserver | undefined, name: VoiceMilestone, at = performance.now()): void {
@@ -149,6 +161,11 @@ export function createVoiceTurnV2(
     },
     captureDsp(dsp: NonNullable<VoiceTurnV2["capture_dsp"]>) { if (!finished) value.capture_dsp = { ...dsp }; },
     avatarCue(cue: AvatarCueObservation) { if (!finished) value.avatar_cue = { ...cue }; },
+    outputStream(stream: Omit<OutputStreamObservation, "llm_transport">) {
+      if (finished) return;
+      value.output_stream = { output: String(stream.output).slice(0, 32), mode: stream.mode,
+        llm_transport: stream.mode === "feed" || stream.mode === "gradium_incremental" ? "sse" : "http_batch" };
+    },
     captureError(error: NonNullable<VoiceTurnV2["capture_error"]>) { if (!finished) value.capture_error = { ...error }; },
     setOrigin(at: number, origin: VoiceTurnV2["latency_origin"]) {
       if (finished || !Number.isFinite(at)) return;

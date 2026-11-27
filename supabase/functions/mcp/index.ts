@@ -375,6 +375,11 @@ var voiceTurnProjectionSchema = z4.object({
     autoGainControl: z4.boolean().nullable(),
     trackSampleRate: z4.number().finite().positive().nullable(),
     contextSampleRate: z4.number().finite().positive()
+  }).optional(),
+  output_stream: z4.object({
+    output: z4.string().max(32),
+    mode: z4.enum(["feed", "batch", "held_batch", "gradium_incremental"]),
+    llm_transport: z4.enum(["sse", "http_batch"])
   }).optional()
 });
 function projectVoiceEvents(rows) {

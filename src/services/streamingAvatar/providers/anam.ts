@@ -12,6 +12,7 @@ import { AvSyncController, DEFAULT_AV_SYNC, VOICED_LEVEL, readAvSample, summariz
 import { recordAvatarAvSync, type AvatarAvSyncRecord } from "../../voiceTelemetry";
 import { readNetworkPath, type AvatarNetworkPath } from "../networkPath";
 import { splitAvatarText } from "../textSegmentation";
+import { abortable, type AvatarLineFeed } from "../avatarAudioBridge";
 import {
   resolveAnamSpeakingCue,
   stripAnamCueTags,
@@ -208,31 +209,95 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
     this.callbacks.onConnectionStateChange?.("warming");
   }
 
+  /** Latency lot 4: true when the admin switch lets a reply be spoken while it is generated. */
+  canStreamText(): boolean {
+    return this.settings.streamedLlm === true;
+  }
+
+  /**
+   * Latency lot 4: one talk stream fed segment by segment. Each chunk leaves as soon as its segment
+   * arrives (never held back for `endOfSpeech`); the stream is closed by `endMessage` once the feed
+   * ended. Same result and failure contract as `renderText`.
+   */
+  async renderTextStream(
+    feed: AvatarLineFeed,
+    context?: ResponseOutputTurnContext,
+  ): Promise<ResponseOutputResult> {
+    if (!this.canStreamText()) throw new AvatarRenderError("Anam text streaming is not enabled", false);
+    await this.assertRenderable(context);
+    const client = this.client;
+    if (!client) throw new AvatarRenderError("Anam video stream is not ready", false);
+    const startedAt = performance.now();
+    let firstStartedAt = 0;
+    let sentChunks = 0;
+    const talk = client.createTalkMessageStream();
+    const speech = createPendingSpeech(talk.getCorrelationId(), context?.turnId);
+    this.currentSpeech = speech;
+    const abort = () => this.interrupt();
+    context?.signal?.addEventListener("abort", abort, { once: true });
+    this.openLine(context?.turnId);
+    const stillCurrent = () => !this.disposed && !context?.signal?.aborted && this.currentSpeech === speech;
+    try {
+      this.sendSpeakingCue(context);
+      const sending = (async () => {
+        for (let index = 0; ; index++) {
+          const next = feed.segmentAt(index);
+          const segment = await (context?.signal ? abortable(next, context.signal) : next);
+          if (!stillCurrent()) throw new DOMException("Avatar turn aborted", "AbortError");
+          if (segment === null) break;
+          for (const chunk of splitAvatarText(segment)) {
+            if (!stillCurrent()) throw new DOMException("Avatar turn aborted", "AbortError");
+            await talk.streamMessageChunk(chunk, false);
+            sentChunks++;
+          }
+        }
+        if (sentChunks === 0) throw new Error("Anam stream ended without text");
+        await talk.endMessage();
+      })();
+      sending.catch(() => {});
+      const started = withDeadline(speech.startedPromise, this.speechStartTimeoutMs, "Anam did not start speaking");
+      started.catch(() => {});
+      await Promise.race([started, sending.then(() => started)]);
+      firstStartedAt = performance.now();
+      context?.onPlaybackStart?.();
+      await sending;
+      await withDeadline(speech.endedPromise, 90_000, "Anam speech did not finish");
+      return {
+        status: "played",
+        provider: "Anam",
+        model: this.settings.avatarModel,
+        firstPlaybackStartMs: Math.round(firstStartedAt - startedAt),
+        playbackTotalMs: Math.round(performance.now() - firstStartedAt),
+        generatedSegments: sentChunks,
+        playedSegments: sentChunks,
+        failedSegments: 0,
+        started: true,
+      };
+    } catch (cause) {
+      // A speech already started is stopped: a failed generation never leaves a line half sent.
+      if (speech.started && !speech.ended && this.currentSpeech === speech) this.interrupt();
+      throw new AvatarRenderError(
+        cause instanceof Error ? cause.message : String(cause),
+        speech.started,
+        { cause },
+      );
+    } finally {
+      context?.signal?.removeEventListener("abort", abort);
+      if (this.currentSpeech === speech) this.currentSpeech = null;
+    }
+  }
+
   async renderText(
     text: string,
     context?: ResponseOutputTurnContext,
   ): Promise<ResponseOutputResult> {
-    if (!this.client || !this.ready || !this._externalSessionId) {
-      throw new AvatarRenderError("Anam video stream is not ready", false);
-    }
-    if (context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
-    // Do not send speech until the browser accepts audible media playback.
-    if (!this.mediaElement || !this.mediaPlayback) {
-      throw new AvatarRenderError("Anam media player is not attached", false);
-    }
-    try {
-      await withDeadline(this.mediaPlayback, this.speechStartTimeoutMs, "Anam media playback timed out");
-    } catch (cause) {
-      throw new AvatarRenderError("Anam audio/video playback failed", false, { cause });
-    }
-    // The opening line waits for a warmed-up stream: sent on the first tracks, it came out of sync.
-    this.warmUp ??= this.waitForWarmUp(this.mediaElement);
-    await this.warmUp;
-    if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
+    await this.assertRenderable(context);
+    const client = this.client;
+    if (!client) throw new AvatarRenderError("Anam video stream is not ready", false);
     const startedAt = performance.now();
     let firstStartedAt = 0;
     const chunks = splitAvatarText(text);
-    const talk = this.client.createTalkMessageStream();
+    const talk = client.createTalkMessageStream();
     const speech = createPendingSpeech(talk.getCorrelationId(), context?.turnId);
     this.currentSpeech = speech;
     const abort = () => this.interrupt();
@@ -270,6 +335,27 @@ export class AnamStreamingAvatarOutput implements ResponseOutput {
       context?.signal?.removeEventListener("abort", abort);
       if (this.currentSpeech === speech) this.currentSpeech = null;
     }
+  }
+
+  /** Connection, audible media and warm-up checks shared by every render entry point. */
+  private async assertRenderable(context?: ResponseOutputTurnContext): Promise<void> {
+    if (!this.client || !this.ready || !this._externalSessionId) {
+      throw new AvatarRenderError("Anam video stream is not ready", false);
+    }
+    if (context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
+    // Do not send speech until the browser accepts audible media playback.
+    if (!this.mediaElement || !this.mediaPlayback) {
+      throw new AvatarRenderError("Anam media player is not attached", false);
+    }
+    try {
+      await withDeadline(this.mediaPlayback, this.speechStartTimeoutMs, "Anam media playback timed out");
+    } catch (cause) {
+      throw new AvatarRenderError("Anam audio/video playback failed", false, { cause });
+    }
+    // The opening line waits for a warmed-up stream: sent on the first tracks, it came out of sync.
+    this.warmUp ??= this.waitForWarmUp(this.mediaElement);
+    await this.warmUp;
+    if (this.disposed || context?.signal?.aborted) throw new DOMException("Avatar turn aborted", "AbortError");
   }
 
   attachMedia(element: HTMLMediaElement): void {

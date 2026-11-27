@@ -81,6 +81,7 @@ export default function GameMasterConfigTab() {
         QUESTIONNAIRE_MODE: gameplay.QUESTIONNAIRE_MODE,
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
         VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
+        VOICE_STREAMED_LLM: gameplay.VOICE_STREAMED_LLM,
         VOICE_ONLY_UI: gameplay.VOICE_ONLY_UI,
       });
       await saveGameplaySettingsToDB(updated);
@@ -111,6 +112,7 @@ export default function GameMasterConfigTab() {
     || gameplay.SHOW_QUESTIONNAIRE !== savedGameplay.SHOW_QUESTIONNAIRE
     || gameplay.QUESTIONNAIRE_MODE !== savedGameplay.QUESTIONNAIRE_MODE
     || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
+    || gameplay.VOICE_STREAMED_LLM !== savedGameplay.VOICE_STREAMED_LLM
     || gameplay.VOICE_ONLY_UI !== savedGameplay.VOICE_ONLY_UI
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
   const voice = gameplay.VOICE_HANDS_FREE;
@@ -227,6 +229,14 @@ export default function GameMasterConfigTab() {
             <p className="text-xs text-muted-foreground">Avec Gradium, la voix commence pendant la génération. La mémoire distingue ce qui a été entendu après une interruption.</p>
           </div>
           <Switch checked={gameplay.VOICE_INCREMENTAL_OUTPUT} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_INCREMENTAL_OUTPUT: checked }))} aria-label="Sortie vocale progressive" />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+          <div>
+            <p className="text-sm font-medium">Voix seule : réponse parlée en cours de génération (mesure)</p>
+            <p className="text-xs text-muted-foreground">Lot 4 latence : avec ElevenLabs (et les autres voix hors Gradium progressif), la première phrase part au TTS dès que le LLM l'a écrite. Lu au début de chaque tour ; désactivé par défaut.</p>
+          </div>
+          <Switch checked={gameplay.VOICE_STREAMED_LLM} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_STREAMED_LLM: checked }))} aria-label="Voix seule : réponse parlée en cours de génération" />
         </div>
 
         <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>
