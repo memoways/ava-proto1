@@ -12,6 +12,9 @@ import {
   type MaxPromptControlSettings,
 } from "@/services/settingsService";
 import { clearSystemPromptCache } from "@/agents/maxAgent";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const FIELD_CONFIG: Array<{ key: keyof MaxPromptControlSettings; label: string; hint: string }> = [
   { key: "persona", label: "Persona", hint: "Identité stable, manière d'être, posture de Max." },
@@ -46,12 +49,22 @@ export default function MaxPromptControlTab() {
 
   async function handleSave() {
     setSaving(true);
-    await saveMaxPromptControlSettingsToDB(settings);
-    clearSystemPromptCache();
-    setSavedSettings(settings);
-    toast.success("Contrat de prompt Max sauvegardé ✓");
-    setSaving(false);
+    try {
+      await saveMaxPromptControlSettingsToDB(settings);
+      clearSystemPromptCache();
+      setSavedSettings(settings);
+      toast.success("Contrat de prompt Max enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSaving(false);
+    }
   }
+
+  useUnsavedChanges({
+    dirty: hasChanges, label: "Contrat de prompt Max", saving, save: handleSave,
+    discard: () => saveMaxPromptControlSettings(savedSettings),
+  });
 
   function handleReset() {
     const defaults = resetMaxPromptControlSettings();
@@ -72,17 +85,9 @@ export default function MaxPromptControlTab() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>Réinitialiser</Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? "Sauvegarde..." : "Sauvegarder"}
-          </Button>
+          <SaveButton dirty={hasChanges} saving={saving} onClick={() => void handleSave()} />
         </div>
       </div>
-
-      {hasChanges && (
-        <div className="rounded-lg border border-yellow-700/50 bg-yellow-900/30 px-4 py-2 text-sm text-yellow-300">
-          ⚠️ Modifications non sauvegardées — cliquez sur “Sauvegarder” pour les persister.
-        </div>
-      )}
 
       <section className="space-y-5 rounded-lg border p-4">
         <div className="rounded-lg border bg-muted/20 p-3 text-xs text-muted-foreground">

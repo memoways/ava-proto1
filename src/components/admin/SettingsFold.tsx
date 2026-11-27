@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   title: string;
@@ -12,13 +14,17 @@ interface Props {
 /** Folded block of the admin settings, closed by default; its fields stay mounted. */
 export function SettingsFold({ title, summary, children, testId, className }: Props) {
   return (
-    <details className={`group rounded border ${className ?? ""}`} data-testid={testId}>
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 px-2 py-1.5 text-xs">
-        <span aria-hidden className="text-muted-foreground transition-transform group-open:rotate-90">▸</span>
-        <span className="font-medium">{title}</span>
-        {summary ? <span className="text-muted-foreground" data-testid={testId ? `${testId}-summary` : undefined}>{summary}</span> : null}
+    <details className={cn("group rounded-md border-2 border-foreground/20 bg-muted/20", className)} data-testid={testId}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[4px] bg-muted/70 px-2 py-2 text-xs hover:bg-muted [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-primary/50 bg-background text-primary">
+          <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" strokeWidth={3} />
+        </span>
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <span className="text-sm font-semibold">{title}</span>
+          {summary ? <span className="text-muted-foreground" data-testid={testId ? `${testId}-summary` : undefined}>{summary}</span> : null}
+        </span>
       </summary>
-      <div className="space-y-2 border-t p-2">{children}</div>
+      <div className="space-y-2 border-t-2 border-foreground/10 bg-background p-2">{children}</div>
     </details>
   );
 }
@@ -38,7 +44,7 @@ export function TestSettingsFold({ children, testId = "test-settings" }: TestSet
       title="Réglages de test (temporaires)"
       summary="mesures et prototypes, à ne changer que pour un test"
       testId={testId}
-      className="border-dashed border-amber-700/50"
+      className="border-dashed border-amber-600/60"
     >
       {children}
     </SettingsFold>

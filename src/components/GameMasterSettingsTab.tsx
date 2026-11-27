@@ -1,8 +1,8 @@
 import { normalizeExperienceFrameConfig } from "@/services/experienceFrame";
 import { displayNameForCharacter } from "@/services/characterRegistry";
 import type { ExperienceFrameConfig } from "@/types";
-import { useEffect, useMemo, useState } from "react";
-import { Archive, Beaker, Copy, Download, Eye, Info, Play, RefreshCw, Save, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Archive, Beaker, Copy, Download, Eye, Info, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { evaluatePostTurnPRD4, EXPERIENCE_DIRECTOR_SYSTEM_PROMPT, GM_CODE_VERSION, resolveDirectorSystemPrompt } from "@/agents/gameMasterPRD4";
@@ -48,6 +48,9 @@ import {
 } from "@/services/gmPriorities";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { GM_MODE_TEXT } from "@/services/gmSettingsRegistry";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 interface SessionVersionRow { orchestration_version_id: string | null }
 
@@ -100,6 +103,7 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const confirmLeave = useConfirmLeave();
   const [testUser, setTestUser] = useState("Pourquoi Ava ne vous faisait-elle plus confiance ?");
   const [testCharacter, setTestCharacter] = useState("Je ne suis pas certain d’avoir mérité sa confiance.");
   const [testCharacterKey, setTestCharacterKey] = useState<RuntimeCharacter>("max");
@@ -192,10 +196,10 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
     setSaving(true);
     try {
       await updateOrchestrationDraft(selected.id, { name, prompt: generatedPrompt, config });
-      toast.success("Brouillon sauvegardé");
+      toast.success("Brouillon enregistré");
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sauvegarde impossible");
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
@@ -228,6 +232,19 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
       setSaving(false);
     }
   };
+
+  const draftDirty = selected?.status === "draft"
+    && (name !== selected.name || JSON.stringify(config) !== JSON.stringify(normalizeDirectorConfig(selected.config)));
+  useUnsavedChanges({
+    dirty: draftDirty,
+    label: `Réglages GM — brouillon v${selected?.version_number ?? ""}`,
+    saving,
+    save: saveDraft,
+    discard: () => { if (selected) selectVersion(selected); },
+  });
+  // Runs after « Enregistrer et continuer »: reads the version as it is then.
+  const createDraftRef = useRef(createDraft);
+  createDraftRef.current = createDraft;
 
   const testDraft = async () => {
     if (!selected || selected.status !== "draft") return;
@@ -371,8 +388,8 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
           <p className="text-sm text-muted-foreground">Un seul directeur post-tour, versionné et hors du chemin personnage → voix.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
-          <Button size="sm" onClick={() => void createDraft()} disabled={saving}><Copy className="mr-1 h-3.5 w-3.5" />Nouveau brouillon</Button>
+          <Button variant="outline" size="sm" onClick={() => confirmLeave(() => void load())}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
+          <Button size="sm" onClick={() => confirmLeave(() => void createDraftRef.current())} disabled={saving}><Copy className="mr-1 h-3.5 w-3.5" />Nouveau brouillon</Button>
         </div>
       </div>
 
@@ -387,7 +404,7 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
           <h3 className="font-semibold">Versions</h3>
           {versions.length === 0 && <p className="text-xs text-muted-foreground">Aucune version. Créez le premier brouillon.</p>}
           {versions.map((version) => (
-            <button key={version.id} onClick={() => selectVersion(version)} className={`w-full rounded border p-3 text-left ${version.id === selectedId ? "border-primary bg-primary/5" : "border-border"}`}>
+            <button key={version.id} onClick={() => { if (version.id !== selectedId) confirmLeave(() => selectVersion(version)); }} className={`w-full rounded border p-3 text-left ${version.id === selectedId ? "border-primary bg-primary/5" : "border-border"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">v{version.version_number} · {version.name}</span>
                 <Badge variant={statusVariant(version.status)}>{version.status}</Badge>
@@ -405,9 +422,9 @@ export default function GameMasterSettingsTab({ previewVersions }: { previewVers
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2"><h3 className="font-semibold">Version v{selected.version_number}</h3><Badge variant={statusVariant(selected.status)}>{selected.status}</Badge></div>
                 <div className="flex gap-2">
-                  {selected.status === "draft" && <Button size="sm" variant="outline" onClick={() => void saveDraft()} disabled={saving}><Save className="mr-1 h-3.5 w-3.5" />Sauvegarder</Button>}
-                  {selected.status === "draft" && <Button size="sm" onClick={() => void publish()} disabled={saving}><Play className="mr-1 h-3.5 w-3.5" />Publier</Button>}
-                  {selected.status === "draft" && <Button size="sm" variant="ghost" onClick={() => void archive()} disabled={saving}><Archive className="mr-1 h-3.5 w-3.5" />Archiver</Button>}
+                  {selected.status === "draft" && <SaveButton dirty={draftDirty} saving={saving} onClick={() => void saveDraft()} />}
+                  {selected.status === "draft" && <Button size="sm" onClick={() => confirmLeave(() => void publish())} disabled={saving}><Play className="mr-1 h-3.5 w-3.5" />Publier</Button>}
+                  {selected.status === "draft" && <Button size="sm" variant="ghost" onClick={() => confirmLeave(() => void archive())} disabled={saving}><Archive className="mr-1 h-3.5 w-3.5" />Archiver</Button>}
                   {selected.status === "archived" && <Button size="sm" variant="outline" onClick={() => void createDraft(selected)} disabled={saving}><Copy className="mr-1 h-3.5 w-3.5" />Restaurer en brouillon</Button>}
                 </div>
               </div>

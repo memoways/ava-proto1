@@ -52,7 +52,7 @@ describe("Expérience › Appareils", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Utiliser le catalogue" }));
     await waitFor(() => expect(screen.getByTestId("effective-voice-smartphone-max")).toHaveTextContent("(catalogue)"));
-    fireEvent.click(screen.getByRole("button", { name: "Sauvegarder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
     await waitFor(() => expect(saveDeviceServicesToDB).toHaveBeenCalledTimes(1));
     const saved = vi.mocked(saveDeviceServicesToDB).mock.calls[0][0];
     expect(saved.smartphone.characters).toEqual({

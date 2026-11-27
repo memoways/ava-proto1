@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { EvalItem } from "@/services/evalJudgePipeline";
 import { EVAL_MIN_ITEMS, type CorpusAudit } from "@/services/evalJudgeScoring";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
 
 interface Props {
   notionId: string;
   onNotionIdChange: (value: string) => void;
   onSaveNotionId: () => void;
+  notionIdDirty: boolean;
   onSync: () => void;
   syncing: boolean;
   items: EvalItem[];
@@ -28,7 +30,7 @@ function notionUrl(id: string): string {
 export default function EvalCorpusPanel({
   notionId,
   onNotionIdChange,
-  onSaveNotionId,
+  onSaveNotionId, notionIdDirty,
   onSync,
   syncing,
   items,
@@ -119,7 +121,7 @@ export default function EvalCorpusPanel({
               placeholder="32 caractères hex"
             />
           </div>
-          <Button variant="outline" onClick={onSaveNotionId}>Enregistrer l’ID</Button>
+          <SaveButton size="default" dirty={notionIdDirty} label="Enregistrer l’ID" onClick={onSaveNotionId} />
           <Button onClick={onSync} disabled={syncing}>{syncing ? "Import…" : "Importer depuis Notion"}</Button>
         </div>
 

@@ -3,9 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-26 (Importation vidéo)
+> **Last Updated**: 2026-11-27 (Enregistrement dans le back-office)  
 
 ---
+
+## Ce qu'on change reste, ou on le sait (27 novembre 2026)
+
+Le bouton pour enregistrer était tout en bas, différent d'un écran à l'autre, et changer de page effaçait sans rien dire. Maintenant une barre reste à l'écran tant qu'un changement attend, et le back-office demande avant de le perdre. En chemin : un enregistrement refusé s'annonçait comme réussi, et enregistrer Max effaçait les changements d'Emma. Les deux sont corrigés.
 
 ## Les vidéos arrivent toutes seules (26 novembre 2026)
 

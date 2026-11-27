@@ -33,9 +33,12 @@ import {
   type SelectableStreamingAvatarProvider,
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 import { EffectiveVoiceLine, useVoiceProfiles } from "@/components/admin/EffectiveVoiceSummary";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const OUTPUT_LABELS: Record<DeviceOutputChoice, string> = {
-  settings: "Suivre l'interrupteur Voix TTS / Avatar vidéo",
+  settings: "Suivre l'interrupteur Voix seule / Avatar vidéo",
   voice: "Appel vocal (voix seule)",
   avatar: "Avatar vidéo en direct",
 };
@@ -131,13 +134,15 @@ export default function DevicesTab() {
       setValue(confirmed);
       setSaved(confirmed);
       setLegacyFormat(false);
-      toast.success("Appareils sauvegardés");
+      toast.success("Appareils enregistrés");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sauvegarde impossible");
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
   };
+
+  useUnsavedChanges({ dirty: dirty && !loading, label: "Réglages par appareil", saving, save });
 
   const changeFallbackEngine = async (engine: TTSProviderId) => {
     const previous = fallbackEngine;
@@ -147,7 +152,7 @@ export default function DevicesTab() {
       toast.success(`Moteur de repli : ${TTS_PROVIDER_LABELS[engine]}`);
     } catch (error) {
       setFallbackEngine(previous);
-      toast.error(error instanceof Error ? error.message : "Sauvegarde impossible");
+      toastSaveError(error);
     }
   };
 
@@ -178,7 +183,7 @@ export default function DevicesTab() {
           <p className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-xs" data-testid="device-services-legacy">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             Ancien format lu sans perte : le moteur commun de chaque appareil s'applique à Max et à Emma, et les ID de voix
-            saisis sont conservés. Sauvegardez pour enregistrer le nouveau format.
+            saisis sont conservés. Enregistrez pour passer au nouveau format.
           </p>
         ) : null}
 
@@ -194,7 +199,7 @@ export default function DevicesTab() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Utilisé quand un personnage n'a pas de moteur dans Réglages personnages. Sauvegardé immédiatement.
+              Utilisé quand un personnage n'a pas de moteur dans Réglages personnages. Enregistré immédiatement.
             </p>
           </div>
           <div className="space-y-1.5 text-xs text-muted-foreground">
@@ -303,10 +308,7 @@ export default function DevicesTab() {
           );
         })}
         <div className="flex justify-end">
-          <Button onClick={save} disabled={(!dirty && !legacyFormat) || saving || loading}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sauvegarder
-          </Button>
+          <SaveButton size="default" dirty={dirty || legacyFormat} saving={saving} disabled={loading} onClick={() => void save()} />
         </div>
       </CardContent>
     </Card>

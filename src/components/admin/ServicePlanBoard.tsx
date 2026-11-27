@@ -25,6 +25,9 @@ import {
   type SavedServicePlan,
   type UsageEvent,
 } from "@/services/servicePlans";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 export interface PlanUsageBatch {
   events: UsageEvent[];
@@ -78,6 +81,7 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
   }, [loadUsage, now, services]);
 
   useEffect(() => { void reload(); }, [reload]);
+  const confirmLeave = useConfirmLeave();
 
   const snapshots = useMemo(
     () => services.map((service) => planSnapshot(service, plans[service.id] ?? emptyPlan(), usage.events, now, usage.capped)),
@@ -89,8 +93,12 @@ export default function ServicePlanBoard({ family, serviceId, onServiceId, loadU
     <Collapsible
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-        writePlansOpen(family, next);
+        // Folding unmounts the cards: ask before it drops a draft.
+        const apply = () => {
+          setOpen(next);
+          writePlansOpen(family, next);
+        };
+        if (next) apply(); else confirmLeave(apply);
       }}
       className="rounded-lg border"
     >
@@ -183,7 +191,10 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
   const accountLabel = snapshot.plan.account === "cancelled" ? "Résilié" : snapshot.plan.account === "paused" ? "En pause" : "Actif";
   const accountTone = snapshot.plan.account === "cancelled" ? "text-red-400" : snapshot.plan.account === "paused" ? "text-amber-400" : "text-emerald-400";
 
-  useEffect(() => { setDraft(snapshot.plan); }, [snapshot.plan]);
+  // Compared by value: a usage refresh must not replace a draft with the same stored plan.
+  const storedPlan = JSON.stringify(snapshot.plan);
+  useEffect(() => { setDraft(JSON.parse(storedPlan)); }, [storedPlan]);
+  const dirty = JSON.stringify(draft) !== storedPlan;
 
   const save = async () => {
     setSaving(true);
@@ -193,11 +204,13 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
       toast.success(`${service.label} enregistré`);
       setOpen(false);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : String(cause));
+      return toastSaveError(cause);
     } finally {
       setSaving(false);
     }
   };
+
+  useUnsavedChanges({ dirty, label: `Forfait ${service.label}`, saving, save });
 
   return (
     <article className="space-y-3 rounded-md border border-border/70 p-3">
@@ -371,7 +384,7 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
           )}
           <p className="text-xs text-muted-foreground md:col-span-2">{service.sourceNote}</p>
           <div className="md:col-span-2">
-            <Button size="sm" onClick={() => void save()} disabled={saving}>{saving ? "…" : "Enregistrer"}</Button>
+            <SaveButton dirty={dirty} saving={saving} onClick={() => void save()} />
           </div>
         </div>
       )}

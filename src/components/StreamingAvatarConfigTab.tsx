@@ -86,6 +86,9 @@ import { assignTavusFace } from "@/services/streamingAvatar/tavusFaceAdmin";
 import StreamingAvatarTestPanel from "@/components/StreamingAvatarTestPanel";
 import TavusFaceTrainer from "@/components/TavusFaceTrainer";
 import { adminTabPath } from "@/services/adminNavigation";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 
 const providerCopy: Record<StreamingAvatarProviderId, { title: string; description: string }> = {
@@ -144,13 +147,15 @@ export default function StreamingAvatarConfigTab() {
     try {
       await saveStreamingAvatarSettingsToDB(settings);
       setSaved(settings);
-      toast.success("Configuration Streaming Avatar sauvegardée");
+      toast.success("Configuration Streaming Avatar enregistrée");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sauvegarde impossible");
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
   };
+
+  useUnsavedChanges({ dirty, label: "Configuration Streaming Avatar", saving, save });
 
   if (loading) {
     return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Chargement…</div>;
@@ -251,7 +256,7 @@ export default function StreamingAvatarConfigTab() {
         <CardHeader>
           <CardTitle className="text-base">Voix réellement jouée</CardTitle>
           <CardDescription>
-            Calculée comme dans l'expérience, avec les réglages affichés ici (même non sauvegardés). Emma démarre toujours
+            Calculée comme dans l'expérience, avec les réglages affichés ici (même non enregistrés). Emma démarre toujours
             en voix seule.
           </CardDescription>
         </CardHeader>
@@ -277,10 +282,7 @@ export default function StreamingAvatarConfigTab() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={save} disabled={!dirty || saving}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Sauvegarder
-        </Button>
+        <SaveButton size="default" dirty={dirty} saving={saving} onClick={() => void save()} />
       </div>
 
       <StreamingAvatarTestPanel settings={settings} dirty={dirty} />

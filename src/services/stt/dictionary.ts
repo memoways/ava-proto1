@@ -100,11 +100,7 @@ export async function saveDictionaryToDB(dict: STTDictionary): Promise<STTDictio
   const normalized = normalize(dict);
   writeEnvironmentStorage(STT_DICTIONARY_KEY, JSON.stringify(normalized));
   cached = normalized;
-  try {
-    await saveEnvironmentSetting(STT_DICTIONARY_KEY, normalized);
-  } catch (err) {
-    console.error("[STT Dictionary] DB save exception:", err);
-  }
+  await saveEnvironmentSetting(STT_DICTIONARY_KEY, normalized);
   return { terms: [...normalized.terms] };
 }
 

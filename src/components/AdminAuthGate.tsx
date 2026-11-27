@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { AdminEnvironmentProvider } from "@/contexts/AdminEnvironmentContext";
 import { getAdminUserProfile, type AdminUserProfile } from "@/services/environmentContext";
+import { UnsavedChangesProvider } from "@/components/admin/unsaved/UnsavedChanges";
+import { useConfirmLeave } from "@/components/admin/unsaved/context";
 
 interface Props {
   children: React.ReactNode;
@@ -103,17 +105,26 @@ export default function AdminAuthGate({ children }: Props) {
   }
 
   return (
-    <div className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={handleLogout}
-        className="absolute right-3 top-3 z-50"
-      >
-        Déconnexion ({session.user.email})
-      </Button>
-      <AdminEnvironmentProvider profile={profile}>{children}</AdminEnvironmentProvider>
-    </div>
+    <UnsavedChangesProvider>
+      <div className="relative">
+        <LogoutButton email={session.user.email} onLogout={handleLogout} />
+        <AdminEnvironmentProvider profile={profile}>{children}</AdminEnvironmentProvider>
+      </div>
+    </UnsavedChangesProvider>
+  );
+}
+
+function LogoutButton({ email, onLogout }: { email?: string; onLogout: () => Promise<void> }) {
+  const confirmLeave = useConfirmLeave();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => confirmLeave(() => void onLogout())}
+      className="absolute right-3 top-3 z-50"
+    >
+      Déconnexion ({email})
+    </Button>
   );
 }

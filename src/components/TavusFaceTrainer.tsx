@@ -49,7 +49,7 @@ interface Props {
   characters: Record<string, TavusCharacterOverride>;
   /** Character keys that can receive a Face, with their label (Max, Emma). */
   characterLabels: Record<string, string>;
-  /** Writes `tavus.characters.<key>.faceId`; the admin still presses « Sauvegarder ». */
+  /** Writes `tavus.characters.<key>.faceId`; the admin still presses « Enregistrer ». */
   onAssign: (characterKey: string, faceId: string) => void;
 }
 
@@ -204,7 +204,7 @@ export default function TavusFaceTrainer({ characters, characterLabels, onAssign
 
   const assign = (face: TavusFace) => {
     onAssign(targetKey, face.faceId);
-    toast.success(`Face attribué à ${targetLabel} (Face ID ${face.faceId}). Cliquez sur « Sauvegarder » pour l'enregistrer.`);
+    toast.success(`Face attribué à ${targetLabel} (Face ID ${face.faceId}). Cliquez sur « Enregistrer » pour le garder.`);
   };
 
   return (

@@ -36,11 +36,8 @@ async function loadFromDB<T>(key: string, defaults: T): Promise<T> {
  * Save a settings object to both localStorage (immediate) and DB (persistent).
  */
 async function saveToDB<T>(key: string, value: T): Promise<void> {
-  try {
-    await saveEnvironmentSetting(key, value);
-  } catch (err) {
-    console.error(`[Settings] DB save exception for ${key}:`, err);
-  }
+  // Throws on a refused write: a screen must never announce a save that did not happen.
+  await saveEnvironmentSetting(key, value);
 }
 
 // ===== LLM Settings =====
@@ -377,7 +374,8 @@ export async function loadLLMSettingsFromDB(options: { readOnly?: boolean } = {}
   const loaded = await loadFromDB(LLM_STORAGE_KEY, llmDefaults);
   const normalized = normalizeLLMSettings(loaded);
   if (!options.readOnly && JSON.stringify(loaded) !== JSON.stringify(normalized)) {
-    await saveToDB(LLM_STORAGE_KEY, normalized);
+    await saveToDB(LLM_STORAGE_KEY, normalized)
+      .catch((err) => console.error("[Settings] LLM normalization not stored:", err));
   }
   return normalized;
 }

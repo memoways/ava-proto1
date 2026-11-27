@@ -50,6 +50,8 @@ import EvalCompareSetup, { type CompareSideState } from "./evalJudge/EvalCompare
 import EvalComparisonPanel from "./evalJudge/EvalComparisonPanel";
 import EvalResultsPanel from "./evalJudge/EvalResultsPanel";
 import EvalScoringPanel from "./evalJudge/EvalScoringPanel";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 interface StoredRunConfig {
   configs?: EvalTurnConfig[];
@@ -76,6 +78,10 @@ export default function EvalJudgeTab() {
   const [extraModels, setExtraModels] = useState<string[]>([]);
   const extraModelsReady = useRef(false);
   const [weights, setWeights] = useState<EvalScoreWeights>({ ...DEFAULT_SCORE_WEIGHTS });
+  const [savedWeights, setSavedWeights] = useState(weights);
+  const [savedNotionId, setSavedNotionId] = useState("");
+  const savedWeightsRef = useRef(JSON.stringify(weights));
+  const savedNotionIdRef = useRef("");
   const [toggles, setToggles] = useState<LeverToggles>({
     tempZero: true,
     tempHigh: true,
@@ -167,10 +173,15 @@ export default function EvalJudgeTab() {
         fetchEvalRuns(),
         loadScoreWeights(),
       ]);
-      setNotionId(id);
+      // A reload (import, end of run) keeps what is being edited.
+      setNotionId((current) => current === savedNotionIdRef.current ? id : current);
+      savedNotionIdRef.current = id;
+      setSavedNotionId(id);
       setItems(nextItems);
       setRuns(nextRuns);
-      setWeights(storedWeights);
+      setWeights((current) => JSON.stringify(current) === savedWeightsRef.current ? storedWeights : current);
+      savedWeightsRef.current = JSON.stringify(storedWeights);
+      setSavedWeights(storedWeights);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -185,9 +196,11 @@ export default function EvalJudgeTab() {
   async function handleSaveNotionId() {
     try {
       await saveEvalNotionDatabaseId(notionId);
+      savedNotionIdRef.current = notionId;
+      setSavedNotionId(notionId);
       toast.success("ID Notion enregistré pour cet environnement");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      return toastSaveError(error);
     }
   }
 
@@ -195,13 +208,20 @@ export default function EvalJudgeTab() {
     setSavingWeights(true);
     try {
       await saveScoreWeights(weights);
+      savedWeightsRef.current = JSON.stringify(weights);
+      setSavedWeights(weights);
       toast.success("Poids enregistrés pour cet environnement");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
+      return toastSaveError(error);
     } finally {
       setSavingWeights(false);
     }
   }
+
+  const notionIdDirty = !loading && notionId !== savedNotionId;
+  const weightsDirty = !loading && JSON.stringify(weights) !== JSON.stringify(savedWeights);
+  useUnsavedChanges({ dirty: notionIdDirty, label: "ID de la base Notion du juge", save: handleSaveNotionId });
+  useUnsavedChanges({ dirty: weightsDirty, label: "Poids de la grille de notation", saving: savingWeights, save: handleSaveWeights });
 
   async function handleSync() {
     if (!notionId.trim()) {
@@ -211,6 +231,8 @@ export default function EvalJudgeTab() {
     setSyncing(true);
     try {
       await saveEvalNotionDatabaseId(notionId);
+      savedNotionIdRef.current = notionId;
+      setSavedNotionId(notionId);
       const report = await syncEvalItemsFromNotion(notionId);
       toast.success(`${report.items_upserted} question(s) importée(s)`);
       await reload();
@@ -365,6 +387,7 @@ export default function EvalJudgeTab() {
       <EvalCorpusPanel
         notionId={notionId}
         onNotionIdChange={setNotionId}
+        notionIdDirty={notionIdDirty}
         onSaveNotionId={() => void handleSaveNotionId()}
         onSync={() => void handleSync()}
         syncing={syncing}
@@ -418,6 +441,7 @@ export default function EvalJudgeTab() {
         onChange={setWeights}
         onSave={() => void handleSaveWeights()}
         saving={savingWeights}
+        dirty={weightsDirty}
       />
 
       <EvalResultsPanel

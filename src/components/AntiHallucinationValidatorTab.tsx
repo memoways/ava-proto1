@@ -11,6 +11,9 @@ import {
   saveAntiHallucinationValidatorSettingsToDB,
   type AntiHallucinationValidatorSettings,
 } from "@/services/settingsService";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 function splitLines(value: string): string[] {
   return value.split("\n").map((line) => line.trim()).filter(Boolean);
@@ -107,11 +110,21 @@ export default function AntiHallucinationValidatorTab() {
 
   async function handleSave() {
     setSaving(true);
-    await saveAntiHallucinationValidatorSettingsToDB(settings);
-    setSavedSettings(settings);
-    toast.success("Règles du validateur sauvegardées ✓");
-    setSaving(false);
+    try {
+      await saveAntiHallucinationValidatorSettingsToDB(settings);
+      setSavedSettings(settings);
+      toast.success("Règles du validateur enregistrées ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSaving(false);
+    }
   }
+
+  useUnsavedChanges({
+    dirty: hasChanges, label: "Règles du validateur", saving, save: handleSave,
+    discard: () => saveAntiHallucinationValidatorSettings(savedSettings),
+  });
 
   function handleReset() {
     const defaults = resetAntiHallucinationValidatorSettings();
@@ -131,9 +144,7 @@ export default function AntiHallucinationValidatorTab() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>Réinitialiser</Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? "Sauvegarde..." : "Sauvegarder"}
-          </Button>
+          <SaveButton dirty={hasChanges} saving={saving} onClick={() => void handleSave()} />
         </div>
       </div>
 
@@ -159,12 +170,6 @@ export default function AntiHallucinationValidatorTab() {
           <li><strong>enforce</strong> : le simulateur applique le comportement historique — retry puis fallback « Je ne peux pas l'affirmer… ».</li>
         </ul>
       </section>
-
-      {hasChanges && (
-        <div className="rounded-lg border border-yellow-700/50 bg-yellow-900/30 px-4 py-2 text-sm text-yellow-300">
-          ⚠️ Modifications non sauvegardées — cliquez sur "Sauvegarder" pour les persister.
-        </div>
-      )}
 
       <section className="space-y-5 rounded-lg border p-4">
         <div className="grid gap-3 md:grid-cols-2">

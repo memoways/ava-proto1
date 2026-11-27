@@ -95,9 +95,9 @@ export default function StreamingAvatarTestPanel({
 
     let effective = settings;
     try {
-      push("Lecture de la configuration sauvegardée…");
+      push("Lecture de la configuration enregistrée…");
       effective = await loadStreamingAvatarSettingsFromDB();
-      push(`Fournisseur sauvegardé : ${effective.activeProvider}`, "ok");
+      push(`Fournisseur enregistré : ${effective.activeProvider}`, "ok");
 
       push("Création d'une session privée de test…");
       sessionId = await createPRD4Session(null, "max", {
@@ -201,8 +201,8 @@ export default function StreamingAvatarTestPanel({
 
         {dirty && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-600">
-            Modifications non sauvegardées : le test utilise toujours la configuration enregistrée.
-            Sauvegarde d'abord pour tester le fournisseur choisi.
+            Modifications non enregistrées : le test utilise toujours la configuration enregistrée.
+            Enregistre d'abord pour tester le fournisseur choisi.
           </p>
         )}
 

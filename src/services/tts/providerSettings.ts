@@ -379,9 +379,6 @@ async function loadFromDB<T>(key: string, defaults: T): Promise<T> {
 }
 
 async function saveToDB<T>(key: string, value: T): Promise<void> {
-  try {
-    await saveEnvironmentSetting(key, value);
-  } catch (err) {
-    console.error(`[ttsProviderSettings] DB save exception for ${key}:`, err);
-  }
+  // Throws on a refused write: a screen must never announce a save that did not happen.
+  await saveEnvironmentSetting(key, value);
 }

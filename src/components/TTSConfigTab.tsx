@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { writeEnvironmentStorage } from "@/services/environmentContext";
-import { Save, RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
+import { RotateCcw, CheckCircle2, HelpCircle } from "lucide-react";
 import type { TTSProviderId } from "@/services/tts/types";
 import {
   getInworldSettings,
@@ -50,6 +50,9 @@ import { listCharacterRuntimeProfiles } from "@/services/experienceOrchestration
 import { PROVIDER_ACTING_SUPPORT } from "@/services/tts/performanceIntent";
 import { elevenLabsCapabilities, normalizeElevenLabsModelId, supportsElevenLabsAudioTags } from "../../supabase/functions/_shared/elevenLabsModels";
 import CharacterVoicesPanel from "@/components/CharacterVoicesPanel";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 const GRADIUM_CHARACTER_ORDER = ["max", "emma"];
 
 function ActingNote({
@@ -154,14 +157,19 @@ export default function TTSConfigTab() {
     const updated = { ...elSettings, ...preset.settings };
     writeEnvironmentStorage("ava_tts_settings", JSON.stringify(updated));
     setElSettings(updated);
-    toast.success(`Preset "${preset.label}" appliqué — sauvegarde nécessaire`);
+    toast.success(`Preset "${preset.label}" appliqué — à enregistrer`);
   }
   async function saveEl() {
     setSavingEl(true);
-    await saveTTSSettingsToDB(elSettings);
-    setElSaved(elSettings);
-    toast.success("ElevenLabs sauvegardé ✓");
-    setSavingEl(false);
+    try {
+      await saveTTSSettingsToDB(elSettings);
+      setElSaved(elSettings);
+      toast.success("ElevenLabs enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSavingEl(false);
+    }
   }
   function resetEl() {
     const d = resetTTSSettings();
@@ -177,10 +185,15 @@ export default function TTSConfigTab() {
   }
   async function saveIw() {
     setSavingIw(true);
-    await saveInworldSettingsToDB(iwSettings);
-    setIwSaved(iwSettings);
-    toast.success("Inworld sauvegardé ✓");
-    setSavingIw(false);
+    try {
+      await saveInworldSettingsToDB(iwSettings);
+      setIwSaved(iwSettings);
+      toast.success("Inworld enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSavingIw(false);
+    }
   }
   function resetIw() {
     const d = resetInworldSettings();
@@ -196,10 +209,15 @@ export default function TTSConfigTab() {
   }
   async function saveFish() {
     setSavingFish(true);
-    await saveFishSettingsToDB(fishSettings);
-    setFishSaved(fishSettings);
-    toast.success("Fish Audio sauvegardé ✓");
-    setSavingFish(false);
+    try {
+      await saveFishSettingsToDB(fishSettings);
+      setFishSaved(fishSettings);
+      toast.success("Fish Audio enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSavingFish(false);
+    }
   }
   function resetFish() {
     const d = resetFishSettings();
@@ -224,10 +242,15 @@ export default function TTSConfigTab() {
   }
   async function saveGr() {
     setSavingGr(true);
-    await saveGradiumSettingsToDB(grSettings);
-    setGrSaved(grSettings);
-    toast.success("Gradium sauvegardé ✓");
-    setSavingGr(false);
+    try {
+      await saveGradiumSettingsToDB(grSettings);
+      setGrSaved(grSettings);
+      toast.success("Gradium enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSavingGr(false);
+    }
   }
   function resetGr() {
     if (!grCharacter) return;
@@ -244,10 +267,15 @@ export default function TTSConfigTab() {
   }
   async function saveCa() {
     setSavingCa(true);
-    await saveCartesiaSettingsToDB(caSettings);
-    setCaSaved(caSettings);
-    toast.success("Cartesia sauvegardé ✓");
-    setSavingCa(false);
+    try {
+      await saveCartesiaSettingsToDB(caSettings);
+      setCaSaved(caSettings);
+      toast.success("Cartesia enregistré ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSavingCa(false);
+    }
   }
   function resetCa() {
     const d = resetCartesiaSettings();
@@ -256,6 +284,26 @@ export default function TTSConfigTab() {
     toast.success("Cartesia réinitialisé");
   }
 
+  useUnsavedChanges({
+    dirty: elHasChanges, label: "Voix ElevenLabs", saving: savingEl, save: saveEl,
+    discard: () => writeEnvironmentStorage("ava_tts_settings", JSON.stringify(elSaved)),
+  });
+  useUnsavedChanges({
+    dirty: iwHasChanges, label: "Voix Inworld", saving: savingIw, save: saveIw,
+    discard: () => writeEnvironmentStorage("ava_tts_settings_inworld", JSON.stringify(iwSaved)),
+  });
+  useUnsavedChanges({
+    dirty: fishHasChanges, label: "Voix Fish Audio", saving: savingFish, save: saveFish,
+    discard: () => writeEnvironmentStorage("ava_tts_settings_fish", JSON.stringify(fishSaved)),
+  });
+  useUnsavedChanges({
+    dirty: grHasChanges, label: "Voix Gradium", saving: savingGr, save: saveGr,
+    discard: () => writeEnvironmentStorage("ava_tts_settings_gradium", JSON.stringify(grSaved)),
+  });
+  useUnsavedChanges({
+    dirty: caHasChanges, label: "Voix Cartesia", saving: savingCa, save: saveCa,
+    discard: () => writeEnvironmentStorage("ava_tts_settings_cartesia", JSON.stringify(caSaved)),
+  });
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -297,18 +345,9 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetEl}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={saveEl} disabled={savingEl || !elHasChanges}
-              className={elHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingEl ? "..." : "Sauver"}
-            </Button>
+            <SaveButton dirty={elHasChanges} saving={savingEl} onClick={() => void saveEl()} />
           </div>
         </div>
-
-        {elHasChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications ElevenLabs non sauvegardées
-          </div>
-        )}
 
         <div>
           <p className="text-xs font-medium mb-2">⚡ Presets rapides</p>
@@ -392,18 +431,9 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetIw}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={saveIw} disabled={savingIw || !iwHasChanges}
-              className={iwHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingIw ? "..." : "Sauver"}
-            </Button>
+            <SaveButton dirty={iwHasChanges} saving={savingIw} onClick={() => void saveIw()} />
           </div>
         </div>
-
-        {iwHasChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Inworld non sauvegardées
-          </div>
-        )}
 
         <div>
           <p className="text-xs font-medium mb-2">Modèle</p>
@@ -493,18 +523,9 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetFish}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={saveFish} disabled={savingFish || !fishHasChanges}
-              className={fishHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingFish ? "..." : "Sauver"}
-            </Button>
+            <SaveButton dirty={fishHasChanges} saving={savingFish} onClick={() => void saveFish()} />
           </div>
         </div>
-
-        {fishHasChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Fish Audio non sauvegardées
-          </div>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1 text-sm">
@@ -605,18 +626,9 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetGr}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={saveGr} disabled={savingGr || !grHasChanges}
-              className={grHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingGr ? "..." : "Sauver"}
-            </Button>
+            <SaveButton dirty={grHasChanges} saving={savingGr} onClick={() => void saveGr()} />
           </div>
         </div>
-
-        {grHasChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Gradium non sauvegardées
-          </div>
-        )}
 
         <div>
           <p className="text-xs font-medium mb-2">Personnage</p>
@@ -752,18 +764,9 @@ export default function TTSConfigTab() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={resetCa}><RotateCcw className="w-3 h-3 mr-1" />Reset</Button>
-            <Button size="sm" onClick={saveCa} disabled={savingCa || !caHasChanges}
-              className={caHasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-              <Save className="w-3 h-3 mr-1" />{savingCa ? "..." : "Sauver"}
-            </Button>
+            <SaveButton dirty={caHasChanges} saving={savingCa} onClick={() => void saveCa()} />
           </div>
         </div>
-
-        {caHasChanges && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-1 text-xs text-yellow-300">
-            ⚠️ Modifications Cartesia non sauvegardées
-          </div>
-        )}
 
         <div>
           <p className="text-xs font-medium mb-2">Modèle</p>

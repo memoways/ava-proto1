@@ -111,7 +111,7 @@ describe('AP2 — one guided workshop and saved comparisons', () => {
   expect(listen).not.toHaveBeenCalled(); expect(saveSpeechPerformanceSettings).not.toHaveBeenCalled();
   vi.mocked(saveSpeechPerformanceSettings).mockRejectedValue(new Error('Relecture impossible'));
   fireEvent.change(screen.getByLabelText('Pauses Action'), { target: { value: 'long' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Sauvegarder le mapping du jeu sandbox et relire', hidden: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le mapping du jeu sandbox et relire', hidden: true }));
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Relecture impossible'));
   expect(saveWorkshopComparison).not.toHaveBeenCalled();
  });

@@ -4,7 +4,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { GM_MIN_MAX_TOKENS } from "@/services/gameMasterContract";
 import { toast } from "sonner";
-import { Save, RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles, Brain } from "lucide-react";
+import { RotateCcw, ChevronDown, ChevronUp, Zap, Scale, Sparkles, Brain } from "lucide-react";
 import {
   getLLMSettings,
   saveLLMSettingsLocal,
@@ -20,6 +20,9 @@ import {
   type LLMSettings,
   type OpenRouterModel,
 } from "@/services/settingsService";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const TIER_META: Record<string, { icon: typeof Zap; label: string; className: string }> = {
   fast: { icon: Zap, label: "Rapide", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -147,11 +150,24 @@ export default function LLMConfigTab() {
 
   async function handleSave() {
     setSaving(true);
-    await saveLLMSettingsToDB(settings);
-    setSavedSettings(settings);
-    toast.success("Réglages LLM sauvegardés ✓");
-    setSaving(false);
+    try {
+      await saveLLMSettingsToDB(settings);
+      setSavedSettings(settings);
+      toast.success("Réglages LLM enregistrés ✓");
+    } catch (error) {
+      return toastSaveError(error);
+    } finally {
+      setSaving(false);
+    }
   }
+
+  useUnsavedChanges({
+    dirty: hasChanges,
+    label: "Réglages LLM",
+    saving,
+    save: handleSave,
+    discard: () => saveLLMSettingsLocal(savedSettings),
+  });
 
   function handleReset() {
     const defaults = resetLLMSettings();
@@ -170,25 +186,16 @@ export default function LLMConfigTab() {
         <div>
           <h2 className="text-lg font-semibold">Configuration LLM</h2>
           <p className="text-sm text-muted-foreground">
-            Modèles OpenRouter, température, tokens — clique "Sauvegarder" pour persister les changements.
+            Modèles OpenRouter, température, tokens — clique « Enregistrer » pour les appliquer.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleReset}>
             <RotateCcw className="w-3 h-3 mr-1" /> Réinitialiser
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}
-            className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-            <Save className="w-3 h-3 mr-1" /> {saving ? "Sauvegarde..." : "Sauvegarder"}
-          </Button>
+          <SaveButton dirty={hasChanges} saving={saving} onClick={() => void handleSave()} />
         </div>
       </div>
-
-      {hasChanges && (
-        <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-sm text-yellow-300">
-          ⚠️ Modifications non sauvegardées — clique "Sauvegarder" pour persister en base de données.
-        </div>
-      )}
 
       {/* ===== MAX AGENT MODEL ===== */}
       <section className="border rounded-lg p-4 space-y-4">

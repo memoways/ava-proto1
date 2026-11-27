@@ -38,6 +38,9 @@ import { adminTabPath } from "@/services/adminNavigation";
 import type { QuestionnaireData } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DEVICE_CLASSES, DEVICE_CLASS_LABELS, UNKNOWN_DEVICE, sessionDeviceKey, sessionDeviceLabel } from "@/services/deviceClass";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 /** Onglet admin où corriger la cause racine selon le type de fallback GM. */
 const FALLBACK_TARGET_TAB: Record<string, { tab: string; label: string }> = {
@@ -705,6 +708,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   const [nameInput, setNameInput] = useState("");
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");
+  const confirmLeave = useConfirmLeave();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [pinnedMessageIndexes, setPinnedMessageIndexes] = useState<Set<number>>(new Set());
   const [pinningMessageIndexes, setPinningMessageIndexes] = useState<Set<number>>(new Set());
@@ -923,26 +927,33 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
   async function saveName(id: string) {
     const { error } = await supabase.from("sessions").update({ name: nameInput || null }).eq("id", id);
     if (error) {
-      toast.error("Erreur: " + error.message);
-    } else {
-      toast.success("Nom mis à jour");
-      if (selected?.id === id) setSelected({ ...selected, name: nameInput || null });
-      onRefresh();
+      return toastSaveError(error);
     }
+    toast.success("Nom mis à jour");
+    if (selected?.id === id) setSelected({ ...selected, name: nameInput || null });
+    onRefresh();
     setEditingName(null);
   }
 
   async function saveNote(id: string) {
     const { error } = await supabase.from("sessions").update({ admin_note: noteInput || null }).eq("id", id);
     if (error) {
-      toast.error("Erreur: " + error.message);
-    } else {
-      toast.success("Note mise à jour");
-      if (selected?.id === id) setSelected({ ...selected, admin_note: noteInput || null });
-      onRefresh();
+      return toastSaveError(error);
     }
+    toast.success("Note mise à jour");
+    if (selected?.id === id) setSelected({ ...selected, admin_note: noteInput || null });
+    onRefresh();
     setEditingNote(null);
   }
+
+  const noteDirty = editingNote !== null && noteInput !== (sessions.find((s) => s.id === editingNote)?.admin_note || "");
+  const nameDirty = editingName !== null && nameInput !== (sessions.find((s) => s.id === editingName)?.name || "");
+  useUnsavedChanges({
+    dirty: noteDirty, label: "Note de session", save: () => saveNote(editingNote!), discard: () => setEditingNote(null),
+  });
+  useUnsavedChanges({
+    dirty: nameDirty, label: "Nom de session", save: () => saveName(editingName!), discard: () => setEditingName(null),
+  });
 
   return (
     <div data-testid="sessions-layout" className="grid grid-cols-1 items-stretch gap-4 lg:h-[calc(100dvh-15rem)] lg:min-h-[32rem] lg:grid-cols-[22rem_minmax(0,1fr)_18rem]">
@@ -1059,14 +1070,14 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                   <Activity className="w-3 h-3" />
                 </Link>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setEditingName(s.id); setNameInput(s.name || ""); }}
+                  onClick={(e) => { e.stopPropagation(); confirmLeave(() => { setEditingName(s.id); setNameInput(s.name || ""); }); }}
                   className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
                   title="Renommer"
                 >
                   <Pencil className="w-3 h-3" />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setEditingNote(s.id); setNoteInput(s.admin_note || ""); }}
+                  onClick={(e) => { e.stopPropagation(); confirmLeave(() => { setEditingNote(s.id); setNoteInput(s.admin_note || ""); }); }}
                   className="p-1 rounded bg-muted/80 hover:bg-muted text-muted-foreground"
                   title="Note"
                 >
@@ -1109,7 +1120,7 @@ export default function SessionsTab({ sessions, selectedSessionId, onSelectSessi
                     autoFocus
                   />
                   <div className="flex gap-1">
-                    <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => saveNote(s.id)}>Enregistrer</Button>
+                    <SaveButton dirty={noteDirty} className="h-6 text-xs" onClick={() => void saveNote(s.id)} />
                     <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingNote(null)}>Annuler</Button>
                   </div>
                 </div>

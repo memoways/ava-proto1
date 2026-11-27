@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, useLocation, useParams } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Routes, Route, useLocation, useParams } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import IndexPRD4 from "./pages/IndexPRD4";
 import AdminAuthGate from "./components/AdminAuthGate";
@@ -48,38 +48,45 @@ function ExternalTestRoute() {
   return <ExternalTestAccessGate invitationId={invitationId}><IndexPRD4 /></ExternalTestAccessGate>;
 }
 
+function AppRoutes() {
+  return (
+    <RoutedThemeProvider>
+      <Toaster />
+      <Sonner />
+      <Routes>
+        <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
+        <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+        <Route path="/confidentialite" element={<Privacy />} />
+        <Route
+          path="/admin/*"
+          element={(
+            <AdminAuthGate>
+              <Suspense fallback={<div className="p-6 text-sm">Chargement de l’admin…</div>}>
+                <Admin />
+              </Suspense>
+            </AdminAuthGate>
+          )}
+        />
+        {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
+        {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
+        {GmSettingsPreview && <Route path="/__preview/gm-settings" element={<Suspense fallback={null}><GmSettingsPreview /></Suspense>} />}
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      {debugLogger.enabled && <DebugPanel />}
+    </RoutedThemeProvider>
+  );
+}
+
+// A data router, so that the back-office can hold a navigation while a change is unsaved (`useBlocker`).
+const router = createBrowserRouter([{ path: "*", element: <AppRoutes /> }]);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BrowserRouter>
-        <RoutedThemeProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route path="/" element={<PublicAccessGate><IndexPRD4 /></PublicAccessGate>} />
-            <Route path="/test/:invitationId" element={<ExternalTestRoute />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
-            <Route path="/confidentialite" element={<Privacy />} />
-            <Route
-              path="/admin/*"
-              element={(
-                <AdminAuthGate>
-                  <Suspense fallback={<div className="p-6 text-sm">Chargement de l’admin…</div>}>
-                    <Admin />
-                  </Suspense>
-                </AdminAuthGate>
-              )}
-            />
-            {LatencyTelemetryPreview && <Route path="/__preview/latency-telemetry" element={<Suspense fallback={null}><LatencyTelemetryPreview /></Suspense>} />}
-            {RAGConfigPreview && <Route path="/__preview/rag-config" element={<Suspense fallback={null}><RAGConfigPreview /></Suspense>} />}
-            {GmSettingsPreview && <Route path="/__preview/gm-settings" element={<Suspense fallback={null}><GmSettingsPreview /></Suspense>} />}
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          {debugLogger.enabled && <DebugPanel />}
-        </RoutedThemeProvider>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </TooltipProvider>
   </QueryClientProvider>
 );
