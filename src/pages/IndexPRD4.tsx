@@ -574,7 +574,7 @@ const IndexPRD4 = () => {
   // ---- Helpers conversation -------------------------------------------------
   const cleanupAudio = useCallback(() => {
     callGenerationRef.current += 1;
-    handoffCoordinatorRef.current.invalidate();
+    handoffCoordinatorRef.current.endCall();
     dispatchCinematicRef.current({ type: "cancel" }, "experience_cleanup");
     cinematicPlayerRef.current?.stop();
     callPreparationRef.current = null;
@@ -2043,7 +2043,8 @@ const IndexPRD4 = () => {
           sessionId: sessionIdRef.current,
           handoffDelivery,
           handoffRequested: Boolean(requestedSwitch),
-          postTurnSignal: handoffLease?.signal,
+          handoffSignal: handoffLease?.signal,
+          postTurnSignal: handoffLease?.postTurnSignal,
           prepareHandoff,
           handoffOpenRequest: turnHandoffState?.openRequest ?? null,
           handoffUserText,
@@ -3707,6 +3708,7 @@ const IndexPRD4 = () => {
     activeOutputControllerRef.current?.abort('character-switch');
     activeTurnSequenceRef.current += 1;
     const switchSequence = activeTurnSequenceRef.current;
+    handoffCoordinatorRef.current.endCall();
     setHandoffCallingTarget(target);
     setHandoffCalling(true);
     setApprovedCallingTarget(null);

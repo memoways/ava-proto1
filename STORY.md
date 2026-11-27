@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Attente de passage, mesure)  
+> **Last Updated**: 2026-11-27 (Attente de passage, lot 1 bis)  
+
+---
+
+## Le Game Master finit sa phrase (27 novembre 2026)
+
+Le joueur peut reparler aussitôt : le Game Master termine en arrière-plan l'analyse du tour précédent et la garde en mémoire. Ses conseils périmés ne sont pas appliqués au nouveau tour. Reste à le vérifier sur un vrai appel.
 
 ---
 

@@ -207,6 +207,25 @@ Sessions `ab76a0c9` (18 tentatives) et `9e2ba88c` (13), `sandbox-ulrich`, voix s
 - **Antérieur au lot 1** : un tour qui ne nomme personne n'attendait déjà pas ; son GM est annulé de la même façon (`ab76a0c9` tour 15). Tous motifs confondus, 38 observations GM sur 288 sont en échec du 21 novembre à la fusion.
 - **Conclusion** : mécanisme confirmé ; gain en secondes **non mesurable** (le GM annulé ne dit pas combien l'ancien code aurait attendu) et passages perdus **non mesurables**. Refaire un appel avant correction n'apporterait rien. Retour possible sans code : activer « Passage : attendre même sur un simple nom » (le GM est conservé sur ces tours, l'attente revient). Suite : [lot 1 bis](prompt_reprise_attente_passage_lot_1_bis.md).
 
+### Attente de passage, lot 1 bis (27 novembre, code)
+
+Deux durées de vie dans `HandoffCoordinator` : le **bail de passage** (dépassé par la demande suivante, comme avant) et le signal du **post-tour**, lié à l'appel. Le post-tour d'un tour ordinaire, avec ou sans nom, va au bout et s'enregistre quand le tour suivant démarre. Il est annulé par la fin d'appel, le redémarrage, le clic d'acceptation et le changement de personnage, d'appel ou de session. Refuser un passage ne l'annule plus. La préparation d'un passage (`character_handoff_preparation`) suit toujours le bail. Aucune attente ajoutée avant la réponse.
+
+Effets d'une évaluation arrivée tard, vérifiés dans le code :
+
+| Effet | Conduite |
+|---|---|
+| Journal `gm_post_turn_log` | écrit, inséré dans l'ordre des tours (la reprise le rejoue dans l'ordre) |
+| Mémoire, `memory_last_turn` | fusionnée si aucun tour plus récent n'est écrit ; sinon seul le journal est complété |
+| Conseil, état de parole, état du personnage, sujets, libellés, fin de scène | ignorés en direct (`isCurrentTurn`) |
+| Cinématique du Game Master | ignorée (`isCurrentTurn`) |
+| Passage | jamais écrit ; `late_after_next_turn` si le Game Master l'avait accordé sur un simple nom |
+| Tour dépassé dont rien n'a été entendu | aucun post-tour : le tour suivant peut reprendre son numéro |
+
+Limites : une réplique lue en bloc puis interrompue n'a rien de confirmé et reste sans post-tour, comme avant. Un tour lent écrit après un plus récent perd sa mémoire (pas son journal). Deux écritures au même instant et sans changement de mémoire pourraient encore se recouvrir dans le journal (non observé).
+
+Tests : reproduction `postTurnSurvival.test.ts` (rouge avant correction), orchestrateur (tour dépassé entendu ou non), ordre du journal sur la vraie fonction SQL. Mesure sur appel réel : [lot de mesure](prompt_reprise_attente_passage_mesure_lot_1_bis.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.
