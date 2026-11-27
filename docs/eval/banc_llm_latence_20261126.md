@@ -1,7 +1,7 @@
 # Banc LLM latence — 26 novembre 2026 (lot 2, mesure seule)
 
 Plan : [plan_latence_conversationnelle_llm_tts.md](../plan_latence_conversationnelle_llm_tts.md), section « Lot 2 ».
-Statut : **banc de latence complet mesuré (run d'Ulrich, 26 novembre, 434 appels, 0 erreur, 0,71 $) ; qualité (`eval:judge`) et rappel long restent à mesurer sur les finalistes.** Aucun réglage d'Ava modifié, rien en production.
+Statut : **lot 2 terminé (26-27 novembre) : banc, qualité et rappel mesurés. Recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` (− 0,43 s sur la première phrase, qualité identique). Décision d'Ulrich attendue pour le lot 3.** Aucun réglage d'Ava modifié, rien en production.
 
 ## Ce qui est livré
 
@@ -111,24 +111,43 @@ Stabilité du préfixe sur les 10 prompts :
 
 ### Surcoût OpenRouter
 
-_Écart médian du premier token entre `oss-cerebras` et `direct-cerebras-oss`, `oss-groq` et `direct-groq-oss`, `gemini-25-flash` et `direct-gemini-25-flash`. Attendu : 30 à 100 ms._
+Non mesuré : aucune clé Cerebras, Groq ou Google en direct dans `.env.eval.local`. Ce n'est pas bloquant, car la recommandation reste sur OpenRouter.
 
-### Qualité (`eval:judge`)
+### Qualité (`eval:judge`, 21 questions × 3 passages, juge Claude Sonnet 5.5, 26-27 novembre)
 
-_Moyenne pondérée référence contre candidat, par personnage. Bruit du juge ≈ 0,6 à 1,4 point : aucun gain déclaré en dessous._
+| Candidat contre gpt-5.6-luna | Référence | Candidat | Δ /10 | Bruit | Questions en hausse / baisse | Verdict |
+|---|---:|---:|---:|---:|---|---|
+| gpt-oss-120b · Cerebras (`reasoningEffort: low`) | 4,55 | 4,04 | **− 0,52** | ± 0,59 | 4 / 10 | baisse sur 10 critères sur 11 (éléments exigés − 0,90, parole incarnée − 0,74, ton − 0,55) ; **écarté** |
+| Gemini 2.5 Flash (`disableReasoning`) | 4,57 | 4,61 | **+ 0,04** | ± 0,66 | 7 / 7 | **équivalent** (dans le bruit) |
 
-### Rappel en conversation longue
+Run gpt-oss : `afcaa174-…`, arrêté au plafond de 4 $ après 120 tours sur 126, 4,10 $ mesurés. Run Gemini : `d3f90e76-…`, 126 tours, ≈ 3,04 $. La session s'est coupée avant l'écriture du rapport, finalisé par `--resume` sans rejouer de tour. La référence joue à T = 1,4, que luna ignore ; les candidats jouent à 0,8 / 0,95.
 
-_Tableau de `npm run eval:llm-recall` : faits rappelés sur 7 par conversation, contradictions, dernier tour fusionné en mémoire._
+### Rappel en conversation longue (`eval:llm-recall`, 40 tours, 1 conversation par personnage)
 
-## Recommandation (à rédiger après les runs)
+| Modèle | Max | Emma | Total | Observations |
+|---|---|---|---|---|
+| gpt-5.6-luna | 2/7 | 2/7 | 4/14 | dit « je ne sais pas » plutôt qu'inventer ; « Lausanne » pour Sion (Max) |
+| gpt-oss-120b · Cerebras | 3/7 | 5/7 | 8/14 | **invente** : « Léo » comme fils de Claire, « quinze ans » (Max) |
+| Gemini 2.5 Flash | 4/7 | 0/7 | 4/14 | Emma refuse toutes les questions (« j'ai la tête ailleurs ») alors que la mémoire contient le prénom |
 
-Grille de décision proposée pour le lot 3 :
+Lecture :
 
-1. Première phrase sûre médiane au moins 0,3 s sous la référence en flux, et p90 non dégradé.
-2. Intent valide ≥ 98 % (sinon relances, coûteuses en lot comme en flux).
-3. Qualité au juge dans le bruit de la référence, ou meilleure.
-4. Rappel ≥ celui de la référence, sans contradiction nouvelle.
-5. Coût par tour du même ordre (≤ 2 × la référence), à préciser par Ulrich.
+- **Le premier facteur est la mémoire d'Ava, pas le modèle.** En fin de conversation, la mémoire structurée ne garde que « Claire, infirmière bénévole » pour les trois modèles. La ville, le fils, le frère et le rendez-vous ne survivent pas aux 1 200 car. d'historique mot pour mot. Le correctif mémoire du lot 3 compte autant que le choix du modèle.
+- La notation lexicale est approximative : « je me souviens de Léo, mon fils à moi » a été compté comme une contradiction pour luna. Avec une seule conversation par personnage, et un run qui a croisé le juge (limite de 60 appels par minute : quelques mises à jour de mémoire du GM perdues, 3 tours en erreur pour gpt-oss avec Max), les écarts restent indicatifs.
 
-Sans candidat qui remplit 1 à 4, garder gpt-5.6-luna et ne retenir que le routage s'il gagne (`provider.sort` ou `openai/fast`), puis passer au lot 4 (flux), dont le gain est déjà visible ci-dessus.
+## Recommandation
+
+**Garder gpt-5.6-luna et activer le routage OpenRouter `provider.sort: "latency"` pour l'appel du personnage.**
+
+| Option | 1re phrase méd. / p90 | Qualité | Rappel | Coût par appel | Risque |
+|---|---|---|---|---|---|
+| luna, routage par défaut (aujourd'hui) | 1,25 / 1,60 s | référence | 4/14 | 0,00056 $ | – |
+| **luna + `sort: latency` (Bedrock)** | **0,82 / 1,01 s** | **identique (même modèle)** | identique | 0,00056 $ | le fournisseur change (Amazon Bedrock) ; à vérifier en usage réel |
+| Gemini 2.5 Flash | 0,78 / 0,91 s | équivalente (+ 0,04) | 4/14, Emma refuse | 0,00173 $ (≈ 3 ×) | jeu d'Emma, coût |
+| gpt-oss-120b · Cerebras | 0,60 / 0,77 s | **− 0,52** | 8/14 mais invente | 0,00186 $ | qualité, inventions |
+
+- Le routage « latence » gagne **0,43 s en médiane et 0,59 s en p90** sur la première phrase. Il ne change ni le modèle, ni le texte, ni le coût, ni le format (intent 100 %). Gemini 2.5 Flash n'est plus rapide que de 0,04 s, coûte trois fois plus et change le jeu d'Emma : rien ne justifie de changer de modèle.
+- gpt-oss-120b est le plus rapide, mais il joue nettement moins bien et invente : écarté.
+- Coût total des mesures du lot 2 : ≈ 8,2 $ (banc 0,71 $, juge gpt-oss 4,10 $, juge Gemini ≈ 3,04 $, rappel ≈ 0,3 $, essais ≈ 0,05 $).
+
+Lot 3 proposé, sur accord d'Ulrich : réglage sandbox de la préférence `sort: latency` pour l'appel du personnage, latence et cache dans `llm_usage`, correctif de mémoire, température cohérente, puis mesure en usage réel (au moins 20 tours). Le lot 4 (flux sur toutes les sorties) reste le plus gros gain suivant : à modèle égal, la réponse entière arrive ≈ 0,7 s après la première phrase.

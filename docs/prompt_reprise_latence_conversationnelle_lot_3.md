@@ -10,6 +10,9 @@
 
 **État vérifié (26 novembre 2026, fin du lot 2)**
 
+- **Résultats du lot 2 (27 novembre)** : 1re phrase sûre médiane de gpt-5.6-luna à 1,25 s par le routage par défaut, **0,82 s avec `provider.sort: "latency"`** (Amazon Bedrock, même modèle, même coût, intent 100 %). Gemini 2.5 Flash : 0,78 s, qualité + 0,04 (dans le bruit), 3 × le coût, Emma refuse les questions de rappel. gpt-oss-120b (Cerebras) : 0,60 s, qualité − 0,52, invente : écarté. Rappel long : la mémoire structurée ne garde que le prénom et le rôle de la personne. **Recommandation de l'agent : luna + `sort: latency`** ; la décision d'Ulrich reste la précondition.
+- Outils d'évaluation : `eval:judge --candidate-json` et `eval:llm-recall --models` acceptent `provider`, `reasoningEffort` et `disableReasoning` (PR #290). Les noms du banc (`luna-latency`, `gemini-25-flash`…) sont acceptés par `eval:llm-recall`.
+
 - Outils livrés : `npm run eval:llm-latency` (banc en flux via `proxy-llm`, 14 candidats, médiane et p90), `npm run eval:llm-recall` (40 tours avec la mémoire réelle, 7 faits), [scénario](eval/rappel_long_v1.json). Vérifier le SHA de fusion du lot 2 avec `git log origin/main` (il figure dans le compte rendu et la tâche Notion).
 - `proxy-llm/payload.ts` accepte `provider` (`sort`, `only`, `order`, `allow_fallbacks`, filtré). Aucun appelant d'Ava ne l'envoie encore. Vérifier qu'il est redéployé : un appel `oss-cerebras` du banc doit indiquer le fournisseur Cerebras, sans « ⚠ routage non appliqué ».
 - Échantillon : gpt-5.6-luna en flux, 1re phrase sûre 1,28 s, fin 1,91 s. Les prompts réels font 4,6 à 5,5 k tokens. Aucun token en cache. Le préfixe stable couvre 2,7 k tokens (Max) et 3,6 k (Emma).

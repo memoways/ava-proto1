@@ -1,7 +1,7 @@
 # Plan — Réduire la latence conversationnelle d'Ava (LLM, TTS, orchestration)
 
 Tâche Notion : [Réduire la latence conversationnelle AVA — LLM, TTS et orchestration](https://app.notion.com/p/18662322e59582878b6381b14558d632) (Gamilab, 🔥🔥🔥🔥).
-Statut (26 novembre 2026) : **lot 1 et lot 1 bis (iPhone) livrés (code), mesure iPhone après synchro Lovable à faire par Ulrich ; lot 2 livré (outils de mesure), runs payants à lancer par Ulrich, puis choix du modèle (lot 3).** Rapport : [banc LLM latence](eval/banc_llm_latence_20261126.md). Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
+Statut (27 novembre 2026) : **lot 1 et lot 1 bis (iPhone) livrés (code), mesure iPhone après synchro Lovable à faire par Ulrich ; lot 2 terminé, recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` ([rapport](eval/banc_llm_latence_20261126.md)). Le lot 3 attend la décision d'Ulrich.** Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
 Règle : **un lot à la fois**. Chaque lot est livré selon le contrat d'Ava, puis s'arrête avec le prompt de reprise du lot suivant ; le lot suivant ne commence que sur nouvelle demande d'Ulrich.
 Historique utile : [analyse Tavus T1-T9](analyse_latence_tavus_20261119.md), [évaluation du LLM streamé](evaluation_llm_streame_vers_tts.md).
 
@@ -110,6 +110,7 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Constats : Llama 4 n'est plus sur Cerebras ni Groq ; `LLM_TEMPERATURE = 1,4` est ignoré par luna mais s'appliquerait à un autre modèle (le banc envoie 0,8 / 0,95) ; gpt-oss et Gemini 3.x réfléchissent par défaut via le proxy.
 - Appel de contrôle après fusion : gpt-oss-120b via le proxy rendait 4 réponses vides sur 4 (tokens de sortie épuisés à réfléchir), servi par Google faute de redéploiement. Correctif : `reasoning_effort` facultatif (banc seulement), et l'alerte de routage compte aussi les appels en erreur.
 - Banc complet (run d'Ulrich, 434 appels, 0 erreur, 0,71 $) : 1re phrase sûre en médiane, gpt-5.6-luna 1,25 s ; **même modèle avec `provider.sort: "latency"` 0,82 s** ; gpt-oss-120b sur Cerebras 0,60 s ; Gemini 2.5 Flash 0,78 s. Gemini 2.5 Flash-Lite est écarté (intent valide 13 %). Restent à mesurer : la qualité (`eval:judge`) et le rappel long sur les finalistes.
+- **Conclusion du lot 2 (27 nov.)** : qualité au juge, gpt-oss-120b − 0,52 (écarté), Gemini 2.5 Flash + 0,04 (équivalent). Rappel long : 4/14 pour luna et Gemini (Emma refuse sous Gemini), 8/14 pour gpt-oss, qui invente. La mémoire ne garde que le prénom et le rôle. **Recommandation : garder luna avec `provider.sort: "latency"`** (1re phrase 1,25 → 0,82 s, même modèle et même coût). Coût des mesures ≈ 8,2 $.
 - Tests : `llmLatencyBench.test.ts` (13), `llmRecallScenario.test.ts` (6), `proxyLLMPayload.test.ts` (+2).
 
 ### Lot 3 — Adoption du LLM et du routage (selon la décision d'Ulrich sur le lot 2)
