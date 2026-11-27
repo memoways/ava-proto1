@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [ElevenLabs annuel lot 1 : quota mensuel, vraies factures, crédits par modèle] — 2026-11-27
+
+- Abonnement annuel : le quota se compare au mois, ancré sur le jour de début ; la date de renouvellement reste annuelle. Mensuel inchangé.
+- Montant de la première année et montant d'un renouvellement saisis séparément ; équivalent mensuel = montant annuel / 12. « Depuis le début » n'additionne plus que les factures annuelles déjà datées.
+- ElevenLabs : 0,22 crédit par caractère (v4 Turbo, Flash, v3 Conversational), 0,44 (v4, v3, Multilingual v2), modèle absent ou inconnu à 0,44 et signalé. Environ 1 000 caractères par minute, capacité montrée par famille. La carte dit que seuls les appels d'Ava sont comptés et que le report n'est pas calculé.
+- Correctif : la consommation voix est lue page par page (jusqu'à 5 000 lignes) au lieu d'une seule requête.
+- Aucune migration, rien en production. Fiche ElevenLabs à saisir.
+
 ## [Attente de passage lot 1 ter : réplique interrompue] — 2026-11-27
 
 - Correctif : en voix au fil de l'eau, une réplique interrompue n'est plus créditée au personnage. Aucun post-tour pour ce tour (journal, mémoire, confidence, passage) et rien au résumé de session.

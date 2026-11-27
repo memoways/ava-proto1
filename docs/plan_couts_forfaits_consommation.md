@@ -29,11 +29,13 @@ Sur les cartes, le bouton de période (24 heures, 7 jours, 30 jours) partage ce 
 
 Le coût de la période, les minutes restantes et la date de renouvellement restent en tête de chaque carte. Le bandeau du haut n'est pas répété. Un service arrêté ou en pause n'a pas de carte ; la rangée du dessus additionne les autres.
 
+Un abonnement annuel garde un quota mensuel : la fenêtre part du jour de début (à défaut du jour de renouvellement), la fin de mois étant ramenée au dernier jour. Le montant mensuel est le montant de l'année en cours / 12.
+
 Les forfaits sont une seule ligne `billing.service_plans` dans `admin_settings` (environnement `prod`). Pas de nouvelle table. Sandboxes comprises dans le forfait, parce que la facture ne les sépare pas.
 
 ## Unités
 
-- Voix : crédits ou caractères réellement journalisés. Les minutes sont une estimation, 750 caractères ≈ 1 minute. ElevenLabs Multilingual v2 : 1 caractère = 1 crédit.
+- Voix : crédits ou caractères réellement journalisés. Les minutes sont une estimation : 750 caractères ≈ 1 minute, 1 000 pour ElevenLabs, dont les crédits dépendent du modèle (voir la section ElevenLabs).
 - Vidéo : minutes de session Ava. Tavus facture 30 secondes minimum ; Anam à la seconde. HeyGen : crédits, 2 par minute en FULL, 1 en LITE, au choix dans la fiche.
 - OpenRouter : dollars déjà renvoyés. Pas d'abonnement public. Un crédit mensuel saisi n'est pas ajouté une seconde fois.
 - Voyage (RAG) : abonnement saisissable. Ava n'enregistre pas le prix de chaque embedding. Le rerank OpenRouter est déjà dans le total LLM.
@@ -59,7 +61,7 @@ Reprise : [prompt](prompt_reprise_couts_scenarios_diffusion.md).
 
 45 900 crédits, 216 000 caractères, 3,2 h, 1 930 requêtes. Soit 0,21 crédit par caractère et 38 % d'un quota mensuel Creator. La capture ne détaille ni les produits ni les modèles.
 
-### Écarts du calcul actuel (`src/services/servicePlans.ts`)
+### Écarts relevés avant le lot 1 (`src/services/servicePlans.ts`)
 
 1. En « Annuel », `billingWindow` ouvre une fenêtre de 12 mois et lui compare le quota d'un mois : faux dépassement.
 2. Un seul montant : la remise de première année serait reprise au renouvellement.
@@ -67,8 +69,16 @@ Reprise : [prompt](prompt_reprise_couts_scenarios_diffusion.md).
 4. 750 caractères par minute, contre environ 1 000 chez ElevenLabs.
 5. La consommation vient des journaux d'Ava : les autres usages du compte n'y sont pas.
 
+### Lot 1 réalisé (27 novembre 2026)
+
+- Fenêtre de quota mensuelle (`quotaWindow`), première année et renouvellement séparés ; le total ne compte que les factures annuelles déjà datées. La première année vaut pour les douze premiers mois, ensuite le montant de renouvellement ; une hausse ultérieure de ce montant recalculerait les renouvellements passés.
+- Crédits : 0,22 et 0,44 par caractère. Pages relues le 27 novembre : la grille API donne 550 000 et 275 000 caractères pour l'offre à 22 $, cohérent avec le relevé du compte (0,21). La FAQ de la page tarifaire annonce au contraire 0,5 et 1 crédit par l'API : à trancher sur l'export « Utilisation » par modèle. Un crédit chargé (prépayé) reste compté au caractère.
+- Pages relues : crédits remis à zéro à chaque cycle « à partir du jour de souscription » ; rien sur le rythme d'un abonnement annuel. Dépassement Creator « ~0,18 $ » par minute supplémentaire sur la grille web.
+- Journal Ava sur 30 jours : tous les appels ElevenLabs ont un modèle ; presque tout est en `eleven_v4_turbo`.
+- Reste : saisir la fiche (début 2026-11-27, renouvellement 2027-11-27, 121 000 crédits, 107,02 $ la première année, 237,82 $ au renouvellement) et la recette de l'écran.
+
 ### Lots
 
-1. Annuel : fenêtre de quota mensuelle, montant payé et montant de renouvellement, crédits par modèle, minutes, puis saisie de la fiche. [Reprise](prompt_reprise_elevenlabs_annuel_lot_1.md).
-2. Consommation réelle lue chez ElevenLabs par une fonction serveur (solde, report, prochaine remise à zéro).
+1. Annuel : code livré (ci-dessus), fiche à saisir. [Prompt d'origine](prompt_reprise_elevenlabs_annuel_lot_1.md).
+2. Consommation réelle lue chez ElevenLabs par une fonction serveur (solde, report, prochaine remise à zéro). [Reprise](prompt_reprise_elevenlabs_annuel_lot_2.md).
 3. Autres usages à évaluer : voix clonées professionnelles pour Max et Emma, effets sonores d'ambiance, comparaison de Scribe avec Deepgram derrière la façade STT. Musique et doublage : pas de besoin identifié. Droits, consommation et latence à vérifier avant tout essai.
