@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages : diagnostic vidéo par personnage et réglages de test] — 2026-11-27
+
+- Documentation seulement : pourquoi Tavus s'est ouvert malgré la sortie globale sur « Voix » (lien vidéo de Max prioritaire), premier essai du lot 4 latence noté dans le plan, prompt de reprise du lot réglages.
+
 ## [Latence lot 4 : LLM streamé sur toutes les sorties] — 2026-11-27
 
 - Voix seule : nouvel interrupteur `VOICE_STREAMED_LLM` (Réglages › Game Master, défaut désactivé). La synthèse reçoit chaque phrase sûre du LLM dès qu'elle est écrite, avec le transport en flux des lots 1 et 1 bis (MP3 ou PCM). Gradium progressif reste prioritaire.
