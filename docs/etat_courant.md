@@ -1,5 +1,15 @@
 # Ava — état courant
 
+**Cohérence émotionnelle lot 1 : garde-fous voix (27 novembre, code)** : Max ne peut plus passer du calme au cri en une réplique.
+- L'intensité monte d'un cran au plus par réplique.
+- Une seule réplique chaude par fenêtre de 6.
+- Max est plafonné à 1, sauf un éclat mérité qui suit une montée.
+- La balise ElevenLabs n'est envoyée que sur la première phrase, avec style ≤ 0,5 et stabilité ≥ 0,3.
+- « maintenant », « vite » et « dur » ne déclenchent plus l'urgence ni l'accusation.
+- La ligne de tour du back-office affiche l'intensité et la garde appliquée.
+
+Aucune migration, aucun réglage enregistré modifié. Les auditions sont inchangées. **À faire par Ulrich** : appel d'écoute de Max sur sandbox-ulrich. [Plan en 6 lots](plan_coherence_emotionnelle_gm.md) · [reprise lot 2](prompt_reprise_coherence_emotionnelle_lot_2.md).
+
 **Réglages lot 3 : les deux arbitrages d'Ulrich (27 novembre, code)** : le global « Voix » coupe la vidéo partout, appareil réglé sur « avatar » compris ; `VOICE_ONLY_UI` est retiré et la réplique de secours (jouée si la voix échoue) est toujours active. Aucune migration, aucune valeur enregistrée modifiée, rien en production. Non vérifié dans l'aperçu Lovable. Ce chantier n'a plus de lot de code à faire. [Plan §9.3 quater](plan_avatar_video_par_personnage.md).
 
 **Réglages lot 2 : tri des réglages de test (27 novembre, code)** : lot 1 confirmé (appel d'Ulrich resté en voix avec Max lié à Tavus ; tours en base `output_stream.output = tts`, une entrée `llm` ; blocs fermés, lus en local sur `sandbox-ulrich`, l'aperçu Lovable n'étant pas ouvrable par l'agent). RAG (variante du prompt, profil à l'essai) et Cinématiques (présentation smartphone) ont leur bloc « Réglages de test (temporaires) » fermé. TTS Config et Appareils n'en avaient pas. Aucune valeur changée, rien en production. Les deux arbitrages ouverts sont appliqués au lot 3. [Plan](plan_avatar_video_par_personnage.md) · [reprise lot 3](prompt_reprise_reglages_tests_et_video_personnage_lot_3.md).

@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cohérence émotionnelle lot 1 : Max monte par paliers au lieu de crier] — 2026-11-27
+
+- Voix (`performanceIntent`) :
+  - rampe : une réplique dépasse au plus d'un cran l'intensité de la précédente ;
+  - budget d'éclats : au plus une réplique chaude (urgent, en colère, accusatoire) par fenêtre de 6. Cela remplace la règle « jamais deux de suite », qui laissait passer un éclat sur deux ;
+  - plafond par personnage : Max à 1, sauf éclat mérité.
+- Réglage optionnel `pacing` dans `ava_speech_performance`. Sans valeur, les défauts du code s'appliquent.
+- ElevenLabs v3/v4 :
+  - balise audio sur la première phrase de la réplique seulement (file voix seule et pont avatar) ;
+  - style ≤ 0,5 et stabilité ≥ 0,3 pour les émotions chaudes.
+- Lexique : « maintenant » et « vite » ne rendent plus Max urgent ; « dur » est borné (« procédure » ne devient plus accusatoire).
+- Mesure :
+  - `audio_latencies.metadata_json` porte l'intensité, la retenue, la rampe ou le plafond, l'éclat et la continuation sur les chemins blob, streaming et PCM ;
+  - le back-office affiche « Émotion de jeu : urgent 1/2 (rampe, au lieu de 2) ».
+- Plan en 6 lots : `docs/plan_coherence_emotionnelle_gm.md`. Aucune migration, aucune valeur enregistrée modifiée, fiches Notion intactes.
+
 ## [Réglages lot 3 : le global « Voix » coupe tout, réplique de secours toujours active] — 2026-11-27
 
 - Routage d'appel : l'interrupteur global sur « Voix » donne un appel en voix aussi sur un appareil réglé sur « avatar ». Libellés d'Avatar vidéo et d'Appareils mis à jour.

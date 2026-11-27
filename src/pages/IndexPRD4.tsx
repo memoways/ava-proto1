@@ -45,7 +45,7 @@ import {
   type STTSession,
 } from "@/services/stt";
 import type { TTSProviderId } from "@/services/tts/types";
-import { derivePerformanceIntent, isHeatedIntent, logPerformanceIntent, type PerformanceIntent } from "@/services/tts/performanceIntent";
+import { derivePerformanceIntent, logPerformanceIntent, pacingEntryFor, pacingFromHistory, recordPacing, type PacingEntry, type PerformanceIntent } from "@/services/tts/performanceIntent";
 import { getSpeechPerformanceSettings, loadSpeechPerformanceSettings } from '@/services/tts/speechPerformanceSettings';
 import { getAudioContextState, installAudioGestureUnlock, unlockAudioPlayback } from "@/services/audioPlayback";
 import { disableScreenWakeLock, enableScreenWakeLock } from "@/services/screenWakeLock";
@@ -481,11 +481,16 @@ const IndexPRD4 = () => {
   const cinematicRef = useRef<CinematicTransitionState<VideoTriggerRow>>(CINEMATIC_IDLE);
   const cinematicMetaRef = useRef<{ turnId: string; turnIndex: number; reason: string | null; confidence: number | null;
     orchestrationVersionId: string | null; previousLastVideoTurn: number } | null>(null);
-  // Recette 1 Nov 2026: a character never flares up on two replies in a row.
-  const heatedReplyRef = useRef(new Map<string, boolean>());
-  const heatedReplyKey = (character: string) => `${sessionIdRef.current ?? "local"}:${character}`;
-  const rememberReplyTemper = (character: string, intent: PerformanceIntent) => {
-    heatedReplyRef.current.set(heatedReplyKey(character), isHeatedIntent(intent));
+  // Voice pacing (emotions lot 1, 27 Nov 2026): rendered intensity history per character,
+  // so a reply climbs one step at most and flares up at most once per outburst window.
+  const pacingHistoryRef = useRef(new Map<string, PacingEntry[]>());
+  const pacingKey = (character: string) => `${sessionIdRef.current ?? "local"}:${character}`;
+  const pacingFor = (character: string, turnId?: string | null) =>
+    pacingFromHistory(pacingHistoryRef.current.get(pacingKey(character)) ?? [], turnId);
+  const rememberReplyPacing = (character: string, turnId: string | null | undefined, intent: PerformanceIntent) => {
+    const key = pacingKey(character);
+    const entry = pacingEntryFor(turnId ?? `local-${Date.now()}`, intent);
+    pacingHistoryRef.current.set(key, recordPacing(pacingHistoryRef.current.get(key) ?? [], entry));
   };
   const audioStateRef = useRef<AudioState>(state.audioState);
   audioStateRef.current = state.audioState;
@@ -806,9 +811,9 @@ const IndexPRD4 = () => {
       speechState: context.speechPerformanceContext?.state,
       rugosite: context.speechPerformanceContext?.rugosite,
       validSpeechStates: context.speechPerformanceContext?.states,
-      previousHeated: heatedReplyRef.current.get(heatedReplyKey(characterKey)) === true,
+      pacing: pacingFor(characterKey, context.turnId),
     });
-    rememberReplyTemper(characterKey, intent);
+    rememberReplyPacing(characterKey, context.turnId, intent);
     logPerformanceIntent(intent, { turnId: context.turnId, characterKey });
     trackEvent("prd4_tts_performance", {
       session_id: sessionIdRef.current,
@@ -821,6 +826,8 @@ const IndexPRD4 = () => {
       speech_state: intent.speechState ?? null,
       mapping_version: intent.mappingVersion ?? null,
       tempered: intent.tempered ?? null,
+      paced_from: intent.paced?.from ?? null,
+      outburst: intent.outburst ?? null,
     });
     const turnContext = {
       sessionId: sessionIdRef.current ?? undefined,
@@ -1931,18 +1938,19 @@ const IndexPRD4 = () => {
           const voiceId = activeVoiceIdRef.current ?? undefined;
           const performanceIntent = derivePerformanceIntent({ text: '', characterKey: turnCharacter,
             previousEmotionalState: pendingEmotionalStateRef.current, userMessage: userText,
-            previousHeated: heatedReplyRef.current.get(heatedReplyKey(turnCharacter)) === true });
+            pacing: pacingFor(turnCharacter, turnId) });
           streamedVoice = prepareStreamedVoiceTurn({ characterKey: turnCharacter, voiceId,
             resolveSpeechPerformance: (state, text) => {
               const intent = derivePerformanceIntent({ text, characterKey: turnCharacter,
                 speechState: state, rugosite: speechRuntimeForVoice.rugosite, validSpeechStates: speechRuntimeForVoice.states,
                 speechSettings: speechSettingsForVoice, previousEmotionalState: pendingEmotionalStateRef.current,
-                previousHeated: heatedReplyRef.current.get(heatedReplyKey(turnCharacter)) === true });
-              rememberReplyTemper(turnCharacter, intent);
+                pacing: pacingFor(turnCharacter, turnId) });
+              rememberReplyPacing(turnCharacter, turnId, intent);
               logPerformanceIntent(intent, { turnId, characterKey: turnCharacter, mappingVersion: intent.mappingVersion });
               trackEvent('prd4_tts_performance', { session_id: owningSessionId, turn_id: turnId, turn_index: turnIndex,
                 character: turnCharacter, emotion: intent.emotion, intensity: intent.intensity, source: intent.source,
-                speech_state: intent.speechState ?? null, mapping_version: intent.mappingVersion ?? null, tempered: intent.tempered ?? null });
+                speech_state: intent.speechState ?? null, mapping_version: intent.mappingVersion ?? null, tempered: intent.tempered ?? null,
+                paced_from: intent.paced?.from ?? null, outburst: intent.outburst ?? null });
               return intent;
             },
             performance: performanceIntent, signal: turnController.signal,

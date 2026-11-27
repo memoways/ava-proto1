@@ -58,4 +58,16 @@ describe("session turn reading", () => {
       face: "concerned · tense",
     })).toBe("État de parole : à vif · GM → personnage : Laisse-la parler. · Émotion de jeu : tense · Parole TTS : à vif · Voix : eleven_v3 · Visage : concerned · tense");
   });
+
+  it("shows the rendered intensity and the voice pacing guard of a reply", () => {
+    const byTurn = indexTtsByTurn([
+      { turn_index: 3, metadata_json: { performance_emotion: "urgent", performance_intensity: 1, performance_paced_from: 2,
+        performance_paced_reason: "ramp", model: "eleven_v4_turbo" } },
+      { turn_index: 4, metadata_json: { performance_emotion: "tense", performance_intensity: 1, performance_tempered: "calmed" } },
+      { turn_index: 5, metadata_json: { performance_emotion: "urgent", performance_intensity: 2, performance_outburst: true } },
+    ]);
+    expect(replyContextLine({ tts: byTurn.get(3) })).toBe("Émotion de jeu : urgent 1/2 (rampe, au lieu de 2) · Voix : eleven_v4_turbo");
+    expect(replyContextLine({ tts: byTurn.get(4) })).toBe("Émotion de jeu : tense 1/2 (retenu, budget d'éclats)");
+    expect(replyContextLine({ tts: byTurn.get(5) })).toBe("Émotion de jeu : urgent 2/2 (éclat autorisé)");
+  });
 });

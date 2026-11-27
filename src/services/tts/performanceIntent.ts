@@ -39,9 +39,25 @@ export interface PerformanceIntent {
   speechState?: string;
   pauses?: 'short' | 'normal' | 'long';
   mappingVersion?: string;
-  /** Set when the temper guard replaced a second flare-up in a row by a held-back delivery. */
+  /** Set when the outburst budget replaced a flare-up by a held-back delivery. */
   tempered?: 'calmed';
+  /** Set when the pacing guard lowered the derived intensity (emotions lot 1, 27 Nov 2026). */
+  paced?: { from: PerformanceIntensity; reason: 'ramp' | 'ceiling' };
+  /** A flare-up at full intensity that passed the outburst budget and the ramp. */
+  outburst?: true;
+  /** Later line of the same reply: the ElevenLabs audio tag is not repeated. */
+  continuation?: true;
 }
+
+/** What the voice already played for this character in the session, newest last. */
+export interface PerformancePacing {
+  /** Intensity actually rendered on the previous reply; null before the first one. */
+  previousIntensity: PerformanceIntensity | null;
+  /** Replies since the last heated one (0 = the previous reply was heated); null if none yet. */
+  turnsSinceHeated: number | null;
+}
+
+export interface PacingEntry { turnId: string; intensity: PerformanceIntensity; heated: boolean }
 
 export interface DerivePerformanceInput {
   text: string;
@@ -52,8 +68,10 @@ export interface DerivePerformanceInput {
   rugosite?: number;
   validSpeechStates?: string[];
   speechSettings?: SpeechPerformanceSettings;
-  /** The character's previous reply was rendered heated (see `isHeatedIntent`). */
+  /** The character's previous reply was rendered heated (see `isHeatedIntent`). Superseded by `pacing`. */
   previousHeated?: boolean;
+  /** Rendered history of this character (see `pacingFromHistory`). */
+  pacing?: PerformancePacing;
 }
 
 export const CANONICAL_EMOTIONS: CanonicalEmotion[] = [
@@ -188,8 +206,9 @@ const LEXICON: Record<Exclude<CanonicalEmotion, "neutral">, string[]> = {
   sarcastic: [
     "bien sur", "evidemment", "genial", "formidable", "c'est ca",
   ],
+  // "maintenant" and "vite" removed (27 Nov 2026): too common, they made Max urgent on ordinary lines.
   urgent: [
-    "maintenant", "vite", "tout de suite", "il faut me le dire",
+    "tout de suite", "il faut me le dire",
     "on n'a plus le temps",
   ],
 };
@@ -200,7 +219,8 @@ const GM_MEMORY_MAP: Array<{ pattern: RegExp; emotion: CanonicalEmotion }> = [
   { pattern: /peur|effray|angoiss|terrif/i, emotion: "scared" },
   { pattern: /fragile|h[eé]sit|vuln[eé]r/i, emotion: "fragile" },
   { pattern: /chaleur|ouvert|apais|calme|pos[eé]/i, emotion: "warm" },
-  { pattern: /accus|confront|dur/i, emotion: "accusatory" },
+  // Word-bounded "dur(e)": "procédure" or "durcit" no longer read as accusatory.
+  { pattern: /accus|confront|(?<!\p{L})dure?s?(?!\p{L})/iu, emotion: "accusatory" },
   { pattern: /sarcas|iron/i, emotion: "sarcastic" },
   { pattern: /urgent|press[eé]/i, emotion: "urgent" },
   { pattern: /tendu|m[eé]fiant|sur la d[eé]fensive|guarded/i, emotion: "tense" },
@@ -339,8 +359,8 @@ function punctuationSignals(text: string): { intensityBoost: PerformanceIntensit
 
 /**
  * Emotions heard as the character flaring up. Ulrich's recette (1 Nov 2026):
- * Max may flare up, but never on two replies in a row. Its strength stays the
- * rugosité setting's business.
+ * Max may flare up, but rarely. On 27 Nov 2026 he still shouted one reply in two
+ * or three, because the guard only forbade two flare-ups in a row.
  */
 const HEATED_EMOTIONS = new Set<CanonicalEmotion>(["angry", "urgent", "accusatory"]);
 
@@ -348,18 +368,83 @@ export function isHeatedIntent(intent: Pick<PerformanceIntent, "emotion"> | null
   return Boolean(intent && HEATED_EMOTIONS.has(intent.emotion));
 }
 
+/** At most one heated reply in this many consecutive replies of a character. */
+export const DEFAULT_OUTBURST_WINDOW = 6;
+/** Per-character intensity ceiling outside an authorized outburst; missing means 2. */
+const DEFAULT_INTENSITY_CEILING: Record<string, PerformanceIntensity> = { max: 1 };
+
+export function outburstWindow(settings?: SpeechPerformanceSettings): number {
+  const value = Number(settings?.pacing?.outburstWindow);
+  return Number.isFinite(value) && value >= 1 ? Math.min(20, Math.round(value)) : DEFAULT_OUTBURST_WINDOW;
+}
+
+export function intensityCeiling(settings: SpeechPerformanceSettings | undefined, characterKey?: string | null): PerformanceIntensity {
+  const key = characterKey?.trim().toLowerCase() ?? '';
+  const saved = settings?.pacing?.intensityCeiling?.[key];
+  if (saved === 0 || saved === 1 || saved === 2) return saved;
+  return DEFAULT_INTENSITY_CEILING[key] ?? 2;
+}
+
+/** Pacing seen by a reply: earlier replies only, so a reply re-derived mid-turn does not count itself. */
+export function pacingFromHistory(history: readonly PacingEntry[], currentTurnId?: string | null): PerformancePacing {
+  const past = history.filter(entry => entry.turnId !== currentTurnId);
+  let turnsSinceHeated: number | null = null;
+  for (let index = past.length - 1; index >= 0; index--) {
+    if (past[index].heated) { turnsSinceHeated = past.length - 1 - index; break; }
+  }
+  return { previousIntensity: past.at(-1)?.intensity ?? null, turnsSinceHeated };
+}
+
+/** Upserts the rendered reply by turn id (a turn may be re-derived when its speech state arrives). */
+export function recordPacing(history: readonly PacingEntry[], entry: PacingEntry, limit = 24): PacingEntry[] {
+  return [...history.filter(item => item.turnId !== entry.turnId), entry].slice(-limit);
+}
+
+export function pacingEntryFor(turnId: string, intent: PerformanceIntent): PacingEntry {
+  return { turnId, intensity: intent.intensity, heated: isHeatedIntent(intent) };
+}
+
+function resolvePacing(input: DerivePerformanceInput): PerformancePacing {
+  return input.pacing ?? { previousIntensity: null, turnsSinceHeated: input.previousHeated ? 0 : null };
+}
+
 /** Rendering only: the speech state, its name and the GM log are unchanged. */
-function withTemper(intent: PerformanceIntent, input: DerivePerformanceInput): PerformanceIntent {
-  if (!isHeatedIntent(intent) || !input.previousHeated) return intent;
+function withTemper(intent: PerformanceIntent, input: DerivePerformanceInput, pacing: PerformancePacing, window: number): PerformanceIntent {
+  const since = pacing.turnsSinceHeated;
+  if (!isHeatedIntent(intent) || since === null || since >= window - 1) return intent;
   const baseline = characterBaseline(input.characterKey);
   const emotion = HEATED_EMOTIONS.has(baseline.emotion) ? "tense" : baseline.emotion;
-  // Second flare-up in a row: held-back delivery instead of the mapping's heat.
-  return withGravity({ ...intent, emotion, intensity: 0, delivery: "measured", pauses: intent.pauses ? "normal" : undefined,
-    actingNl: buildActingNl(emotion, 0, "measured"), speedHint: 1, tempered: "calmed" }, input.characterKey);
+  const intensity = Math.min(intent.intensity, 1) as PerformanceIntensity;
+  // Flare-up inside the budget window: held-back delivery instead of the mapping's heat.
+  return withGravity({ ...intent, emotion, intensity, delivery: "measured", pauses: intent.pauses ? "normal" : undefined,
+    actingNl: buildActingNl(emotion, intensity, "measured"), speedHint: 1, tempered: "calmed" }, input.characterKey);
+}
+
+/** Intensity climbs one step per reply at most; the character ceiling holds except for an earned outburst. */
+function withPacing(intent: PerformanceIntent, input: DerivePerformanceInput, pacing: PerformancePacing,
+  ceiling: PerformanceIntensity): PerformanceIntent {
+  const previous = pacing.previousIntensity ?? 0;
+  const rampMax = Math.min(2, previous + 1) as PerformanceIntensity;
+  const outburst = isHeatedIntent(intent) && !intent.tempered && intent.intensity === 2 && previous >= 1;
+  const limit = outburst ? rampMax : Math.min(rampMax, ceiling) as PerformanceIntensity;
+  if (intent.intensity <= limit) return outburst ? { ...intent, outburst: true } : intent;
+  const from = intent.intensity;
+  const reason = rampMax <= (outburst ? 2 : ceiling) ? 'ramp' : 'ceiling';
+  const speedHint = intent.source === 'speech_state'
+    ? clamp(Number((1 + ((intent.speedHint ?? 1) - 1) * (limit + 1) / (from + 1)).toFixed(2)), 0.7, 1.2)
+    : speedFor(intent.emotion, limit, intent.delivery);
+  const actingNl = intent.source === 'speech_state' ? intent.actingNl
+    : `${isGraveCharacter(input.characterKey) ? GRAVE_ACTING_PREFIX : ''}${buildActingNl(intent.emotion, limit, intent.delivery)}`.slice(0, 100);
+  return { ...intent, intensity: limit, speedHint, actingNl, paced: { from, reason } };
 }
 
 export function derivePerformanceIntent(input: DerivePerformanceInput): PerformanceIntent {
-  return withTemper(deriveUntemperedIntent(input), input);
+  const settings = input.speechSettings ?? getSpeechPerformanceSettings();
+  const resolved = { ...input, speechSettings: settings };
+  const pacing = resolvePacing(input);
+  const tempered = withTemper(deriveUntemperedIntent(resolved), resolved, pacing, outburstWindow(settings));
+  // Ramp and ceiling need the conversation history: auditions and workshops play the mapping as saved.
+  return input.pacing ? withPacing(tempered, resolved, pacing, intensityCeiling(settings, input.characterKey)) : tempered;
 }
 
 function deriveUntemperedIntent(input: DerivePerformanceInput): PerformanceIntent {
@@ -478,6 +563,25 @@ export function resolveGradiumPauseSeconds(intent: PerformanceIntent | null | un
   return { short: 0.25, normal: 0.6, long: 1 }[mapping.pauses] as GradiumPauseSeconds | undefined;
 }
 
+const HEATED_STYLE_CEILING = 0.5;
+const HEATED_STABILITY_FLOOR = 0.3;
+
+/** Telemetry fields describing how a reply was voiced (audio_latencies.metadata_json). */
+export function performanceLogFields(intent?: PerformanceIntent | null): Record<string, string | number | boolean | null> {
+  return {
+    performance_emotion: intent?.emotion ?? null,
+    performance_intensity: intent?.intensity ?? null,
+    performance_source: intent?.source ?? null,
+    performance_speech_state: intent?.speechState ?? null,
+    performance_mapping_version: intent?.mappingVersion ?? null,
+    performance_tempered: intent?.tempered ?? null,
+    performance_paced_from: intent?.paced?.from ?? null,
+    performance_paced_reason: intent?.paced?.reason ?? null,
+    performance_outburst: intent?.outburst ?? null,
+    performance_continuation: intent?.continuation ?? null,
+  };
+}
+
 export interface ElevenLabsVoiceShaping {
   style: number;
   stability: number;
@@ -509,7 +613,7 @@ export function applyElevenLabsPerformance(
   const delta = deltas[intent.emotion];
   const speed = intent.source === 'speech_state' ? clamp(base.speed * (intent.speedHint ?? 1), 0.7, 1.2) : intent.speedHint ?? clamp(base.speed + delta.speed * factor, 0.7, 1.2);
   let spoken = text;
-  if (supportsElevenLabsAudioTags(base.modelId)) {
+  if (supportsElevenLabsAudioTags(base.modelId) && !intent.continuation) {
     const tag = ELEVENLABS_AUDIO_TAGS[intent.emotion];
     const deliveryTag = intent.delivery === "whisper" ? "[whispers]" : "";
     const prefix = [tag, deliveryTag].filter(Boolean).join("");
@@ -517,9 +621,13 @@ export function applyElevenLabsPerformance(
   }
   // Workshop intents: lower stability and higher style so the delivery breaks and changes pace.
   const workshop = intent.source === 'manual';
+  const style = clamp(base.style + delta.style * factor + (workshop ? 0.08 * intent.intensity : 0), 0, 1);
+  const stability = clamp(base.stability + delta.stability * factor - (workshop ? 0.1 * intent.intensity : 0), 0, 1);
+  // Game heat stays a raised voice, not a scream (27 Nov 2026): style ceiling and stability floor.
+  const heated = isHeatedIntent(intent) && !workshop;
   return {
-    style: clamp(base.style + delta.style * factor + (workshop ? 0.08 * intent.intensity : 0), 0, 1),
-    stability: clamp(base.stability + delta.stability * factor - (workshop ? 0.1 * intent.intensity : 0), 0, 1),
+    style: heated ? Math.min(style, Math.max(base.style, HEATED_STYLE_CEILING)) : style,
+    stability: heated ? Math.max(stability, Math.min(base.stability, HEATED_STABILITY_FLOOR)) : stability,
     speed,
     text: spoken,
   };

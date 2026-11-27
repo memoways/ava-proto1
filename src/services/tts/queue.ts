@@ -152,6 +152,8 @@ export class TTSQueue {
     const genStart = performance.now();
     const genOptions: TTSOptions = {
       ...entry.options,
+      // Later sentence of the same reply: same acting, no repeated ElevenLabs audio tag.
+      ...(previousText && entry.options?.performance ? { performance: { ...entry.options.performance, continuation: true as const } } : {}),
       previousText,
       nextText,
       signal: this.abortController.signal,

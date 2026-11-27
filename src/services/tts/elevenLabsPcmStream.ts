@@ -8,6 +8,7 @@
 import { requestElevenLabsSpeech, buildElevenLabsRequest } from "@/services/tts/providers/elevenlabs";
 import { debugLogger } from "@/services/debugLogger";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
+import { performanceLogFields } from "@/services/tts/performanceIntent";
 import { observeService, observeVoice } from "@/services/voiceTurnTelemetryV2";
 import type { TTSGenerateContext } from "@/services/tts/types";
 
@@ -107,10 +108,7 @@ export async function openElevenLabsPcmStream(
         transport: "http_stream_pcm",
         stitched_previous: !!ctx.previousText,
         stitched_next: !!ctx.nextText,
-        performance_emotion: ctx.performance?.emotion ?? null,
-        performance_source: ctx.performance?.source ?? null,
-        performance_speech_state: ctx.performance?.speechState ?? null,
-        performance_mapping_version: ctx.performance?.mappingVersion ?? null,
+        ...performanceLogFields(ctx.performance),
       },
     });
   };
