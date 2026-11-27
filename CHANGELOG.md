@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence : mesure iPhone et attente de passage] — 2026-11-27
+
+- Documentation seulement : lot 1 bis confirmé sur iPhone ; cause des tours lents consignée et prompt de reprise du lot « attente de passage ».
+
 ## [Latence lot 4 : mesure voix seule et retour sur l'interruption] — 2026-11-27
 
 - Documentation seulement : mesure consignée (gain médian 0,23 s, critère non atteint, défaut inchangé) et prompt de reprise du lot « interruption douce ».
