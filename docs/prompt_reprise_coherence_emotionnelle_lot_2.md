@@ -7,17 +7,16 @@
 **Objectif** : vérifier que les fiches Notion de Max et Emma ne contredisent pas le radar, et ne le doublent pas. Le radar gère l'état émotionnel de l'expérience ; les fiches gardent le caractère fondamental. Ulrich veut une logique simple, vivante et évolutive, avec le moins possible d'injonctions multiples et contradictoires. Livrable : un document d'audit et des propositions de formulation pour Romed. **Aucune écriture dans la base Caractères.**
 
 **État vérifié au départ**
-- Le lot 1 (garde-fous voix) est fusionné sur main. Il apporte :
+- Les lots 1 (garde-fous voix, PR #302) et 1 bis (tempérament vocal réglable) sont sur main. En jeu :
   - une rampe d'intensité (au plus un cran par réplique) ;
-  - un budget d'éclats (une réplique chaude au plus par fenêtre de 6) ;
-  - un plafond de Max à 1, sauf éclat mérité ;
-  - la balise ElevenLabs sur la première phrase seulement ;
-  - des limites de style et de stabilité ;
-  - la journalisation `performance_*` et la ligne de tour « Émotion de jeu : … 1/2 (rampe, au lieu de 2) ».
+  - par personnage, dans **Atelier de parole → Tempérament vocal en jeu** : moments chauds (jamais / contenus / éclats forts), intensité maximale, fréquence, montée progressive ;
+  - défauts : Max « jamais », intensité 1 ; Emma « éclats forts », intensité 2, un moment chaud au plus par fenêtre de 6 ;
+  - balise ElevenLabs sur la première phrase seulement, limites de style et de stabilité ;
+  - journalisation `performance_*` (`performance_tempered` : `muted` ou `calmed`) et ligne de tour « Émotion de jeu ».
 - Vérifier le SHA de fusion sur origin/main et dans le CHANGELOG avant de commencer.
-- L'écoute d'Ulrich après le lot 1 n'est pas encore faite, sauf s'il le dit.
+- L'écoute d'Ulrich après le lot 1 bis n'est pas encore faite, sauf s'il le dit. Demander quel réglage il a retenu.
 
-**Première action exécutable** : si Ulrich a appelé Max sur sandbox-ulrich depuis la fusion du lot 1, sortir tour par tour (lecture seule, via le MCP Lovable Ava) dans `audio_latencies.metadata_json` : `performance_intensity`, `performance_tempered`, `performance_paced_*`, `performance_outburst`. Vérifier qu'aucune réplique ne saute de 0 à 2 et qu'il y a au plus un éclat par fenêtre de 6. Noter le résultat dans l'audit. Ensuite, lire les fiches.
+**Première action exécutable** : lire (lecture seule, MCP Lovable Ava) le réglage `admin_settings` `ava_speech_performance` → `pacing` de sandbox-ulrich, puis, si Ulrich a appelé Max depuis la fusion du lot 1 bis, sortir tour par tour dans `audio_latencies.metadata_json` : `performance_intensity`, `performance_tempered`, `performance_paced_*`, `performance_outburst`. Vérifier que les répliques respectent le réglage enregistré (avec les défauts : Max jamais au-dessus de 1, aucun éclat). Noter le résultat dans l'audit. Ensuite, lire les fiches.
 
 **Sources**
 - Base Caractères AVA (Gamilab, `get-self` `7e1a9a09-09cb-4deb-a306-83a29b831bc2`) : lecture seule, **interdiction formelle d'écrire**. Fiches actives de Max et Emma, champs Manière de parler, États de parole (« Bloqué », « La digue cède »…), Dynamique de la conversation, Politique relationnelle, Qui t'appelle, Ce que tu ne fais jamais.
@@ -27,7 +26,7 @@
 - L'audit de départ : la section Audit du plan.
 
 **Périmètre**
-- Tableau par personnage et par champ : consigne émotionnelle trouvée, si elle relève du caractère (Notion) ou de l'état de l'expérience (radar), et le conflit éventuel avec le radar, la voix ou un autre champ. Exemples à confirmer : « fait confiance dès le début », un état de parole qui impose une intensité, « La digue cède » face au plafond de voix.
+- Tableau par personnage et par champ : consigne émotionnelle trouvée, si elle relève du caractère (Notion) ou de l'état de l'expérience (radar), et le conflit éventuel avec le radar, la voix ou un autre champ. Exemples à confirmer : « fait confiance dès le début », un état de parole qui impose une intensité, « La digue cède » face au tempérament vocal de Max (aucun moment chaud par défaut).
 - Repérer aussi les doublons entre le prompt du personnage, la directive relationnelle, le conseil du GM et le bloc radar : ce sont les injonctions multiples.
 - Pour chaque conflit, une proposition de formulation pour Romed, ou une proposition de changement côté application, qui sera prise au lot 3.
 - Livrable : `docs/audit_fiches_vs_radar.md`. Mettre à jour la section du 27 novembre de la tâche Notion, en écrivant seulement dans la tâche.

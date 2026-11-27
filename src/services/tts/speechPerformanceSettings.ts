@@ -1,10 +1,37 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getActiveEnvironment, loadEnvironmentSetting, readEnvironmentStorage, writeEnvironmentStorage, type EnvironmentId } from '../environmentContext';
 import type { CanonicalEmotion, PerformanceDelivery, PerformanceIntensity } from './performanceIntent';
-/** Voice pacing (emotions lot 1): outburst budget and per-character intensity ceiling. Missing fields use code defaults. */
-export interface SpeechPacingSettings { outburstWindow?: number; intensityCeiling?: Record<string, PerformanceIntensity> }
+/** Heated moments: never played, played within the ceiling, or allowed to reach full intensity. */
+export type SpeechFlareMode = 'never' | 'contained' | 'full';
+/** Voice pacing of one character during the game (emotions lot 1 bis). */
+export interface CharacterPacing {
+  /** Highest intensity 0–2 outside a full flare-up. */
+  ceiling: PerformanceIntensity;
+  flares: SpeechFlareMode;
+  /** At most one heated reply in this many consecutive replies (1–20). */
+  window: number;
+  /** Intensity climbs one step per reply at most. */
+  ramp: boolean;
+}
+export const DEFAULT_OUTBURST_WINDOW = 6;
+const DEFAULT_PACING: CharacterPacing = { ceiling: 2, flares: 'full', window: DEFAULT_OUTBURST_WINDOW, ramp: true };
+/** Max does not flare up (Ulrich, 27 Nov 2026); Emma keeps the lot 1 behaviour. */
+const CHARACTER_PACING: Record<string, Partial<CharacterPacing>> = { max: { ceiling: 1, flares: 'never' } };
+/** Saved values win field by field; missing or invalid fields use the code defaults. */
+export function resolveCharacterPacing(settings: Pick<SpeechPerformanceSettings, 'pacing'> | undefined, characterKey?: string | null): CharacterPacing {
+  const key = characterKey?.trim().toLowerCase() ?? '';
+  const base = { ...DEFAULT_PACING, ...CHARACTER_PACING[key] };
+  const saved = settings?.pacing?.[key];
+  const window = Number(saved?.window);
+  return {
+    ceiling: saved?.ceiling === 0 || saved?.ceiling === 1 || saved?.ceiling === 2 ? saved.ceiling : base.ceiling,
+    flares: saved?.flares === 'never' || saved?.flares === 'contained' || saved?.flares === 'full' ? saved.flares : base.flares,
+    window: Number.isFinite(window) && window >= 1 ? Math.min(20, Math.round(window)) : base.window,
+    ramp: typeof saved?.ramp === 'boolean' ? saved.ramp : base.ramp,
+  };
+}
 export interface SpeechVoiceMapping { emotion: CanonicalEmotion; delivery: PerformanceDelivery; speed: number; pauses: 'short' | 'normal' | 'long'; instruction: string }
-export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>>; pacing?: SpeechPacingSettings }
+export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>>; pacing?: Record<string, Partial<CharacterPacing>> }
 export const SPEECH_PERFORMANCE_KEY = 'ava_speech_performance';
 export const EMPTY_SPEECH_PERFORMANCE: SpeechPerformanceSettings = { enabled: false, version: '', gradiumTagsEnabled: false, byCharacter: {} };
 // Production guard lifted on 25 Oct 2026 (Ulrich): every environment reads its own saved mapping.
@@ -63,10 +90,10 @@ export async function saveSpeechPerformanceSettings(value: SpeechPerformanceSett
   }
   const saved = await readSavedSpeechPerformance(environment);
   assertEnvironment();
-  const stable = (value: unknown) => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
+  const stable = (value: unknown) => JSON.stringify(value ?? null, (_key, item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
   if (saved.version !== next.version || stable(saved.byCharacter) !== stable(next.byCharacter)
-    || saved.enabled !== next.enabled || saved.gradiumPausesEnabled !== next.gradiumPausesEnabled) throw new Error('Relecture du mapping différente : sauvegarde non confirmée');
+    || stable(saved.pacing) !== stable(next.pacing) || saved.enabled !== next.enabled || saved.gradiumPausesEnabled !== next.gradiumPausesEnabled) throw new Error('Relecture du mapping différente : sauvegarde non confirmée');
   writeEnvironmentStorage(SPEECH_PERFORMANCE_KEY, JSON.stringify(saved), environment);
   return saved;
 }

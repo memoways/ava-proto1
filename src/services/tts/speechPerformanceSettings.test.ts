@@ -32,6 +32,12 @@ describe('A3 — explicit sandbox save and strict same-environment readback', ()
   expect(db.writes).toBe(1); expect(new Set(db.environments)).toEqual(new Set(['sandbox-ulrich']));
   expect(JSON.parse(readEnvironmentStorage(SPEECH_PERFORMANCE_KEY)!)).toEqual(result);
  });
+ it('saves and reads back the per-character voice temper (emotions lot 1 bis)', async () => {
+  const saved = await readSavedSpeechPerformance('sandbox-ulrich');
+  const draft = { ...structuredClone(saved), pacing: { max: { flares: 'full' as const, ceiling: 1 as const, window: 8, ramp: true } } };
+  const result = await saveSpeechPerformanceSettings(draft, saved, 'sandbox-ulrich');
+  expect(result.pacing).toEqual(draft.pacing); expect(result.byCharacter).toEqual(saved.byCharacter);
+ });
  it('refuses stale versions and compare-and-swap conflicts', async () => {
   db.current = { ...original, version: 'newer' };
   await expect(saveSpeechPerformanceSettings(original, original)).rejects.toThrow('modifié'); expect(db.writes).toBe(0);

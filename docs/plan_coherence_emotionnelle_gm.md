@@ -1,6 +1,6 @@
 # Plan — Cohérence émotionnelle des personnages, dirigée par le Game Master
 
-Statut : plan validé par Ulrich le 27 novembre 2026. **Lot 1 livré en code** (voir sa section) ; lots 2 à 6 à faire, un par conversation. Reprise : [lot 2](prompt_reprise_coherence_emotionnelle_lot_2.md). Remplace [prompt_reprise_emotions_max_gradation_lot_1.md](prompt_reprise_emotions_max_gradation_lot_1.md).
+Statut : plan validé par Ulrich le 27 novembre 2026. **Lots 1 et 1 bis livrés en code** (voir leurs sections) ; lots 2 à 6 à faire, un par conversation. Reprise : [lot 2](prompt_reprise_coherence_emotionnelle_lot_2.md). Remplace [prompt_reprise_emotions_max_gradation_lot_1.md](prompt_reprise_emotions_max_gradation_lot_1.md).
 
 Décisions d'Ulrich (27 novembre) : le radar donne le départ, mais l'état doit bouger et ne jamais rester bloqué ; éclats rares, mérités et autorisés ; recadrage gradué par le personnage quand l'appelant sort du rôle de bénévole ; premier lot = garde-fous voix et mesure. Les fiches Notion gardent le caractère fondamental, l'application gère l'état de l'expérience ; on minimise les injonctions multiples et contradictoires.
 
@@ -65,6 +65,28 @@ Prévu :
 - **Journalisation** (streaming, PCM et blob) : intensité, atténuation, raison du budget, balise envoyée, style, stabilité et vitesse finaux. Les afficher sur la ligne de tour de `SessionsTab` (`sessionTurnReading.ts`).
 - On ne touche ni le mapping enregistré en base ni la fiche. Tests unitaires de `performanceIntent` pour la rampe, le budget, le plafond et la balise unique.
 
+### Lot 1 bis — Max ne s'emporte plus, tempérament vocal réglable — livré en code le 27 novembre 2026
+
+Constat sur `sandbox-ulrich`, session `70968df2-1092-4e94-9f0b-178041b6b760` : au tour 3, « La digue cède » jouée `urgent`, intensité 2, éclat autorisé sur les trois morceaux ; deux autres sessions du jour avaient un éclat au tour 3. Le texte était calme selon Ulrich (non relu ici) : l'emportement venait de la voix. La balise ElevenLabs ne dépend pas de l'intensité : plafonner à 1 ne suffisait pas.
+
+Décision d'Ulrich : régler et comparer depuis le back-office. Écran **Atelier de parole → Tempérament vocal en jeu** (`SpeechPacingPanel.tsx`), par personnage et par sandbox, dans `ava_speech_performance.pacing` :
+
+| Réglage | Valeurs | Max par défaut | Emma par défaut |
+|---|---|---|---|
+| Moments chauds | Jamais / Contenus / Éclats forts | Jamais | Éclats forts |
+| Intensité maximale (hors éclat fort) | 0, 1, 2 | 1 | 2 |
+| Au plus un moment chaud toutes les N répliques | 1 à 20 | 6 | 6 |
+| Montée progressive | oui / non | oui | oui |
+
+- **Jamais** : les états chauds sont joués retenus (`tense`, mesuré, sans `[urgent]` ni `[angry]`), journalisés `performance_tempered = muted`.
+- **Contenus** : un moment chaud par fenêtre, avec sa balise, sous le plafond.
+- **Éclats forts** : comportement du lot 1 (intensité 2 possible après une montée).
+- Retour au lot 1 pour Max : « Éclats forts », intensité 1.
+- Les défauts d'Emma reproduisent le lot 1. La forme `pacing { outburstWindow, intensityCeiling }` du lot 1 est remplacée ; aucune valeur n'était enregistrée.
+- Auditions et ateliers inchangés. Aucune migration, rien en production. À la prochaine publication, la production prendra les défauts (Max calme) ; l'écran n'y est pas disponible.
+- La manière de s'emporter (émotion, débit, instruction de chaque état) reste dans le mapping existant, sous les options avancées de l'atelier.
+- Non fait : aucune écoute.
+
 ### Lot 2 — Audit des fiches Notion face au radar (document, lecture seule)
 - Pour Max et Emma, champ par champ (Manière de parler, états de parole, Dynamique, Politique relationnelle, mémoires RAG qui contiennent « furieux » ou « tu cries »), relever chaque consigne émotionnelle qui contredit le radar ou le double. Exemples : « confiance dès le début », un état de parole qui impose une intensité.
 - Livrable : `docs/audit_fiches_vs_radar.md`, avec ce qui reste dans Notion (le caractère) et ce que le radar prend en charge (l'état de l'expérience), plus des propositions de formulation pour Romed. **Aucune écriture dans la base Caractères.**
@@ -75,7 +97,7 @@ Prévu :
 - Remplacer la phrase « ne touche jamais la forme de la parole » par une consigne unique et cohérente. Rendre `speechStateHistory` au personnage (« évite de rejouer le même état fort »).
 - **État vivant** : retour d'un cran vers l'initial après K tours sans stimulation (K réglable). Le GM peut bouger dans les deux sens, et la consigne GM interdit l'immobilité injustifiée.
 - Corriger la persistance : ne pas enregistrer `character_state_after` d'un tour dépassé ; ordonner la reconstruction par tour source ; vérifier `gmExecuted` ; figer le profil avant le tour 1 ; ajouter `character_state_delta` au schéma et aux champs requis.
-- Mode GM off : radar initial fixe (inchangé) ; garde-fous voix du lot 1 actifs.
+- Mode GM off : radar initial fixe (inchangé) ; garde-fous voix des lots 1 et 1 bis actifs. Le tempérament vocal réglé au lot 1 bis reste la limite haute de ce que le radar peut demander à la voix.
 
 ### Lot 4 — Registre de la conversation et direction de jeu
 - Le GM produit `conversation_register` (factuel, personnel, émotionnel ou confrontant), avec l'amplitude cible qui en découle. Le code borne le delta du radar à cette amplitude : une conversation factuelle garde un personnage plutôt factuel.

@@ -14,6 +14,7 @@ import { hydrateAllSettings } from "@/services/settingsService";
 import LLMConfigTab from "@/components/LLMConfigTab";
 import RAGConfigTab from "@/components/RAGConfigTab";
 import SpeechIntentWorkshop from '@/components/SpeechIntentWorkshop';
+import SpeechPacingPanel from '@/components/SpeechPacingPanel';
 import TTSConfigTab from "@/components/TTSConfigTab";
 import STTConfigTab from "@/components/STTConfigTab";
 import GameMasterConfigTab from "@/components/GameMasterConfigTab";
@@ -635,7 +636,7 @@ export default function Admin() {
 
           {/* ==================== EXPÉRIENCE ==================== */}
           <TabsContent value="speech-workshop">
-            {activeTab === "speech-workshop" && <SpeechIntentWorkshop />}
+            {activeTab === "speech-workshop" && <><SpeechPacingPanel /><SpeechIntentWorkshop /></>}
           </TabsContent>
 
           <TabsContent value="gamemaster">

@@ -50,6 +50,6 @@ export function tavusCueObservation(
     intensity: intent?.intensity ?? null,
     source: intent?.source ?? null,
     speech_state: intent?.speechState ? intent.speechState.slice(0, 60) : null,
-    tempered: intent?.tempered === "calmed",
+    tempered: Boolean(intent?.tempered),
   };
 }

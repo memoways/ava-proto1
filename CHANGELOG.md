@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cohérence émotionnelle lot 1 bis : Max ne s'emporte plus, réglable] — 2026-11-27
+
+- Constat : sur `sandbox-ulrich`, Max recevait un éclat à intensité 2 dès le tour 3 (« La digue cède », `[urgent]`).
+- Nouvel écran « Atelier de parole → Tempérament vocal en jeu » : par personnage, moments chauds (jamais, contenus, éclats forts), intensité maximale, fréquence et montée progressive, avec un aperçu réplique par réplique.
+- Défauts : Max sans moment chaud et intensité 1 au plus ; Emma comme au lot 1. Retour au lot 1 pour Max : « Éclats forts ».
+- La ligne de tour du back-office indique « retenu, aucun éclat pour ce personnage ». Auditions et ateliers inchangés. Aucune migration ; écoute à faire.
+
 ## [ElevenLabs annuel : diagnostic des mesures] — 2026-11-27
 
 - Documentation seulement : abonnement Creator annuel pris en compte, écarts du calcul des coûts relevés et prompt de reprise du lot 1.
