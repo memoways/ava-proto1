@@ -245,6 +245,8 @@ export interface ConversationTurnTraceV1 {
       topP: number;
       reasoning: boolean;
       timeoutMs: number | null;
+      /** Latency lot 3: OpenRouter provider preference sent with the character call. */
+      provider?: { sort?: string; only?: string[]; order?: string[]; allow_fallbacks?: boolean };
     };
     error: string | null;
   };

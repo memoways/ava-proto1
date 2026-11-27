@@ -120,6 +120,15 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Correctif mémoire : en `optimized_v3`, garder au moins le dernier échange, tronqué, plutôt qu'aucun historique (`conversationMemory.ts`), avec un test.
 - Mesure : au moins 20 tours en sandbox (voix seule puis Tavus), `eval:judge` avec le modèle choisi, test de rappel long, écoute d'Ulrich.
 
+**Résultat du lot 3 (27 nov., code livré, mesure en usage réel à faire)**
+
+- Décision appliquée : gpt-5.6-luna gardé, défauts du code inchangés. La température n'est pas touchée (luna l'ignore, retirée avant l'envoi).
+- Nouveau réglage admin `LLM_CHARACTER_PROVIDER` (Réglages › LLM › Agent Max, interrupteur « Routage OpenRouter : fournisseur le plus rapide »). Défaut vide : aucun `provider` envoyé, comportement actuel. Activé : `{ sort: "latency" }` part avec l'appel du personnage (`simulateMaxResponse`, en lot comme en flux) vers `proxy-llm`. Seule la valeur mesurée au banc est acceptée ; une préférence d'évaluation (`llmOverrides.provider`) reste prioritaire. La trace du tour (`requestedSettings.provider`) dit ce qui est parti.
+- `llm_usage` : colonnes additives `latency_ms` (premier token en flux, appel entier en lot) et `cached_tokens` (`prompt_tokens_details.cached_tokens`). `metadata_json` ajoute `latency_kind`, `duration_ms`, `effective_provider` (fournisseur qui a servi) et `provider_preference`. Tant que la migration n'est pas appliquée, la ligne est écrite sans ces colonnes (aucune perte de suivi).
+- Mémoire `optimized_v3` : si le dernier échange dépasse seul 1 200 car., il est gardé, chaque message coupé en proportion (terminé par « … »), au lieu d'aucun historique. Le reste du prompt est inchangé.
+- Tests : `conversationMemory.test.ts` (+4), `llmUsageLatency.test.ts` (5), `characterProviderSetting.test.ts` (3), `maxAgent.identity.test.ts` (+3).
+- Reste : appliquer la migration via Lovable, activer le réglage sur `sandbox-ulrich`, puis au moins 20 tours (voix seule, puis Tavus), relecture `voice_turn_events` et `llm_usage`, `eval:judge` avec `luna-latency` et `eval:llm-recall` après le correctif mémoire (runs payants lancés par Ulrich), écoute d'Ulrich.
+
 ### Lot 4 — LLM streamé sur toutes les sorties
 
 - Généraliser le chemin `streamPRD4Turn` + `AvatarLineFeed` (T7/T8) à la voix seule ElevenLabs, à Anam et aux autres sorties, derrière un réglage par sortie (défaut faux pendant la mesure).

@@ -362,3 +362,39 @@ describe("lot P — candidate PRÉSENT in memory (judge only)", () => {
     expect(trace.finalSystemPrompt).toContain("Max Lorenzo est à Lausanne aujourd'hui.");
   });
 });
+
+describe('routage OpenRouter de l’appel du personnage (latence, lot 3)', () => {
+  const llm = { LLM_MODEL: 'openai/gpt-5.6-luna', LLM_MAX_TOKENS: 220, LLM_TEMPERATURE: 0.7, LLM_TOP_P: 0.9 };
+  const turn = { conversationHistory: [], userMessage: 'Où es-tu ?' };
+  const answer = { content: 'À la maison.', usage: null, generationId: null, model: 'openai/gpt-5.6-luna', latencyMs: 1, diagnosticTrace: null };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getGameplaySettings).mockReturnValue({ MAX_PROMPT_VARIANT: 'optimized_v3' } as never);
+    vi.mocked(loadCharacterPrompt).mockResolvedValue(sheet('max') as never);
+    vi.mocked(callLLMWithUsage).mockResolvedValue(answer);
+  });
+
+  it('n’envoie aucune préférence quand le réglage est absent (comportement actuel)', async () => {
+    vi.mocked(getLLMSettings).mockReturnValue({ ...llm, LLM_CHARACTER_PROVIDER: null } as never);
+    const result = await simulateMaxResponse(turn, { characterContext: contexts.max });
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).not.toHaveProperty('provider');
+    expect(result.requestedSettings).not.toHaveProperty('provider');
+  });
+
+  it('transmet sort: latency quand le réglage admin le demande, en lot comme en flux', async () => {
+    vi.mocked(getLLMSettings).mockReturnValue({ ...llm, LLM_CHARACTER_PROVIDER: { sort: 'latency' } } as never);
+    vi.mocked(streamLLM).mockResolvedValueOnce('À la maison.');
+    const result = await simulateMaxResponse(turn, { characterContext: contexts.max });
+    await simulateMaxResponse(turn, { characterContext: contexts.max, onSpeechToken: vi.fn() });
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ provider: { sort: 'latency' } });
+    expect(vi.mocked(streamLLM).mock.calls[0][2]).toMatchObject({ provider: { sort: 'latency' } });
+    expect(result.requestedSettings?.provider).toEqual({ sort: 'latency' });
+  });
+
+  it('laisse la préférence d’une évaluation prendre le pas sur le réglage', async () => {
+    vi.mocked(getLLMSettings).mockReturnValue({ ...llm, LLM_CHARACTER_PROVIDER: { sort: 'latency' } } as never);
+    await simulateMaxResponse(turn, { characterContext: contexts.max, llmOverrides: { provider: { only: ['cerebras'] } } });
+    expect(vi.mocked(callLLMWithUsage).mock.calls[0][1]).toMatchObject({ provider: { only: ['cerebras'] } });
+  });
+});
