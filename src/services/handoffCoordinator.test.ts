@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@/types';
-import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation, withoutTransferOffer, handoffFinalizationWritesSnapshot } from './handoffCoordinator';
+import { HandoffCoordinator, completedCallExchanges, candidateEvidence, withdrawsHandoff, needsHandoffPreparation, withoutTransferOffer, handoffFinalizationMode, handoffFinalizationStep } from './handoffCoordinator';
 import { advanceHandoffTurn, assessHandoffTurn, restoreHandoffOffer } from './characterHandoffState';
 import { validInput } from './characterHandoff.fixtures';
 
@@ -94,25 +94,85 @@ describe('F1 request lifetime and delivered exchanges', () => {
   });
 });
 
-describe('T2 handoff finalisation write', () => {
+describe('handoff finalisation mode', () => {
   const base = { sessionId: 's', sourceCharacter: 'max' as const, orchestrationVersionId: 'v1', turnId: 's:1', turnIndex: 1 };
-  const writes = (userText: string, reply: string) =>
-    handoffFinalizationWritesSnapshot(advanceHandoffTurn(null, base, userText), userText, reply, 'max');
-  it('writes nothing, so the next turn does not wait, when no passage is plausible', () => {
-    expect(writes('On parle de l\u2019hôtel.', 'Je ne sais plus, c\u2019était la nuit.')).toBe(false);
-    expect(handoffFinalizationWritesSnapshot(null, '', '', 'max')).toBe(false);
+  const mode = (userText: string, reply: string, waitOnNameAlone = false) =>
+    handoffFinalizationMode(advanceHandoffTurn(null, base, userText), userText, reply, 'max', waitOnNameAlone);
+
+  it('skips when no passage is plausible', () => {
+    expect(mode('On parle de l\u2019hôtel.', 'Je ne sais plus, c\u2019était la nuit.')).toBe('skip');
+    expect(mode('On parle de l\u2019hôtel.', 'Je ne sais plus.', true)).toBe('skip');
+    expect(handoffFinalizationMode(null, '', '', 'max')).toBe('skip');
     const idle = advanceHandoffTurn(null, base, 'Bonjour.');
-    expect(handoffFinalizationWritesSnapshot({ ...idle, state: 'available' }, 'Merci', 'Oui.', 'max')).toBe(false);
+    expect(handoffFinalizationMode({ ...idle, state: 'available' }, 'Merci', 'Je te la passe.', 'max')).toBe('skip');
   });
-  it('keeps the wait while a request is open or an offer is prepared', () => {
+
+  it('blocks while a request is open or an offer is prepared', () => {
     const asked = advanceHandoffTurn(null, base, 'Je voudrais parler à Emma.');
     expect(asked.state).toBe('awaiting_character');
-    expect(handoffFinalizationWritesSnapshot(asked, 'Oui.', 'Oui.', 'max')).toBe(true);
-    expect(handoffFinalizationWritesSnapshot({ ...asked, state: 'prepared' }, 'Oui.', 'Oui.', 'max')).toBe(true);
+    expect(handoffFinalizationMode(asked, 'Oui.', 'Oui.', 'max')).toBe('blocking');
+    expect(handoffFinalizationMode({ ...asked, state: 'prepared' }, 'Oui.', 'Oui.', 'max')).toBe('blocking');
   });
-  it('keeps the wait when the other character is named or the reply reads as a transfer', () => {
-    expect(writes('Est-ce que je peux discuter avec Emma ?', 'Peut-être.')).toBe(true);
-    expect(writes('Oui.', 'Emma va peut-être répondre.')).toBe(true);
-    expect(writes('D\u2019accord.', 'Je te la passe.')).toBe(true);
+
+  it('blocks on a transfer offer or consent in the reply, even without a request', () => {
+    expect(mode('D\u2019accord.', 'Je te la passe.')).toBe('blocking');
+    expect(mode('Merci.', 'Je te transfère maintenant la ligne.')).toBe('blocking');
+    expect(mode('Merci.', 'Tu peux parler à Emma, elle est là.')).toBe('blocking');
+  });
+
+  it.each([
+    'Tu peux demander de causer avec Emma par exemple.',
+    'Est-ce qu\u2019Emma est là, au bout du fil ?',
+    'Emma, tu peux aller la chercher ?',
+    'Et Emma, tu me la passes ?',
+    'Je peux avoir Emma au téléphone ?',
+  ])('blocks when the player speaks of contact: %s', userText => {
+    expect(mode(userText, 'Peut-être.')).toBe('blocking');
+  });
+
+  // Real slow turns of the 2026-11-27 diagnosis: only the name was there.
+  it.each([
+    ['Ouais, mais du du coup, tu, qu\u2019est-ce que tu aimerais dire à Emma', 'Que je l\u2019aime.'],
+    ['Mais du coup,', 'Je voudrais rester auprès d\u2019Emma sans lui mentir.'],
+    ['Bonjour Max, j\u2019aimerais savoir comment tu vas.', 'Je ne sais plus comment parler à Emma.'],
+    ['Comment ça s\u2019est passé ?', 'Emma était terrorisée.'],
+  ])('validates a name alone in the background: %s', (userText, reply) => {
+    expect(mode(userText, reply)).toBe('background');
+    expect(mode(userText, reply, true)).toBe('blocking');
+  });
+});
+
+describe('handoff finalisation step', () => {
+  const never = () => { throw new Error('validation must not run'); };
+  /** Lease of a name-only turn; `nextTurn` binds the following one, which gets a new request id. */
+  const lease = () => {
+    const coordinator = new HandoffCoordinator();
+    const bind = (request: string) => coordinator.bind('s', 'call', 'max', 'v1', request);
+    const first = bind('turn-1');
+    return { first, nextTurn: () => bind('turn-2') };
+  };
+
+  it('answer before the next turn: a granted passage holds that turn, then is written', () => {
+    const { first } = lease();
+    expect(handoffFinalizationStep('background', first.current(), () => true)).toBe('hold');
+  });
+
+  it('answer after the next turn started: nothing is written over it and the loss is recorded', () => {
+    const { first, nextTurn } = lease();
+    const second = nextTurn();
+    expect(handoffFinalizationStep('background', first.current(), () => true)).toBe('late');
+    expect(handoffFinalizationStep('background', first.current(), () => false)).toBe('drop');
+    expect(second.current()).toBe(true);
+  });
+
+  it('writes nothing for a refused or absent passage', () => {
+    expect(handoffFinalizationStep('background', true, () => false)).toBe('idle');
+    expect(handoffFinalizationStep('skip', true, never)).toBe('idle');
+    expect(handoffFinalizationStep('skip', false, never)).toBe('drop');
+  });
+
+  it('keeps the previous behaviour for a blocking turn', () => {
+    expect(handoffFinalizationStep('blocking', true, never)).toBe('write');
+    expect(handoffFinalizationStep('blocking', false, never)).toBe('drop');
   });
 });

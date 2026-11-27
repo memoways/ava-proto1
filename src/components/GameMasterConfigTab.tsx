@@ -87,6 +87,7 @@ export default function GameMasterConfigTab() {
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
         VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
         VOICE_STREAMED_LLM: gameplay.VOICE_STREAMED_LLM,
+        VOICE_HANDOFF_WAIT_ON_NAME: gameplay.VOICE_HANDOFF_WAIT_ON_NAME,
       });
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
@@ -119,6 +120,7 @@ export default function GameMasterConfigTab() {
     || gameplay.QUESTIONNAIRE_MODE !== savedGameplay.QUESTIONNAIRE_MODE
     || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
     || gameplay.VOICE_STREAMED_LLM !== savedGameplay.VOICE_STREAMED_LLM
+    || gameplay.VOICE_HANDOFF_WAIT_ON_NAME !== savedGameplay.VOICE_HANDOFF_WAIT_ON_NAME
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
   const voice = gameplay.VOICE_HANDS_FREE;
   const setVoice = (patch: Partial<HandsFreeVoiceSettings>) =>
@@ -286,6 +288,14 @@ export default function GameMasterConfigTab() {
               <p className="text-xs text-muted-foreground">Avec ElevenLabs et les autres voix hors Gradium, la première phrase part à la voix dès qu’elle est écrite au lieu d’attendre la réponse entière. Pris en compte au tour suivant.</p>
             </div>
             <Switch checked={gameplay.VOICE_STREAMED_LLM} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_STREAMED_LLM: checked }))} aria-label="Voix seule : réponse parlée en cours de génération" />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+            <div>
+              <p className="text-sm font-medium">Passage : attendre même sur un simple nom<TestSettingState state="en mesure" /></p>
+              <p className="text-xs text-muted-foreground">Éteint (conseillé) : quand l’autre personnage est seulement nommé, la réponse suivante n’attend pas le Game Master ; un passage accordé trop tard est abandonné et noté dans la session. Allumé : ancienne règle, réponses parfois retardées. Une demande de passage fait toujours attendre. Pris en compte au tour suivant.</p>
+            </div>
+            <Switch checked={gameplay.VOICE_HANDOFF_WAIT_ON_NAME} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_HANDOFF_WAIT_ON_NAME: checked }))} aria-label="Passage : attendre même sur un simple nom" />
           </div>
 
           <div className={voice.enabled ? "space-y-2" : "pointer-events-none space-y-2 opacity-50"}>

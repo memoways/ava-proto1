@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Attente de passage lot 1 (27 novembre, code)** : un simple nom de l'autre personnage ne retarde plus la réponse suivante. L'attente reste pour toute demande, offre, accord ou parole de contact ; un passage accordé après le début du tour suivant est abandonné et noté `late_after_next_turn` (cas résiduel accepté par Ulrich). Retour possible par le réglage « Passage : attendre même sur un simple nom ». Gain non mesuré. **À faire par Ulrich** : recette sur sandbox-ulrich. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise mesure](prompt_reprise_attente_passage_mesure.md).
+
 **Latence, mesure iPhone (27 novembre)** : lot 1 bis confirmé (tout en `http_stream_pcm`, réponse → son 0,24 s en médiane, premier son 5,00 → 3,28 s sur 8 tours avec son). Les tours les plus lents attendent 1,2 à 2,0 s l'écriture du tour précédent liée au passage de personnage. Restent à mesurer : Anam et le poste de Romed. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise attente de passage](prompt_reprise_attente_passage_lot_1.md).
 
 **Latence lot 4, mesure voix seule (27 novembre)** : premier son médian 2,88 → 2,65 s (16 tours contre 11) ; sur les seuls tours menés au bout, 2,68 → 2,58 s. Critère de 0,5 s non atteint, défaut inchangé. Ulrich : réactif et fluide, mais quand il recoupe Max la voix s'arrête net. Restent à mesurer : Anam, iPhone, poste de Romed. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise interruption douce](prompt_reprise_interruption_douce_lot_1.md).

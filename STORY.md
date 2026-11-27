@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Enregistrement dans le back-office)  
+> **Last Updated**: 2026-11-27 (Attente de passage)  
+
+---
+
+## Prononcer son nom ne suffit plus à faire attendre (27 novembre 2026)
+
+Sur iPhone, certaines réponses de Max arrivaient avec une à deux secondes de retard. La cause : dès qu'Emma était nommée, l'application attendait de savoir s'il fallait passer l'appel. Aucune des quatorze attentes relevées ne menait à un passage. Désormais seule une vraie demande, une offre ou un accord fait attendre. Le prix, accepté par Ulrich : un passage accordé trop tard sur un simple nom est abandonné, et noté pour qu'on puisse le compter.
 
 ---
 
