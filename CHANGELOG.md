@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 4 : mesure voix seule et retour sur l'interruption] — 2026-11-27
+
+- Documentation seulement : mesure consignée (gain médian 0,23 s, critère non atteint, défaut inchangé) et prompt de reprise du lot « interruption douce ».
+
 ## [Cohérence émotionnelle lot 1 : Max monte par paliers au lieu de crier] — 2026-11-27
 
 - Voix (`performanceIntent`) :

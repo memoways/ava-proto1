@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**Latence lot 4, mesure voix seule (27 novembre)** : premier son médian 2,88 → 2,65 s (16 tours contre 11) ; sur les seuls tours menés au bout, 2,68 → 2,58 s. Critère de 0,5 s non atteint, défaut inchangé. Ulrich : réactif et fluide, mais quand il recoupe Max la voix s'arrête net. Restent à mesurer : Anam, iPhone, poste de Romed. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise interruption douce](prompt_reprise_interruption_douce_lot_1.md).
+
 **Cohérence émotionnelle lot 1 : garde-fous voix (27 novembre, code)** : Max ne peut plus passer du calme au cri en une réplique.
 - L'intensité monte d'un cran au plus par réplique.
 - Une seule réplique chaude par fenêtre de 6.
