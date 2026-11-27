@@ -916,7 +916,6 @@ export type Database = {
       }
       llm_usage: {
         Row: {
-          cached_tokens: number | null
           completion_tokens: number | null
           cost_usd: number | null
           created_at: string
@@ -924,7 +923,6 @@ export type Database = {
           feature_key: string
           generation_id: string | null
           id: string
-          latency_ms: number | null
           metadata_json: Json | null
           model: string
           prompt_tokens: number | null
@@ -934,7 +932,6 @@ export type Database = {
           total_tokens: number | null
         }
         Insert: {
-          cached_tokens?: number | null
           completion_tokens?: number | null
           cost_usd?: number | null
           created_at?: string
@@ -942,7 +939,6 @@ export type Database = {
           feature_key?: string
           generation_id?: string | null
           id?: string
-          latency_ms?: number | null
           metadata_json?: Json | null
           model: string
           prompt_tokens?: number | null
@@ -952,7 +948,6 @@ export type Database = {
           total_tokens?: number | null
         }
         Update: {
-          cached_tokens?: number | null
           completion_tokens?: number | null
           cost_usd?: number | null
           created_at?: string
@@ -960,7 +955,6 @@ export type Database = {
           feature_key?: string
           generation_id?: string | null
           id?: string
-          latency_ms?: number | null
           metadata_json?: Json | null
           model?: string
           prompt_tokens?: number | null
