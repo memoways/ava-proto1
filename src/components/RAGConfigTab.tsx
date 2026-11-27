@@ -28,6 +28,7 @@ import {
 import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
 import { useUnsavedChanges } from "@/components/admin/unsaved/context";
 import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { TestSettingsFold, TestSettingState } from "@/components/admin/SettingsFold";
 import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const SELECTABLE_PROFILES: RagEmbeddingProfileId[] = [
@@ -53,14 +54,14 @@ const PROMPT_VARIANTS: Array<{
   {
     value: "legacy",
     label: "Legacy",
-    status: "Live actuel · rollback",
-    description: "Comportement historique stable. À conserver comme retour arrière tant que la canary n’est pas validée.",
+    status: "Retour arrière",
+    description: "Comportement historique, conservé pour revenir en arrière.",
   },
   {
     value: "optimized_v3",
     label: "Optimized v3",
-    status: "Canary encadrée",
-    description: "Payload borné, mémoire structurée et déduplication globale. À activer d’abord sur une session diagnostique.",
+    status: "Version retenue",
+    description: "Payload borné, mémoire structurée et déduplication globale.",
   },
   {
     value: "rich_v2",
@@ -217,6 +218,28 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
     }
   }
 
+  const renderProfileCard = (profileId: RagEmbeddingProfileId) => {
+    const profile = RAG_EMBEDDING_PROFILES[profileId];
+    const active = dashboard?.state?.active_profile === profileId;
+    return (
+    <button
+      type="button"
+      key={profile.id}
+      onClick={() => setTargetProfile(profile.id)}
+      className={`rounded-lg border p-4 text-left transition-colors ${targetProfile === profile.id ? "border-primary bg-primary/5" : "hover:bg-muted/20"}`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{profile.label}</span>
+        {profile.recommended && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">RECOMMANDÉ</span>}
+        {profile.experimental && <span className="rounded bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-300">EN ESSAI</span>}
+        {active && <span className="rounded bg-primary/15 px-2 py-0.5 text-[10px] text-primary">ACTIF</span>}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{profile.description}</p>
+      <p className="mt-2 font-mono text-[10px] text-muted-foreground/70">{profile.documentModel} → {profile.queryModel} · {profile.dimension}D · {dashboard?.profileCounts[profile.id] || 0} chunks présents</p>
+    </button>
+    );
+  };
+
   const metrics = dashboard?.metrics;
 
   const saveButton = (className = "") => (
@@ -287,28 +310,17 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          {SELECTABLE_PROFILES.map((profileId) => {
-            const profile = RAG_EMBEDDING_PROFILES[profileId];
-            const active = dashboard?.state?.active_profile === profileId;
-            return (
-              <button
-                type="button"
-                key={profile.id}
-                onClick={() => setTargetProfile(profile.id)}
-                className={`rounded-lg border p-4 text-left transition-colors ${targetProfile === profile.id ? "border-primary bg-primary/5" : "hover:bg-muted/20"}`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{profile.label}</span>
-                  {profile.recommended && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">RECOMMANDÉ</span>}
-                  {profile.experimental && <span className="rounded bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-300">CANARY</span>}
-                  {active && <span className="rounded bg-primary/15 px-2 py-0.5 text-[10px] text-primary">ACTIF</span>}
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">{profile.description}</p>
-                <p className="mt-2 font-mono text-[10px] text-muted-foreground/70">{profile.documentModel} → {profile.queryModel} · {profile.dimension}D · {dashboard?.profileCounts[profile.id] || 0} chunks présents</p>
-              </button>
-            );
-          })}
+          {SELECTABLE_PROFILES.filter((profileId) => !RAG_EMBEDDING_PROFILES[profileId].experimental).map(renderProfileCard)}
         </div>
+
+        <TestSettingsFold testId="test-settings-rag-profiles">
+          <p className="text-xs text-muted-foreground">
+            Profil encore à l’essai<TestSettingState state="prototype" />. Le choisir ne change rien tant qu’il n’est pas construit ou activé ; l’index est partagé par tous les environnements.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {SELECTABLE_PROFILES.filter((profileId) => RAG_EMBEDDING_PROFILES[profileId].experimental).map(renderProfileCard)}
+          </div>
+        </TestSettingsFold>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/10 p-3">
           <div>
@@ -414,38 +426,40 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
       <section className="space-y-6 rounded-lg border p-4">
         <h3 className="text-base font-semibold">🎚️ Récupération et injection</h3>
 
-        <div className="space-y-3 rounded-lg border bg-muted/10 p-4">
-          <div>
-            <p className="text-sm font-medium">Variante du prompt Max</p>
-            <Doc>Ce choix modifie la construction du prompt, la mémoire utilisée et le budget RAG. Il prend effet au prochain tour après enregistrement.</Doc>
+        <TestSettingsFold testId="test-settings-rag-prompt">
+          <div className="space-y-3 rounded-lg border bg-muted/10 p-4">
+            <div>
+              <p className="text-sm font-medium">Variante du prompt Max<TestSettingState state="adopté" /></p>
+              <Doc>Optimized v3 est la version retenue ; les autres servent à comparer ou à revenir en arrière. Ce choix change la construction du prompt, la mémoire et le budget RAG, au prochain tour après enregistrement.</Doc>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Variante du prompt Max">
+              {PROMPT_VARIANTS.map((variant) => {
+                const selected = gameplay.MAX_PROMPT_VARIANT === variant.value;
+                const active = saved.MAX_PROMPT_VARIANT === variant.value;
+                const format = maxRagFormatOptionsForVariant(variant.value);
+                const totalChars = format.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
+                return (
+                  <button
+                    key={variant.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => update({ MAX_PROMPT_VARIANT: variant.value })}
+                    className={`rounded-lg border p-3 text-left transition-colors ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/30"}`}
+                  >
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold">{variant.label}</span>
+                      <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{variant.status}</span>
+                      {active && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">ACTIF</span>}
+                    </span>
+                    <span className="mt-2 block text-xs leading-relaxed text-muted-foreground">{variant.description}</span>
+                    <span className="mt-2 block font-mono text-[10px] text-muted-foreground/70">Budget RAG : {totalChars.toLocaleString("fr-FR")} caractères</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label="Variante du prompt Max">
-            {PROMPT_VARIANTS.map((variant) => {
-              const selected = gameplay.MAX_PROMPT_VARIANT === variant.value;
-              const active = saved.MAX_PROMPT_VARIANT === variant.value;
-              const format = maxRagFormatOptionsForVariant(variant.value);
-              const totalChars = format.totalChars ?? MAX_MAX_RAG_CONTEXT_CHARS;
-              return (
-                <button
-                  key={variant.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => update({ MAX_PROMPT_VARIANT: variant.value })}
-                  className={`rounded-lg border p-3 text-left transition-colors ${selected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "hover:bg-muted/30"}`}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold">{variant.label}</span>
-                    <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{variant.status}</span>
-                    {active && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-400">ACTIF</span>}
-                  </span>
-                  <span className="mt-2 block text-xs leading-relaxed text-muted-foreground">{variant.description}</span>
-                  <span className="mt-2 block font-mono text-[10px] text-muted-foreground/70">Budget RAG : {totalChars.toLocaleString("fr-FR")} caractères</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        </TestSettingsFold>
 
         <div>
           <div className="mb-1 flex justify-between"><label className="text-sm font-medium text-muted-foreground">Seuil cosine minimal</label><span className="font-mono text-sm">{gameplay.RAG_MATCH_THRESHOLD.toFixed(2)}</span></div>

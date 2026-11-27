@@ -604,7 +604,7 @@ export default function LatencyTelemetryTab({
       {internal && (
         <section className="space-y-3 rounded-xl border border-primary/35 bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div><h3 className="font-semibold">Canary interne — couverture et publication</h3><p className="text-xs text-muted-foreground">Mesures persistées par session et par tour, conservées même si PostHog est absent.</p></div>
+            <div><h3 className="font-semibold">Contrôle interne — couverture et publication</h3><p className="text-xs text-muted-foreground">Mesures persistées par session et par tour, conservées même si PostHog est absent.</p></div>
             <Badge>AVA interne</Badge>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -614,7 +614,7 @@ export default function LatencyTelemetryTab({
             <SummaryCard label="Erreurs internes" value={fmtRate(internal.errorRate)} detail={`${internal.errorCount} tour(s) en échec`} icon={AlertTriangle} tone={internal.errorCount ? "danger" : "neutral"} />
           </div>
           <div className="flex flex-wrap items-end justify-between gap-3 border-t pt-3">
-            <div><h4 className="text-sm font-semibold">Canary interne — décision de publication</h4><p className="text-xs text-muted-foreground">Premier son, erreurs et persistance viennent d’AVA ; PostHog complète la tendance.</p></div>
+            <div><h4 className="text-sm font-semibold">Contrôle interne — décision de publication</h4><p className="text-xs text-muted-foreground">Premier son, erreurs et persistance viennent d’AVA ; PostHog complète la tendance.</p></div>
             <div className="w-56"><label className="text-xs text-muted-foreground">Budget maximum / session (USD)</label><Input type="number" min="0" step="0.001" value={costBudget} onChange={(event) => setCostBudget(event.target.value)} placeholder="à approuver" /></div>
           </div>
           {canary && <><Badge variant="outline">{canary.decision === "promote" ? "PROMOUVOIR" : canary.decision === "rollback" ? "REVENIR EN ARRIÈRE" : "DONNÉES MANQUANTES / ATTENTE"}</Badge><div className="grid gap-2 md:grid-cols-2">{canary.checks.map((check) => <div key={check.key} className={`rounded border p-2 text-xs ${statusClass(check.status)}`}>{check.detail}<span className="ml-1 opacity-70">({check.key === "costPerSessionUsd" ? "coûts internes" : "AVA interne"})</span></div>)}</div></>}

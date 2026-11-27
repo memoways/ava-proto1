@@ -54,6 +54,7 @@ import { extractTranscriptStatus, type ExtractTranscriptStatus } from "../../sup
 import CinematicPreview from "@/components/CinematicPreview";
 import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
 import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { TestSettingsFold, TestSettingState } from "@/components/admin/SettingsFold";
 import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -277,7 +278,7 @@ function VideoTriggerRulesPanel() {
             Superposer à la réponse
           </label>
           </RadioGroup>
-          <label htmlFor="cinematic-overlay-gain" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Superposition seulement. −15 dB = valeur d'essai. Sur iPhone/iPad, le réglage passe par Web Audio ; si la source ne le permet pas, la vidéo y reste muette.">
+          <label htmlFor="cinematic-overlay-gain" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Superposition seulement. Valeur de départ : −15 dB. Sur iPhone/iPad, le réglage passe par Web Audio ; si la source ne le permet pas, la vidéo y reste muette.">
           Son sous la voix (dB)
           <Input
             id="cinematic-overlay-gain"
@@ -304,37 +305,42 @@ function VideoTriggerRulesPanel() {
         </div>
       </fieldset>
 
-      <fieldset className="mt-2 border-0 p-0" data-testid="smartphone-video-mode" aria-label="Présentation sur smartphone">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="text-sm font-medium" title="Smartphone seulement (écran tactile de moins de 600 px). Desktop et tablette ne changent pas. Pour tester : ajouter ?ecran=telephone à l'adresse.">Smartphone</span>
-          <RadioGroup
-            value={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE)}
-            onValueChange={(value) => update({ SMARTPHONE_VIDEO_MODE: smartphoneVideoModeFrom(value) })}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1"
-          >
-            {SMARTPHONE_VIDEO_MODES.map((mode) => (
-              <label key={mode} htmlFor={`smartphone-video-mode-${mode}`} className="flex cursor-pointer items-center gap-1.5 text-sm">
-                <RadioGroupItem id={`smartphone-video-mode-${mode}`} value={mode} />
-                {SMARTPHONE_VIDEO_MODE_LABELS[mode]}
-              </label>
-            ))}
-          </RadioGroup>
-          <label htmlFor="smartphone-pan-start" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Mode vertical : où le cadrage démarre, en % de la largeur du film (0 = gauche, 50 = centre, 100 = droite). Le doigt déplace ensuite l'image.">
-            Départ du cadrage (%)
-            <Input
-              id="smartphone-pan-start"
-              type="number"
-              min={0}
-              max={100}
-              step={5}
-              value={Math.round(smartphonePanStartFrom(settings.SMARTPHONE_PAN_START) * 100)}
-              disabled={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE) !== "portrait"}
-              className="h-8 w-16"
-              onChange={(e) => update({ SMARTPHONE_PAN_START: smartphonePanStartFrom((Number(e.target.value) || 0) / 100) })}
-            />
-          </label>
-        </div>
-      </fieldset>
+      <TestSettingsFold testId="test-settings-cinematics">
+        <p className="text-xs text-muted-foreground">
+          Présentation d’une cinématique sur smartphone<TestSettingState state="en mesure" /> : trois modes à essayer sur iPhone avant d’en retenir un ; « Actuel » est le comportement d’origine.
+        </p>
+        <fieldset className="border-0 p-0" data-testid="smartphone-video-mode" aria-label="Présentation sur smartphone">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-sm font-medium" title="Smartphone seulement (écran tactile de moins de 600 px). Desktop et tablette ne changent pas. Pour tester : ajouter ?ecran=telephone à l'adresse.">Smartphone</span>
+            <RadioGroup
+              value={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE)}
+              onValueChange={(value) => update({ SMARTPHONE_VIDEO_MODE: smartphoneVideoModeFrom(value) })}
+              className="flex flex-wrap items-center gap-x-4 gap-y-1"
+            >
+              {SMARTPHONE_VIDEO_MODES.map((mode) => (
+                <label key={mode} htmlFor={`smartphone-video-mode-${mode}`} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                  <RadioGroupItem id={`smartphone-video-mode-${mode}`} value={mode} />
+                  {SMARTPHONE_VIDEO_MODE_LABELS[mode]}
+                </label>
+              ))}
+            </RadioGroup>
+            <label htmlFor="smartphone-pan-start" className="flex items-center gap-2 text-[11px] text-muted-foreground" title="Mode vertical : où le cadrage démarre, en % de la largeur du film (0 = gauche, 50 = centre, 100 = droite). Le doigt déplace ensuite l'image.">
+              Départ du cadrage (%)
+              <Input
+                id="smartphone-pan-start"
+                type="number"
+                min={0}
+                max={100}
+                step={5}
+                value={Math.round(smartphonePanStartFrom(settings.SMARTPHONE_PAN_START) * 100)}
+                disabled={smartphoneVideoModeFrom(settings.SMARTPHONE_VIDEO_MODE) !== "portrait"}
+                className="h-8 w-16"
+                onChange={(e) => update({ SMARTPHONE_PAN_START: smartphonePanStartFrom((Number(e.target.value) || 0) / 100) })}
+              />
+            </label>
+          </div>
+        </fieldset>
+      </TestSettingsFold>
 
       <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
         <CompactNumber
