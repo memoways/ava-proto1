@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, Gauge, Info, Loader2, RefreshCw, RotateCcw, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, Gauge, Info, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,9 @@ import {
   type GameplaySettings,
 } from "@/services/settingsService";
 import { RAG_DEGRADED_MODE_DEADLINE_MS } from "@/config/experienceRuntime";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const SELECTABLE_PROFILES: RagEmbeddingProfileId[] = [
   "voyage-4-realtime",
@@ -167,11 +170,15 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
     try {
       if (!previewMode) await saveGameplaySettingsToDB(gameplay);
       setSaved({ ...gameplay });
-      toast.success("Réglages de récupération sauvegardés ✓");
+      toast.success("Réglages de récupération enregistrés ✓");
+    } catch (error) {
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
   }
+
+  useUnsavedChanges({ dirty: hasChanges, label: "Réglages de récupération RAG", saving, save: handleSave });
 
   async function handleBuildProfile() {
     const confirmed = window.confirm(
@@ -213,15 +220,7 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
   const metrics = dashboard?.metrics;
 
   const saveButton = (className = "") => (
-    <Button
-      size="sm"
-      onClick={handleSave}
-      disabled={saving || !hasChanges}
-      className={`${hasChanges ? "bg-green-600 hover:bg-green-700" : ""} ${className}`}
-    >
-      {saving ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
-      {saving ? "Enregistrement…" : "Enregistrer et activer les réglages"}
-    </Button>
+    <SaveButton dirty={hasChanges} saving={saving} onClick={() => void handleSave()} className={className} />
   );
 
   return (
@@ -238,10 +237,10 @@ export default function RAGConfigTab({ initialDashboard, initialGameplay, previe
       </div>
 
       {hasChanges && (
-        <div className="rounded-lg border border-yellow-700/50 bg-yellow-900/30 px-4 py-2 text-sm text-yellow-300">
-          Modifications non enregistrées : elles n’affectent pas les prochains tours tant que vous ne les avez pas
-          activées. Le profil d’index reste, lui, activé séparément après rebuild.
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Les réglages modifiés s’appliquent aux prochains tours une fois enregistrés. Le profil d’index reste, lui, activé
+          séparément après rebuild.
+        </p>
       )}
 
       <section className="space-y-4 rounded-lg border p-4">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, Save } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,10 @@ import {
   type CharacterAutoReadiness,
   type CharacterRuntimeProfile,
 } from "@/services/experienceOrchestration";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { UnsavedSection } from "@/components/admin/unsaved/UnsavedSection";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const KEY_ORDER = ["max", "emma", "ava", "leo"];
 
@@ -111,6 +115,9 @@ export default function CharacterRuntimeSettingsTab() {
   // Loads the experience settings (read-only) so the "Joué" summaries read the database values.
   useVoiceProfiles();
   const [profiles, setProfiles] = useState<CharacterRuntimeProfile[]>([]);
+  /** Last values read from the database, to tell which character holds a draft. */
+  const [savedProfiles, setSavedProfiles] = useState<CharacterRuntimeProfile[]>([]);
+  const confirmLeave = useConfirmLeave();
   const [autoReadiness, setAutoReadiness] = useState<Record<string, CharacterAutoReadiness>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,14 +128,17 @@ export default function CharacterRuntimeSettingsTab() {
   /** Unsaved video choices; a character without one is not rewritten on save. */
   const [videoDrafts, setVideoDrafts] = useState<Record<string, CharacterVideoChoice>>({});
 
+  const readProfiles = async () => (await listCharacterRuntimeProfiles()).slice().sort(
+    (a, b) => KEY_ORDER.indexOf(a.character_key) - KEY_ORDER.indexOf(b.character_key),
+  );
+
   const load = async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const nextProfiles = (await listCharacterRuntimeProfiles()).slice().sort(
-        (a, b) => KEY_ORDER.indexOf(a.character_key) - KEY_ORDER.indexOf(b.character_key),
-      );
+      const nextProfiles = await readProfiles();
       setProfiles(nextProfiles);
+      setSavedProfiles(nextProfiles);
       // Same prefill as TTS Config: a voice the game already uses counts until the catalogue has one.
       setVoices(seedFromProfiles(await loadCharacterVoicesFromDB(), nextProfiles));
       setAvatarSettings(await loadStreamingAvatarSettingsFromDB());
@@ -156,12 +166,31 @@ export default function CharacterRuntimeSettingsTab() {
     try {
       const url = await uploadCharacterPortrait(profile.character_key, file);
       patchProfile(profile.id, { portrait_url: url });
-      toast.success("Portrait téléversé, pensez à sauvegarder le profil");
+      toast.success("Portrait téléversé, à enregistrer avec le profil");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Téléversement du portrait impossible");
     } finally {
       setUploadingPortrait(null);
     }
+  };
+
+  /** Rereads the saved character only: the drafts of the other characters stay on screen. */
+  const refreshSaved = async (saved: CharacterRuntimeProfile) => {
+    let fresh = saved;
+    try {
+      fresh = (await readProfiles()).find((candidate) => candidate.id === saved.id) ?? saved;
+      setAvatarSettings(await loadStreamingAvatarSettingsFromDB());
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+    }
+    const replace = (current: CharacterRuntimeProfile[]) => current.map((candidate) => candidate.id === fresh.id ? fresh : candidate);
+    setProfiles(replace);
+    setSavedProfiles(replace);
+    setVideoDrafts((current) => {
+      const next = { ...current };
+      delete next[saved.character_key];
+      return next;
+    });
   };
 
   const saveProfile = async (profile: CharacterRuntimeProfile) => {
@@ -184,10 +213,10 @@ export default function CharacterRuntimeSettingsTab() {
       });
       const videoDraft = videoDrafts[profile.character_key];
       if (videoDraft) await saveCharacterVideoChoiceToDB(profile.character_key, videoDraft);
-      toast.success(`Profil runtime ${profile.display_name} sauvegardé`);
-      await load();
+      toast.success(`Profil de ${profile.display_name} enregistré`);
+      await refreshSaved(profile);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sauvegarde du profil impossible");
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
@@ -205,7 +234,7 @@ export default function CharacterRuntimeSettingsTab() {
             se règle maintenant dans « Orchestration ».
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
+        <Button variant="outline" size="sm" onClick={() => confirmLeave(() => void load())}><RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser</Button>
       </div>
 
       {loadError && (
@@ -223,8 +252,13 @@ export default function CharacterRuntimeSettingsTab() {
           const videoChoice = videoDrafts[profile.character_key] ?? characterVideoChoice(avatarSettings, profile.character_key);
           const greetings = profile.character_key === 'max' || profile.character_key === 'emma'
             ? initialGreetingLines(profile.character_key, profile.opening_line, getActiveEnvironment()) : [];
+          const saved = savedProfiles.find((candidate) => candidate.id === profile.id);
+          const videoChanged = Boolean(videoDrafts[profile.character_key])
+            && JSON.stringify(videoDrafts[profile.character_key]) !== JSON.stringify(characterVideoChoice(avatarSettings, profile.character_key));
+          const dirty = videoChanged || JSON.stringify(profile) !== JSON.stringify(saved);
           return (
-            <div key={profile.id} className="rounded border p-3">
+            <div key={profile.id} className={`rounded border p-3 ${dirty ? "border-amber-500" : ""}`}>
+              <UnsavedSection dirty={dirty} label={`Profil de ${profile.display_name}`} saving={saving} save={() => saveProfile(profile)} />
               <div className="flex items-center justify-between gap-2">
                 <strong>{profile.display_name}</strong>
                 <div className="flex gap-1">
@@ -300,7 +334,7 @@ export default function CharacterRuntimeSettingsTab() {
                 {(() => {
                   const catalogued = characterVoice(voices, profile.character_key, profile.tts_provider as TTSProviderId | null);
                   if (profile.tts_provider && !catalogued) return <p className="text-xs text-amber-300/90">Ajoutez l’ID de {profile.display_name} pour ce fournisseur dans <a className="underline" href={adminTabPath("voice")}>Technique → Configuration TTS</a>.{profile.tts_voice_id ? ` Le jeu garde pour l’instant ${profile.tts_voice_id}.` : ""}</p>;
-                  if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; sauvegarder le profil applique l’ID de la configuration TTS.</p>;
+                  if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; enregistrer le profil applique l’ID de la configuration TTS.</p>;
                   return null;
                 })()}
                  <p className="text-xs text-muted-foreground">
@@ -376,9 +410,15 @@ export default function CharacterRuntimeSettingsTab() {
                   </label>
                 </div>
 
-                <Button size="sm" variant="outline" disabled={saving || uploadingPortrait === profile.id} onClick={() => void saveProfile(profile)}>
-                  <Save className="mr-1 h-3.5 w-3.5" />{uploadingPortrait === profile.id ? "Téléversement…" : "Sauvegarder le profil"}
-                </Button>
+                {/* Always clickable: saving also applies the voice catalogue and the readiness flags. */}
+                <SaveButton
+                  dirty
+                  variant={dirty ? "default" : "outline"}
+                  saving={saving}
+                  disabled={uploadingPortrait === profile.id}
+                  label={uploadingPortrait === profile.id ? "Téléversement…" : "Enregistrer le profil"}
+                  onClick={() => void saveProfile(profile)}
+                />
               </div>
             </div>
           );

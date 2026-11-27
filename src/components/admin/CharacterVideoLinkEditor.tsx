@@ -197,7 +197,7 @@ export function CharacterVideoLinkEditor({ characterKey, characterName, settings
         <span className="font-medium">Prochain appel sur ordinateur :</span> {nextCall}
       </p>
       <p className="text-xs text-muted-foreground">
-        L’interrupteur global sur « Voix » coupe la vidéo pour tous les personnages. Quand il est sur « Vidéo » :
+        L’interrupteur global sur « Voix seule » coupe la vidéo pour tous les personnages. Quand il est sur « Avatar vidéo » :
         {" "}« Pas de vidéo » donne un appel en voix seule, un fournisseur ouvre ce fournisseur, « Suivre le réglage global »
         {" "}fait suivre l’appareil à Max et laisse les autres personnages en voix. Un appareil réglé sur « voix » reste en voix.
         {" "}La vidéo reste celle du personnage qui ouvre l’appel : après un passage à un autre personnage, l’appel continue en voix.

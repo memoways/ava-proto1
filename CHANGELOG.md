@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Back-office : rien ne se perd sans enregistrer] — 2026-11-27
+
+- Barre fixe « Modifications non enregistrées » dès qu'un écran de réglages porte un changement, avec « Enregistrer » ou « Tout enregistrer » (`components/admin/unsaved`).
+- Changement de page, retour du navigateur, changement d'environnement, déconnexion, autre version ou autre personnage : choix entre rester, continuer sans enregistrer, ou enregistrer et continuer. Fermer ou recharger l'onglet déclenche l'alerte du navigateur. L'app passe au routeur « data » de React Router (`createBrowserRouter`) pour retenir une navigation.
+- Un seul bouton « Enregistrer » partout (`SaveButton`), grisé quand il n'y a rien à enregistrer.
+- Corrigé : une écriture refusée par la base affichait « sauvegardé » (erreur avalée par les services de réglages) ; elle affiche maintenant « Rien n'a été enregistré » et garde le brouillon. « Sauvegarder le profil » d'un personnage n'efface plus les changements non enregistrés des autres ; replier des réglages API STT garde le brouillon.
+- « Output de Max » devient « Vidéo des avatars — tous les personnages » (Voix seule / Avatar vidéo). Blocs repliables (Audio, Vidéo, réglages de test) et leur flèche plus visibles.
+- Aucune migration, aucune valeur enregistrée modifiée.
+
 ## [Réglages lot 1 : global « Voix » coupe la vidéo, « Pas de vidéo » par personnage, réglages de test repliés] — 2026-11-27
 
 - Routage d'appel (`callOutputMode`, `callVideoRouting`) : l'interrupteur global sur « Voix » donne un appel en voix pour tous, lien de personnage ou pas ; un appareil réglé sur « avatar » garde son choix. Nouvelle option « Pas de vidéo (voix seule) » par personnage, stockée `characterLinks.<clé> = { provider: "none" }` (additif, anciennes valeurs relues à l'identique), raison `character_no_video`. `describeNextCall` dit ce que donnera le prochain appel.

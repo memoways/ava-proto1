@@ -9,6 +9,9 @@ import {
   saveNewsletterSettingsToDB,
   type NewsletterSettings,
 } from "@/services/settingsService";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 /** Admin switch for sending « tenu·e au courant » requests to the Memoways newsletter. */
 export function NewsletterSettingsPanel() {
@@ -30,11 +33,14 @@ export function NewsletterSettingsPanel() {
       setSaved(settings);
       toast.success("Réglage newsletter enregistré ✓");
     } catch (err) {
-      toast.error("Erreur sauvegarde : " + (err as Error).message);
+      return toastSaveError(err);
     } finally {
       setSaving(false);
     }
   }
+
+  const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
+  useUnsavedChanges({ dirty, label: "Nouvelles de Gamiways", saving, save });
 
   return (
     <section className="space-y-3 rounded-lg border p-4" data-testid="newsletter-settings">

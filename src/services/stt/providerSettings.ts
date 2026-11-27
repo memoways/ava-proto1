@@ -150,11 +150,7 @@ export async function saveSTTProviderSettings<K extends STTProviderId>(
   };
   cached = next;
   try { writeEnvironmentStorage(STORAGE_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-  try {
-    await saveEnvironmentSetting(STORAGE_KEY, next);
-  } catch (err) {
-    console.error("[STT ProviderSettings] DB save exception:", err);
-  }
+  await saveEnvironmentSetting(STORAGE_KEY, next);
   return next;
 }
 

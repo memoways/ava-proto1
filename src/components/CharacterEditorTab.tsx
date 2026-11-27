@@ -5,6 +5,7 @@ import {
   listCharactersWithPrompts,
 } from "@/services/characterPromptService";
 import CharacterPromptEditorPanel from "@/components/CharacterPromptEditorPanel";
+import { useConfirmLeave } from "@/components/admin/unsaved/context";
 
 const HIDDEN_NAMES = new Set([
   "identité & présentation",
@@ -16,6 +17,7 @@ const HIDDEN_NAMES = new Set([
 export default function CharacterEditorTab() {
   const [list, setList] = useState<CharacterListEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const confirmLeave = useConfirmLeave();
 
   const refreshList = useCallback(async () => {
     const entries = await listCharactersWithPrompts();
@@ -48,7 +50,7 @@ export default function CharacterEditorTab() {
         {list.map((c) => (
           <button
             key={c.character_id}
-            onClick={() => setActiveId(c.character_id)}
+            onClick={() => { if (c.character_id !== activeId) confirmLeave(() => setActiveId(c.character_id)); }}
             className={`w-full text-left p-3 border rounded-lg hover:bg-accent/50 transition-colors ${
               activeId === c.character_id ? "bg-accent border-primary" : ""
             }`}

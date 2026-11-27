@@ -20,6 +20,7 @@ import { AUDITION_PROVIDERS, createAuditionCorpus, auditionVoice, createAudition
 import { readWorkshop, saveWorkshopComparison, exportWorkshop, workshopEvidence, type WorkshopComparison, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
 import type { TTSProviderId } from '@/services/tts/types';
 import { ELEVENLABS_WORKSHOP_MODEL } from '@/services/tts/speechIntentWorkshop';
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
 interface Character { promptId?: string; key: string; name: string; level: number; provider: TTSProviderId; states: Array<{ name: string; description: string }> }
 const NOTE_FIELDS = ['words', 'rhythm', 'timbre', 'artifacts'] as const;
 const NOTE_LABELS = ['Mots / pensée', 'Pauses / rythme', 'Affect / timbre', 'Clics / hoquets'];
@@ -67,6 +68,7 @@ export default function SpeechAuditionBench() {
  const [name, setName] = useState('');
  const [hypothesis, setHypothesis] = useState('Un rythme global différent rend-il cette réplique plus naturelle ?');
  const [notes, setNotes] = useState(emptyNotes);
+ const [unsavedNotes, setUnsavedNotes] = useState(false);
  const [decision, setDecision] = useState<WorkshopComparison['decision']>('relisten');
  const [editing, setEditing] = useState<WorkshopComparison | null>(null);
  const [loadedReferences, setLoadedReferences] = useState<Record<string, string> | null>(null);
@@ -174,8 +176,8 @@ export default function SpeechAuditionBench() {
    if (!storeReady) throw new Error('Recharger les variantes avant toute sauvegarde.');
    const value = draftComparison(); const confirmed = await saveWorkshopComparison(value, document, environment);
    if (!stillHere()) return;
-   setDocument(confirmed); setEditing(confirmed.comparisons.find(c => c.id === value.id)!); setStatus('Comparaison enregistrée et relue dans cette sandbox. Aucun réglage du jeu modifié.');
-  } catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); }
+   setDocument(confirmed); setEditing(confirmed.comparisons.find(c => c.id === value.id)!); setUnsavedNotes(false); setStatus('Comparaison enregistrée et relue dans cette sandbox. Aucun réglage du jeu modifié.');
+  } catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); return false; }
   finally { if (stillHere()) setSaving(false); }
  }
  async function reloadDocuments() {
@@ -193,17 +195,21 @@ export default function SpeechAuditionBench() {
   setVoices(old => ({ ...old, [`${c.character}:${c.provider}`]: c.voice })); setControl(c.control in VOCAL_CONTROLS ? c.control as VocalControl : 'paddingBonus'); setComparison(c.control === 'pauses' ? 'pauses' : 'vocal');
   if (['speed', 'emotion', 'delivery', 'instruction'].includes(c.control)) { setMappingControl(c.control as typeof mappingControl); setMappingValue(String(c.b.settings.byCharacter[c.character]?.[c.line.state]?.[c.control as keyof SpeechVoiceMapping] ?? 'neutral')); }
   setVocalValue(c.control in VOCAL_CONTROLS ? c.b.gradium[c.control as VocalControl] : c.b.gradium.paddingBonus); setSpeed(c.b.settings.byCharacter[c.character]?.[c.line.state]?.speed ?? 1); setTransport(c.transport); setBufferPreset(c.bufferPreset ?? 'current'); setLoadedReferences(c.references);
-  setName(c.name); setHypothesis(c.hypothesis); setNotes(c.notes); setDecision(c.decision); setEditing(c); setStatus('Brouillon chargé sans audio ni sauvegarde. Une nouvelle écoute régénère : l’ancien son exact n’est pas conservé.');
+  setName(c.name); setHypothesis(c.hypothesis); setNotes(c.notes); setDecision(c.decision); setEditing(c); setUnsavedNotes(false); setStatus('Brouillon chargé sans audio ni sauvegarde. Une nouvelle écoute régénère : l’ancien son exact n’est pas conservé.');
  }
  async function saveMapping() {
   if (!contextReady) return;
   stop(); setSaving(true); setError('');
   try { const confirmed = await saveSpeechPerformanceSettings(mappingDraft, saved, environment); if (stillHere()) { setSaved(confirmed); setMappingDraft(structuredClone(confirmed)); toast.success('Mapping du jeu sauvegardé et relu ; essais existants conservés.'); } }
-  catch (e) { if (stillHere()) setError(String(e)); } finally { if (stillHere()) setSaving(false); }
+  catch (e) { if (stillHere()) setError(String(e)); return false; } finally { if (stillHere()) setSaving(false); }
  }
  function patchMapping(state: string, patch: Partial<SpeechVoiceMapping>) {
   stop(); setMappingDraft(old => ({ ...old, byCharacter: { ...old.byCharacter, [character]: { ...old.byCharacter[character], [state]: { ...(old.byCharacter[character]?.[state] ?? proposeSpeechMapping(state, active?.states.find(s => s.name === state)?.description ?? '')), ...patch } } } }));
  }
+ const mappingDirty = contextReady && auditionKey(saved) !== auditionKey(mappingDraft);
+ useUnsavedChanges({ dirty: mappingDirty, label: 'Mapping des états de parole du jeu', saving, save: saveMapping });
+ useUnsavedChanges({ dirty: unsavedNotes, label: 'Comparaison A/B : hypothèse et avis', saving, save: saveComparison,
+  blocked: storeReady && name.trim() && hypothesis.trim() ? null : 'Nom et hypothèse requis.' });
  if (environment === 'prod') return <section><h3>Atelier de parole</h3><p>Réservé aux environnements sandbox.</p></section>;
  return <section aria-label="Comparaison A/B des réglages" className="min-w-0 max-w-3xl space-y-4 break-words [&_select]:max-w-full [&_select]:min-w-0 [&_select]:rounded [&_select]:border [&_select]:bg-background [&_select]:p-2 [&_label]:min-w-0">
   <fieldset disabled={saving} className="min-w-0 space-y-4"><h3 className="text-xl font-semibold">Comparaison A/B des réglages — {active?.name ?? 'Max'}</h3>
@@ -237,9 +243,9 @@ export default function SpeechAuditionBench() {
    </>}
    {step === 4 && <><p aria-label="Différence comparée">{diff}</p><p>Comparez ce que vous avez entendu, puis nommez et enregistrez votre comparaison.</p>
     <label className="block">Nom de la comparaison<Input ref={nameField} aria-label="Nom de la comparaison" maxLength={100} value={name} onChange={e => { setName(e.target.value); setStatus(''); }}/></label>
-    <label className="block">Hypothèse<Textarea aria-label="Hypothèse" maxLength={500} value={hypothesis} onChange={e => { setHypothesis(e.target.value); setStatus('Brouillon modifié : changements non enregistrés.'); }}/></label>
-    <div className="grid gap-3 sm:grid-cols-2">{NOTE_FIELDS.map((field, i) => <label key={field}>{NOTE_LABELS[i]}<Input aria-label={NOTE_LABELS[i]} maxLength={500} value={notes[field]} onChange={e => { setNotes(old => ({ ...old, [field]: e.target.value })); setStatus('Avis modifié : changements non enregistrés.'); }}/></label>)}</div>
-    <label className="block">Avis humain<select className="block w-full" aria-label="Décision humaine" value={decision} onChange={e => { setDecision(e.target.value as WorkshopComparison['decision']); setStatus('Avis modifié : changements non enregistrés.'); }}><option value="relisten">À réécouter</option><option value="preferred">Essai préféré</option><option value="rejected">Essai rejeté</option></select></label>
+    <label className="block">Hypothèse<Textarea aria-label="Hypothèse" maxLength={500} value={hypothesis} onChange={e => { setHypothesis(e.target.value); setUnsavedNotes(true); setStatus('Brouillon modifié : changements non enregistrés.'); }}/></label>
+    <div className="grid gap-3 sm:grid-cols-2">{NOTE_FIELDS.map((field, i) => <label key={field}>{NOTE_LABELS[i]}<Input aria-label={NOTE_LABELS[i]} maxLength={500} value={notes[field]} onChange={e => { setNotes(old => ({ ...old, [field]: e.target.value })); setUnsavedNotes(true); setStatus('Avis modifié : changements non enregistrés.'); }}/></label>)}</div>
+    <label className="block">Avis humain<select className="block w-full" aria-label="Décision humaine" value={decision} onChange={e => { setDecision(e.target.value as WorkshopComparison['decision']); setUnsavedNotes(true); setStatus('Avis modifié : changements non enregistrés.'); }}><option value="relisten">À réécouter</option><option value="preferred">Essai préféré</option><option value="rejected">Essai rejeté</option></select></label>
     <Button disabled={!storeReady || !name.trim() || !hypothesis.trim() || !aResult || !bResult || busy || saving} onClick={() => void saveComparison()}>Enregistrer la comparaison et mon avis</Button>
     <p className="text-sm">Avis humain uniquement. Aucune application au jeu. Coût inconnu.</p>
    </>}
@@ -266,7 +272,7 @@ export default function SpeechAuditionBench() {
    <label className="block">Transport demandé<select aria-label="Transport audition" value={requestedTransport} disabled={provider !== 'gradium' || comparison === 'pauses'} onChange={e => { resetPair(); setTransport(e.target.value as AuditionTransport); }}><option value="rest">REST — génération directe</option><option value="websocket">WebSocket — repli REST possible</option></select></label>
    <label className="block">Buffer streaming de la paire<select aria-label="Buffer de la paire" value={bufferPreset} disabled={provider !== 'gradium' || requestedTransport !== 'websocket'} onChange={e => { resetPair(); setBufferPreset(e.target.value as GradiumBufferPreset); }}>{Object.entries(GRADIUM_BUFFER_PRESETS).map(([id, preset]) => <option key={id} value={id}>{id} · {preset.prebufferMs}/{preset.rebufferMs} ms</option>)}</select></label>
    <p>{PROVIDER_ACTING_SUPPORT[provider].detailFr}</p><p>Les pauses A2 restent soumises aux gardes du mapping. Un repli REST ne les valide pas. Tags Gradium fermés ; aucune pause ne garantit un souffle ni un sanglot.</p>
-   <details><summary>Enregistrer un brouillon sans écoute</summary><p>Conserve les réglages et l’hypothèse sans prétendre qu’ils ont été écoutés. Une seule différence requise.</p><label>Nom du brouillon<Input aria-label="Nom du brouillon" value={name} maxLength={100} onChange={e => setName(e.target.value)}/></label><label>Hypothèse du brouillon<Input aria-label="Hypothèse du brouillon" value={hypothesis} maxLength={500} onChange={e => { setHypothesis(e.target.value); setStatus('Brouillon modifié : changements non enregistrés.'); }}/></label><Button variant="outline" disabled={!valid || !differs || !name.trim() || !hypothesis.trim() || !storeReady || busy || saving} onClick={() => void saveComparison()}>Enregistrer ce brouillon sans écoute</Button></details>
+   <details><summary>Enregistrer un brouillon sans écoute</summary><p>Conserve les réglages et l’hypothèse sans prétendre qu’ils ont été écoutés. Une seule différence requise.</p><label>Nom du brouillon<Input aria-label="Nom du brouillon" value={name} maxLength={100} onChange={e => setName(e.target.value)}/></label><label>Hypothèse du brouillon<Input aria-label="Hypothèse du brouillon" value={hypothesis} maxLength={500} onChange={e => { setHypothesis(e.target.value); setUnsavedNotes(true); setStatus('Brouillon modifié : changements non enregistrés.'); }}/></label><Button variant="outline" disabled={!valid || !differs || !name.trim() || !hypothesis.trim() || !storeReady || busy || saving} onClick={() => void saveComparison()}>Enregistrer ce brouillon sans écoute</Button></details>
   </div></details>
   <details><summary className="cursor-pointer">Références et différences — fiche, rugosité, GM, LLM, synthèse</summary><div className="space-y-2 py-3">
    <p>Fiche synchronisée : {refs.copy} · version éditoriale Notion inconnue. Rugosité de la paire : {level}.</p><p>Orchestration publiée : {refs.orchestration} ; elle ne génère pas ces répliques fixes.</p><p>Compilateur : {refs.compiler} · {refs.compilerSource}. LLM : {refs.llm} · {refs.llmSource}.</p><p>Synthèse : {provider} · voix {voice ?? 'inconnue'} · {refs.ttsSource}. Mapping : {a?.settings.version || 'inconnu / absent'}.</p>
@@ -274,10 +280,10 @@ export default function SpeechAuditionBench() {
    <Link className="underline" to={adminTabPath('character-editor')}>Fiche synchronisée</Link> · <Link className="underline" to={adminTabPath('gamemaster')}>Orchestration</Link> · <Link className="underline" to={adminTabPath('llm')}>Configuration LLM</Link> · <Link className="underline" to={adminTabPath('voice')}>Configuration technique TTS</Link>
   </div></details>
   <details><summary className="cursor-pointer">Preuves et JSON — préparation et requêtes effectives</summary><div className="space-y-2 py-3"><p>{runner.current.providerCalls} appels TTS réels attestés, repli compris · coût inconnu. Cache mémoire : 16 écoutes / 16 Mio ; capture WS bornée à 30 s. Les paramètres préparés ne prouvent pas une écoute.</p><pre className="whitespace-pre-wrap break-all text-xs">{JSON.stringify({ versionActuelle: a, essai: b, transport: requestedTransport, bufferPreset, gradiumPrepared: valid ? buildGradiumJsonConfig(a.gradium, auditionIntent(a, line.text, line.state, level)) : null, evidence: [aResult, bResult].filter((r): r is Result => !!r).map(r => workshopEvidence(r.evidence, r.variant)) }, null, 2)}</pre><Button variant="outline" onClick={() => { resetPair(); runner.current.clear(); setResults([]); }}>Vider le cache audio de la séance</Button></div></details>
-  <details><summary className="cursor-pointer">Configuration persistante du jeu — mapping des états (avancé)</summary><div className="space-y-3 py-3"><p>Ce panneau modifie le mapping du jeu dans {environment} uniquement au clic explicite de sauvegarde. Il est distinct des variantes temporaires ci-dessus. Déplacer ce panneau n’a changé aucune valeur enregistrée.</p><label><input type="checkbox" checked={mappingDraft.enabled} onChange={e => { stop(); setMappingDraft(old => ({ ...old, enabled: e.target.checked })); }}/> Rendu par état du jeu (brouillon)</label>
+  <details><summary className="cursor-pointer">Configuration persistante du jeu — mapping des états (avancé)</summary><div className="space-y-3 py-3"><p>Ce panneau modifie le mapping du jeu dans {environment} uniquement au clic explicite sur « Enregistrer ». Il est distinct des variantes temporaires ci-dessus. Déplacer ce panneau n’a changé aucune valeur enregistrée.</p><label><input type="checkbox" checked={mappingDraft.enabled} onChange={e => { stop(); setMappingDraft(old => ({ ...old, enabled: e.target.checked })); }}/> Rendu par état du jeu (brouillon)</label>
    {active?.states.map(state => { const mapping = mappingDraft.byCharacter[character]?.[state.name] ?? proposeSpeechMapping(state.name, state.description); return <div key={state.name} className="space-y-2 border-b py-2"><strong>{state.name}</strong><p>{state.description}</p>{!mappingDraft.byCharacter[character]?.[state.name] && <p>Proposition non enregistrée.</p>}<div className="grid gap-2 sm:grid-cols-2"><label>Débit relatif<Input aria-label={`Débit ${state.name}`} type="number" min="0.7" max="1.2" step="0.01" value={mapping.speed} onChange={e => patchMapping(state.name, { speed: Math.max(0.7, Math.min(1.2, Number(e.target.value) || 1)) })}/></label><label>Pauses<select aria-label={`Pauses ${state.name}`} value={mapping.pauses} onChange={e => patchMapping(state.name, { pauses: e.target.value as SpeechVoiceMapping['pauses'] })}>{['short', 'normal', 'long'].map(v => <option key={v}>{v}</option>)}</select></label><label>Delivery<select aria-label={`Delivery ${state.name}`} value={mapping.delivery} onChange={e => patchMapping(state.name, { delivery: e.target.value as SpeechVoiceMapping['delivery'] })}>{['measured', 'whisper', 'rushed', 'cutting'].map(v => <option key={v}>{v}</option>)}</select></label><label>Émotion<select aria-label={`Émotion ${state.name}`} value={mapping.emotion} onChange={e => patchMapping(state.name, { emotion: e.target.value as SpeechVoiceMapping['emotion'] })}>{CANONICAL_EMOTIONS.map(v => <option key={v}>{v}</option>)}</select></label></div><Input aria-label={`Instruction ${state.name}`} maxLength={70} value={mapping.instruction} onChange={e => patchMapping(state.name, { instruction: e.target.value })}/></div>; })}
-   <p>Gradium : débit relatif, émotion, delivery et instruction d’acting non transmis ; pauses module le padding. Tags toujours fermés. Les snapshots d’essai déjà chargés restent inchangés après cette sauvegarde.</p>
-   <Button variant="outline" disabled={!contextReady || saving || busy || auditionKey(saved) === auditionKey(mappingDraft)} onClick={() => void saveMapping()}>Sauvegarder le mapping du jeu sandbox et relire</Button>
+   <p>Gradium : débit relatif, émotion, delivery et instruction d’acting non transmis ; pauses module le padding. Tags toujours fermés. Les snapshots d’essai déjà chargés restent inchangés après cet enregistrement.</p>
+   <Button variant="outline" disabled={!contextReady || saving || busy || auditionKey(saved) === auditionKey(mappingDraft)} onClick={() => void saveMapping()}>Enregistrer le mapping du jeu sandbox et relire</Button>
   </div></details>
  </fieldset></section>;
 }

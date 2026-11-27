@@ -37,7 +37,7 @@ describe('AP4-bis — character settings read voice IDs from TTS configuration',
  it('saves the profile with the catalogue ID of the chosen provider', async () => {
   render(<CharacterRuntimeSettingsTab />);
   await screen.findByLabelText('Voice ID Emma');
-  const saveButtons = screen.getAllByRole('button', { name: /Sauvegarder/ });
+  const saveButtons = screen.getAllByRole('button', { name: /Enregistrer/ });
   fireEvent.click(saveButtons[1]);
   await waitFor(() => expect(updateCharacterRuntimeProfile).toHaveBeenCalledWith('p-emma', expect.objectContaining({ tts_provider: 'gradium', tts_voice_id: 'emma-new' })));
  });

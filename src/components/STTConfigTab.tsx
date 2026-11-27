@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, BookOpen, CheckCircle2, ChevronDown, RotateCcw, Save } from "lucide-react";
+import { AlertCircle, BookOpen, CheckCircle2, ChevronDown, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,9 @@ import {
 } from "@/services/stt/dictionary";
 import { loadSTTProviderSettingsFromDB } from "@/services/stt/providerSettings";
 import STTProviderSettingsPanel from "@/components/stt/ProviderSettingsPanel";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 
 const STATUS_LABELS: Record<STTProviderStatus, string> = {
@@ -56,6 +59,8 @@ export default function STTConfigTab() {
   const [dictSaving, setDictSaving] = useState(false);
 
   const [expandedProvider, setExpandedProvider] = useState<STTProviderId | null>(null);
+  /** Opened panels stay mounted: folding one never drops its draft. */
+  const [openedProviders, setOpenedProviders] = useState<STTProviderId[]>([]);
 
   useEffect(() => {
     loadSTTSettingsFromDB().then((loaded) => {
@@ -84,7 +89,9 @@ export default function STTConfigTab() {
       const text = termsToText(savedDict.terms);
       setDictText(text);
       setDictSaved(text);
-      toast.success(`Dictionnaire sauvegardé (${savedDict.terms.length} termes)`);
+      toast.success(`Dictionnaire enregistré (${savedDict.terms.length} termes)`);
+    } catch (error) {
+      return toastSaveError(error);
     } finally {
       setDictSaving(false);
     }
@@ -93,7 +100,7 @@ export default function STTConfigTab() {
   function resetDictionary() {
     const text = termsToText(DEFAULT_STT_DICTIONARY_TERMS);
     setDictText(text);
-    toast.info("Dictionnaire réinitialisé — sauvegarde nécessaire");
+    toast.info("Dictionnaire réinitialisé — à enregistrer");
   }
 
 
@@ -110,7 +117,7 @@ export default function STTConfigTab() {
   function activate(provider: STTProviderId) {
     const next = saveSTTSettingsLocal({ activeProvider: provider });
     setSettings(next);
-    toast.info("Provider STT sélectionné — sauvegarde nécessaire");
+    toast.info("Provider STT sélectionné — à enregistrer");
   }
 
   async function save() {
@@ -118,11 +125,21 @@ export default function STTConfigTab() {
     try {
       await saveSTTSettingsToDB(settings);
       setSaved(settings);
-      toast.success("Configuration STT sauvegardée");
+      toast.success("Provider STT enregistré");
+    } catch (error) {
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
   }
+
+  useUnsavedChanges({
+    dirty: dictHasChanges, label: "Dictionnaire de transcription", saving: dictSaving, save: saveDictionary,
+  });
+  useUnsavedChanges({
+    dirty: hasChanges, label: "Provider de transcription (STT)", saving, save,
+    discard: () => saveSTTSettingsLocal(saved),
+  });
 
   function reset() {
     const next = resetSTTSettings();
@@ -180,30 +197,13 @@ export default function STTConfigTab() {
         />
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            onClick={saveDictionary}
-            disabled={dictSaving || !dictHasChanges}
-            className={dictHasChanges ? "bg-green-600 hover:bg-green-700" : ""}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            {dictSaving ? "Sauvegarde..." : "Sauver le dictionnaire"}
-          </Button>
+          <SaveButton dirty={dictHasChanges} saving={dictSaving} label="Enregistrer le dictionnaire" onClick={() => void saveDictionary()} />
           <Button size="sm" variant="ghost" onClick={resetDictionary}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Réinitialiser aux valeurs par défaut
           </Button>
-          {dictHasChanges && (
-            <span className="text-xs text-amber-400">Modifications non sauvegardées</span>
-          )}
         </div>
       </section>
-
-      {hasChanges && (
-        <div className="rounded-md border border-yellow-700/50 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-300">
-          Modifications STT non sauvegardées. Le runtime local les voit déjà, mais Lovable/Supabase utilisera la valeur sauvegardée.
-        </div>
-      )}
 
       {/* ===== Providers ===== */}
       <section className="space-y-3">
@@ -262,7 +262,10 @@ export default function STTConfigTab() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
+                  onClick={() => {
+                    setExpandedProvider(isExpanded ? null : provider.id);
+                    setOpenedProviders((ids) => ids.includes(provider.id) ? ids : [...ids, provider.id]);
+                  }}
                   className="text-xs"
                 >
                   <ChevronDown className={`mr-1 h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
@@ -278,8 +281,8 @@ export default function STTConfigTab() {
                 </Button>
               </div>
 
-              {isExpanded && (
-                <div className="mt-4 border-t border-border/50 pt-4">
+              {openedProviders.includes(provider.id) && (
+                <div className="mt-4 border-t border-border/50 pt-4" hidden={!isExpanded}>
                   <STTProviderSettingsPanel providerId={provider.id} />
                 </div>
               )}
@@ -290,10 +293,7 @@ export default function STTConfigTab() {
 
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={save} disabled={saving || !hasChanges} className={hasChanges ? "bg-green-600 hover:bg-green-700" : ""}>
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? "Sauvegarde..." : "Sauvegarder le provider actif"}
-        </Button>
+        <SaveButton size="default" dirty={hasChanges} saving={saving} label="Enregistrer le provider actif" onClick={() => void save()} />
         <Button variant="outline" onClick={refreshStatuses}>
           Vérifier les statuts
         </Button>

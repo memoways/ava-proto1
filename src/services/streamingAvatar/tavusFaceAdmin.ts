@@ -55,7 +55,7 @@ export function charactersUsingTavusFace(
 
 /**
  * Writes `tavus.characters.<key>.faceId` (a copy; other overrides untouched). The admin still
- * has to press the usual « Sauvegarder » to persist it.
+ * has to press the usual « Enregistrer » to persist it.
  */
 export function assignTavusFace(
   characters: Record<string, TavusCharacterOverride>,

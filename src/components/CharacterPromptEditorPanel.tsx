@@ -28,6 +28,9 @@ import {
   formatSyncDate,
   type CharacterSyncReport,
 } from "@/services/characterSyncReport";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -72,6 +75,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
   const [syncReport, setSyncReport] = useState<CharacterSyncReport | null>(null);
   const [mappingWarnings, setMappingWarnings] = useState<string[]>([]);
   const [syncErrors, setSyncErrors] = useState<string[]>([]);
+  const confirmLeave = useConfirmLeave();
 
 
   // Resolve character id from name if necessary
@@ -124,15 +128,16 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       CHARACTER_PROMPT_FIELDS.forEach((f) => { partial[f.key] = draft[f.key] || ""; });
       await saveCharacterPrompt(resolvedId, partial);
       clearSystemPromptCache();
-      toast.success("Champs éditoriaux sauvegardés ✓");
+      toast.success("Champs éditoriaux enregistrés ✓");
       await loadActive(resolvedId);
     } catch (error: unknown) {
-      toast.error("Erreur sauvegarde: " + errorMessage(error));
+      setSaving(false);
+      return toastSaveError(error);
     }
     setSaving(false);
   }
 
-  async function handleResync() {
+  async function runResync() {
     if (!resolvedId) return;
     setResyncing(true);
     try {
@@ -191,6 +196,9 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
     setResyncing(false);
   }
 
+  // A resync reloads both fields: ask before it replaces a draft.
+  const handleResync = () => confirmLeave(() => void runResync());
+
   async function handleSaveLegacy() {
     if (!resolvedId) return;
     setSavingLegacy(true);
@@ -198,14 +206,20 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
       .from("characters")
       .update({ system_prompt: legacyPrompt })
       .eq("id", resolvedId);
-    if (error) toast.error(`Sauvegarde legacy échouée : ${error.message}`);
-    else {
-      setSavedLegacyPrompt(legacyPrompt);
-      clearSystemPromptCache();
-      toast.success("Prompt legacy sauvegardé pour le rollback");
-    }
     setSavingLegacy(false);
+    if (error) return toastSaveError(error);
+    setSavedLegacyPrompt(legacyPrompt);
+    clearSystemPromptCache();
+    toast.success("Prompt legacy enregistré pour le rollback");
   }
+
+  useUnsavedChanges({
+    dirty: Boolean(hasChanges), label: `Champs éditoriaux de ${prompt?.name ?? "ce personnage"}`, saving, save: handleSave,
+  });
+  useUnsavedChanges({
+    dirty: Boolean(prompt) && legacyPrompt !== savedLegacyPrompt, label: `Prompt legacy de ${prompt?.name ?? "ce personnage"}`,
+    saving: savingLegacy, save: handleSaveLegacy,
+  });
 
 
   const preview = prompt ? buildCharacterPromptSections({ ...prompt, ...draft }) : "";
@@ -254,9 +268,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
             <Button variant="outline" size="sm" onClick={handleResync} disabled={resyncing}>
               {resyncing ? "Sync…" : "↻ Resync Notion"}
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
-              {saving ? "Sauvegarde…" : "Sauvegarder"}
-            </Button>
+            <SaveButton dirty={Boolean(hasChanges)} saving={saving} onClick={() => void handleSave()} />
           </div>
         </div>
       )}
@@ -266,9 +278,7 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           <Button variant="outline" size="sm" onClick={handleResync} disabled={resyncing}>
             {resyncing ? "Sync…" : "↻ Resync Notion"}
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? "Sauvegarde…" : "Sauvegarder"}
-          </Button>
+          <SaveButton dirty={Boolean(hasChanges)} saving={saving} onClick={() => void handleSave()} />
         </div>
       )}
 
@@ -287,12 +297,6 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           <ul className="list-disc pl-4 space-y-0.5">
             {mappingWarnings.map((m, i) => <li key={i}>{m}</li>)}
           </ul>
-        </div>
-      )}
-
-      {hasChanges && (
-        <div className="rounded border border-yellow-700/50 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-300">
-          ⚠️ Modifications non sauvegardées.
         </div>
       )}
 
@@ -465,14 +469,12 @@ export default function CharacterPromptEditorPanel({ characterId, characterName,
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{legacyPrompt.length} caractères</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSaveLegacy}
-              disabled={savingLegacy || legacyPrompt === savedLegacyPrompt}
-            >
-              {savingLegacy ? "Sauvegarde…" : "Sauvegarder le rollback legacy"}
-            </Button>
+            <SaveButton
+              dirty={legacyPrompt !== savedLegacyPrompt}
+              saving={savingLegacy}
+              label="Enregistrer le rollback legacy"
+              onClick={() => void handleSaveLegacy()}
+            />
           </div>
         </div>
       </details>

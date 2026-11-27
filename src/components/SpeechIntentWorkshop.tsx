@@ -16,6 +16,7 @@ import {
 } from '@/services/tts/speechIntentWorkshop';
 import { cardEvidence, readWorkshop, saveIntentTrial, type IntentTrial, type WorkshopDocument } from '@/services/tts/speechWorkshopStore';
 import type { TTSProviderId } from '@/services/tts/types';
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
 
 type PassageId = IntentTrial['passage']['id'];
 interface Generated { key: string; evidence: AuditionEvidence }
@@ -141,9 +142,13 @@ export default function SpeechIntentWorkshop() {
    if (!stillHere()) return;
    setDocument(confirmed); setTrialId(crypto.randomUUID()); setRatings({}); setSavedOnce(true);
    setStatus('Essai enregistré et relu dans cette sandbox. Les notes sont des avis : aucun réglage du jeu modifié.');
-  } catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); }
+  } catch (e) { if (stillHere()) setStoreError(e instanceof Error ? e.message : String(e)); return false; }
   finally { if (stillHere()) setSaving(false); }
  }
+ useUnsavedChanges({
+  dirty: Object.values(ratings).some(r => r.rating || r.off.trim()), label: 'Atelier de parole : notes de l’essai', saving, save: saveTrial,
+  blocked: canSave ? null : 'Une note ou un commentaire manque.',
+ });
  async function reload() {
   setStoreError(''); setStoreReady(false);
   try { const value = await readWorkshop(environment); if (stillHere()) { setDocument(value); setStoreReady(true); setStatus('Essais rechargés ; votre brouillon est conservé.'); } }

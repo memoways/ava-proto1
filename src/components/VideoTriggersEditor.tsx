@@ -13,7 +13,7 @@ import {
   smartphoneVideoModeFrom,
 } from "@/services/videoFraming";
 import { toast } from "sonner";
-import { Pencil, Save, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic, ChevronRight } from "lucide-react";
+import { Pencil, X, RefreshCw, ExternalLink, Settings as SettingsIcon, Sparkles, Mic, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   listVideoTriggers,
@@ -52,6 +52,9 @@ import {
 } from "../../supabase/functions/_shared/videoTranscription";
 import { extractTranscriptStatus, type ExtractTranscriptStatus } from "../../supabase/functions/_shared/videoMetadata";
 import CinematicPreview from "@/components/CinematicPreview";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -128,12 +131,16 @@ function CompactNumber({
 
 function ExtractRulesPanel() {
   const [settings, setSettings] = useState<ExtractSettings>(extractDefaults);
+  const [saved, setSaved] = useState<ExtractSettings>(extractDefaults);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadExtractSettingsFromDB().then(setSettings).finally(() => setLoading(false));
+    loadExtractSettingsFromDB()
+      .then((loaded) => { setSettings(loaded); setSaved(loaded); })
+      .finally(() => setLoading(false));
   }, []);
+  const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
 
   const update = (patch: Partial<ExtractSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
@@ -141,13 +148,16 @@ function ExtractRulesPanel() {
     setSaving(true);
     try {
       await saveExtractSettingsToDB(settings);
+      setSaved(settings);
       toast.success("Réglages des extraits enregistrés ✓");
     } catch (err) {
-      toast.error("Erreur sauvegarde : " + (err as Error).message);
+      return toastSaveError(err);
     } finally {
       setSaving(false);
     }
   }
+
+  useUnsavedChanges({ dirty, label: "Règles des extraits", saving, save });
 
   if (loading) return null;
 
@@ -181,10 +191,8 @@ function ExtractRulesPanel() {
         <CompactNumber label="Max / session (0 = illimité)" value={settings.MAX_PER_SESSION}
           onChange={(MAX_PER_SESSION) => update({ MAX_PER_SESSION })} />
         <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" disabled={saving} onClick={() => { setSettings(resetExtractSettings()); toast.success("Réglages réinitialisés"); }}>Réinitialiser</Button>
-          <Button size="sm" onClick={save} disabled={saving}>
-            <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
-          </Button>
+          <Button variant="outline" size="sm" disabled={saving} onClick={() => { const defaults = resetExtractSettings(); setSettings(defaults); setSaved(defaults); toast.success("Réglages réinitialisés"); }}>Réinitialiser</Button>
+          <SaveButton dirty={dirty} saving={saving} onClick={() => void save()} />
         </div>
       </div>
     </section>
@@ -193,6 +201,7 @@ function ExtractRulesPanel() {
 
 function VideoTriggerRulesPanel() {
   const [settings, setSettings] = useState<VideoTriggerSettings>(videoTriggerDefaults);
+  const [saved, setSaved] = useState<VideoTriggerSettings>(videoTriggerDefaults);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -201,6 +210,7 @@ function VideoTriggerRulesPanel() {
       try {
         const s = await loadVideoTriggerSettingsFromDB();
         setSettings(s);
+        setSaved(s);
       } finally {
         setLoading(false);
       }
@@ -213,17 +223,22 @@ function VideoTriggerRulesPanel() {
     setSaving(true);
     try {
       await saveVideoTriggerSettingsToDB(settings);
+      setSaved(settings);
       toast.success("Réglages enregistrés ✓");
     } catch (err) {
-      toast.error("Erreur sauvegarde : " + (err as Error).message);
+      return toastSaveError(err);
     } finally {
       setSaving(false);
     }
   }
 
+  const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
+  useUnsavedChanges({ dirty, label: "Règles de déclenchement des cinématiques", saving, save });
+
   function reset() {
     const d = resetVideoTriggerSettings();
     setSettings(d);
+    setSaved(d);
     toast.success("Réglages réinitialisés");
   }
 
@@ -355,9 +370,7 @@ function VideoTriggerRulesPanel() {
       </div>
       <div className="mt-2 flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={reset} disabled={saving}>Réinitialiser</Button>
-        <Button size="sm" onClick={save} disabled={saving}>
-          <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Enregistrer"}
-        </Button>
+        <SaveButton dirty={dirty} saving={saving} onClick={() => void save()} />
       </div>
     </section>
   );
@@ -498,6 +511,7 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VideoTriggerRow>>({});
+  const confirmLeave = useConfirmLeave();
   const [newTheme, setNewTheme] = useState("");
   const [playCounts, setPlayCounts] = useState<PlayCount[]>([]);
   const [playsUnreadable, setPlaysUnreadable] = useState(false);
@@ -536,9 +550,11 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
   }, []);
 
   function startEdit(t: VideoTriggerRow) {
-    setEditingId(t.id);
-    setDraft({ ...t });
-    setNewTheme("");
+    confirmLeave(() => {
+      setEditingId(t.id);
+      setDraft({ ...t });
+      setNewTheme("");
+    });
   }
 
   function cancelEdit() {
@@ -560,11 +576,11 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
   }
 
   async function saveTrigger() {
-    if (!editingId || !draft.title?.trim()) return;
+    if (!editingId || !draft.title?.trim()) return false;
     const row = triggers.find((t) => t.id === editingId);
     if (!row?.notion_id) {
       toast.error("Cette ligne n'a pas d'ID Notion — re-synchronise la base d'abord.");
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -579,15 +595,26 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
         video_url: draft.video_url || null,
       };
       await updateVideoTriggerOnNotion(row.notion_id, patch);
-      toast.success("Sauvegardé sur Notion ✓");
+      toast.success("Enregistré sur Notion ✓");
       cancelEdit();
       await fetchTriggers();
     } catch (err) {
-      toast.error("Erreur sauvegarde Notion : " + (err as Error).message);
+      return toastSaveError(err);
     } finally {
       setSaving(false);
     }
   }
+
+  const editedRow = triggers.find((t) => t.id === editingId);
+  const triggerDirty = Boolean(editedRow) && JSON.stringify(draft) !== JSON.stringify(editedRow);
+  useUnsavedChanges({
+    dirty: triggerDirty,
+    label: `Fiche Notion « ${editedRow?.title ?? ""} »`,
+    saving,
+    save: saveTrigger,
+    discard: cancelEdit,
+    blocked: draft.title?.trim() ? (editedRow?.notion_id ? null : "Pas d’ID Notion : synchronise la base.") : "Le titre est vide.",
+  });
 
   async function describeOne(t: VideoTriggerRow): Promise<boolean> {
     if (!t.notion_id) return false;
@@ -850,9 +877,7 @@ export default function VideoTriggersEditor({ scope = "cinematics" }: { scope?: 
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={cancelEdit} disabled={saving}><X className="h-3 w-3 mr-1" /> Annuler</Button>
-                <Button size="sm" onClick={saveTrigger} disabled={saving}>
-                  <Save className="h-3 w-3 mr-1" /> {saving ? "Sauvegarde…" : "Sauvegarder sur Notion"}
-                </Button>
+                <SaveButton dirty={triggerDirty} saving={saving} label="Enregistrer sur Notion" onClick={() => void saveTrigger()} />
               </div>
             </div>
           );

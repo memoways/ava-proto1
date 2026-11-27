@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RotateCcw, Save, Settings2 } from "lucide-react";
+import { RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,9 @@ import {
   type STTProviderSettingsMap,
 } from "@/services/stt/providerSettings";
 import type { STTProviderId } from "@/services/stt";
+import { useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 interface Props {
   providerId: STTProviderId;
@@ -105,16 +108,20 @@ export default function STTProviderSettingsPanel({ providerId }: Props) {
     try {
       const all = await saveSTTProviderSettings(providerId, settings as never);
       setSaved(all[providerId] as typeof settings);
-      toast.success(`Réglages ${providerId} sauvegardés`);
+      toast.success(`Réglages ${providerId} enregistrés`);
+    } catch (error) {
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
   }
 
+  useUnsavedChanges({ dirty, label: `Réglages API ${providerId}`, saving, save });
+
   function reset() {
     const defaults = DEFAULT_STT_PROVIDER_SETTINGS[providerId] as typeof settings;
     setSettings({ ...defaults });
-    toast.info("Réglages réinitialisés — sauvegarde nécessaire");
+    toast.info("Réglages réinitialisés — à enregistrer");
   }
 
   const body = renderBody(providerId, settings, update);
@@ -136,15 +143,11 @@ export default function STTProviderSettingsPanel({ providerId }: Props) {
         {body}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={save} disabled={saving || !dirty} className={dirty ? "bg-green-600 hover:bg-green-700" : ""}>
-          <Save className="mr-2 h-3.5 w-3.5" />
-          {saving ? "..." : "Sauver"}
-        </Button>
+        <SaveButton dirty={dirty} saving={saving} onClick={() => void save()} />
         <Button size="sm" variant="ghost" onClick={reset}>
           <RotateCcw className="mr-2 h-3.5 w-3.5" />
           Réinitialiser
         </Button>
-        {dirty && <span className="text-[10px] text-amber-400">Non sauvegardé</span>}
       </div>
     </div>
   );

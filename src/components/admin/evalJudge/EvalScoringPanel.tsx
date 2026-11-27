@@ -1,4 +1,4 @@
-import { RotateCcw, Save } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -8,6 +8,7 @@ import {
   describeCriterion,
   type EvalScoreWeights,
 } from "@/services/evalJudgeScoring";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
 
 interface Props {
   characterName?: string | null;
@@ -15,9 +16,10 @@ interface Props {
   onChange: (weights: EvalScoreWeights) => void;
   onSave: () => void;
   saving: boolean;
+  dirty: boolean;
 }
 
-export default function EvalScoringPanel({ characterName, weights, onChange, onSave, saving }: Props) {
+export default function EvalScoringPanel({ characterName, weights, onChange, onSave, saving, dirty }: Props) {
   const total = EVAL_SCORE_CRITERIA.reduce((sum, criterion) => sum + (weights[criterion.key] ?? 0), 0);
 
   return (
@@ -63,9 +65,7 @@ export default function EvalScoringPanel({ characterName, weights, onChange, onS
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onSave} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" /> Enregistrer ces poids
-          </Button>
+          <SaveButton size="default" dirty={dirty} saving={saving} label="Enregistrer ces poids" onClick={onSave} />
           <Button variant="outline" onClick={() => onChange({ ...DEFAULT_SCORE_WEIGHTS })}>
             <RotateCcw className="mr-2 h-4 w-4" /> Revenir aux poids conseillés
           </Button>

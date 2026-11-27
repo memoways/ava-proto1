@@ -81,11 +81,7 @@ export async function saveSTTSettingsToDB(settings: STTSettings): Promise<void> 
   const normalized = normalizeSTTSettings(settings);
   writeEnvironmentStorage(STT_STORAGE_KEY, JSON.stringify(normalized));
   cachedSTTSettings = normalized;
-  try {
-    await saveEnvironmentSetting(STT_STORAGE_KEY, normalized);
-  } catch (err) {
-    console.error("[STT Settings] DB save exception:", err);
-  }
+  await saveEnvironmentSetting(STT_STORAGE_KEY, normalized);
 }
 
 export function resetSTTSettings(): STTSettings {

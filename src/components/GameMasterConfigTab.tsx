@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AudioLines, Clock3, RefreshCw, Save, UsersRound } from "lucide-react";
+import { AudioLines, Clock3, RefreshCw, UsersRound } from "lucide-react";
 import {
   BARGE_IN_MIN_WORDS_MAX,
   BARGE_IN_MIN_WORDS_MIN,
@@ -30,6 +30,9 @@ import {
   MAX_SESSION_DURATION_SECONDS,
   MIN_SESSION_DURATION_SECONDS,
 } from "@/config/experienceRuntime";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 const CHARACTER_ORDER = ["max", "emma"];
 
@@ -46,6 +49,7 @@ export default function GameMasterConfigTab() {
   const [savedActivation, setSavedActivation] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const confirmLeave = useConfirmLeave();
 
   const load = async () => {
     setLoading(true);
@@ -88,7 +92,9 @@ export default function GameMasterConfigTab() {
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
       setSavedGameplay(updated);
-      toast.success("Réglages globaux sauvegardés");
+      toast.success("Réglages globaux enregistrés");
+    } catch (error) {
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
@@ -101,9 +107,9 @@ export default function GameMasterConfigTab() {
     try {
       await Promise.all(changed.map((profile) => updateCharacterRuntimeActivation(profile.id, profile.enabled)));
       setSavedActivation(Object.fromEntries(profiles.map((profile) => [profile.id, profile.enabled])));
-      toast.success("Personnages actifs sauvegardés");
+      toast.success("Personnages actifs enregistrés");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Activation des personnages impossible");
+      return toastSaveError(error);
     } finally {
       setSaving(false);
     }
@@ -121,6 +127,13 @@ export default function GameMasterConfigTab() {
     setGameplay((current) => ({ ...current, VOICE_HANDS_FREE: { ...current.VOICE_HANDS_FREE, ...patch } }));
   const activationChanged = profiles.some((profile) => savedActivation[profile.id] !== profile.enabled);
 
+  useUnsavedChanges({
+    dirty: globalChanged, label: "Orchestration : déroulement et voix", saving, save: saveGlobalSettings,
+    // The save writes the local cache before the database: restore it when the draft is dropped.
+    discard: () => saveGameplaySettings(savedGameplay),
+  });
+  useUnsavedChanges({ dirty: activationChanged, label: "Orchestration : personnages actifs", saving, save: saveCharacters });
+
   if (loading) return <p className="text-sm text-muted-foreground">Chargement de l’orchestration…</p>;
 
   return (
@@ -132,7 +145,7 @@ export default function GameMasterConfigTab() {
             Étapes, durée et personnages disponibles pour toute nouvelle session. Les sessions déjà ouvertes conservent leur état.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}>
+        <Button variant="outline" size="sm" onClick={() => confirmLeave(() => void load())}>
           <RefreshCw className="mr-1 h-3.5 w-3.5" />Actualiser
         </Button>
       </div>
@@ -148,9 +161,7 @@ export default function GameMasterConfigTab() {
               </p>
             </div>
           </div>
-          <Button size="sm" onClick={() => void saveGlobalSettings()} disabled={saving || !globalChanged}>
-            <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
-          </Button>
+          <SaveButton dirty={globalChanged} saving={saving} onClick={() => void saveGlobalSettings()} />
         </div>
 
         <div className="space-y-2">
@@ -211,9 +222,7 @@ export default function GameMasterConfigTab() {
               </p>
             </div>
           </div>
-          <Button size="sm" onClick={() => void saveGlobalSettings()} disabled={saving || !globalChanged}>
-            <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
-          </Button>
+          <SaveButton dirty={globalChanged} saving={saving} onClick={() => void saveGlobalSettings()} />
         </div>
 
         <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
@@ -307,9 +316,7 @@ export default function GameMasterConfigTab() {
               </p>
             </div>
           </div>
-          <Button size="sm" onClick={() => void saveCharacters()} disabled={saving || !activationChanged}>
-            <Save className="mr-1 h-3.5 w-3.5" />Enregistrer
-          </Button>
+          <SaveButton dirty={activationChanged} saving={saving} onClick={() => void saveCharacters()} />
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">

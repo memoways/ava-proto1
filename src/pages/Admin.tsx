@@ -68,6 +68,9 @@ import {
   saveOutputSettingsToDB,
   type OutputMode,
 } from "@/services/streamingAvatar";
+import { useConfirmLeave, useUnsavedChanges } from "@/components/admin/unsaved/context";
+import { SaveButton } from "@/components/admin/unsaved/SaveButton";
+import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -197,6 +200,7 @@ export default function Admin() {
   }, [activeGroup, activeTab]);
 
   const navigateToTab = (tabId: string) => navigate(adminTabPath(tabId));
+  const confirmLeave = useConfirmLeave();
 
   const loadSessions = useCallback(async () => {
     sessionLoadController.current?.abort();
@@ -384,10 +388,10 @@ export default function Admin() {
     setOutputMode(mode);
     try {
       await saveOutputSettingsToDB({ mode });
-      toast.success(mode === "tts" ? "Output Voix TTS activé" : "Output Avatar vidéo activé");
+      toast.success(mode === "tts" ? "Voix seule : vidéo coupée pour tous les personnages" : "Avatar vidéo activé");
     } catch (error) {
       setOutputMode(previous);
-      toast.error(error instanceof Error ? error.message : "Impossible de sauvegarder l'output");
+      toastSaveError(error);
     }
   };
 
@@ -418,7 +422,7 @@ export default function Admin() {
               </TooltipContent>
             </Tooltip>
             {canSwitchEnvironments(profile) ? (
-              <Select value={environmentId} onValueChange={(value) => selectEnvironment(value as EnvironmentId)}>
+              <Select value={environmentId} onValueChange={(value) => confirmLeave(() => selectEnvironment(value as EnvironmentId))}>
                 <SelectTrigger className="w-[210px]" aria-label="Environnement actif">
                   <SelectValue />
                 </SelectTrigger>
@@ -474,22 +478,25 @@ export default function Admin() {
 
 
         {/* ===== TABS WITHIN GROUP ===== */}
-        <Tabs value={activeTab} onValueChange={navigateToTab} className="w-full">
+        {/* Manual activation: a tab that only receives focus back (leave dialog) must not ask again. */}
+        <Tabs value={activeTab} onValueChange={navigateToTab} activationMode="manual" className="w-full">
           {activeGroup === "tech" && (
             <div className="mb-4 space-y-4 rounded-lg border bg-muted/20 px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold">Output de Max</p>
-                <p className="text-xs text-muted-foreground">
-                  Ce choix est figé au démarrage de chaque nouvelle session publique.
+                <p className="text-sm font-semibold">Vidéo des avatars — tous les personnages</p>
+                <p className="max-w-2xl text-xs text-muted-foreground">
+                  « Voix seule » coupe la vidéo de tous les personnages ; seul un appareil réglé explicitement sur « avatar »
+                  (Expérience › Appareils) garde son choix. Enregistré immédiatement, pris en compte à l’ouverture de chaque
+                  nouvelle session.
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={outputMode === "tts" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Voix TTS</span>
+                <span className={outputMode === "tts" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Voix seule</span>
                 <Switch
                   checked={outputMode === "streaming_avatar"}
                   onCheckedChange={(checked) => void changeOutputMode(checked ? "streaming_avatar" : "tts")}
-                  aria-label="Basculer entre voix TTS et avatar vidéo"
+                  aria-label="Vidéo des avatars pour tous les personnages : voix seule ou avatar vidéo"
                 />
                 <span className={outputMode === "streaming_avatar" ? "text-sm font-medium" : "text-sm text-muted-foreground"}>Avatar vidéo</span>
               </div>
@@ -849,7 +856,7 @@ function PublicPasswordSetting() {
   const save = async () => {
     if (password.length < 8) {
       toast.error("Utilisez au moins 8 caractères pour le mot de passe public.");
-      return;
+      return false;
     }
     setSaving(true);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
@@ -864,12 +871,20 @@ function PublicPasswordSetting() {
       } as never, { onConflict: "key,environment_id" });
     setSaving(false);
     if (error) {
-      toast.error(`Mot de passe non enregistré : ${error.message}`);
-      return;
+      return toastSaveError(error);
     }
     setPassword("");
     toast.success("Mot de passe public mis à jour pour les nouvelles visites.");
   };
+
+  useUnsavedChanges({
+    dirty: password.length > 0,
+    label: "Mot de passe d’accès public",
+    saving,
+    save,
+    discard: () => setPassword(""),
+    blocked: password.length < 8 ? "8 caractères au minimum." : null,
+  });
 
   return (
     <div className="border-t pt-4">
@@ -886,9 +901,7 @@ function PublicPasswordSetting() {
           onChange={(event) => setPassword(event.target.value)}
           placeholder="Nouveau mot de passe"
         />
-        <Button onClick={() => void save()} disabled={saving || !password}>
-          {saving ? "Enregistrement…" : "Mettre à jour"}
-        </Button>
+        <SaveButton size="default" dirty={password.length > 0} saving={saving} onClick={() => void save()} />
       </div>
     </div>
   );
