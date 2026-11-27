@@ -6,6 +6,7 @@ import {
   parseServicePlans,
   periodCostReading,
   planSnapshot,
+  quotaWindow,
   requestedDays,
   serviceById,
   subscriptionSpend,
@@ -56,7 +57,7 @@ describe("planSnapshot", () => {
     const plan = applyTier(service, "creator", "monthly", { ...emptyPlan(), renewsOn: "2026-12-05" });
     const snapshot = planSnapshot(service, plan, events, NOW, false);
     expect(snapshot.status).toBe("inside");
-    expect(snapshot.used).toBe(1000);
+    expect(snapshot.used).toBe(440);
     expect(snapshot.overageUnits).toBe(0);
     expect(snapshot.overageUsd).toBe(0);
     expect(snapshot.periodUsd).toBe(22);
@@ -80,7 +81,7 @@ describe("planSnapshot", () => {
     plan.included = 100;
     const snapshot = planSnapshot(service, plan, events, NOW, false);
     expect(snapshot.status).toBe("over-rate-missing");
-    expect(snapshot.overageUnits).toBe(900);
+    expect(snapshot.overageUnits).toBe(340);
     expect(snapshot.overageUsd).toBeNull();
     expect(snapshot.periodUsd).toBeNull();
   });
@@ -326,10 +327,10 @@ describe("periodCostReading", () => {
       NOW,
       1,
     );
-    expect(reading.consumedMinutes).toBe(2);
+    expect(reading.consumedMinutes).toBe(1.5);
     expect(reading.minutesAreEstimate).toBe(true);
     expect(reading.subscriptionUsd).toBeCloseTo(22 / 30);
-    expect(reading.remainingUnits).toBe(121000 - 1500);
+    expect(reading.remainingUnits).toBe(121000 - 660);
     expect(reading.totalUsd).toBeCloseTo(22 / 30);
   });
 
@@ -416,5 +417,122 @@ describe("sumUsage", () => {
       new Date("2026-12-01T00:00:00.000Z"),
     );
     expect(total).toBe(10);
+  });
+});
+
+describe("yearly ElevenLabs Creator", () => {
+  const service = serviceById("elevenlabs")!;
+  const annual = {
+    ...applyTier(service, "creator", "yearly", emptyPlan()),
+    startedOn: "2026-11-27",
+    renewsOn: "2027-11-27",
+    firstYearFeeUsd: 107.02,
+    renewalFeeUsd: 237.82,
+  };
+  const at = (day: string) => new Date(`${day}T12:00:00.000Z`);
+  const call = (day: string, amount: number, model?: string): UsageEvent => ({
+    serviceId: "elevenlabs", at: at(day).toISOString(), amount, model,
+  });
+  const window = (plan: typeof annual, day: string) => {
+    const { start, end } = quotaWindow(plan, at(day));
+    return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+  };
+
+  it("compares the allowance with one month, anchored on the start day", () => {
+    expect(window(annual, "2026-11-27")).toEqual(["2026-11-27", "2026-12-27"]);
+    expect(window(annual, "2027-03-02")).toEqual(["2027-02-27", "2027-03-27"]);
+    const snapshot = planSnapshot(
+      service,
+      annual,
+      [call("2026-11-28", 1000, "eleven_v4_turbo"), call("2026-12-28", 2000, "eleven_v4_turbo")],
+      at("2026-12-29"),
+      false,
+    );
+    expect(snapshot.used).toBe(440);
+    expect(snapshot.included).toBe(121_000);
+  });
+
+  it("keeps a start on the 31st through shorter months", () => {
+    const plan = { ...annual, startedOn: "2026-01-31", renewsOn: "2027-01-31" };
+    expect(window(plan, "2026-02-15")).toEqual(["2026-01-31", "2026-02-28"]);
+    expect(window(plan, "2026-02-28")).toEqual(["2026-02-28", "2026-03-31"]);
+    expect(window(plan, "2026-04-30")).toEqual(["2026-04-30", "2026-05-31"]);
+  });
+
+  it("anchors on the renewal day when the start is not typed", () => {
+    expect(window({ ...annual, startedOn: null }, "2027-01-10")).toEqual(["2026-12-27", "2027-01-27"]);
+  });
+
+  it("leaves a monthly plan on its renewal date", () => {
+    const monthly = { ...annual, cadence: "monthly" as const, startedOn: "2026-11-02", renewsOn: "2026-12-05" };
+    expect(window(monthly, "2026-11-22")).toEqual(["2026-11-05", "2026-12-05"]);
+  });
+
+  it("spreads the discounted first year, then the renewal amount", () => {
+    const first = planSnapshot(service, annual, [], at("2026-11-28"), false);
+    expect(first.fixedUsd).toBeCloseTo(107.02 / 12);
+    expect(first.spend).toMatchObject({ count: 1, totalUsd: 107.02, includesUpcoming: false });
+    const second = planSnapshot(service, annual, [], at("2027-11-27"), false);
+    expect(second.fixedUsd).toBeCloseTo(237.82 / 12);
+    expect(second.spend?.count).toBe(2);
+    expect(second.spend?.totalUsd).toBeCloseTo(344.84);
+    const third = planSnapshot(service, { ...annual, renewsOn: "2029-11-27" }, [], at("2028-12-01"), false);
+    expect(third.spend?.totalUsd).toBeCloseTo(107.02 + 2 * 237.82);
+  });
+
+  it("does not invent a missing renewal amount", () => {
+    const plan = { ...annual, renewalFeeUsd: null };
+    expect(planSnapshot(service, plan, [], at("2026-12-01"), false).spend?.totalUsd).toBe(107.02);
+    const later = planSnapshot(service, plan, [], at("2027-12-01"), false);
+    expect(later.fixedUsd).toBeNull();
+    expect(later.spend?.totalUsd).toBeNull();
+  });
+
+  it("does not count the end date of a stopped year as an invoice", () => {
+    const plan = { ...annual, account: "cancelled" as const, endedOn: "2027-11-27" };
+    expect(planSnapshot(service, plan, [], at("2028-02-01"), false).spend?.totalUsd).toBe(107.02);
+  });
+
+  it("keeps the old monthly equivalent while no yearly amount is typed", () => {
+    const plan = { ...annual, firstYearFeeUsd: null, renewalFeeUsd: null };
+    const snapshot = planSnapshot(service, plan, [], at("2026-12-01"), false);
+    expect(snapshot.fixedUsd).toBe(18.33);
+    expect(snapshot.spend?.totalUsd).toBeCloseTo(18.33 * 12);
+  });
+
+  it("charges each model its own credits and flags an unknown one at the highest rate", () => {
+    const calls = [
+      call("2026-11-28", 1000, "eleven_v4_turbo"),
+      call("2026-11-28", 1000, "eleven_flash_v2_5"),
+      call("2026-11-28", 1000, "eleven_multilingual_v2"),
+      call("2026-11-28", 500),
+      call("2026-11-28", 500, "eleven_future"),
+    ];
+    const reading = periodCostReading(service, annual, calls, calls, at("2026-11-29"), 7);
+    expect(reading.consumedUnits).toBe(220 + 220 + 440 + 440);
+    expect(reading.consumedMinutes).toBe(4);
+    expect(reading.unknownModelChars).toBe(1000);
+    expect(reading.subscriptionUsd).toBeCloseTo((107.02 / 12) * (7 / 30));
+    expect(reading.remainingMinutes).toBeNull();
+    expect(reading.renewsOn).toBe("2027-11-27");
+  });
+
+  it("shows the monthly capacity of each model family", () => {
+    const snapshot = planSnapshot(service, annual, [], at("2026-11-28"), false);
+    expect(snapshot.capacity.map((family) => Math.round(family.includedMinutes!))).toEqual([550, 275]);
+    expect(snapshot.includedMinutes).toBeNull();
+  });
+
+  it("prices a prepaid balance per character, whatever the model", () => {
+    const plan = { ...emptyPlan(), funding: "prepaid" as const, balanceUsd: 10, creditedOn: "2026-11-01", usdPerUnit: 0.001 };
+    const snapshot = planSnapshot(service, plan, [call("2026-11-10", 1000, "eleven_v4_turbo")], NOW, false);
+    expect(snapshot.spentUsd).toBe(1);
+    expect(snapshot.capacity).toEqual([]);
+    expect(snapshot.usedMinutes).toBe(1);
+  });
+
+  it("reads back the two yearly amounts", () => {
+    const parsed = parseServicePlans({ plans: { elevenlabs: annual } });
+    expect(parsed.elevenlabs).toMatchObject({ firstYearFeeUsd: 107.02, renewalFeeUsd: 237.82 });
   });
 });

@@ -39,10 +39,14 @@ describe("PeriodCostLines", () => {
       7,
     );
     render(<PeriodCostLines reading={reading} service={service} />);
-    expect(screen.getByText("~2 min")).toBeTruthy();
+    expect(screen.getByText("~1,5 min")).toBeTruthy();
     expect(screen.getByText("Crédits consommés")).toBeTruthy();
-    expect(screen.getByText("1'500")).toBeTruthy();
-    expect(screen.getByText("~159 min restantes · 119'500 crédits")).toBeTruthy();
+    expect(screen.getByText("660")).toBeTruthy();
+    expect(screen.getByText(/^120.340 crédits restants ce mois$/)).toBeTruthy();
+    expect(screen.getByText("~547 min restantes en v4 Turbo, Flash, v3 Conversational")).toBeTruthy();
+    expect(screen.getByText("~274 min restantes en v4, v3, Multilingual v2")).toBeTruthy();
+    expect(screen.getByText(/1.500 caractères sans modèle connu/)).toBeTruthy();
+    expect(screen.getByText(/Seuls les appels journalisés par Ava/)).toBeTruthy();
     expect(screen.getAllByText("5,13 $")).toHaveLength(2);
   });
 });

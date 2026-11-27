@@ -19,6 +19,11 @@ export default function PeriodCostLines({ reading, service }: { reading: PeriodC
         <p className="text-2xl font-semibold tracking-tight">{costText(reading)}</p>
         <p className="text-xs text-muted-foreground">{costCaption(reading)}</p>
         <p className="mt-1 text-base font-semibold">{remainingHeadline(reading, service)}</p>
+        {reading.capacity.map((family) => (
+          <p key={family.label} className="text-sm">
+            {formatMinutes(family.remainingMinutes, true)} restantes en {family.label}
+          </p>
+        ))}
         <p className="text-sm text-muted-foreground">{renewalHeadline(reading)}</p>
       </div>
       <div className="border-t pt-2 text-xs space-y-1">
@@ -43,6 +48,12 @@ export default function PeriodCostLines({ reading, service }: { reading: PeriodC
             )}
           </>
         )}
+        {reading.unknownModelChars > 0 && (
+          <p className="text-[11px] text-amber-500">
+            {formatAmount(reading.unknownModelChars, "credits")} caractères sans modèle connu, comptés au taux le plus élevé.
+          </p>
+        )}
+        {reading.countingNote && <p className="text-[11px] text-muted-foreground">{reading.countingNote}</p>}
         {reading.capped && (
           <p className="text-[11px] text-amber-500">Consommation du cycle tronquée : le reste est un maximum.</p>
         )}
@@ -70,6 +81,9 @@ function remainingHeadline(reading: PeriodCostReading, service: ServiceDefinitio
     return reading.remainingUsd == null ? "crédit non chiffré" : `${formatUsd(reading.remainingUsd)} restants`;
   }
   if (reading.kind === "stopped" || reading.kind === "unset") return "minutes non disponibles";
+  if (!reading.allowanceMissing && reading.capacity.length > 0 && reading.remainingUnits != null) {
+    return `${formatAmount(reading.remainingUnits, service.unit)} ${service.unitLabel} restants ce mois`;
+  }
   if (reading.allowanceMissing || reading.remainingMinutes == null) return "quota non saisi";
   const minutes = formatMinutes(reading.remainingMinutes, reading.minutesAreEstimate);
   if (service.unit === "minutes" || reading.remainingUnits == null) return `${minutes} restantes`;

@@ -183,10 +183,14 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
   const [seed, setSeed] = useState(0);
   const [saving, setSaving] = useState(false);
   const { service } = snapshot;
+  const yearly = snapshot.plan.funding === "subscription" && snapshot.plan.cadence === "yearly";
+  const renewal = yearly && snapshot.plan.account === "active" && snapshot.plan.renewsOn
+    ? ` · renouvellement annuel ${formatDay(new Date(`${snapshot.plan.renewsOn}T00:00:00.000Z`))}${snapshot.plan.renewalFeeUsd == null ? "" : ` (${formatUsd(snapshot.plan.renewalFeeUsd)})`}`
+    : "";
   const cycle = snapshot.window.source === "credit"
     ? (snapshot.plan.creditedOn ? `crédit depuis le ${formatDay(snapshot.window.start)}` : "crédit depuis le début des mesures, date non saisie")
     : snapshot.window.source === "renewal"
-      ? `${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)}`
+      ? `${yearly ? "quota du mois : " : ""}${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)}`
       : `mois calendaire (${formatDay(snapshot.window.start)} → ${formatDay(snapshot.window.end)})`;
   const accountLabel = snapshot.plan.account === "cancelled" ? "Résilié" : snapshot.plan.account === "paused" ? "En pause" : "Actif";
   const accountTone = snapshot.plan.account === "cancelled" ? "text-red-400" : snapshot.plan.account === "paused" ? "text-amber-400" : "text-emerald-400";
@@ -217,7 +221,7 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="font-medium">{service.label}</h4>
         <span className={`text-xs font-medium ${accountTone}`}>{accountLabel}</span>
-        <p className="text-xs text-muted-foreground">{cycle}</p>
+        <p className="text-xs text-muted-foreground">{cycle}{renewal}</p>
       </div>
       <dl className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
         {snapshot.plan.funding === "prepaid" ? (
@@ -229,7 +233,7 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
           </>
         ) : (
           <>
-            <Metric label="Abonnement / mois" value={snapshot.plan.account === "active" ? formatUsd(snapshot.fixedUsd) : "arrêté"} />
+            <Metric label={yearly ? "Équivalent / mois (annuel)" : "Abonnement / mois"} value={snapshot.plan.account === "active" ? formatUsd(snapshot.fixedUsd) : "arrêté"} />
             <Metric label="Inclus" value={allowance(snapshot)} />
             <Metric label="Consommé" value={consumed(snapshot)} />
             <Metric label="Au-dessus du forfait" value={snapshot.plan.account === "active" ? overage(snapshot) : "—"} warn={snapshot.status === "over" || snapshot.status === "over-rate-missing"} />
@@ -246,6 +250,22 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
           <span className="font-semibold">{spendSentence(snapshot)}</span>
         </p>
       )}
+      {snapshot.capacity.length > 0 && (
+        <ul className="text-xs text-muted-foreground">
+          {snapshot.capacity.map((family) => (
+            <li key={family.label}>
+              {family.label} : {formatMinutes(family.includedMinutes, true)} par mois
+              {snapshot.plan.account === "active" && family.remainingMinutes != null && `, ${formatMinutes(family.remainingMinutes, true)} restantes`}
+            </li>
+          ))}
+        </ul>
+      )}
+      {snapshot.unknownModelChars > 0 && (
+        <p className="text-xs text-amber-500">
+          {formatAmount(snapshot.unknownModelChars, "credits")} caractères sans modèle connu, comptés au taux le plus élevé.
+        </p>
+      )}
+      {service.countingNote && <p className="text-xs text-muted-foreground">{service.countingNote}</p>}
       {service.unmeasuredReason && <p className="text-xs text-muted-foreground">{service.unmeasuredReason}</p>}
       <div className="flex justify-end">
         <Button size="sm" variant="outline" onClick={() => setOpen((value) => !value)}>
@@ -345,12 +365,22 @@ function PlanCard({ snapshot, onSaved }: { snapshot: PlanSnapshot; onSaved: (pla
               <SelectTrigger className="h-9 text-xs text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="monthly">Mensuel</SelectItem>
-                <SelectItem value="yearly">Annuel (montant par mois)</SelectItem>
+                <SelectItem value="yearly">Annuel (quota par mois)</SelectItem>
               </SelectContent>
             </Select>
           </label>
-          <NumberField key={`${seed}-fee`} label="Ce que tu paies / mois ($)" value={draft.monthlyFeeUsd} onChange={(monthlyFeeUsd) => setDraft({ ...draft, tierId: "custom", monthlyFeeUsd })} />
-          <NumberField key={`${seed}-included`} label={`Inclus (${service.unitLabel})`} value={draft.included} onChange={(included) => setDraft({ ...draft, tierId: "custom", included })} />
+          {draft.cadence === "yearly" ? (
+            <>
+              <NumberField key={`${seed}-first-year`} label="Payé pour la première année ($, remise comprise)" value={draft.firstYearFeeUsd} onChange={(firstYearFeeUsd) => setDraft({ ...draft, firstYearFeeUsd })} />
+              <NumberField key={`${seed}-renewal`} label="Montant d'un renouvellement ($ / an)" value={draft.renewalFeeUsd} onChange={(renewalFeeUsd) => setDraft({ ...draft, renewalFeeUsd })} />
+              {draft.firstYearFeeUsd == null && draft.renewalFeeUsd == null && draft.monthlyFeeUsd != null && (
+                <p className="text-xs text-muted-foreground md:col-span-2">Sans ces montants, Ava compte {formatUsd(draft.monthlyFeeUsd)} par mois.</p>
+              )}
+            </>
+          ) : (
+            <NumberField key={`${seed}-fee`} label="Ce que tu paies / mois ($)" value={draft.monthlyFeeUsd} onChange={(monthlyFeeUsd) => setDraft({ ...draft, tierId: "custom", monthlyFeeUsd })} />
+          )}
+          <NumberField key={`${seed}-included`} label={`Inclus par mois (${service.unitLabel})`} value={draft.included} onChange={(included) => setDraft({ ...draft, tierId: "custom", included })} />
           <NumberField key={`${seed}-overage`} label="Prix d'une unité au-dessus ($)" value={draft.overagePerUnitUsd} onChange={(overagePerUnitUsd) => setDraft({ ...draft, tierId: "custom", overagePerUnitUsd })} />
           <label className="space-y-1 text-xs text-muted-foreground">
             Début de l'abonnement
@@ -462,7 +492,8 @@ function spendSentence(snapshot: PlanSnapshot): string {
   const noun = snapshot.plan.cadence === "yearly" ? "facture annuelle" : "mensualité";
   const plural = spend.count > 1 ? "s" : "";
   const upcoming = spend.includesUpcoming ? ", prochaine facture comprise" : "";
-  const total = spend.totalUsd == null ? "montant mensuel manquant" : formatUsd(spend.totalUsd);
+  const missing = snapshot.plan.cadence === "yearly" ? "montant annuel manquant" : "montant mensuel manquant";
+  const total = spend.totalUsd == null ? missing : formatUsd(spend.totalUsd);
   return `${total} · ${spend.count} ${noun}${plural} du ${formatDay(new Date(`${spend.from}T00:00:00.000Z`))} au ${formatDay(new Date(`${spend.to}T00:00:00.000Z`))}${upcoming}`;
 }
 
