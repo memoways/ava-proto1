@@ -44,3 +44,31 @@ Tarifs publics lus le 22 novembre 2026. Un écart avec la facture se corrige dan
 
 Coût marginal par session une fois les forfaits saisis, scénarios 1 / 5 / 20 lieux, hébergement, entraînement, self-hosting.
 Reprise : [prompt](prompt_reprise_couts_scenarios_diffusion.md).
+
+## ElevenLabs en abonnement annuel (diagnostic du 27 novembre 2026)
+
+### Facture et grille
+
+- Creator annuel du 27 novembre 2026 au 27 novembre 2027 : 220 $ au tarif normal, remise Black Friday de 121 $, 99 $ hors taxe, TVA 8,1 % de 8,02 $, soit **107,02 $ payés** (8,92 $ par mois).
+- Renouvellement annoncé : 220 $ hors taxe (237,82 $ avec la même TVA).
+- [Tarifs](https://elevenlabs.io/pricing) et [tarifs API](https://elevenlabs.io/pricing/api), lus le 27 novembre : 121 000 crédits par mois ; report des crédits non utilisés jusqu'à deux mois.
+- Minutes incluses (lecture d'un tableau aplati, seule la ligne v4 est confirmée) : environ **550 min** sur v4 Turbo, Flash et v3 Conversational, **275 min** sur v4, v3 et Multilingual v2 (1 000 caractères ≈ 1 min).
+- Prix API : 0,04 $ (famille Turbo) ou 0,08 $ (v4, v3, Multilingual v2) pour 1 000 caractères.
+
+### Relevé du compte (30 jours au 27 novembre, capture d'écran)
+
+45 900 crédits, 216 000 caractères, 3,2 h, 1 930 requêtes. Soit 0,21 crédit par caractère et 38 % d'un quota mensuel Creator. La capture ne détaille ni les produits ni les modèles.
+
+### Écarts du calcul actuel (`src/services/servicePlans.ts`)
+
+1. En « Annuel », `billingWindow` ouvre une fenêtre de 12 mois et lui compare le quota d'un mois : faux dépassement.
+2. Un seul montant : la remise de première année serait reprise au renouvellement.
+3. Un caractère compte un crédit pour tous les modèles. Les deux sources ci-dessus donnent environ 0,22 (famille Turbo) et 0,44 (v4, v3, Multilingual v2) : valeurs déduites, à confirmer sur l'export par modèle.
+4. 750 caractères par minute, contre environ 1 000 chez ElevenLabs.
+5. La consommation vient des journaux d'Ava : les autres usages du compte n'y sont pas.
+
+### Lots
+
+1. Annuel : fenêtre de quota mensuelle, montant payé et montant de renouvellement, crédits par modèle, minutes, puis saisie de la fiche. [Reprise](prompt_reprise_elevenlabs_annuel_lot_1.md).
+2. Consommation réelle lue chez ElevenLabs par une fonction serveur (solde, report, prochaine remise à zéro).
+3. Autres usages à évaluer : voix clonées professionnelles pour Max et Emma, effets sonores d'ambiance, comparaison de Scribe avec Deepgram derrière la façade STT. Musique et doublage : pas de besoin identifié. Droits, consommation et latence à vérifier avant tout essai.
