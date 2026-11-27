@@ -1,5 +1,7 @@
 # Ava — état courant
 
+**ElevenLabs en annuel (27 novembre, diagnostic, aucun code)** : Creator annuel acheté. Le calcul actuel est faux en facturation annuelle (quota de 121 000 crédits comparé à 12 mois d'usage) et compte 1 crédit par caractère, alors que l'API en prend moins. **Ne pas choisir « Annuel » dans la fiche avant le lot 1.** [Plan](plan_couts_forfaits_consommation.md) · [reprise lot 1](prompt_reprise_elevenlabs_annuel_lot_1.md).
+
 **Attente de passage lot 1 (27 novembre, code)** : un simple nom de l'autre personnage ne retarde plus la réponse suivante. L'attente reste pour toute demande, offre, accord ou parole de contact ; un passage accordé après le début du tour suivant est abandonné et noté `late_after_next_turn` (cas résiduel accepté par Ulrich). Retour possible par le réglage « Passage : attendre même sur un simple nom ». Gain non mesuré. **À faire par Ulrich** : recette sur sandbox-ulrich. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise mesure](prompt_reprise_attente_passage_mesure.md).
 
 **Latence, mesure iPhone (27 novembre)** : lot 1 bis confirmé (tout en `http_stream_pcm`, réponse → son 0,24 s en médiane, premier son 5,00 → 3,28 s sur 8 tours avec son). Les tours les plus lents attendent 1,2 à 2,0 s l'écriture du tour précédent liée au passage de personnage. Restent à mesurer : Anam et le poste de Romed. [Plan](plan_latence_conversationnelle_llm_tts.md) · [reprise attente de passage](prompt_reprise_attente_passage_lot_1.md).

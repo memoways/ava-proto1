@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [ElevenLabs annuel : diagnostic des mesures] — 2026-11-27
+
+- Documentation seulement : abonnement Creator annuel pris en compte, écarts du calcul des coûts relevés et prompt de reprise du lot 1.
+
 ## [Attente de passage lot 1 : le simple nom ne retarde plus la réponse] — 2026-11-27
 
 - Diagnostic (lecture seule, 21–27 novembre) : 14 tours sur 574 attendaient plus de 0,5 s (médiane 1,45 s, maximum 3,10 s) l'écriture du tour précédent. Les 14 venaient du seul nom de l'autre personnage ; le Game Master n'a décidé aucun passage.
