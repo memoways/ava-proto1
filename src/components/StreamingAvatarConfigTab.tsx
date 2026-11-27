@@ -256,8 +256,8 @@ export default function StreamingAvatarConfigTab() {
         <CardHeader>
           <CardTitle className="text-base">Voix réellement jouée</CardTitle>
           <CardDescription>
-            Calculée comme dans l'expérience, avec les réglages affichés ici (même non enregistrés). Emma démarre toujours
-            en voix seule.
+            Calculée comme dans l'expérience, avec les réglages affichés ici (même non enregistrés). Emma n'a la vidéo que si
+            sa fiche (Réglages personnages) lui donne un service vidéo.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

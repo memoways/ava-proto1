@@ -168,8 +168,8 @@ export default function DevicesTab() {
         <CardDescription>
           Appareil → personnage → moteur. Pour chaque type d'écran : sortie, avatar et transcription, puis le moteur de
           voix de Max et d'Emma. La voix vient du catalogue de TTS Config ; les réglages fins de chaque moteur restent
-          dans Technique avancée. Lu au début de chaque appel. Emma démarre toujours en voix seule ; un avatar Anam ou
-          HeyGen garde sa propre voix.
+          dans Technique avancée. Lu au début de chaque appel. Emma n'a la vidéo que si sa fiche
+          lui donne un service vidéo ; un avatar Anam ou HeyGen garde sa propre voix.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

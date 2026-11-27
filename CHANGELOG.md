@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages lot 2 : tri des réglages de test sur RAG et Cinématiques] — 2026-11-27
+
+- RAG : « Variante du prompt Max » et le profil d'embedding à l'essai passent dans « Réglages de test (temporaires) », fermé par défaut ; libellés « canary » et « Live actuel » (devenu faux) retirés.
+- Cinématiques : la présentation sur smartphone (mode et départ du cadrage) passe dans « Réglages de test (temporaires) ».
+- Appareils et Avatar vidéo : phrase périmée sur Emma corrigée. Latences PostHog : « Canary interne » devient « Contrôle interne ».
+- Aucune migration, aucune valeur enregistrée modifiée, aucun comportement de jeu changé.
+
 ## [Back-office : rien ne se perd sans enregistrer] — 2026-11-27
 
 - Barre fixe « Modifications non enregistrées » dès qu'un écran de réglages porte un changement, avec « Enregistrer » ou « Tout enregistrer » (`components/admin/unsaved`).

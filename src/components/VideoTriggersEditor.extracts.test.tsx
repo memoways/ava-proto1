@@ -82,6 +82,17 @@ describe("VideoTriggersEditor sections", () => {
     expect(screen.queryByTestId("extract-rules")).toBeNull();
   });
 
+  it("folds the smartphone presentation trial, apart from the durable cinematic rules", async () => {
+    render(<VideoTriggersEditor />);
+    const fold = await screen.findByTestId("test-settings-cinematics");
+    expect(fold.tagName).toBe("DETAILS");
+    expect(fold).not.toHaveAttribute("open");
+    expect(fold).toContainElement(screen.getByTestId("smartphone-video-mode"));
+    expect(fold).toHaveTextContent("en mesure");
+    expect(fold).not.toContainElement(screen.getByTestId("cinematic-presentation"));
+    expect(fold).not.toContainElement(screen.getByTestId("cinematic-mute-smartphone"));
+  });
+
   it("offers Transcrire only on spoken extracts and says why the others cannot", async () => {
     render(<VideoTriggersEditor scope="extracts" />);
     await waitFor(() => expect(screen.getByText("Cuisine parlée")).toBeTruthy());

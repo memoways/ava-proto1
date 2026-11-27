@@ -67,7 +67,7 @@ export const RAG_EMBEDDING_PROFILES: Record<RagEmbeddingProfileId, RagEmbeddingP
     id: "voyage-context-4-quality",
     label: "Voyage Context 4 · qualité",
     shortLabel: "Contextualisé",
-    description: "Chaque chunk est encodé avec le contexte de toute la page Notion. À valider en canary face à la contrainte voix.",
+    description: "Chaque chunk est encodé avec le contexte de toute la page Notion. À valider face à la contrainte de latence de la voix.",
     provider: "voyage",
     documentModel: "voyage-context-4",
     queryModel: "voyage-context-4",

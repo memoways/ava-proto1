@@ -203,6 +203,20 @@ Décision d’Ulrich après une session Tavus ouverte malgré la sortie globale 
 
 La forme `{ provider: "none" }` est additive : les anciennes valeurs se relisent à l’identique, et une version antérieure du code l’ignorait (« Suivre le réglage global »). Aucune migration. La fiche du personnage dit ce que donnera le prochain appel sur ordinateur (`describeNextCall`, par exemple « Vidéo Tavus » ou « Voix seule, car le réglage global est sur Voix »). Un passage vers un autre personnage repasse toujours en voix (inchangé).
 
+### 9.3 ter Tri des réglages de test (lot 2, 27 novembre)
+
+Recette du lot 1 : appel vérifié par Ulrich (global sur « Voix », Max lié à Tavus → voix, réactif) ; les 4 tours en flux lus en base portent `output_stream.output = tts`, une seule entrée `llm` et `tts` (une entrée par morceau envoyé à la voix). Orchestration, Avatar vidéo et Réglages personnages lus en local sur `sandbox-ulrich` : blocs fermés. L’aperçu Lovable n’était pas ouvrable par l’agent (compte sans accès au projet).
+
+| Page | Décision |
+|---|---|
+| RAG | « Variante du prompt Max » (`optimized_v3` enregistré dans les cinq environnements lus, production comprise : adopté) et profil Voyage Context 4 (prototype) dans « Réglages de test ». Libellés « canary » et « Live actuel » retirés. |
+| Cinématiques | Présentation sur smartphone (mode et départ du cadrage, recette iPhone à faire : en mesure) dans « Réglages de test ». Interrompre / Superposer, gain et son sur smartphone restent des réglages durables. |
+| TTS Config, Appareils | Aucun réglage de mesure ou de prototype. Appareils et Avatar vidéo : phrase périmée « Emma démarre toujours en voix seule » corrigée. |
+| Gameplay | Réglages portés par Orchestration (lot 1) et RAG (ci-dessus). |
+| Latences PostHog | « Canary interne » renommé « Contrôle interne ». |
+
+Deux décisions restent à Ulrich : l’appareil réglé sur « avatar » face au global « Voix » (inchangé) ; `VOICE_ONLY_UI` (inchangé).
+
 ### 9.4 Tests à ajouter à la liste du §4
 
 - Emma liée à Nuance, interrupteur global sur Voix, tablette : vidéo Nuance, persona d’Emma. **Remplacé le 27 novembre** : voix (règle 9.3 bis) ; la vidéo Nuance d’Emma demande le global sur Vidéo.
