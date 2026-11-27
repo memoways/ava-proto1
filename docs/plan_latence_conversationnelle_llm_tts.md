@@ -177,6 +177,12 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Interruption pendant le flux, vérifiée : la voix s'arrête, mais **net** (retour d'Ulrich : « comme si on lui enlevait la prise », puis un silence). Lot séparé : [interruption douce](prompt_reprise_interruption_douce_lot_1.md).
 - Restent à mesurer : Anam (aucun tour activé), et le lot 1 sur iPhone et sur le poste de Romed. Le lot 5 attend la mesure Anam, ou la décision d'Ulrich de s'en passer.
 
+**Mesure iPhone (27 nov., 14 h 02-14 h 05 UTC, `sandbox-ulrich`, Safari, mains libres, voix seule en flux, session `0cd6f1f5…`)**
+
+- 10 tours : 8 avec son (menés au bout), 2 annulés avant tout son. Écoute d'Ulrich : plutôt réactif, avec des moments plus longs.
+- Lot 1 bis confirmé : les 22 segments des tours sont en `http_stream_pcm`, aucun motif de repli ; réponse du LLM → son ≤ 0,54 s (médiane 0,24 s) contre 1,94-2,27 s avant ; premier son médian depuis le transcript final 3,28 s contre 5,00 s le 26 novembre. La cible (≤ 3,8 s, écart ≤ 0,6 s) est atteinte, sur 8 tours avec son au lieu des 10 demandés. Le flux du lot 4 était actif : la comparaison cumule les deux.
+- Tours lents : 7, 8 et 10 (premier son 3,9, 4,2 et 4,6 s) attendent d'abord l'écriture du tour précédent (`pre_turn_handoff_prior_write` 1,18, 1,76 et 1,97 s). Tour 4 (3,8 s) : LLM 1,7 s et embedding 0,7 s. Lot proposé : [attente de passage](prompt_reprise_attente_passage_lot_1.md).
+
 ### Lot 5 — Fin de parole plus courte (essai)
 
 - Réglage admin `endOfSpeechMs` à 600-700 ms en sandbox ; vérifier aussi l'attente `Finalize` de Deepgram (jusqu'à 1,5 s).
