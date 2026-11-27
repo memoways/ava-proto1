@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Attente de passage : mesure après lot 1] — 2026-11-27
+
+- Documentation seulement : attente nulle sur deux appels de recette, passage réussi.
+- Défaut constaté : un tour suivant qui démarre pendant le Game Master annule tout son post-tour (mémoire, guidage, journal) et le compteur `late_after_next_turn` reste muet. Prompt de reprise du lot 1 bis.
+
 ## [Cohérence émotionnelle lot 1 bis : Max ne s'emporte plus, réglable] — 2026-11-27
 
 - Constat : sur `sandbox-ulrich`, Max recevait un éclat à intensité 2 dès le tour 3 (« La digue cède », `[urgent]`).
