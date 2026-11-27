@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Attente de passage lot 1 bis : le Game Master survit au tour suivant] — 2026-11-27
+
+- Correctif : quand le tour suivant démarre ou que le joueur interrompt, le post-tour du Game Master va au bout et s'enregistre. Son signal suit désormais l'appel, plus la demande de passage.
+- Le passage dépassé reste abandonné ; `late_after_next_turn` peut se déclencher. La préparation d'un passage est inchangée.
+- Journal des post-tours tenu dans l'ordre des tours. Un tour dépassé dont rien n'a été entendu n'est pas évalué.
+- Fin d'appel, changement de personnage et redémarrage annulent toujours. Aucune migration, aucun réglage modifié ; mesure sur appel réel à faire.
+
 ## [Attente de passage : mesure après lot 1] — 2026-11-27
 
 - Documentation seulement : attente nulle sur deux appels de recette, passage réussi.

@@ -70,6 +70,7 @@ vi.mock("@/services/characterPromptService", () => ({
 import { simulateMaxResponse } from "@/agents/maxAgent";
 import { evaluatePostTurnPRD4, commitHandoffCandidate } from "@/agents/gameMasterPRD4";
 import { persistPostTurnMemory } from "@/services/sessionConversationMemory";
+import type { ResponseDeliveryReceipt } from "@/services/responseDelivery";
 import { queryRAGDetailed } from "@/services/ragService";
 import { enqueueConversationTurnTrace, patchQueuedConversationTurnTrace } from "@/services/conversationTraceOutbox";
 import { materializeConversationTurnTrace } from "@/services/conversationTraceFormat";
@@ -287,6 +288,38 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     const delivery = Promise.resolve('');
     const result = await streamPRD4Turn({ sessionId: null, characterContext: MAX_CONTEXT,
       conversationHistory: [], userMessage: 'Bonjour', userRole: null, timeElapsedSeconds: 30 }, ()=>{}, delivery);
+    await expect(result.postTurnPromise).rejects.toThrow('No confirmed delivery');
+    expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+  });
+
+  it("runs the post-turn on its own call signal once the next turn has superseded a heard reply", async () => {
+    const turn = cancellableTurn();
+    const call = cancellableTurn();
+    const passage = cancellableTurn();
+    let deliver!: (receipt: ResponseDeliveryReceipt) => void;
+    const handoffDelivery = new Promise<ResponseDeliveryReceipt>(resolve => { deliver = resolve; });
+    vi.mocked(evaluatePostTurnPRD4).mockClear();
+    const result = await processPRD4Turn({ sessionId: null, characterContext: MAX_CONTEXT, conversationHistory: [],
+      userMessage: 'Et Emma ?', userRole: null, timeElapsedSeconds: 30, turnId: 's:1', turnIndex: 1,
+      signal: turn.signal, postTurnSignal: call.signal, handoffSignal: passage.signal, handoffDelivery });
+    turn.abort('superseded-turn'); passage.abort('handoff-invalidated');
+    deliver({ turnId: 's:1', turnIndex: 1, character: 'max', generated: result.maxResponse, delivered: result.maxResponse,
+      uncertain: '', privateContinuation: '', status: 'completed', intent: null, scheduledSamples: null,
+      playedSamples: null, sampleRate: null });
+    await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].signal).toBe(call.signal);
+    expect(call.signal.aborted).toBe(false);
+  });
+
+  it("never records a superseded reply that was not heard", async () => {
+    const turn = cancellableTurn();
+    vi.mocked(evaluatePostTurnPRD4).mockClear();
+    let deliver!: (receipt: undefined) => void;
+    const handoffDelivery = new Promise<undefined>(resolve => { deliver = resolve; });
+    const result = await processPRD4Turn({ sessionId: null, characterContext: MAX_CONTEXT, conversationHistory: [],
+      userMessage: 'Bonjour', userRole: null, timeElapsedSeconds: 30, turnId: 's:1', turnIndex: 1,
+      signal: turn.signal, postTurnSignal: cancellableTurn().signal, handoffDelivery });
+    turn.abort('player-barge-in'); deliver(undefined);
     await expect(result.postTurnPromise).rejects.toThrow('No confirmed delivery');
     expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
   });

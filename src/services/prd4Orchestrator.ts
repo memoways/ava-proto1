@@ -76,6 +76,8 @@ export interface PRD4TurnInput {
     onRetry: () => void; onRecovered: (text: string) => void };
   handoffRequested?: boolean;
   postTurnSignal?: AbortSignal;
+  /** Passage lease: cancels a transfer preparation once the request is superseded, never an ordinary post-turn. */
+  handoffSignal?: AbortSignal;
   prepareHandoff?: (evaluation: PRD4PostTurnEvaluation, text: string, signal: AbortSignal, startedAt: number) => Promise<boolean>;
   handoffDelivery?: Promise<ResponseDeliveryReceipt | undefined>;
   handoffOpenRequest?: OpenHandoffRequest | null;
@@ -566,13 +568,18 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
   const runPostTurn = async (candidate = false, candidateSignal?: AbortSignal) => {
     const handoffDelivery = candidate ? candidateEvidence(candidateText, input.turnId!, turnIndex, activeCharacter)
       : input.handoffDelivery ? await input.handoffDelivery : undefined;
+    // The post-turn outlives its turn: once superseded without a receipt, nothing counts as heard.
     const deliveredResponse = handoffDelivery ? handoffDelivery.delivered
-      : input.streamControl ? await input.streamControl.delivery : maxResponse;
+      : input.streamControl ? await input.streamControl.delivery
+      : input.handoffDelivery && !candidate && input.signal?.aborted ? '' : maxResponse;
     const playedState = deliveredResponse.trim() && !identityGuard.blocked && maxResult
       ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult.responseIntent?.parole, speechStates)
       : null;
-    (input.postTurnSignal ?? input.signal)?.throwIfAborted();
-    if (input.streamControl && !deliveredResponse.trim()) throw new Error("No confirmed delivery for GM");
+    (candidateSignal ?? input.postTurnSignal ?? input.signal)?.throwIfAborted();
+    // An unheard superseded turn is never recorded: the next one may reuse its turn index.
+    if ((input.streamControl || (!candidate && input.signal?.aborted)) && !deliveredResponse.trim()) {
+      throw new Error("No confirmed delivery for GM");
+    }
     if (gmMode === "off") {
       // GM off: no post-turn call. The turn is still logged (mode + what the
       // character received) so the history can say "nothing: mode off".
@@ -661,7 +668,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     || (input.handoffOpenRequest && /^(?:oui|d[’']accord|ok(?:ay)?|bien s[uû]r)[ .!…]*$/i.test(maxResponse.trim())))) {
     const preparationStartedAt = performance.now();
     const controller = new AbortController();
-    const parent = input.postTurnSignal ?? input.signal;
+    const parent = input.handoffSignal ?? input.postTurnSignal ?? input.signal;
     const signal = parent ? AbortSignal.any([parent, controller.signal]) : controller.signal;
     try {
       await withTimeout('handoff_preparation', (async () => {
@@ -690,10 +697,13 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     }
   }
   const finishPostTurn = () => candidateResult
-    ? (input.handoffDelivery ?? Promise.resolve(undefined)).then(receipt => commitHandoffCandidate({
-      sessionId: input.sessionId, signal: input.postTurnSignal ?? input.signal,
-      userText: input.handoffUserText ?? input.userMessage, openRequest: input.handoffOpenRequest ?? null,
-      speechStatePlayed: candidateReleased ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) : null }, candidateResult!, receipt, candidateReleased))
+    ? (input.handoffDelivery ?? Promise.resolve(undefined)).then(receipt => {
+      if (input.signal?.aborted && !receipt?.delivered.trim()) throw new Error("No confirmed delivery for GM");
+      return commitHandoffCandidate({
+        sessionId: input.sessionId, signal: input.postTurnSignal ?? input.signal,
+        userText: input.handoffUserText ?? input.userMessage, openRequest: input.handoffOpenRequest ?? null,
+        speechStatePlayed: candidateReleased ? selectSpeechState(input.playedSpeechStateRef?.current ?? maxResult?.responseIntent?.parole, speechStates) : null }, candidateResult!, receipt, candidateReleased);
+    })
     : runPostTurn();
   // En diagnostic, le post-tour (qui prépare la suite et écrit son propre log)
   // ne démarre qu'après la mise en file locale durable de la réponse.

@@ -113,19 +113,30 @@ export function completedCallExchanges(history: ConversationMessage[], character
   return count;
 }
 
-/** A lease belongs to a request in a call, not a voice turn. Generic over the registry. */
+/**
+ * Two lifetimes. The passage lease belongs to a request in a call: the next request supersedes it. The GM post-turn
+ * belongs to the call: it completes and is recorded while later turns run, and stops only with that call
+ * (`endCall`), or when another session, call or character binds. Generic over the registry.
+ */
 export class HandoffCoordinator<Character extends string = RuntimeCharacter> {
   private generation = 0;
   private owner: string | null = null;
   private lifetime = new AbortController();
+  private callScope: string | null = null;
+  private callLifetime = new AbortController();
   bind(session: string, call: string, source: Character, version: string, request: string) {
+    const scope = JSON.stringify([session, call, source]);
+    if (this.callScope !== scope) { if (this.callScope !== null) this.endCall(); this.callScope = scope; }
     const owner = JSON.stringify([session, call, source, version, request]);
     if (this.owner !== owner) { this.invalidate(); this.owner = owner; }
     const generation = this.generation;
     return { current: () => this.generation === generation && this.owner === owner && !this.lifetime.signal.aborted,
-      signal: this.lifetime.signal };
+      signal: this.lifetime.signal, postTurnSignal: this.callLifetime.signal };
   }
+  /** Drops the passage only. */
   invalidate() { this.lifetime.abort('handoff-invalidated'); this.lifetime = new AbortController(); this.generation++; this.owner = null; }
+  /** Call end, character change, restart: drops the passage and the pending GM post-turns. */
+  endCall() { this.invalidate(); this.callLifetime.abort('call-ended'); this.callLifetime = new AbortController(); this.callScope = null; }
 
 }
 

@@ -35,6 +35,12 @@ describe('V4 receipt persistence and optimistic JSONB concurrency',()=>{
   harness.beforeUpdate=async()=>{const memory=mergeConversationMemory(createEmptyConversationMemory(),{userFacts:['Alice appelle.']},2,'emma');await db.query('update sessions set conversation_memory=$1::jsonb,memory_last_turn=2',[JSON.stringify(memory)]);};
   await persistDeliveryReceipt(id,receipt);const memory=await fetchConversationMemory(id,{force:true});expect(memory.characterStates?.emma?.userFacts[0].text).toBe('Alice appelle.');expect(memory.deliveryByCharacter?.max?.[0]).toEqual(receipt);expect(memory.lastTurn).toBe(2);
  });
+ it('records a slow post-turn in turn order without overwriting the newer memory',async()=>{
+  await persistPostTurnMemory(id,{...entry,turn_index:5},{userFacts:['Tour cinq.']},5,'max');
+  const memory=await persistPostTurnMemory(id,{...entry,turn_index:4},{userFacts:['Tour quatre.']},4,'max');
+  expect(memory.lastTurn).toBe(5);expect(memory.characterStates?.max?.userFacts.map(f=>f.text)).toEqual(['Tour cinq.']);
+  const row=(await db.query<{gm_post_turn_log:{turn_index:number}[]}>('select * from sessions')).rows[0];expect(row.gm_post_turn_log.map(e=>e.turn_index)).toEqual([4,5]);
+ });
  it('GM CAS preserves a receipt that arrives between read and update',async()=>{
   harness.beforeUpdate=async()=>{await db.query("update sessions set conversation_memory=jsonb_set(conversation_memory,'{deliveryByCharacter}', $1::jsonb)",[JSON.stringify({emma:[{...receipt,turnId:'emma-1',character:'emma'}]})]);};
   const memory=await persistPostTurnMemory(id,entry,{userFacts:['Alice appelle.']},3,'max');expect(memory.deliveryByCharacter?.emma?.[0].turnId).toBe('emma-1');expect(memory.characterStates?.max?.userFacts[0].text).toBe('Alice appelle.');

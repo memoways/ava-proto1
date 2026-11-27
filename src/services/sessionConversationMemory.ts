@@ -108,7 +108,11 @@ export async function fetchConversationMemory(
 function appendPostTurnEntry(current: unknown, entry: PRD4PostTurnEvaluation): PRD4PostTurnEvaluation[] {
   const entries = Array.isArray(current) ? current as PRD4PostTurnEvaluation[] : [];
   if (entry.turn_index != null && entries.some((candidate) => candidate.turn_index === entry.turn_index)) return entries;
-  return [...entries, entry].slice(-80);
+  // A slow post-turn may land after a newer one: the log stays in turn order (resume replays it in order).
+  const later = entry.turn_index == null ? -1
+    : entries.findIndex((candidate) => candidate.turn_index != null && candidate.turn_index > entry.turn_index!);
+  const at = later < 0 ? entries.length : later;
+  return [...entries.slice(0, at), entry, ...entries.slice(at)].slice(-80);
 }
 
 /** Excludes legacy/global and foreign-character director results from live resume state. */
