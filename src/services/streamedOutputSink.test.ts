@@ -51,7 +51,6 @@ describe("streamed output sink (lot T7, every output since latency lot 4)", () =
     expect(output.start).toHaveBeenCalledOnce();
     expect(output.start).toHaveBeenCalledWith("Une.", expect.anything(), { goal: "g", points: [], parole: "calme" });
     expect(output.received).toEqual(["Une.", "Deux.", "Trois."]);
-    await expect(sink.delivery).resolves.toBe("Une. Deux. Trois.");
     expect(onComplete).toHaveBeenCalledWith("Une. Deux. Trois.");
   });
 
@@ -82,7 +81,31 @@ describe("streamed output sink (lot T7, every output since latency lot 4)", () =
     sink.onEvent({ type: "complete", response: "Réponse récupérée." });
     expect(sink.render).toBeNull();
     expect(output.start).not.toHaveBeenCalled();
+    sink.confirmHeard("Réponse récupérée.");
     await expect(sink.delivery).resolves.toBe("Réponse récupérée.");
+  });
+
+  it("delivers the heard text only once the output confirms it, never at the end of generation", async () => {
+    const sink = createStreamedOutputSink(recordingOutput().start);
+    let settled = false;
+    void sink.delivery.finally(() => { settled = true; }).catch(() => {});
+    sink.onEvent({ type: "segment", text: "Une." });
+    sink.onEvent({ type: "complete", response: "Une." });
+    await sink.render;
+    expect(settled).toBe(false);
+    sink.confirmHeard("Une.");
+    await expect(sink.delivery).resolves.toBe("Une.");
+  });
+
+  it.each(["abort", "empty receipt"])("credits nothing of a generated reply that was not heard (%s)", async cause => {
+    const turn = new AbortController();
+    const sink = createStreamedOutputSink(recordingOutput().start, undefined, turn.signal);
+    sink.onEvent({ type: "segment", text: "Une." });
+    sink.onEvent({ type: "complete", response: "Une." });
+    if (cause === "abort") turn.abort("player-barge-in");
+    else sink.confirmHeard("");
+    sink.confirmHeard("Une."); // A late confirmation never revives a cut reply.
+    await expect(sink.delivery).rejects.toThrow("No confirmed audio delivery");
   });
 
   it("fails the feed and the delivery when the generation fails", async () => {

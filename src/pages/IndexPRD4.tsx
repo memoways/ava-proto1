@@ -2000,7 +2000,7 @@ const IndexPRD4 = () => {
             });
           }, response => {
             if (streamingOutput?.mode === 'streaming_avatar') expectedAvatarTextRef.current.set(turnId, response);
-          });
+          }, turnController.signal);
         }
         const prepareHandoff = async (ev: import('@/types').PRD4PostTurnEvaluation, text: string, preparationSignal: AbortSignal, started: number): Promise<boolean> => {
           if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return false;
@@ -2708,6 +2708,7 @@ const IndexPRD4 = () => {
             scheduledSamples: null, playedSamples: null, sampleRate: null });
         }
         resolveHandoffDelivery(responseReceipt);
+        avatarStream?.confirmHeard(responseReceipt?.delivered ?? '');
         if (outputResult.status === "played") telemetry.observe("audio_end");
         if (streamedVoice && earlyFirstPlaybackAt != null) onPlaybackStart();
         telemetry.durations(outputResult.generatedSegments > 0 ? outputResult.generationWallMs ?? null : null, outputResult.status === "played" ? outputResult.playbackTotalMs : null,

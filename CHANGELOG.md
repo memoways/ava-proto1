@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Attente de passage lot 1 ter : réplique interrompue] — 2026-11-27
+
+- Correctif : en voix au fil de l'eau, une réplique interrompue n'est plus créditée au personnage. Aucun post-tour pour ce tour (journal, mémoire, confidence, passage) et rien au résumé de session.
+- Le Game Master et le résumé attendent la confirmation de la sortie, plus la fin de la génération.
+- Voix lue en bloc, Gradium progressif et préparation de passage inchangés. Aucune migration, aucun réglage modifié ; recette sur appel réel à faire.
+
 ## [Attente de passage : mesure après lot 1 bis] — 2026-11-27
 
 - Documentation seulement : sur un appel de recette, les 11 tours entendus sont au journal du Game Master et la demande Max → Emma aboutit.

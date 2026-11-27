@@ -80,6 +80,7 @@ import { fetchCharacterStateProfile, fetchCharacterSpeechRuntime, fetchPinnedDir
 import { loadCharacterPrompt } from '@/services/characterPromptService';
 import speechSheets from '@/agents/__fixtures__/speechSandbox20261025.json';
 import { getGameplaySettings } from "@/services/settingsService";
+import { createStreamedOutputSink } from "@/services/streamedOutputSink";
 import { streamPRD4Turn, processPRD4Turn as processPRD4TurnImpl, type PRD4TurnInput } from "@/services/prd4Orchestrator";
 import {
   MAX_LLM_RESPONSE_DEADLINE_MS,
@@ -322,6 +323,49 @@ describe("processPRD4Turn — Phase 2 endurance", () => {
     turn.abort('player-barge-in'); deliver(undefined);
     await expect(result.postTurnPromise).rejects.toThrow('No confirmed delivery');
     expect(evaluatePostTurnPRD4).not.toHaveBeenCalled();
+  });
+
+  // Lot 1 ter (session 8cd27ab0, turns 7 and 9): generation is over, playback is cut by the next turn.
+  it("feed voice: a reply interrupted during playback is not credited to the GM or the summary", async () => {
+    const turn = cancellableTurn();
+    const call = cancellableTurn();
+    const response = 'Je vais te dire une chose. Le fusil était chargé.';
+    // Same wiring as IndexPRD4: the abort listener settles the receipt before the output returns one.
+    let resolveReceipt!: (receipt: ResponseDeliveryReceipt | undefined) => void;
+    const handoffDelivery = new Promise<ResponseDeliveryReceipt | undefined>(resolve => { resolveReceipt = resolve; });
+    turn.signal.addEventListener('abort', () => resolveReceipt(undefined), { once: true });
+    const sink = createStreamedOutputSink(() => new Promise(() => {}), undefined, turn.signal);
+    vi.mocked(simulateMaxResponse).mockResolvedValueOnce({ response, systemPrompt: 'system' });
+    vi.mocked(evaluatePostTurnPRD4).mockClear();
+    vi.mocked(summarizeSessionAsync).mockClear();
+    vi.mocked(fetchSessionSummary).mockResolvedValueOnce(null); // The summary is due on this turn.
+    const result = await streamPRD4Turn({ sessionId: 'session-cut', characterContext: MAX_CONTEXT,
+      conversationHistory: makeConversation(3), userMessage: 'Raconte.', userRole: null, timeElapsedSeconds: 30,
+      turnId: 's:4', turnIndex: 4, signal: turn.signal, postTurnSignal: call.signal, handoffDelivery },
+      event => sink.onEvent(event), sink.delivery);
+    turn.abort('player-barge-in'); // Generation is over, nothing was confirmed by the output.
+    await expect(result.postTurnPromise).rejects.toThrow('No confirmed audio delivery');
+    await Promise.resolve();
+    const unheard = (texts: string[]) => texts.filter(text => text.includes('fusil'));
+    expect.soft(unheard(vi.mocked(evaluatePostTurnPRD4).mock.calls.map(([input]) => input.maxResponse)), 'GM').toEqual([]);
+    expect.soft(unheard(vi.mocked(summarizeSessionAsync).mock.calls
+      .flatMap(([, messages]) => messages.map(message => message.content))), 'summary').toEqual([]);
+  });
+
+  it("feed voice: a reply confirmed as heard reaches the GM and the summary", async () => {
+    const response = 'Je vais te dire une chose.';
+    const sink = createStreamedOutputSink(() => new Promise(() => {}));
+    vi.mocked(simulateMaxResponse).mockResolvedValueOnce({ response, systemPrompt: 'system' });
+    vi.mocked(evaluatePostTurnPRD4).mockClear();
+    vi.mocked(summarizeSessionAsync).mockClear();
+    vi.mocked(fetchSessionSummary).mockResolvedValueOnce(null);
+    const result = await streamPRD4Turn({ sessionId: 'session-heard', characterContext: MAX_CONTEXT,
+      conversationHistory: makeConversation(3), userMessage: 'Raconte.', userRole: null, timeElapsedSeconds: 30,
+      turnIndex: 4 }, event => sink.onEvent(event), sink.delivery);
+    sink.confirmHeard(response);
+    await result.postTurnPromise;
+    expect(vi.mocked(evaluatePostTurnPRD4).mock.calls[0][0].maxResponse).toBe(response);
+    expect(summarizeSessionAsync).toHaveBeenCalledOnce();
   });
 
   it.each([MAX_CONTEXT, EMMA_CONTEXT])('$characterKey logs only the declared, validated and delivered state, never the GM suggestion', async context => {
