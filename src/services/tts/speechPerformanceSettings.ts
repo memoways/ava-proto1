@@ -1,8 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getActiveEnvironment, loadEnvironmentSetting, readEnvironmentStorage, writeEnvironmentStorage, type EnvironmentId } from '../environmentContext';
-import type { CanonicalEmotion, PerformanceDelivery } from './performanceIntent';
+import type { CanonicalEmotion, PerformanceDelivery, PerformanceIntensity } from './performanceIntent';
+/** Voice pacing (emotions lot 1): outburst budget and per-character intensity ceiling. Missing fields use code defaults. */
+export interface SpeechPacingSettings { outburstWindow?: number; intensityCeiling?: Record<string, PerformanceIntensity> }
 export interface SpeechVoiceMapping { emotion: CanonicalEmotion; delivery: PerformanceDelivery; speed: number; pauses: 'short' | 'normal' | 'long'; instruction: string }
-export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>> }
+export interface SpeechPerformanceSettings { enabled: boolean; version: string; gradiumTagsEnabled: boolean; /** A2, opt-in per environment after human acceptance. Missing means false. */ gradiumPausesEnabled?: boolean; byCharacter: Record<string, Record<string, SpeechVoiceMapping>>; pacing?: SpeechPacingSettings }
 export const SPEECH_PERFORMANCE_KEY = 'ava_speech_performance';
 export const EMPTY_SPEECH_PERFORMANCE: SpeechPerformanceSettings = { enabled: false, version: '', gradiumTagsEnabled: false, byCharacter: {} };
 // Production guard lifted on 25 Oct 2026 (Ulrich): every environment reads its own saved mapping.

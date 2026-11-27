@@ -54,6 +54,18 @@ export interface TtsReading {
   emotion: string | null;
   speechState: string | null;
   model: string | null;
+  /** Rendered intensity 0–2 and the pacing guard that shaped it (emotions lot 1); absent on older rows. */
+  intensity?: number;
+  guard?: string;
+}
+
+/** Back-office wording of the voice pacing guard logged with a reply. */
+function pacingGuard(record: Record<string, unknown>): string | undefined {
+  if (record.performance_outburst === true) return "éclat autorisé";
+  if (record.performance_tempered === "calmed") return "retenu, budget d'éclats";
+  const from = finite(record.performance_paced_from);
+  if (from == null) return undefined;
+  return record.performance_paced_reason === "ceiling" ? `plafonné, au lieu de ${from}` : `rampe, au lieu de ${from}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -166,6 +178,10 @@ export function readTtsMetadata(metadata: unknown): TtsReading | null {
     speechState: textOrNull(record.performance_speech_state),
     model: textOrNull(record.model),
   };
+  const intensity = finite(record.performance_intensity);
+  if (intensity != null) reading.intensity = intensity;
+  const guard = pacingGuard(record);
+  if (guard) reading.guard = guard;
   if (!reading.emotion && !reading.speechState && !reading.model) return null;
   return reading;
 }
@@ -178,10 +194,14 @@ export function indexTtsByTurn(rows: ReadonlyArray<{ turn_index?: unknown; metad
     const reading = readTtsMetadata(row.metadata_json);
     if (turn == null || !reading) continue;
     const previous = map.get(turn);
+    const intensity = reading.intensity ?? previous?.intensity;
+    const guard = reading.guard ?? previous?.guard;
     map.set(turn, {
       emotion: reading.emotion ?? previous?.emotion ?? null,
       speechState: reading.speechState ?? previous?.speechState ?? null,
       model: reading.model ?? previous?.model ?? null,
+      ...(intensity != null ? { intensity } : {}),
+      ...(guard ? { guard } : {}),
     });
   }
   return map;
@@ -198,7 +218,10 @@ export function replyContextLine(parts: {
   if (parts.speechState) bits.push(`État de parole : ${parts.speechState}`);
   if (parts.playedState) bits.push(`État joué : ${parts.playedState}`);
   if (parts.gmToCharacter) bits.push(`GM → personnage : ${parts.gmToCharacter}`);
-  if (parts.tts?.emotion) bits.push(`Émotion de jeu : ${parts.tts.emotion}`);
+  if (parts.tts?.emotion) {
+    const level = parts.tts.intensity != null ? ` ${parts.tts.intensity}/2` : "";
+    bits.push(`Émotion de jeu : ${parts.tts.emotion}${level}${parts.tts.guard ? ` (${parts.tts.guard})` : ""}`);
+  }
   if (parts.tts?.speechState) bits.push(`Parole TTS : ${parts.tts.speechState}`);
   if (parts.tts?.model) bits.push(`Voix : ${parts.tts.model}`);
   if (parts.face) bits.push(`Visage : ${parts.face}`);

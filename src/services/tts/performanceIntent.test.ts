@@ -9,6 +9,13 @@ import {
   derivePerformanceIntent,
   intentFromManualEmotion,
   PROVIDER_ACTING_SUPPORT,
+  DEFAULT_OUTBURST_WINDOW,
+  intensityCeiling,
+  outburstWindow,
+  pacingEntryFor,
+  pacingFromHistory,
+  recordPacing,
+  type PacingEntry,
 } from "./performanceIntent";
 
 describe("derivePerformanceIntent", () => {
@@ -202,12 +209,13 @@ describe("temper guard (recette d'Ulrich, 1er novembre 2026)", () => {
   });
 
   it("calms the second flare-up in a row, keeping the played speech state name", () => {
-    const first = derivePerformanceIntent({ text: reply2, characterKey: "max", speechSettings, validSpeechStates: states, rugosite: 3 });
+    const first = derivePerformanceIntent({ text: reply2, characterKey: "max", speechState: "La digue cède",
+      speechSettings, validSpeechStates: states, rugosite: 3 });
     expect(isHeatedIntent(first)).toBe(true);
     const second = derivePerformanceIntent({ text: reply3, characterKey: "max", speechState: "La digue cède",
       validSpeechStates: states, rugosite: 3, speechSettings, previousHeated: isHeatedIntent(first) });
     expect(isHeatedIntent(second)).toBe(false);
-    expect(second).toMatchObject({ emotion: "tense", intensity: 0, delivery: "measured", speedHint: 1, speechState: "La digue cède", tempered: "calmed" });
+    expect(second).toMatchObject({ emotion: "tense", intensity: 1, delivery: "measured", speedHint: 1, speechState: "La digue cède", tempered: "calmed" });
     expect(second.actingNl).not.toMatch(/overflowing|rushed|urgent/i);
   });
 
@@ -216,5 +224,75 @@ describe("temper guard (recette d'Ulrich, 1er novembre 2026)", () => {
       validSpeechStates: states, rugosite: 3, speechSettings, previousHeated: true });
     expect(calm).toMatchObject({ emotion: "fragile", speechState: "Bloqué" });
     expect(calm.tempered).toBeUndefined();
+  });
+});
+
+describe("voice pacing (emotions lot 1, 27 novembre 2026)", () => {
+  const map = {
+    "La digue cède": { delivery: "rushed", emotion: "urgent", instruction: "Fast, overflowing remorse", pauses: "short", speed: 1.12 },
+    "Bloqué": { delivery: "measured", emotion: "fragile", instruction: "Broken, hesitant speech", pauses: "long", speed: 0.9 },
+  };
+  const speechSettings = { enabled: true, version: "v", gradiumTagsEnabled: false, byCharacter: { max: map, emma: map } } as never;
+  const states = Object.keys(map);
+  const say = (state: string, history: PacingEntry[], turnId: string, characterKey = "max") => {
+    const intent = derivePerformanceIntent({ text: "Je ne sais plus.", characterKey, speechState: state, validSpeechStates: states,
+      rugosite: 3, speechSettings, pacing: pacingFromHistory(history, turnId) });
+    return { intent, history: recordPacing(history, pacingEntryFor(turnId, intent)) };
+  };
+
+  it("climbs one step per reply instead of jumping from calm to a shout", () => {
+    const first = say("La digue cède", [], "t1");
+    expect(first.intent).toMatchObject({ intensity: 1, paced: { from: 2, reason: "ramp" } });
+    expect(first.intent.outburst).toBeUndefined();
+    expect(first.intent.speedHint).toBeLessThan(1.12);
+  });
+
+  it("allows at most one flare-up per outburst window (default 6 replies)", () => {
+    let history: PacingEntry[] = [];
+    const heated: boolean[] = [];
+    for (let turn = 1; turn <= 12; turn++) {
+      const step = say("La digue cède", history, `t${turn}`);
+      history = step.history;
+      heated.push(isHeatedIntent(step.intent));
+    }
+    expect(heated.filter(Boolean)).toHaveLength(2);
+    expect(heated.indexOf(true, 1) - heated.indexOf(true)).toBeGreaterThanOrEqual(DEFAULT_OUTBURST_WINDOW);
+  });
+
+  it("caps Max at intensity 1 except for an earned outburst", () => {
+    let history = say("Bloqué", [], "t1").history; // intensity ≤ 1
+    const blocked = say("Bloqué", history, "t2");
+    expect(blocked.intent).toMatchObject({ intensity: 1, paced: { from: 2, reason: "ceiling" } });
+    history = blocked.history;
+    const outburst = say("La digue cède", history, "t3");
+    expect(outburst.intent).toMatchObject({ intensity: 2, outburst: true });
+    expect(intensityCeiling(undefined, "emma")).toBe(2);
+    expect(intensityCeiling({ pacing: { intensityCeiling: { max: 2 } } } as never, "max")).toBe(2);
+    expect(outburstWindow({ pacing: { outburstWindow: 3 } } as never)).toBe(3);
+  });
+
+  it("does not count a reply re-derived in the same turn", () => {
+    const once = say("La digue cède", [], "t1");
+    const again = say("La digue cède", once.history, "t1");
+    expect(again.intent.tempered).toBeUndefined();
+    expect(again.history).toHaveLength(1);
+  });
+
+  it("sends the ElevenLabs tag once per reply and keeps heat below a scream", () => {
+    const intent = { emotion: "urgent", intensity: 2, source: "speech_state", actingNl: "x", speedHint: 1.12 } as const;
+    const base = { style: 0.38, stability: 0.38, speed: 1, modelId: "eleven_v4_turbo" };
+    const first = applyElevenLabsPerformance(base, "Je ne sais plus.", intent);
+    const later = applyElevenLabsPerformance(base, "Je ne sais plus.", { ...intent, continuation: true });
+    expect(first.text.startsWith("[urgent]")).toBe(true);
+    expect(later.text).toBe("Je ne sais plus.");
+    expect(first.style).toBeLessThanOrEqual(0.5);
+    expect(first.stability).toBeGreaterThanOrEqual(0.3);
+  });
+
+  it("no longer reads ordinary words as urgent or accusatory", () => {
+    const now = derivePerformanceIntent({ text: "Et maintenant je ne sais plus.", characterKey: "emma" });
+    expect(now.emotion).not.toBe("urgent");
+    const procedure = derivePerformanceIntent({ text: "Je ne sais pas.", characterKey: "emma", previousEmotionalState: "procédure en cours" });
+    expect(procedure.emotion).not.toBe("accusatory");
   });
 });

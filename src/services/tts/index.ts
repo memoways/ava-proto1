@@ -18,6 +18,7 @@ import type {
   TTSStreamPlaybackHandle,
 } from "@/services/tts/types";
 import { recordAudioLatency } from "@/services/latencyTelemetry";
+import { performanceLogFields } from "@/services/tts/performanceIntent";
 import { playAudioBlobRobust, type PlaybackResult } from "@/services/audioPlayback";
 import { getOpeningTTSBlob, openingTTSCacheKey } from '../openingTTSCache';
 import { getActiveEnvironment } from '../environmentContext';
@@ -171,11 +172,7 @@ async function generateUncachedSpeech(provider: TTSProvider, text: string, opts?
         retry_count: retryCount,
         stitched_previous: !!opts?.previousText,
         stitched_next: !!opts?.nextText,
-        performance_emotion: opts?.performance?.emotion ?? null,
-        performance_intensity: opts?.performance?.intensity ?? null,
-        performance_source: opts?.performance?.source ?? null,
-        performance_speech_state: opts?.performance?.speechState ?? null,
-        performance_mapping_version: opts?.performance?.mappingVersion ?? null,
+        ...performanceLogFields(opts?.performance),
       },
     });
     return blob;
@@ -245,10 +242,7 @@ export function tryCreateStreamingPlayback(text: string, opts?: TTSOptions): TTS
           error_type: "ok",
           transport: stats.transport,
           fallback_reason: stats.fallbackReason ?? null,
-          performance_emotion: opts?.performance?.emotion ?? null,
-          performance_source: opts?.performance?.source ?? null,
-          performance_speech_state: opts?.performance?.speechState ?? null,
-          performance_mapping_version: opts?.performance?.mappingVersion ?? null,
+          ...performanceLogFields(opts?.performance),
           buffer_preset: stats.bufferPreset ?? null,
           buffer_prebuffer_ms: stats.prebufferMs ?? null,
           buffer_rebuffer_ms: stats.rebufferMs ?? null,

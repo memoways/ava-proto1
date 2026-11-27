@@ -1,5 +1,7 @@
 # Prompt de reprise — Émotions de Max : graduer au lieu d'exploser, lot 1 (diagnostic)
 
+> **Remplacé le 27 novembre 2026** par le [plan de cohérence émotionnelle](plan_coherence_emotionnelle_gm.md) (lot 1 livré : garde-fous voix et mesure). Reprendre au [lot 2](prompt_reprise_coherence_emotionnelle_lot_2.md).
+
 À copier dans un nouveau chat Ava, **une fois le chantier latence terminé** (lots 4 et 5, bilan) sauf demande contraire d'Ulrich. Tâche Notion : [5 développements Game Master AVA](https://app.notion.com/p/fd65f37db8bc473e92189da38527894c) (Gamilab, section « États dynamiques — M04 », où des ruptures émotionnelles étaient déjà perçues le 20 novembre).
 
 ---

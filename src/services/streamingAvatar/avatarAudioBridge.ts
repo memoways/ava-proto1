@@ -397,7 +397,8 @@ async function synthesizeLine(
     providerId,
     characterOverride: context?.providerId != null,
     characterKey: context?.characterKey,
-    performance: context?.performance,
+    // Later line of the same reply: same acting, no repeated ElevenLabs audio tag.
+    performance: index > 0 && context?.performance ? { ...context.performance, continuation: true } : context?.performance,
     cacheOpening: context?.cacheOpening,
     onVoiceObservation: context?.onVoiceObservation,
     onServiceObserved: context?.onServiceObserved,

@@ -38,6 +38,21 @@ describe("TTSQueue drain status", () => {
     });
   });
 
+  it("marks later sentences of a reply as continuations so the audio tag is not repeated", async () => {
+    vi.mocked(generateSpeech).mockResolvedValue(new Blob(["audio"], { type: "audio/mpeg" }));
+    vi.mocked(playAudioBlob).mockResolvedValue({ status: "played", playbackStartMs: 0, playbackTotalMs: 0 });
+    const queue = new TTSQueue();
+    const performance = { emotion: "urgent", intensity: 1, source: "speech_state", actingNl: "x" } as const;
+
+    queue.enqueue("Première phrase.", { performance });
+    queue.enqueue("Deuxième phrase.", { performance });
+    await queue.drain();
+
+    const calls = vi.mocked(generateSpeech).mock.calls;
+    expect(calls[0][1]?.performance?.continuation).toBeUndefined();
+    expect(calls[1][1]?.performance?.continuation).toBe(true);
+  });
+
   it("reports failure instead of hiding playback errors", async () => {
     vi.mocked(generateSpeech).mockResolvedValue(new Blob(["audio"], { type: "audio/mpeg" }));
     vi.mocked(playAudioBlob).mockRejectedValue(new Error("Audio playback failed"));
