@@ -127,7 +127,20 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - `llm_usage` : colonnes additives `latency_ms` (premier token en flux, appel entier en lot) et `cached_tokens` (`prompt_tokens_details.cached_tokens`). `metadata_json` ajoute `latency_kind`, `duration_ms`, `effective_provider` (fournisseur qui a servi) et `provider_preference`. Tant que la migration n'est pas appliquée, la ligne est écrite sans ces colonnes (aucune perte de suivi).
 - Mémoire `optimized_v3` : si le dernier échange dépasse seul 1 200 car., il est gardé, chaque message coupé en proportion (terminé par « … »), au lieu d'aucun historique. Le reste du prompt est inchangé.
 - Tests : `conversationMemory.test.ts` (+4), `llmUsageLatency.test.ts` (5), `characterProviderSetting.test.ts` (3), `maxAgent.identity.test.ts` (+3).
-- Reste : appliquer la migration via Lovable, activer le réglage sur `sandbox-ulrich`, puis au moins 20 tours (voix seule, puis Tavus), relecture `voice_turn_events` et `llm_usage`, `eval:judge` avec `luna-latency` et `eval:llm-recall` après le correctif mémoire (runs payants lancés par Ulrich), écoute d'Ulrich.
+- Fait le 27 nov. : migration appliquée par Lovable (`2f59b2f5`), réglage activé sur `sandbox-ulrich` seulement.
+- **Mesure réelle (27 nov., `sandbox-ulrich`, 24 tours complétés : 16 voix seule, 4 Tavus, 4 Anam ; médianes depuis le transcript final, `voice_turn_events`)** :
+
+  | Sortie | LLM avant → après | Réponse prête avant → après | Premier son avant → après |
+  |---|---|---|---|
+  | Voix seule | 1,97 → **1,23 s** | 3,32 → 2,47 s | 5,25 → **2,88 s** (p90 5,95 → 3,64) |
+  | Tavus | 2,02 → **1,30 s** | 3,70 → 2,52 s | 4,17 → **3,19 s** |
+  | Anam | 2,04 → **1,20 s** | 3,67 → 2,47 s | 4,17 → **3,01 s** |
+
+  « Avant » = les 7 jours précédents sur `sandbox-ulrich` (45 tours voix, 34 Tavus, 4 Anam). Le gain du LLM (≈ − 0,75 s) vient du routage ; celui du premier son en voix seule cumule les lots 1, 1 bis et 3. Petits échantillons Tavus et Anam (4 tours chacun).
+- `llm_usage` (appel du personnage, 26 appels) : servi par **Amazon Bedrock** à chaque fois ; en lot (voix seule), appel entier médian 1,18 s (p90 1,46) ; en flux (Tavus), premier token 0,74 s, fin 0,94 s. 0 token en cache sur les prompts du personnage (≈ 5,2 k tokens) ; le Game Master, lui, en reçoit (Google AI Studio). 3 appels annulés par une coupure du tour, attendus.
+- Écoute d'Ulrich : plus rapide, plus réactif, aucun artefact entendu. **Constat hors latence** : Max s'emporte un tour sur deux ou trois (colère, cris), sans gradation d'un tour à l'autre. Chantier séparé : [reprise émotions de Max](prompt_reprise_emotions_max_gradation_lot_1.md).
+- Reste, facultatif et payant (lancé par Ulrich) : `eval:judge` avec `luna-latency` et `eval:llm-recall` pour mesurer l'effet du correctif mémoire. Ils ne bloquent pas le lot 4.
+- **Statut : lot 3 terminé.**
 
 ### Lot 4 — LLM streamé sur toutes les sorties
 

@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 3 : mesure réelle] — 2026-11-27
+
+- Documentation seulement : 24 tours sur `sandbox-ulrich` avec le routage `sort: latency`. Appel du personnage 1,97 → 1,23 s en médiane ; premier son voix seule 5,25 → 2,88 s. Constat sur les emportements de Max consigné, avec un prompt de reprise pour ce chantier.
+
 ## [Latence lot 3 : routage rapide du personnage, latence dans llm_usage, mémoire] — 2026-11-27
 
 - Réglage admin `LLM_CHARACTER_PROVIDER` (interrupteur dans Réglages › LLM) : envoie `provider.sort: "latency"` à `proxy-llm` pour l'appel du personnage. Défaut vide, payload inchangé. Une préférence d'évaluation reste prioritaire.
