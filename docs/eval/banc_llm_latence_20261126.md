@@ -1,7 +1,7 @@
 # Banc LLM latence — 26 novembre 2026 (lot 2, mesure seule)
 
 Plan : [plan_latence_conversationnelle_llm_tts.md](../plan_latence_conversationnelle_llm_tts.md), section « Lot 2 ».
-Statut : **lot 2 terminé (26-27 novembre) : banc, qualité et rappel mesurés. Recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` (− 0,43 s sur la première phrase, qualité identique). Décision d'Ulrich attendue pour le lot 3.** Aucun réglage d'Ava modifié, rien en production.
+Statut : **lot 2 terminé (26-27 novembre) : banc, qualité et rappel mesurés. Recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` (− 0,43 s sur la première phrase, qualité identique). **Décision d'Ulrich (27 novembre) : oui au routage, à appliquer au lot 3.** Aucun réglage d'Ava modifié, rien en production.
 
 ## Ce qui est livré
 
