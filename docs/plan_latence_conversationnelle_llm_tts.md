@@ -240,6 +240,29 @@ Session `8cd27ab0` (`sandbox-ulrich`, voix seule, mains libres, 19:12–19:16 UT
 
 Suite : [lot 1 ter](prompt_reprise_attente_passage_lot_1_ter.md).
 
+### Attente de passage, lot 1 ter : réplique interrompue (27 novembre, code)
+
+**Décision d'Ulrich** : aucune sortie `feed` (voix seule, Tavus, Anam) ne fournit un préfixe entendu fiable (voix seule : compte de morceaux sans texte, morceau coupé possible dans le compte ; Tavus et Anam : segments envoyés, pas entendus). Une réplique coupée n'a donc **aucun post-tour**, comme la voix lue en bloc.
+
+- `streamedOutputSink.ts` : `delivery` ne se résout plus à la fin de la génération mais sur `confirmHeard(reçu.delivered)` ; l'interruption du tour avant confirmation, ou un reçu sans rien d'entendu, la rejette. Même contrat que la voix progressive Gradium (texte entendu).
+- `IndexPRD4.tsx` : la sortie reçoit le signal du tour et la confirmation après le reçu.
+- Même contrat pour le résumé de session : en `feed`, il attend la fin de la lecture et n'inclut jamais une réplique coupée (avant : texte généré, dès la fin de la génération). L'historique des tours suivants l'écartait déjà.
+
+| Cas | Post-tour |
+|---|---|
+| `feed`, réplique lue en entier, même si le joueur reparle pendant le Game Master | enregistré (survie du lot 1 bis inchangée) |
+| `feed`, réplique coupée, génération finie ou non | aucun : ni journal, ni mémoire, ni confidence, ni passage |
+| `feed`, voix en échec | aucun, comme avant |
+| Voix lue en bloc, Gradium progressif, préparation de passage | inchangés |
+
+Coût accepté : le tour coupé manque au journal et ce que le joueur a dit à ce tour n'est pas analysé (il reste dans l'historique).
+
+Tests : reproduction orchestrateur (rouge avant correction, Game Master et résumé), réplique confirmée créditée, contrat de la sortie. Le câblage dans `IndexPRD4.tsx` n'a pas de test propre ; aucun appel réel essayé.
+
+Restes lus dans le code, non corrigés : la voix lue en bloc (et `held_batch`) résume encore la réplique avant sa lecture ; un préfixe entendu fiable demanderait une instrumentation par sortie.
+
+**Recette d'Ulrich** (`sandbox-ulrich`, voix seule, mains libres, après synchro Lovable) : environ 10 tours avec Max ; laisser finir au moins 4 répliques ; en couper au moins 3 au milieu d'une phrase qui contient une information ; reparler aussitôt après au moins 2 répliques finies ; terminer par une demande Max → Emma. Attendu à l'oreille : Max ne fait jamais référence à ce qu'il n'a pas eu le temps de dire comme à une chose dite. [Mesure](prompt_reprise_attente_passage_mesure_lot_1_ter.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

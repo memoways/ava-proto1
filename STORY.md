@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Attente de passage, mesure du lot 1 bis)  
+> **Last Updated**: 2026-11-27 (Attente de passage lot 1 ter)  
+
+---
+
+## Ce qui est coupé n'a pas été dit (27 novembre 2026)
+
+Quand le joueur coupe Max, le Game Master ne retient plus rien de cette réplique : faute de savoir jusqu'où elle a été entendue, Ulrich préfère perdre ce tour plutôt que de prêter à Max un aveu que personne n'a entendu. Reste à le vérifier sur un vrai appel.
 
 ---
 
