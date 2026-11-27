@@ -33,7 +33,6 @@ interface Props {
   onPTTRelease: () => void;
   /** Mode mains libres : un seul bouton pour ouvrir/couper le micro. */
   handsFree?: boolean;
-  voiceOnly?: boolean;
   handsFreeListening?: boolean;
   onToggleHandsFree?: () => void;
   onHangUp: () => void;

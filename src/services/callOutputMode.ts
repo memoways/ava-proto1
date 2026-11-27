@@ -6,7 +6,8 @@
  * never connects the streaming avatar; it takes the voice-only path already
  * used by Emma, grid calls and fallbacks. Tablet and desktop keep the
  * configured mode. Since 8 November the admin "Services par appareil" can set
- * each device to voice call, live avatar or the global switch.
+ * each device to voice call, live avatar or the global switch; the live avatar
+ * only applies while the global switch is on video.
  */
 import type { DeviceClass } from "./deviceClass";
 import type { DeviceOutputChoice } from "./deviceServices";
@@ -49,9 +50,9 @@ export function resolveCallOutputMode({
   if (choice === "voice") {
     return { mode: "tts", reason: deviceClass === "smartphone" ? "device_smartphone" : "device_settings" };
   }
-  // Decision of 27 November: the global switch on « Voix » cuts the video for everyone, link
-  // or not. Only a device explicitly set to the live avatar keeps its own choice.
-  if (choice !== "avatar" && configuredMode === "tts") return { mode: "tts", reason: "settings" };
+  // Decision of 27 November: the global switch on « Voix » cuts the video for everyone, with or
+  // without a character link, including a device set to the live avatar.
+  if (configuredMode === "tts") return { mode: "tts", reason: "settings" };
   // Video is on: « Pas de vidéo » keeps this character voice-only, a provider opens it.
   if (characterVideo === "none") return { mode: "tts", reason: "character_no_video" };
   if (characterVideo === "provider") return { mode: "streaming_avatar", reason: "character_link" };

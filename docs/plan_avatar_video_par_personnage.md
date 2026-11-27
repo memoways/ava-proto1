@@ -196,7 +196,7 @@ Ajouter une raison distincte (par exemple `character_link`) pour que la session 
 Décision d’Ulrich après une session Tavus ouverte malgré la sortie globale sur « Voix » (lien Tavus de Max posé le matin, invisible à l’écran) :
 
 1. Appareil en « voix » (ou smartphone par défaut) → voix, lien ou pas.
-2. Interrupteur global sur « Voix » → voix pour tous les personnages, lien ou pas (raison `settings`). Seul un appareil réglé explicitement sur « avatar » garde son choix, comme avant.
+2. Interrupteur global sur « Voix » → voix pour tous les personnages, lien ou pas (raison `settings`), y compris sur un appareil réglé sur « avatar » (décision du lot 3, 9.3 quater).
 3. Vidéo active, personnage en « Pas de vidéo (voix seule) » (`characterLinks.<clé> = { provider: "none" }`) → voix, raison `character_no_video`. Gagne aussi sur un appareil « avatar ».
 4. Vidéo active, lien vers un fournisseur → ce fournisseur, champs du lien par-dessus la config globale (raison `character_link`).
 5. Vidéo active, « Suivre le réglage global » (pas d’entrée) → Max suit l’appareil et le global ; les autres personnages restent en voix (`character_voice_only`).
@@ -216,6 +216,11 @@ Recette du lot 1 : appel vérifié par Ulrich (global sur « Voix », Max lié �
 | Latences PostHog | « Canary interne » renommé « Contrôle interne ». |
 
 Deux décisions restent à Ulrich : l’appareil réglé sur « avatar » face au global « Voix » (inchangé) ; `VOICE_ONLY_UI` (inchangé).
+
+### 9.3 quater Les deux arbitrages d’Ulrich (lot 3, 27 novembre)
+
+1. **Le global « Voix » coupe tout**, appareil réglé sur « avatar » compris. Ce réglage d’appareil n’ouvre la vidéo que si le global est sur « Avatar vidéo » ; il sert alors à l’ouvrir sur un smartphone (Max sans lien) et à fixer le fournisseur. Libellés d’Avatar vidéo et d’Appareils mis à jour.
+2. **`VOICE_ONLY_UI` retiré, réplique de secours toujours active** : préparée à chaque appel, jouée si la sortie vocale échoue. La clé déjà enregistrée reste en base sans effet (aucune réécriture automatique). `voicePreset.voiceOnly` n’est plus écrit ni lu ; une mémoire de session qui le porte se relit sans lui.
 
 ### 9.4 Tests à ajouter à la liste du §4
 

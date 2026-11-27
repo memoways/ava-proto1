@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages lot 3 : le global « Voix » coupe tout, réplique de secours toujours active] — 2026-11-27
+
+- Routage d'appel : l'interrupteur global sur « Voix » donne un appel en voix aussi sur un appareil réglé sur « avatar ». Libellés d'Avatar vidéo et d'Appareils mis à jour.
+- `VOICE_ONLY_UI` (sans écran) retiré : la réplique de secours est préparée à chaque appel et jouée si la voix échoue. `voicePreset.voiceOnly` n'est plus écrit.
+- Aucune migration, aucune valeur enregistrée réécrite.
+
 ## [Réglages lot 2 : tri des réglages de test sur RAG et Cinématiques] — 2026-11-27
 
 - RAG : « Variante du prompt Max » et le profil d'embedding à l'essai passent dans « Réglages de test (temporaires) », fermé par défaut ; libellés « canary » et « Live actuel » (devenu faux) retirés.

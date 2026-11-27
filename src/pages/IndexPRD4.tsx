@@ -317,7 +317,6 @@ const IndexPRD4 = () => {
   const discardedPrefixRef = useRef("");
   const confirmedTextRef = useRef("");
   const activeVoiceTelemetryRef = useRef<ReturnType<typeof createVoiceTurnV2> | null>(null);
-  const [voiceOnly, setVoiceOnly] = useState(false);
   // From the frozen device class: smartphones get the voice call screen, unless
   // "Services par appareil" connects the live avatar (set when the call starts).
   const [conversationLayout, setConversationLayout] = useState(() => conversationLayoutFor(getDeviceClass()));
@@ -325,7 +324,6 @@ const IndexPRD4 = () => {
   const rescueRef = useRef(new Map<RuntimeCharacter, { text: string; blob: Blob }>());
   const lastRescueRef = useRef(new Map<RuntimeCharacter, string>());
   const rescuePendingRef = useRef(new Set<RuntimeCharacter>());
-  const voiceOnlyRef = useRef(voiceOnly); voiceOnlyRef.current = voiceOnly;
   const preloadRescueRef = useRef<(character: RuntimeCharacter, voiceId?: string, providerId?: TTSProviderId) => void>(() => {});
   const handsFreeNeedsRearmRef = useRef(false);
   const handoffMicResumeRef = useRef(false);
@@ -338,7 +336,7 @@ const IndexPRD4 = () => {
   const scheduleMicRecoveryRef = useRef<(reason: string) => boolean>(() => false);
   const rescueLifetimeRef = useRef(new AbortController());
   preloadRescueRef.current = (character, voiceId, providerId) => {
-    if (!voiceOnlyRef.current || endedRef.current || rescueRef.current.has(character) || rescuePendingRef.current.has(character)) return;
+    if (endedRef.current || rescueRef.current.has(character) || rescuePendingRef.current.has(character)) return;
     if (rescueLifetimeRef.current.signal.aborted) rescueLifetimeRef.current = new AbortController();
     const lifetime = rescueLifetimeRef.current;
     rescuePendingRef.current.add(character);
@@ -979,7 +977,6 @@ const IndexPRD4 = () => {
     incrementalOutputEnabledRef.current = pinnedGameplay.VOICE_INCREMENTAL_OUTPUT === true;
     handsFreeSettingsRef.current = normalizeHandsFreeSettings(pinnedGameplay.VOICE_HANDS_FREE);
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
-    setVoiceOnly(pinnedGameplay.VOICE_ONLY_UI === true);
     const technicalExpiry = Date.now() + TECHNICAL_RESUME_SECONDS * 1000;
     // Settings pinned at call start; the voices are described once the profiles arrive.
     const recordStartedAt = new Date();
@@ -1173,7 +1170,6 @@ const IndexPRD4 = () => {
     const preset = session.conversation_memory.voicePreset;
     handsFreeSettingsRef.current = normalizeHandsFreeSettings(preset?.handsFree ?? { ...getGameplaySettings().VOICE_HANDS_FREE, interruptionStrategy: "text" });
     setHandsFreeEnabled(handsFreeSettingsRef.current.enabled);
-    setVoiceOnly(preset?.voiceOnly === true);
     cleanupAudio();
     const now = Date.now();
     const cycleTime = callTime(session.conversation_log, now);
@@ -2696,7 +2692,7 @@ const IndexPRD4 = () => {
           : outputResult.status === "failed" ? "failed" : outputResult.status === "cancelled" ? "cancelled"
           : outputResult.started ? "completed" : "no_audio");
         if (!isCurrentTurn()) return;
-        if (outputResult.status === "failed" && voiceOnly && rescueRef.current.has(turnCharacter)) {
+        if (outputResult.status === "failed" && rescueRef.current.has(turnCharacter)) {
           const rescue = rescueRef.current.get(turnCharacter)!;
           rescueRef.current.delete(turnCharacter);
           lastRescueRef.current.set(turnCharacter, rescue.text);
@@ -2978,7 +2974,6 @@ const IndexPRD4 = () => {
       finalizeAndEnd,
       setCurrentHandoffOffer,
       latencyOverlayEnabled,
-      voiceOnly,
       setAudioState,
       setLastUserLabels,
       startLatencySegment,
@@ -4225,7 +4220,6 @@ const IndexPRD4 = () => {
               layout={conversationLayout}
               touchFirst={touchFirst}
               handsFree={handsFreeEnabled}
-              voiceOnly={voiceOnly}
               handsFreeListening={handsFreeListening}
               onToggleHandsFree={() => { micRecoveryRef.current.reset(); micGaveUpRef.current = false; void handleToggleHandsFree(); }}
               onHangUp={handleHangUp}

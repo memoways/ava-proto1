@@ -167,7 +167,6 @@ async function installNetworkFakes(
     localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4,
       ...(incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
       ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
-      ...(p2 ? { VOICE_ONLY_UI: true } : {}),
       ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
       ...(conversational ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
     }));
@@ -503,7 +502,6 @@ async function installNetworkFakes(
         ava_gameplay_settings: { TIMEOUT_SECONDS: 930,
           ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
           ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(options.p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
-          ...(options.p2 ? { VOICE_ONLY_UI: true } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
           ...(options.conversationalQuestionnaire ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
         },
