@@ -226,6 +226,20 @@ Limites : une réplique lue en bloc puis interrompue n'a rien de confirmé et re
 
 Tests : reproduction `postTurnSurvival.test.ts` (rouge avant correction), orchestrateur (tour dépassé entendu ou non), ordre du journal sur la vraie fonction SQL. Mesure sur appel réel : [lot de mesure](prompt_reprise_attente_passage_mesure_lot_1_bis.md).
 
+### Attente de passage, lot 1 bis : mesure (27 novembre, aucun code)
+
+Session `8cd27ab0` (`sandbox-ulrich`, voix seule, mains libres, 19:12–19:16 UTC, après synchro Lovable de la PR #309). Voix `feed` (`output_stream`), `llm_transport: sse`. Lecture seule : `sessions`, `voice_turn_events`, `experience_events`. Une session, 12 tours : recette un peu courte (9 tours nomment Emma sans demande formelle, dont 2 parlent de lui parler, au lieu de 10 simples noms).
+
+- **Survie du post-tour : confirmée.** Tours 1 à 11 présents une fois chacun, dans l'ordre, tous `executed`, sans `parent_aborted` ; `memory_last_turn` = 11 ; spans `gm_*` tous `ok`. Dans 4 cas (tours 1, 5, 6 et 7), le tour suivant a démarré pendant le Game Master : tous enregistrés. La tentative du tour 8 jamais entendue est absente, et le tour 8 n'a qu'une entrée. Tour 12 absent : raccroché pendant la réplique, attendu.
+- **Attente** : `pre_turn_handoff_prior_write` = 0 sur toutes les tentatives sauf une (1,57 s) après « parler avec Emma » au tour 7, cas bloquant voulu.
+- **Rien de périmé appliqué** : aucun conseil ni état de parole d'un ancien tour injecté, aucune cinématique d'un ancien tour jouée.
+- **Passages** : `late_after_next_turn` = 0 (aucun passage accordé sur un simple nom, donc le compteur n'a pas été éprouvé). Demande Max → Emma : `handoff_prepared`, `handoff_validated`, `handoff_accepted`, `handoff_executed`.
+- **Défaut : réplique interrompue évaluée en entier** (tours 7 et 9). Reçus `cancelled`, `delivered` vide, mais le post-tour est enregistré et sa mémoire reprend la fin des répliques ; confidence `sourceTurn: 9` « il l'a déjà blessée ainsi », tirée de la dernière phrase, probablement non entendue (coupure à 12,9 s de lecture). Cause lue dans le code : en voix `feed`, `streamControl.delivery` est le texte **généré** complet (`streamedOutputSink.ts`, résolu à `complete`) ; à l'interruption, l'écouteur `abort` d'`IndexPRD4.tsx` résout `handoffDelivery` avant tout reçu (`undefined`), et `runPostTurn` (`prd4Orchestrator.ts`) retombe sur ce texte. Antérieur au lot 1 bis quand le Game Master finissait avant le tour suivant ; le lot 1 bis le rend systématique. La mesure attendue « partie entendue évaluée » ne vaut que pour la voix progressive Gradium (lu dans le code, non mesuré ici).
+- **À savoir** : 6 répliques sur les 11 suivantes (tours 2, 6 à 10) sont parties sans conseil du Game Master. Tours 2, 6 et 7 : tour suivant parti avant sa réponse ; tour 9 : léger chevauchement ; tours 8 et 10 : la réplique précédente avait été interrompue, et le conseil, pourtant arrivé avant, est écarté (`isCurrentTurn`). Conforme au code, non corrigé ici.
+- **Hors lot** : après une tentative abandonnée, la télémétrie voix numérote le tour 8 en 9 (`turn_id` en double) ; tours 3 et 4, préparation de passage refusée (`assessment_missing`), la réplique du tour 3 étant remplacée par une question d'attente.
+
+Suite : [lot 1 ter](prompt_reprise_attente_passage_lot_1_ter.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

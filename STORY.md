@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Attente de passage, lot 1 bis)  
+> **Last Updated**: 2026-11-27 (Attente de passage, mesure du lot 1 bis)  
+
+---
+
+## Il n'oublie plus, mais il entend trop (27 novembre 2026)
+
+Sur un vrai appel, le Game Master a gardé les onze tours, même quand le joueur reparlait aussitôt. Mais quand Max est coupé, il note la réplique entière : Max peut croire avoir avoué ce que personne n'a entendu. Prochaine correction.
 
 ---
 
