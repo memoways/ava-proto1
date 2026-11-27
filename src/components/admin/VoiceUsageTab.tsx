@@ -18,6 +18,7 @@ import ServicePlanBoard, { type MeasuredPlans } from "@/components/admin/Service
 import UsageRangeBar, { VOICE_VIDEO_RANGES } from "@/components/admin/UsageRangeBar";
 import { emptyPlan, formatUsd, periodCostReading, requestedDays, serviceById } from "@/services/servicePlans";
 import type { Json } from "@/integrations/supabase/types";
+import { readAllPages } from "@/services/readAllPages";
 
 interface AudioRow {
   id: string;
@@ -57,16 +58,24 @@ export default function VoiceUsageTab() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    let query = supabase
-      .from("audio_latencies" as never)
-      .select("*")
-      .eq("direction", "out")
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    if (!includeSandbox) query = query.neq("context_type", "sandbox");
-    const { data, error } = await query;
-    if (error) toast.error("Erreur chargement consommation voix: " + error.message);
-    else setRows((data as unknown as AudioRow[]) || []);
+    try {
+      const { rows: loaded } = await readAllPages<AudioRow>(async (from, to) => {
+        let query = supabase
+          .from("audio_latencies" as never)
+          .select("*")
+          .eq("direction", "out")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to);
+        if (!includeSandbox) query = query.neq("context_type", "sandbox");
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+        return (data as unknown as AudioRow[]) ?? [];
+      });
+      setRows(loaded);
+    } catch (cause) {
+      toast.error("Erreur chargement consommation voix: " + (cause instanceof Error ? cause.message : String(cause)));
+    }
     setLoading(false);
   }, [includeSandbox]);
 
@@ -86,23 +95,28 @@ export default function VoiceUsageTab() {
   );
 
   const loadPlanUsage = useCallback(async (fromIso: string) => {
-    const { data, error } = await supabase
-      .from("audio_latencies" as never)
-      .select("created_at, tts_text_len, metadata_json")
-      .eq("direction", "out")
-      .gte("created_at", fromIso)
-      .limit(5000);
-    if (error) throw new Error(error.message);
-    const list = (data as unknown as { created_at: string; tts_text_len: number | null; metadata_json: Json | null }[]) ?? [];
+    const { rows: list, capped } = await readAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("audio_latencies" as never)
+        .select("created_at, tts_text_len, metadata_json")
+        .eq("direction", "out")
+        .gte("created_at", fromIso)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+      if (error) throw new Error(error.message);
+      return (data as unknown as { created_at: string; tts_text_len: number | null; metadata_json: Json | null }[]) ?? [];
+    });
     return {
-      capped: list.length >= 5000,
+      capped,
       events: list.flatMap((row) => {
         const meta = row.metadata_json;
         if (!meta || typeof meta !== "object" || Array.isArray(meta)) return [];
-        const record = meta as { provider?: unknown; error_type?: unknown };
+        const record = meta as { provider?: unknown; error_type?: unknown; model?: unknown };
         if (typeof record.provider !== "string") return [];
         if (typeof record.error_type === "string" && record.error_type !== "ok") return [];
-        return [{ serviceId: record.provider, at: row.created_at, amount: row.tts_text_len ?? 0 }];
+        const model = typeof record.model === "string" ? record.model : null;
+        return [{ serviceId: record.provider, at: row.created_at, amount: row.tts_text_len ?? 0, model }];
       }),
     };
   }, []);
@@ -130,7 +144,15 @@ export default function VoiceUsageTab() {
       const service = serviceById(p.id);
       const visible = serviceId === "all" || serviceId === p.id;
       const reading = service && plans && visible
-        ? periodCostReading(service, plans.plans[p.id] ?? emptyPlan(), plans.events, charsSuccess, now, requestedDays(period), plans.capped)
+        ? periodCostReading(
+          service,
+          plans.plans[p.id] ?? emptyPlan(),
+          plans.events,
+          success.map((r) => ({ amount: r.tts_text_len ?? 0, model: r.metadata_json?.model })),
+          now,
+          requestedDays(period),
+          plans.capped,
+        )
         : null;
       const lastError = errors[0];
       return {

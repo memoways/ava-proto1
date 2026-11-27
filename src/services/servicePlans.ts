@@ -7,6 +7,9 @@
  *
  * A minute inside the allowance costs nothing more. Only units past the
  * allowance are multiplied by the overage rate, then added to the fixed fee.
+ *
+ * Yearly billing keeps a monthly allowance: the quota window moves every month
+ * from the start day, while the renewal date stays yearly.
  */
 
 export const PLAN_CATALOG_CHECKED_ON = "2026-11-22";
@@ -30,6 +33,14 @@ export interface PublicTier {
   detail: string;
 }
 
+/** Credits one character costs, shared by models priced alike. */
+export interface ModelFamily {
+  id: string;
+  label: string;
+  creditsPerChar: number;
+  models: readonly string[];
+}
+
 export interface ServiceDefinition {
   id: string;
   family: PlanFamily;
@@ -40,6 +51,10 @@ export interface ServiceDefinition {
   charsPerMinute: number | null;
   /** HeyGen bills credits per streamed minute (FULL = 2, LITE = 1). */
   creditsPerMinute: number | null;
+  /** Character credits that depend on the model. Empty: one character, one unit. */
+  modelFamilies?: readonly ModelFamily[];
+  /** What the measured figures leave out. Shown with them. */
+  countingNote?: string;
   measured: boolean;
   unmeasuredReason: string | null;
   sourceNote: string;
@@ -52,7 +67,13 @@ export interface SavedServicePlan {
   cadence: BillingCadence;
   funding: PlanFunding;
   account: PlanAccount;
+  /** Monthly fee. On a yearly plan, only used while no yearly amount is typed. */
   monthlyFeeUsd: number | null;
+  /** Yearly plan: amount paid for the first year, discount included. */
+  firstYearFeeUsd: number | null;
+  /** Yearly plan: amount of each renewal. */
+  renewalFeeUsd: number | null;
+  /** Monthly allowance, whatever the billing cadence. */
   included: number | null;
   overagePerUnitUsd: number | null;
   /** Next renewal the admin typed, `YYYY-MM-DD`. */
@@ -74,6 +95,18 @@ export interface UsageEvent {
   serviceId: string;
   at: string;
   amount: number;
+  /** Voice model, when the log has one. */
+  model?: string | null;
+}
+
+/** One measured call: its raw amount and, for voice, its model. */
+export type UsageAmount = Pick<UsageEvent, "amount" | "model">;
+
+/** What is left of a monthly allowance if it were spent on one model family. */
+export interface FamilyCapacity {
+  label: string;
+  includedMinutes: number | null;
+  remainingMinutes: number | null;
 }
 
 export interface BillingWindow {
@@ -109,6 +142,9 @@ export interface PlanSnapshot {
   included: number | null;
   includedMinutes: number | null;
   remaining: number | null;
+  capacity: FamilyCapacity[];
+  /** Characters whose model is missing or unknown, counted at the highest rate. */
+  unknownModelChars: number;
   overageUnits: number | null;
   overageMinutes: number | null;
   fixedUsd: number | null;
@@ -128,6 +164,27 @@ export interface PlanSnapshot {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Deduced from the public API grid read on 2026-11-27: the Creator allowance of
+ * 121,000 credits covers about 550,000 characters (low family) or 275,000
+ * (high family). A 30-day account reading gave 0.21 credit per character.
+ * The pricing FAQ states 0.5 and 1 instead, which that reading contradicts.
+ */
+const ELEVENLABS_FAMILIES: readonly ModelFamily[] = [
+  {
+    id: "fast",
+    label: "v4 Turbo, Flash, v3 Conversational",
+    creditsPerChar: 0.22,
+    models: ["eleven_v4_turbo", "eleven_v3_conversational", "eleven_flash_v2_5", "eleven_flash_v2", "eleven_turbo_v2_5", "eleven_turbo_v2"],
+  },
+  {
+    id: "full",
+    label: "v4, v3, Multilingual v2",
+    creditsPerChar: 0.44,
+    models: ["eleven_v4", "eleven_v3", "eleven_multilingual_v2"],
+  },
+];
+
 /** Gradium bills extra credits at the plan rate plus this surcharge. */
 function creditOverage(monthlyUsd: number, credits: number, surcharge: number): number {
   return (monthlyUsd / credits) * (1 + surcharge);
@@ -140,13 +197,15 @@ export const SERVICE_CATALOG: readonly ServiceDefinition[] = [
     label: "ElevenLabs",
     unit: "credits",
     unitLabel: "crédits",
-    charsPerMinute: 750,
+    charsPerMinute: 1000,
     creditsPerMinute: null,
+    modelFamilies: ELEVENLABS_FAMILIES,
+    countingNote: "Seuls les appels journalisés par Ava sont comptés, pas les autres usages du compte. Le report de crédits n'est pas calculé. Crédits et minutes sont des estimations.",
     measured: true,
     unmeasuredReason: null,
-    sourceUrl: "https://elevenlabs.io/pricing",
+    sourceUrl: "https://elevenlabs.io/pricing/api",
     sourceNote:
-      "Forfaits mensuels lus le 22 novembre 2026. 1 caractère Multilingual v2 = 1 crédit. Les modèles Flash/Turbo peuvent coûter 0,5 crédit : Ava compte 1. Le report de crédits (jusqu'à 2 mois) n'est pas dans ce calcul. Le prix du crédit supplémentaire n'était pas sur la page : à saisir.",
+      "Tarifs lus le 27 novembre 2026. Par caractère : 0,22 crédit (v4 Turbo, Flash, v3 Conversational), 0,44 (v4, v3, Multilingual v2), valeurs déduites des minutes incluses ; un modèle absent compte 0,44. La FAQ annonce 0,5 et 1 : le relevé du compte (0,21) ne le confirme pas. Environ 1 000 caractères par minute. Le prix du crédit supplémentaire est à saisir.",
     tiers: [
       { id: "free", label: "Free", monthlyFeeUsd: 0, yearlyMonthlyFeeUsd: null, included: 10_000, overagePerUnitUsd: null, detail: "10 000 crédits" },
       { id: "starter", label: "Starter", monthlyFeeUsd: 6, yearlyMonthlyFeeUsd: 5, included: 30_000, overagePerUnitUsd: null, detail: "30 000 crédits" },
@@ -358,6 +417,8 @@ export function emptyPlan(): SavedServicePlan {
     funding: "subscription",
     account: "active",
     monthlyFeeUsd: null,
+    firstYearFeeUsd: null,
+    renewalFeeUsd: null,
     included: null,
     overagePerUnitUsd: null,
     renewsOn: null,
@@ -428,6 +489,37 @@ export function billingWindow(renewsOn: string | null, cadence: BillingCadence, 
   return calendar();
 }
 
+/**
+ * Window the allowance is compared with. A monthly plan ends on its renewal.
+ * A yearly plan keeps a monthly allowance, anchored on its start day (else on
+ * the renewal day): a 31st start falls back to the end of shorter months.
+ */
+export function quotaWindow(plan: Pick<SavedServicePlan, "cadence" | "startedOn" | "renewsOn">, now: Date): BillingWindow {
+  if (plan.cadence !== "yearly") return billingWindow(plan.renewsOn, "monthly", now);
+  const anchor = (plan.startedOn && dayStamp(plan.startedOn) ? plan.startedOn : null) ?? plan.renewsOn;
+  return billingWindow(anchor, "monthly", now);
+}
+
+/** Yearly invoice that covers `now`: the first year's amount, then the renewal amount. */
+export function annualFeeUsd(plan: SavedServicePlan, now: Date): number | null {
+  const fallback = plan.monthlyFeeUsd == null ? null : plan.monthlyFeeUsd * 12;
+  if (plan.firstYearFeeUsd == null && plan.renewalFeeUsd == null) return fallback;
+  const start = plan.startedOn ? dayStamp(plan.startedOn) : null;
+  const renews = plan.renewsOn ? dayStamp(plan.renewsOn) : null;
+  const secondYear = start
+    ? shiftMonths(start, 12, start.getUTCDate())
+    : renews;
+  const renewed = secondYear != null && now.getTime() >= secondYear.getTime();
+  return renewed ? plan.renewalFeeUsd : plan.firstYearFeeUsd;
+}
+
+/** Fee of one month: the typed monthly fee, or a twelfth of the yearly invoice. */
+export function monthlyFee(plan: SavedServicePlan, now: Date): number | null {
+  if (plan.cadence !== "yearly") return plan.monthlyFeeUsd;
+  const annual = annualFeeUsd(plan, now);
+  return annual == null ? null : annual / 12;
+}
+
 /** Usage that reduces a prepaid balance: from the top-up day through now. */
 export function prepaidWindow(creditedOn: string | null, now: Date): BillingWindow {
   const end = new Date(now.getTime() + 86_400_000);
@@ -461,7 +553,9 @@ function stampIso(date: Date): string {
 
 /**
  * Monthly (or yearly) invoices from the first one through the horizon.
- * An active plan counts the next renewal. A stopped plan stops at its end, or at today.
+ * An active monthly plan counts the next renewal. A yearly plan counts only the
+ * invoices already dated: the first year's amount, then each renewal amount.
+ * A stopped plan stops at its end, or at today.
  */
 export function subscriptionSpend(input: {
   startedOn: string | null;
@@ -469,6 +563,8 @@ export function subscriptionSpend(input: {
   endedOn: string | null;
   cadence: BillingCadence;
   monthlyFeeUsd: number | null;
+  firstYearFeeUsd?: number | null;
+  renewalFeeUsd?: number | null;
   account: PlanAccount;
   now: Date;
 }): SubscriptionSpend | null {
@@ -479,21 +575,36 @@ export function subscriptionSpend(input: {
   const step = input.cadence === "yearly" ? 12 : 1;
   let horizon = input.now;
   let includesUpcoming = false;
-  if (input.account === "active" && renews && (!ended || renews.getTime() <= ended.getTime())) {
+  const yearly = input.cadence === "yearly";
+  if (yearly) {
+    if (ended && ended.getTime() < horizon.getTime()) horizon = ended;
+  } else if (input.account === "active" && renews && (!ended || renews.getTime() <= ended.getTime())) {
     horizon = renews;
     includesUpcoming = renews.getTime() > input.now.getTime();
   } else if (ended) {
     horizon = ended;
   }
-  const invoice = input.cadence === "yearly"
+  const first = input.firstYearFeeUsd ?? null;
+  const renewal = input.renewalFeeUsd ?? null;
+  const split = yearly && (first != null || renewal != null);
+  const flat = yearly
     ? (input.monthlyFeeUsd == null ? null : input.monthlyFeeUsd * 12)
     : input.monthlyFeeUsd;
+  const total = (count: number): number | null => {
+    if (count === 0) return split || flat != null ? 0 : null;
+    if (!split) return flat == null ? null : flat * count;
+    if (first == null) return null;
+    if (count === 1) return first;
+    return renewal == null ? null : first + renewal * (count - 1);
+  };
   if (start.getTime() > horizon.getTime()) {
-    return { count: 0, from: input.startedOn, to: input.startedOn, totalUsd: invoice == null ? null : 0, includesUpcoming: false };
+    return { count: 0, from: input.startedOn, to: input.startedOn, totalUsd: total(0), includesUpcoming: false };
   }
   const dates: Date[] = [];
   let cursor = start;
   for (let i = 0; i < 240 && cursor.getTime() <= horizon.getTime(); i += 1) {
+    // The end date of a yearly run is not a new invoice.
+    if (yearly && ended && cursor.getTime() >= ended.getTime() && dates.length > 0) break;
     dates.push(cursor);
     cursor = shiftMonths(cursor, step, start.getUTCDate());
   }
@@ -502,7 +613,7 @@ export function subscriptionSpend(input: {
     count: dates.length,
     from: stampIso(dates[0] ?? start),
     to: stampIso(last),
-    totalUsd: invoice == null ? null : invoice * dates.length,
+    totalUsd: total(dates.length),
     includesUpcoming,
   };
 }
@@ -523,7 +634,11 @@ export interface PeriodCostReading {
   includedMinutes: number | null;
   /** Left on the current cycle after every measured unit, sandboxes included. */
   remainingUnits: number | null;
+  /** Null when the minutes depend on the model: read `capacity`. */
   remainingMinutes: number | null;
+  capacity: FamilyCapacity[];
+  unknownModelChars: number;
+  countingNote: string | null;
   /** Share of the monthly fee for `days`, or the whole month when `days` is null. */
   subscriptionUsd: number | null;
   overageUnits: number | null;
@@ -553,7 +668,8 @@ export function requestedDays(periodId: string): number | null {
  * Real cost of the window the admin picked.
  *
  * The monthly fee is multiplied by `days / 30`. Minutes consumed are the ones
- * passed in (`periodAmount`, the same unit as a usage event). Minutes left are
+ * passed in (`period`: calls, or a total in the same unit as a usage event; a
+ * total carries no model). Minutes left are
  * the subscription allowance minus the whole current cycle, so a 7-day view
  * does not pretend the rest of the month was free. Only units of this window
  * that sit past the allowance are priced as overage. "Tout" shows the current
@@ -563,21 +679,21 @@ export function periodCostReading(
   service: ServiceDefinition,
   plan: SavedServicePlan,
   cycleEvents: readonly UsageEvent[],
-  periodAmount: number,
+  period: number | readonly UsageAmount[],
   now: Date,
   days: number | null,
   capped = false,
 ): PeriodCostReading {
   const window = plan.funding === "prepaid"
     ? prepaidWindow(plan.creditedOn, now)
-    : billingWindow(plan.renewsOn, plan.cadence, now);
-  const cycleRaw = service.measured ? sumUsage(cycleEvents, service.id, window.start, window.end) : null;
-  const cycleUsed = billedAmount(service, plan, cycleRaw);
-  const safePeriod = Number.isFinite(periodAmount) && periodAmount > 0 ? periodAmount : 0;
-  const periodUsed = billedAmount(service, plan, service.measured ? safePeriod : null);
-  const consumedMinutes = asMinutes(service, plan, periodUsed);
+    : quotaWindow(plan, now);
+  const cycle = service.measured ? measure(service, plan, inWindow(cycleEvents, service.id, window.start, window.end)) : null;
+  const measured = service.measured ? measure(service, plan, typeof period === "number" ? [{ amount: period }] : period) : null;
+  const cycleUsed = cycle?.billed ?? null;
+  const periodUsed = measured?.billed ?? null;
+  const consumedMinutes = usageMinutes(service, plan, measured);
   const included = plan.included;
-  const includedMinutes = asMinutes(service, plan, included);
+  const includedMinutes = allowanceMinutes(service, plan, included);
   const base: PeriodCostReading = {
     days,
     monthDays: PLAN_MONTH_DAYS,
@@ -588,6 +704,9 @@ export function periodCostReading(
     includedMinutes: includedMinutes.minutes,
     remainingUnits: null,
     remainingMinutes: null,
+    capacity: [],
+    unknownModelChars: measured?.unknownModelChars ?? 0,
+    countingNote: service.countingNote ?? null,
     subscriptionUsd: null,
     overageUnits: null,
     overageMinutes: null,
@@ -621,12 +740,12 @@ export function periodCostReading(
     return { ...base, kind: "stopped", subscriptionUsd: 0, totalUsd: 0 };
   }
 
-  const fee = plan.monthlyFeeUsd;
+  const fee = monthlyFee(plan, now);
   if (fee == null && included == null) return base;
 
   const subscriptionUsd = fee == null ? null : days == null ? fee : fee * (days / PLAN_MONTH_DAYS);
   const remainingUnits = included != null && cycleUsed != null ? Math.max(0, included - cycleUsed) : null;
-  const remainingMinutes = asMinutes(service, plan, remainingUnits);
+  const remainingMinutes = allowanceMinutes(service, plan, remainingUnits);
   let overageUnits: number | null = null;
   if (included != null && cycleUsed != null && periodUsed != null) {
     if (days == null) {
@@ -638,7 +757,7 @@ export function periodCostReading(
       overageUnits = Math.max(0, attributable - left);
     }
   }
-  const overageMinutes = asMinutes(service, plan, overageUnits);
+  const overageMinutes = allowanceMinutes(service, plan, overageUnits);
   let overageUsd: number | null = null;
   let rateMissing = false;
   if (overageUnits === 0) overageUsd = 0;
@@ -656,6 +775,7 @@ export function periodCostReading(
     subscriptionUsd,
     remainingUnits,
     remainingMinutes: remainingMinutes.minutes,
+    capacity: familyCapacity(service, included, remainingUnits),
     overageUnits,
     overageMinutes: overageMinutes.minutes,
     overageUsd,
@@ -676,15 +796,73 @@ export function sumPeriodTotals(readings: Array<PeriodCostReading | null>): { to
   };
 }
 
-export function sumUsage(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): number {
-  let total = 0;
-  for (const event of events) {
-    if (event.serviceId !== serviceId || !Number.isFinite(event.amount) || event.amount < 0) continue;
+function inWindow(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): UsageEvent[] {
+  return events.filter((event) => {
+    if (event.serviceId !== serviceId) return false;
     const at = new Date(event.at).getTime();
-    if (Number.isNaN(at) || at < start.getTime() || at >= end.getTime()) continue;
-    total += event.amount;
+    return !Number.isNaN(at) && at >= start.getTime() && at < end.getTime();
+  });
+}
+
+export function sumUsage(events: readonly UsageEvent[], serviceId: string, start: Date, end: Date): number {
+  return inWindow(events, serviceId, start, end).reduce(
+    (total, event) => total + (Number.isFinite(event.amount) && event.amount > 0 ? event.amount : 0),
+    0,
+  );
+}
+
+interface Measure {
+  /** Journal amount: characters, minutes or dollars. */
+  raw: number;
+  /** Same usage in the provider's billed unit. */
+  billed: number;
+  unknownModelChars: number;
+}
+
+/**
+ * Model rates apply to a subscription allowance in credits. A prepaid balance is
+ * priced per character, so it keeps the journal amount.
+ */
+function measure(service: ServiceDefinition, plan: SavedServicePlan, calls: readonly UsageAmount[]): Measure {
+  const families = plan.funding === "subscription" ? service.modelFamilies : undefined;
+  const highest = families ? Math.max(...families.map((family) => family.creditsPerChar)) : 0;
+  let raw = 0;
+  let weighted = 0;
+  let unknownModelChars = 0;
+  for (const call of calls) {
+    if (!Number.isFinite(call.amount) || call.amount <= 0) continue;
+    raw += call.amount;
+    if (!families) continue;
+    const family = families.find((entry) => call.model != null && entry.models.includes(call.model));
+    if (!family) unknownModelChars += call.amount;
+    weighted += call.amount * (family?.creditsPerChar ?? highest);
   }
-  return total;
+  // Rounded to the cent of a credit, so float noise never reads as an overage.
+  const billed = families ? Math.round(weighted * 100) / 100 : billedAmount(service, plan, raw) ?? 0;
+  return { raw, billed, unknownModelChars };
+}
+
+function usageMinutes(service: ServiceDefinition, plan: SavedServicePlan, usage: Measure | null): { minutes: number | null; estimated: boolean } {
+  if (!usage) return { minutes: null, estimated: false };
+  // Spoken time follows the characters, whatever the model charged for them.
+  return asMinutes(service, plan, service.modelFamilies ? usage.raw : usage.billed);
+}
+
+/** An allowance in model-rated credits has no single duration. */
+function allowanceMinutes(service: ServiceDefinition, plan: SavedServicePlan, amount: number | null): { minutes: number | null; estimated: boolean } {
+  if (service.modelFamilies && plan.funding === "subscription") return { minutes: null, estimated: true };
+  return asMinutes(service, plan, amount);
+}
+
+function familyCapacity(service: ServiceDefinition, included: number | null, remaining: number | null): FamilyCapacity[] {
+  const perMinute = service.charsPerMinute;
+  if (!perMinute || included == null) return [];
+  const minutes = (credits: number | null, rate: number) => (credits == null ? null : credits / rate / perMinute);
+  return (service.modelFamilies ?? []).map((family) => ({
+    label: family.label,
+    includedMinutes: minutes(included, family.creditsPerChar),
+    remainingMinutes: minutes(remaining, family.creditsPerChar),
+  }));
 }
 
 export function earliestWindowStart(services: readonly ServiceDefinition[], plans: Readonly<Record<string, SavedServicePlan>>, now: Date): Date {
@@ -692,7 +870,7 @@ export function earliestWindowStart(services: readonly ServiceDefinition[], plan
   for (const service of services) {
     if (!service.measured) continue;
     const plan = plans[service.id] ?? emptyPlan();
-    const start = billingWindow(plan.renewsOn, plan.cadence, now).start;
+    const start = quotaWindow(plan, now).start;
     if (start.getTime() < earliest.getTime()) earliest = start;
   }
   return earliest;
@@ -730,13 +908,13 @@ export function planSnapshot(
 ): PlanSnapshot {
   const window = plan.funding === "prepaid"
     ? prepaidWindow(plan.creditedOn, now)
-    : billingWindow(plan.renewsOn, plan.cadence, now);
-  const raw = service.measured ? sumUsage(events, service.id, window.start, window.end) : null;
-  const used = billedAmount(service, plan, raw);
-  const usedMinutes = asMinutes(service, plan, used);
+    : quotaWindow(plan, now);
+  const usage = service.measured ? measure(service, plan, inWindow(events, service.id, window.start, window.end)) : null;
+  const used = usage?.billed ?? null;
+  const usedMinutes = usageMinutes(service, plan, usage);
   const included = plan.included;
-  const includedMinutes = asMinutes(service, plan, included);
-  const fixedUsd = plan.monthlyFeeUsd;
+  const includedMinutes = allowanceMinutes(service, plan, included);
+  const fixedUsd = monthlyFee(plan, now);
 
   const base: PlanSnapshot = {
     service,
@@ -749,6 +927,8 @@ export function planSnapshot(
     included,
     includedMinutes: includedMinutes.minutes,
     remaining: null,
+    capacity: [],
+    unknownModelChars: usage?.unknownModelChars ?? 0,
     overageUnits: null,
     overageMinutes: null,
     fixedUsd,
@@ -763,6 +943,8 @@ export function planSnapshot(
       endedOn: plan.endedOn,
       cadence: plan.cadence,
       monthlyFeeUsd: plan.monthlyFeeUsd,
+      firstYearFeeUsd: plan.firstYearFeeUsd,
+      renewalFeeUsd: plan.renewalFeeUsd,
       account: plan.account,
       now,
     }),
@@ -771,7 +953,13 @@ export function planSnapshot(
 
   const built = plan.funding === "prepaid"
     ? prepaidSnapshot(base, service, plan, used)
-    : subscriptionSnapshot(base, service, plan, used, included);
+    : subscriptionSnapshot(
+      { ...base, capacity: familyCapacity(service, included, included != null && used != null ? Math.max(0, included - used) : null) },
+      service,
+      plan,
+      used,
+      included,
+    );
   if (plan.funding === "prepaid" || plan.account === "active") return built;
   return {
     ...built,
@@ -803,7 +991,7 @@ function subscriptionSnapshot(
   used: number | null,
   included: number | null,
 ): PlanSnapshot {
-  const fixedUsd = plan.monthlyFeeUsd;
+  const fixedUsd = base.fixedUsd;
   if (!service.measured) return { ...base, status: "unmeasured", periodUsd: fixedUsd };
   if (used == null) return base;
 
@@ -817,7 +1005,7 @@ function subscriptionSnapshot(
 
   const overageUnits = Math.max(0, used - included);
   const remaining = Math.max(0, included - used);
-  const overageMinutes = asMinutes(service, plan, overageUnits).minutes;
+  const overageMinutes = allowanceMinutes(service, plan, overageUnits).minutes;
   const rate = service.unit === "usd" ? (plan.overagePerUnitUsd ?? 1) : plan.overagePerUnitUsd;
   if (overageUnits === 0) {
     return {
@@ -869,6 +1057,8 @@ export function parseSavedPlan(value: unknown): SavedServicePlan | null {
     funding,
     account,
     monthlyFeeUsd: finiteOrNull(record.monthlyFeeUsd),
+    firstYearFeeUsd: finiteOrNull(record.firstYearFeeUsd),
+    renewalFeeUsd: finiteOrNull(record.renewalFeeUsd),
     included: finiteOrNull(record.included),
     overagePerUnitUsd: finiteOrNull(record.overagePerUnitUsd),
     renewsOn,
