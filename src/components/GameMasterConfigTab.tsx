@@ -87,7 +87,6 @@ export default function GameMasterConfigTab() {
         VOICE_HANDS_FREE: gameplay.VOICE_HANDS_FREE,
         VOICE_INCREMENTAL_OUTPUT: gameplay.VOICE_INCREMENTAL_OUTPUT,
         VOICE_STREAMED_LLM: gameplay.VOICE_STREAMED_LLM,
-        VOICE_ONLY_UI: gameplay.VOICE_ONLY_UI,
       });
       await saveGameplaySettingsToDB(updated);
       setGameplay(updated);
@@ -120,7 +119,6 @@ export default function GameMasterConfigTab() {
     || gameplay.QUESTIONNAIRE_MODE !== savedGameplay.QUESTIONNAIRE_MODE
     || gameplay.VOICE_INCREMENTAL_OUTPUT !== savedGameplay.VOICE_INCREMENTAL_OUTPUT
     || gameplay.VOICE_STREAMED_LLM !== savedGameplay.VOICE_STREAMED_LLM
-    || gameplay.VOICE_ONLY_UI !== savedGameplay.VOICE_ONLY_UI
     || JSON.stringify(gameplay.VOICE_HANDS_FREE) !== JSON.stringify(savedGameplay.VOICE_HANDS_FREE);
   const voice = gameplay.VOICE_HANDS_FREE;
   const setVoice = (patch: Partial<HandsFreeVoiceSettings>) =>

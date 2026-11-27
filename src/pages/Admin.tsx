@@ -486,8 +486,8 @@ export default function Admin() {
               <div>
                 <p className="text-sm font-semibold">Vidéo des avatars — tous les personnages</p>
                 <p className="max-w-2xl text-xs text-muted-foreground">
-                  « Voix seule » coupe la vidéo de tous les personnages ; seul un appareil réglé explicitement sur « avatar »
-                  (Expérience › Appareils) garde son choix. Enregistré immédiatement, pris en compte à l’ouverture de chaque
+                  « Voix seule » coupe la vidéo de tous les personnages et de tous les appareils, y compris ceux réglés sur
+                  « avatar » (Expérience › Appareils). Enregistré immédiatement, pris en compte à l’ouverture de chaque
                   nouvelle session.
                 </p>
               </div>

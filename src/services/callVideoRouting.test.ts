@@ -91,13 +91,13 @@ describe("resolveCallVideo with the global switch on voice (27 November)", () =>
       .toMatchObject({ mode: "tts", reason: "settings" });
   });
 
-  it("keeps a device explicitly set to the live avatar on its own choice", () => {
+  it("cuts the video of a device set to the live avatar too", () => {
     const decision = resolveCallVideo(input({
       configuredMode: "tts",
       avatar: linked({ max: { provider: "tavus" } }),
       deviceServices: { output: "avatar", avatarProvider: null },
     }));
-    expect(decision).toMatchObject({ mode: "streaming_avatar", reason: "character_link" });
+    expect(decision).toMatchObject({ mode: "tts", reason: "settings" });
   });
 });
 

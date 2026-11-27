@@ -24,10 +24,17 @@ describe("resolveCallOutputMode", () => {
 
 describe("resolveCallOutputMode with a device choice", () => {
   it("connects the avatar on a smartphone set to avatar, for Max only", () => {
-    expect(resolveCallOutputMode({ startingCharacter: "max", configuredMode: "tts", deviceClass: "smartphone", deviceOutput: "avatar" }))
+    expect(resolveCallOutputMode({ startingCharacter: "max", configuredMode: "streaming_avatar", deviceClass: "smartphone", deviceOutput: "avatar" }))
       .toEqual({ mode: "streaming_avatar", reason: "device_settings" });
-    expect(resolveCallOutputMode({ startingCharacter: "emma", configuredMode: "tts", deviceClass: "smartphone", deviceOutput: "avatar" }))
+    expect(resolveCallOutputMode({ startingCharacter: "emma", configuredMode: "streaming_avatar", deviceClass: "smartphone", deviceOutput: "avatar" }))
       .toEqual({ mode: "tts", reason: "character_voice_only" });
+  });
+
+  it.each(["smartphone", "tablet", "desktop"] as const)("lets the global voice switch cut the video of a %s set to avatar", (deviceClass) => {
+    for (const startingCharacter of ["max", "emma"] as const) {
+      expect(resolveCallOutputMode({ startingCharacter, configuredMode: "tts", deviceClass, deviceOutput: "avatar" }))
+        .toEqual({ mode: "tts", reason: "settings" });
+    }
   });
 
   it("puts a desktop set to voice in a voice call whatever the switch says", () => {

@@ -167,7 +167,6 @@ async function installNetworkFakes(
     localStorage.setItem("ava:prod:ava_gameplay_settings", JSON.stringify({ RAG_SUMMARY_EVERY_N_TURNS: 4,
       ...(incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
       ...(handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
-      ...(p2 ? { VOICE_ONLY_UI: true } : {}),
       ...(skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
       ...(conversational ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
     }));
@@ -503,7 +502,6 @@ async function installNetworkFakes(
         ava_gameplay_settings: { TIMEOUT_SECONDS: 930,
           ...(options.incrementalOutput ? { VOICE_INCREMENTAL_OUTPUT: true } : {}),
           ...(options.handsFree ? { VOICE_HANDS_FREE: { enabled: true, ...(options.p2 ? { interruptionStrategy: "acoustic_confirmed" } : {}) } } : {}),
-          ...(options.p2 ? { VOICE_ONLY_UI: true } : {}),
           ...(options.skipQuestionnaire ? { SHOW_QUESTIONNAIRE: false } : {}),
           ...(options.conversationalQuestionnaire ? { QUESTIONNAIRE_MODE: "conversational" } : {}),
         },
@@ -860,14 +858,17 @@ for (const character of ['Max', 'Emma'] as const) {
     await expect(page.getByRole('button', { name: /Passer/ })).toBeVisible();
     await startCharacterConversation(page, character, '/?env=sandbox-ulrich');
     await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
-    expect(fakes.getTtsText()).toBe(choices[1].normalize('NFKC').replace(/\s+([?!])/g, '$1'));
-    expect(fakes.getTtsCallCount()).toBe(1);
+    // Two syntheses: the rescue line prepared in advance, then the single greeting.
+    const greeting = choices[1].normalize('NFKC').replace(/\s+([?!])/g, '$1');
+    const rescue = character === 'Max' ? 'Reprenez, je vous écoute.' : 'Je vous écoute. On reprend doucement?';
+    expect(fakes.getTtsText()).toBe(`${rescue} ${greeting}`);
+    expect(fakes.getTtsCallCount()).toBe(2);
     expect(fakes.getMaxTurnCount()).toBe(0);
     expect(fakes.getGmPostTurnCount()).toBe(0);
     // Unrelated renders never select or read a second greeting.
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
-    expect(fakes.getTtsCallCount()).toBe(1);
+    expect(fakes.getTtsCallCount()).toBe(2);
   });
 }
 

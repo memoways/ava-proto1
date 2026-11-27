@@ -216,7 +216,7 @@ export function normalizeConversationMemory(raw: unknown): ConversationMemoryV1 
     deliveryByCharacter: normalizeDeliveries(candidate.deliveryByCharacter),
     ...(typeof candidate.incrementalOutputEnabled === "boolean" ? { incrementalOutputEnabled: candidate.incrementalOutputEnabled } : {}),
     ...(candidate.voicePreset && typeof candidate.voicePreset === "object" ? { voicePreset: {
-      handsFree: normalizeHandsFreeSettings(candidate.voicePreset.handsFree), voiceOnly: candidate.voicePreset.voiceOnly === true,
+      handsFree: normalizeHandsFreeSettings(candidate.voicePreset.handsFree),
     } } : {}),
   };
 }

@@ -64,7 +64,7 @@ describe("ConversationScreen streaming avatar", () => {
   it("does not reattach the video while live user transcription changes", () => {
     const attachAvatarMedia = vi.fn();
     const props = { ...baseProps, streamingAvatarActive: true, attachAvatarMedia,
-      audioState: "user_speaking" as const, voiceOnly: true };
+      audioState: "user_speaking" as const };
     const { rerender } = render(<ConversationScreen {...props} userSubtitle="Je voudrais" />);
     expect(screen.getByText("« Je voudrais »")).toBeInTheDocument();
     rerender(<ConversationScreen {...props} userSubtitle="Je voudrais comprendre la fin" />);

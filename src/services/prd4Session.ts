@@ -44,7 +44,7 @@ export async function createPRD4Session(
     player_role: (userRole as unknown as Json) ?? null,
     modalite_voix: "push_to_talk",
     conversation_memory: JSON.parse(JSON.stringify({ ...createEmptyConversationMemory(),
-      voicePreset: { handsFree: normalizeHandsFreeSettings(getGameplaySettings().VOICE_HANDS_FREE), voiceOnly: getGameplaySettings().VOICE_ONLY_UI === true },
+      voicePreset: { handsFree: normalizeHandsFreeSettings(getGameplaySettings().VOICE_HANDS_FREE) },
       incrementalOutputEnabled: getGameplaySettings().VOICE_INCREMENTAL_OUTPUT === true })) as Json,
     ...extra,
     environment_id: runtime.environmentId,

@@ -40,7 +40,7 @@ import { toastSaveError } from "@/components/admin/unsaved/toastSaveError";
 const OUTPUT_LABELS: Record<DeviceOutputChoice, string> = {
   settings: "Suivre l'interrupteur Voix seule / Avatar vidéo",
   voice: "Appel vocal (voix seule)",
-  avatar: "Avatar vidéo en direct",
+  avatar: "Avatar vidéo en direct (si l'interrupteur est sur Avatar vidéo)",
 };
 
 const AVATAR_LABELS: Record<SelectableStreamingAvatarProvider, string> = {

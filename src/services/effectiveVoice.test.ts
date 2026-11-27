@@ -155,7 +155,7 @@ describe("describeEffectiveVoice", () => {
 
   it("device avatar provider overrides the Streaming Avatar provider", () => {
     const voice = describeEffectiveVoice(input({
-      device: "desktop", configuredOutput: "tts", deviceServices: { ...followSwitch, output: "avatar", avatarProvider: "anam" },
+      device: "desktop", configuredOutput: "streaming_avatar", deviceServices: { ...followSwitch, output: "avatar", avatarProvider: "anam" },
     }));
     expect(voice.avatarProvider).toBe("anam");
   });

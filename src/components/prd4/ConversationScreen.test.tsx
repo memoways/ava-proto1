@@ -15,7 +15,7 @@ const baseProps = {
 
 describe("ConversationScreen", () => {
   it("voice-only preserves user transcription and hides character dialogue while preserving status, microphone and explicit GM consent", () => {
-    render(<ConversationScreen {...baseProps} voiceOnly handsFree handsFreeListening activeCharacter="max" audioState="max_speaking"
+    render(<ConversationScreen {...baseProps} handsFree handsFreeListening activeCharacter="max" audioState="max_speaking"
       userSubtitle="Parole du joueur" maxSubtitle="Parole du personnage" conversationLog={[tagSpokenWith({ role: "user", content: "Parole du joueur", timestamp: 1 }, "max")]}
       handoffOffer={{ reason: "Consentement validé", targetCharacter: "emma" }} />);
     expect(screen.getByText("« Parole du joueur »")).toBeInTheDocument();expect(screen.queryByText("Parole du personnage")).not.toBeInTheDocument();

@@ -2,8 +2,8 @@
  * Which video service a call opens, decided once at pick-up (per-character video plan, §9.3).
  *
  * 1. A device set to voice (smartphone by default) stays voice-only, link or not.
- * 2. The global switch on « Voix » cuts the video for everyone, link or not (decision
- *    of 27 November); a device explicitly set to the live avatar keeps its choice.
+ * 2. The global switch on « Voix » cuts the video for everyone, link or not, a device
+ *    set to the live avatar included (decisions of 27 November).
  * 3. Video on: « Pas de vidéo » keeps the character voice-only; a linked character
  *    opens its provider, with its fields, over the device's provider.
  * 4. Without a link, Max follows the device or the switch, with the device's
