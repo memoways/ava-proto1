@@ -41,4 +41,15 @@ describe('AP4-bis — character settings read voice IDs from TTS configuration',
   fireEvent.click(saveButtons[1]);
   await waitFor(() => expect(updateCharacterRuntimeProfile).toHaveBeenCalledWith('p-emma', expect.objectContaining({ tts_provider: 'gradium', tts_voice_id: 'emma-new' })));
  });
+ it('folds Audio and Vidéo by default, with a one-line summary each', async () => {
+  render(<CharacterRuntimeSettingsTab />);
+  await screen.findByLabelText('Voice ID Max');
+  const audio = screen.getByTestId('audio-max');
+  const video = screen.getByTestId('video-max');
+  expect(audio).not.toHaveAttribute('open');
+  expect(video).not.toHaveAttribute('open');
+  expect(screen.getByTestId('audio-max-summary')).toHaveTextContent('Gradium TTS · voix max-gradium');
+  expect(screen.getByTestId('video-max-summary')).toHaveTextContent('Suit le réglage global');
+  expect(screen.getByLabelText('Accueil de Max')).toBeInTheDocument();
+ });
 });

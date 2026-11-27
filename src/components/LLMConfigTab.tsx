@@ -294,11 +294,11 @@ export default function LLMConfigTab() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <label htmlFor="llm-character-provider-latency" className="text-sm font-medium text-muted-foreground block">
-              Routage OpenRouter : fournisseur le plus rapide
+              Répondre avec l'hébergeur le plus rapide
             </label>
             <p className="text-xs text-muted-foreground mt-1">
-              Envoie <code>provider.sort: "latency"</code> avec l'appel du personnage. Banc du 27 novembre, gpt-5.6-luna :
-              1re phrase 1,25 s → 0,82 s, même modèle et même coût. Désactivé : routage par défaut d'OpenRouter.
+              Le personnage répond avec le même modèle et au même prix, chez l'hébergeur OpenRouter le plus rapide
+              (première phrase 1,25 s → 0,82 s mesurée le 27 novembre). Désactivé : choix par défaut d'OpenRouter.
             </p>
           </div>
           <Switch

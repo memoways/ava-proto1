@@ -3,9 +3,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { adminTabPath } from "@/services/adminNavigation";
+import { describeNextCall } from "@/services/callVideoRouting";
+import { getDeviceServices } from "@/services/deviceServices";
 import { AVATAR_LABELS } from "@/services/effectiveVoice";
-import type { CharacterVideoChoice } from "@/services/streamingAvatar/settings";
-import type { CharacterVideoLink, StreamingAvatarSettings } from "@/services/streamingAvatar/types";
+import {
+  getOutputSettings,
+  withCharacterVideoChoice,
+  type CharacterVideoChoice,
+} from "@/services/streamingAvatar/settings";
+import type { CharacterVideoLink, OutputMode, StreamingAvatarSettings } from "@/services/streamingAvatar/types";
 import {
   NUANCE_DRIVE_MODES,
   NUANCE_PERSONAS,
@@ -14,6 +20,7 @@ import {
 } from "../../../supabase/functions/_shared/streamingAvatarRequest";
 
 const GLOBAL = "__global__";
+const NONE = "none";
 const DRIVE_LABELS: Record<NuanceDriveMode, string> = {
   verbatim: "Texte d’Ava",
   native: "Conversation Nuance",
@@ -34,17 +41,46 @@ function inheritedFields({ link, tavus }: CharacterVideoChoice): string[] {
   }
 }
 
+/** One line for the folded « Vidéo » block. */
+export function characterVideoSummary({ link, tavus }: CharacterVideoChoice): string {
+  if (!link) return "Suit le réglage global";
+  if (link.provider === "none") return "Pas de vidéo";
+  const label = AVATAR_LABELS[link.provider];
+  switch (link.provider) {
+    case "tavus":
+      return tavus.faceId ? `${label} · Face ${tavus.faceId}` : label;
+    case "nuance":
+      return link.personaId ? `${label} · ${link.personaId}` : label;
+    case "heygen":
+    case "anam":
+      return link.avatarId ? `${label} · avatar ${link.avatarId}` : label;
+    case "lemonslice":
+      return link.agentId ? `${label} · agent ${link.agentId}` : label;
+  }
+}
+
 interface Props {
   characterKey: string;
   characterName: string;
   settings: StreamingAvatarSettings;
   choice: CharacterVideoChoice;
   onChange: (choice: CharacterVideoChoice) => void;
+  /** Global switch « Voix / Vidéo »; defaults to the local copy of the stored setting. */
+  configuredMode?: OutputMode;
 }
 
-/** Video service of one character: none (global rule) or a provider and its own fields. */
-export function CharacterVideoLinkEditor({ characterKey, characterName, settings, choice, onChange }: Props) {
+/** Video service of one character: global rule, « Pas de vidéo » or a provider and its own fields. */
+export function CharacterVideoLinkEditor({ characterKey, characterName, settings, choice, onChange, configuredMode }: Props) {
   const { link } = choice;
+  const globalMode = configuredMode ?? getOutputSettings().mode;
+  // Desktop following the global switch: the reference case of the admin screens.
+  const nextCall = describeNextCall({
+    character: characterKey,
+    configuredMode: globalMode,
+    deviceClass: "desktop",
+    deviceServices: getDeviceServices().desktop,
+    avatar: withCharacterVideoChoice(settings, characterKey, choice),
+  });
   const inherited = characterKey === "max" ? [] : inheritedFields(choice);
   const setLink = (next: CharacterVideoLink | null) => onChange({ ...choice, link: next });
   /** An emptied field is removed so the character follows the global value again. */
@@ -75,6 +111,7 @@ export function CharacterVideoLinkEditor({ characterKey, characterName, settings
         <SelectTrigger aria-label={`Service vidéo ${characterName}`}><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value={GLOBAL}>Suivre le réglage global</SelectItem>
+          <SelectItem value={NONE}>Pas de vidéo (voix seule)</SelectItem>
           {SELECTABLE_STREAMING_AVATAR_PROVIDERS.map((provider) => (
             <SelectItem key={provider} value={provider}>{AVATAR_LABELS[provider]}</SelectItem>
           ))}
@@ -156,10 +193,13 @@ export function CharacterVideoLinkEditor({ characterKey, characterName, settings
         </p>
       )}
 
+      <p className="text-xs" data-testid={`next-call-${characterKey}`}>
+        <span className="font-medium">Prochain appel sur ordinateur :</span> {nextCall}
+      </p>
       <p className="text-xs text-muted-foreground">
-        {link
-          ? "Ce personnage ouvre son appel en vidéo, même si l’interrupteur global est sur Voix et quel que soit le fournisseur de l’appareil. Un appareil réglé sur « voix » reste en voix."
-          : "Sans service propre : Max suit l’appareil et l’interrupteur global, les autres personnages restent en voix."}
+        L’interrupteur global sur « Voix » coupe la vidéo pour tous les personnages. Quand il est sur « Vidéo » :
+        {" "}« Pas de vidéo » donne un appel en voix seule, un fournisseur ouvre ce fournisseur, « Suivre le réglage global »
+        {" "}fait suivre l’appareil à Max et laisse les autres personnages en voix. Un appareil réglé sur « voix » reste en voix.
         {" "}La vidéo reste celle du personnage qui ouvre l’appel : après un passage à un autre personnage, l’appel continue en voix.
         Secrets, délais et qualité : <a className="underline" href={adminTabPath("streaming-avatar")}>Streaming Avatar Config</a>.
       </p>

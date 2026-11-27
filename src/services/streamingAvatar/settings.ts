@@ -23,6 +23,7 @@ import {
   TAVUS_AVATAR_CHARACTERS,
   TAVUS_EMOTIONS,
   TAVUS_VOICE_SOURCES,
+  type CharacterProviderLink,
   type CharacterVideoLink,
   type OutputSettings,
   type ResolvedTavusCharacterSettings,
@@ -303,6 +304,7 @@ function linkText<K extends string>(entry: Record<string, unknown>, key: K): Par
 /** An unknown provider drops the link; an unknown or empty field follows the global value. */
 function normalizeCharacterVideoLink(value: unknown): CharacterVideoLink | null {
   const entry = asRecord(value);
+  if (entry.provider === "none") return { provider: "none" };
   const provider = SELECTABLE_STREAMING_AVATAR_PROVIDERS.find((id) => id === entry.provider);
   if (!provider) return null;
   switch (provider) {
@@ -345,7 +347,7 @@ function normalizeCharacterVideoLinks(value: unknown): Record<string, CharacterV
  */
 export function applyCharacterVideoLink(
   settings: StreamingAvatarSettings,
-  link: CharacterVideoLink,
+  link: CharacterProviderLink,
 ): StreamingAvatarSettings {
   const base: StreamingAvatarSettings = { ...settings, activeProvider: link.provider };
   switch (link.provider) {

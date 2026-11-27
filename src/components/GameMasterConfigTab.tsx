@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { NewsletterSettingsPanel } from "@/components/admin/NewsletterSettingsPanel";
+import { TestSettingsFold, TestSettingState } from "@/components/admin/SettingsFold";
 import {
   getGameplaySettings,
   loadGameplaySettingsFromDB,
@@ -223,34 +224,7 @@ export default function GameMasterConfigTab() {
           <Switch checked={voice.enabled} onCheckedChange={(checked) => setVoice({ enabled: checked })} aria-label="Conversation mains libres" />
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
-          <div>
-            <p className="text-sm font-medium">Sortie vocale progressive</p>
-            <p className="text-xs text-muted-foreground">Avec Gradium, la voix commence pendant la génération. La mémoire distingue ce qui a été entendu après une interruption.</p>
-          </div>
-          <Switch checked={gameplay.VOICE_INCREMENTAL_OUTPUT} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_INCREMENTAL_OUTPUT: checked }))} aria-label="Sortie vocale progressive" />
-        </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
-          <div>
-            <p className="text-sm font-medium">Voix seule : réponse parlée en cours de génération (mesure)</p>
-            <p className="text-xs text-muted-foreground">Lot 4 latence : avec ElevenLabs (et les autres voix hors Gradium progressif), la première phrase part au TTS dès que le LLM l'a écrite. Lu au début de chaque tour ; désactivé par défaut.</p>
-          </div>
-          <Switch checked={gameplay.VOICE_STREAMED_LLM} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_STREAMED_LLM: checked }))} aria-label="Voix seule : réponse parlée en cours de génération" />
-        </div>
-
         <div className={voice.enabled ? "space-y-4" : "pointer-events-none space-y-4 opacity-50"}>
-          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
-            <div><p className="text-sm font-medium">Transcription du joueur</p><p className="text-xs text-muted-foreground">La parole du joueur est affichée en direct puis après envoi. Le personnage répond à la voix, sans sous-titres.</p></div>
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="interruption-strategy" className="text-sm">Détection d'interruption</label>
-            <select id="interruption-strategy" className="block rounded-md border bg-background p-2 text-sm" value={voice.interruptionStrategy ?? "text"}
-              onChange={event => setVoice({ interruptionStrategy: event.target.value === "acoustic_confirmed" ? "acoustic_confirmed" : "text" })}>
-              <option value="text">Paroles reconnues</option><option value="acoustic_confirmed">Voix candidate puis parole confirmée</option>
-            </select>
-            <p className="text-xs text-muted-foreground">Canary avec sortie progressive Gradium et annulation d'écho effective ; sinon compatibilité par paroles reconnues.</p>
-          </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Silence avant la réponse</span>
@@ -289,6 +263,37 @@ export default function GameMasterConfigTab() {
             <p className="text-xs text-muted-foreground">Conseillé : 2. À 1, une toux ou un « oui » suffit à couper. Avec haut-parleurs sans casque, monter à 3 si le personnage se coupe tout seul.</p>
           </div>
         </div>
+
+        <TestSettingsFold testId="test-settings-hands-free">
+          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+            <div>
+              <p className="text-sm font-medium">Voix Gradium pendant la génération<TestSettingState state="en mesure" /></p>
+              <p className="text-xs text-muted-foreground">Avec Gradium, la voix commence pendant que le texte s’écrit ; la mémoire retient ce qui a été entendu avant une interruption.</p>
+            </div>
+            <Switch checked={gameplay.VOICE_INCREMENTAL_OUTPUT} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_INCREMENTAL_OUTPUT: checked }))} aria-label="Sortie vocale progressive" />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md bg-muted/40 p-3">
+            <div>
+              <p className="text-sm font-medium">Voix seule : parler dès la première phrase<TestSettingState state="en mesure" /></p>
+              <p className="text-xs text-muted-foreground">Avec ElevenLabs et les autres voix hors Gradium, la première phrase part à la voix dès qu’elle est écrite au lieu d’attendre la réponse entière. Pris en compte au tour suivant.</p>
+            </div>
+            <Switch checked={gameplay.VOICE_STREAMED_LLM} onCheckedChange={checked => setGameplay(current => ({ ...current, VOICE_STREAMED_LLM: checked }))} aria-label="Voix seule : réponse parlée en cours de génération" />
+          </div>
+
+          <div className={voice.enabled ? "space-y-2" : "pointer-events-none space-y-2 opacity-50"}>
+            <label htmlFor="interruption-strategy" className="text-sm">Détection d'interruption<TestSettingState state="en mesure" /></label>
+            <select id="interruption-strategy" className="block rounded-md border bg-background p-2 text-sm" value={voice.interruptionStrategy ?? "text"}
+              onChange={event => setVoice({ interruptionStrategy: event.target.value === "acoustic_confirmed" ? "acoustic_confirmed" : "text" })}>
+              <option value="text">Paroles reconnues</option><option value="acoustic_confirmed">Voix candidate puis parole confirmée</option>
+            </select>
+            <p className="text-xs text-muted-foreground">« Voix candidate » coupe le personnage dès qu’une voix est entendue puis confirmée, seulement avec la voix Gradium pendant la génération et l’annulation d’écho ; sinon Ava attend des paroles reconnues.</p>
+          </div>
+        </TestSettingsFold>
+
+        <p className="text-xs text-muted-foreground" data-testid="player-transcript-note">
+          À savoir : la parole du joueur s’affiche en direct puis après envoi ; le personnage répond à la voix, sans sous-titres. Ce comportement est fixe.
+        </p>
       </section>
 
       <section className="space-y-4 rounded-lg border p-4">

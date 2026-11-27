@@ -16,6 +16,7 @@ export type OutputModeReason =
   | "settings"
   | "character_link"
   | "character_voice_only"
+  | "character_no_video"
   | "device_smartphone"
   | "device_settings";
 
@@ -25,8 +26,11 @@ export interface CallOutputModeInput {
   deviceClass: DeviceClass;
   /** Admin choice for this device; absent = historic rule (smartphone voice, others on the switch). */
   deviceOutput?: DeviceOutputChoice;
-  /** The starting character has its own video service (Réglages personnages). */
-  hasCharacterLink?: boolean;
+  /**
+   * The starting character's video service (Réglages personnages): its own provider,
+   * « Pas de vidéo », or absent to follow the global rule.
+   */
+  characterVideo?: "provider" | "none" | null;
 }
 
 export interface CallOutputModeDecision {
@@ -39,14 +43,18 @@ export function resolveCallOutputMode({
   configuredMode,
   deviceClass,
   deviceOutput,
-  hasCharacterLink,
+  characterVideo,
 }: CallOutputModeInput): CallOutputModeDecision {
   const choice = deviceOutput ?? (deviceClass === "smartphone" ? "voice" : "settings");
   if (choice === "voice") {
     return { mode: "tts", reason: deviceClass === "smartphone" ? "device_smartphone" : "device_settings" };
   }
-  // A linked character opens its own video, whatever the global switch says.
-  if (hasCharacterLink) return { mode: "streaming_avatar", reason: "character_link" };
+  // Decision of 27 November: the global switch on « Voix » cuts the video for everyone, link
+  // or not. Only a device explicitly set to the live avatar keeps its own choice.
+  if (choice !== "avatar" && configuredMode === "tts") return { mode: "tts", reason: "settings" };
+  // Video is on: « Pas de vidéo » keeps this character voice-only, a provider opens it.
+  if (characterVideo === "none") return { mode: "tts", reason: "character_no_video" };
+  if (characterVideo === "provider") return { mode: "streaming_avatar", reason: "character_link" };
   // Without a link, the live video stream is Max's: another character (Emma) starts
   // voice-only, with her portrait, so Max's stream is never shown for her.
   if (startingCharacter !== "max") return { mode: "tts", reason: "character_voice_only" };

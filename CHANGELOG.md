@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Réglages lot 1 : global « Voix » coupe la vidéo, « Pas de vidéo » par personnage, réglages de test repliés] — 2026-11-27
+
+- Routage d'appel (`callOutputMode`, `callVideoRouting`) : l'interrupteur global sur « Voix » donne un appel en voix pour tous, lien de personnage ou pas ; un appareil réglé sur « avatar » garde son choix. Nouvelle option « Pas de vidéo (voix seule) » par personnage, stockée `characterLinks.<clé> = { provider: "none" }` (additif, anciennes valeurs relues à l'identique), raison `character_no_video`. `describeNextCall` dit ce que donnera le prochain appel.
+- Réglages personnages : « Audio » (fournisseur TTS, Voice ID, rugosité) et « Vidéo » (service vidéo et ses champs) en blocs repliés avec un résumé d'une ligne.
+- Réglages de test (temporaires), bloc replié : Orchestration (voix Gradium pendant la génération, voix seule dès la première phrase, détection d'interruption), Tavus et Anam (parler dès la première phrase). Libellés sans numéro de lot, état affiché. « Transcription du joueur » devient une note de comportement. Routage OpenRouter rapide renommé « Répondre avec l'hébergeur le plus rapide ».
+- Télémétrie : une seule observation LLM par appel en flux (avant : une par morceau, qui chassait `tts` et `video` de `services`).
+- Aucune migration, aucune valeur enregistrée modifiée.
+
 ## [Réglages : diagnostic vidéo par personnage et réglages de test] — 2026-11-27
 
 - Documentation seulement : pourquoi Tavus s'est ouvert malgré la sortie globale sur « Voix » (lien vidéo de Max prioritaire), premier essai du lot 4 latence noté dans le plan, prompt de reprise du lot réglages.
