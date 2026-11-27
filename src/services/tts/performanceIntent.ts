@@ -8,7 +8,7 @@
 
 import type { TTSProviderId } from "./types";
 import { getActiveEnvironment } from '../environmentContext';
-import { getSpeechPerformanceSettings, type SpeechPerformanceSettings } from './speechPerformanceSettings';
+import { getSpeechPerformanceSettings, resolveCharacterPacing, type CharacterPacing, type SpeechPerformanceSettings } from './speechPerformanceSettings';
 import { supportsElevenLabsAudioTags } from "../../../supabase/functions/_shared/elevenLabsModels";
 import type { GradiumPauseSeconds } from './gradiumSpeech';
 
@@ -39,8 +39,8 @@ export interface PerformanceIntent {
   speechState?: string;
   pauses?: 'short' | 'normal' | 'long';
   mappingVersion?: string;
-  /** Set when the outburst budget replaced a flare-up by a held-back delivery. */
-  tempered?: 'calmed';
+  /** A flare-up replaced by a held-back delivery: by the budget (`calmed`) or because the character never flares (`muted`). */
+  tempered?: 'calmed' | 'muted';
   /** Set when the pacing guard lowered the derived intensity (emotions lot 1, 27 Nov 2026). */
   paced?: { from: PerformanceIntensity; reason: 'ramp' | 'ceiling' };
   /** A flare-up at full intensity that passed the outburst budget and the ramp. */
@@ -368,23 +368,6 @@ export function isHeatedIntent(intent: Pick<PerformanceIntent, "emotion"> | null
   return Boolean(intent && HEATED_EMOTIONS.has(intent.emotion));
 }
 
-/** At most one heated reply in this many consecutive replies of a character. */
-export const DEFAULT_OUTBURST_WINDOW = 6;
-/** Per-character intensity ceiling outside an authorized outburst; missing means 2. */
-const DEFAULT_INTENSITY_CEILING: Record<string, PerformanceIntensity> = { max: 1 };
-
-export function outburstWindow(settings?: SpeechPerformanceSettings): number {
-  const value = Number(settings?.pacing?.outburstWindow);
-  return Number.isFinite(value) && value >= 1 ? Math.min(20, Math.round(value)) : DEFAULT_OUTBURST_WINDOW;
-}
-
-export function intensityCeiling(settings: SpeechPerformanceSettings | undefined, characterKey?: string | null): PerformanceIntensity {
-  const key = characterKey?.trim().toLowerCase() ?? '';
-  const saved = settings?.pacing?.intensityCeiling?.[key];
-  if (saved === 0 || saved === 1 || saved === 2) return saved;
-  return DEFAULT_INTENSITY_CEILING[key] ?? 2;
-}
-
 /** Pacing seen by a reply: earlier replies only, so a reply re-derived mid-turn does not count itself. */
 export function pacingFromHistory(history: readonly PacingEntry[], currentTurnId?: string | null): PerformancePacing {
   const past = history.filter(entry => entry.turnId !== currentTurnId);
@@ -409,27 +392,33 @@ function resolvePacing(input: DerivePerformanceInput): PerformancePacing {
 }
 
 /** Rendering only: the speech state, its name and the GM log are unchanged. */
-function withTemper(intent: PerformanceIntent, input: DerivePerformanceInput, pacing: PerformancePacing, window: number): PerformanceIntent {
+function withTemper(intent: PerformanceIntent, input: DerivePerformanceInput, pacing: PerformancePacing,
+  rules: CharacterPacing): PerformanceIntent {
+  if (!isHeatedIntent(intent)) return intent;
+  // "Never" is a game rule: without a history (auditions, workshops) the mapping plays as saved.
+  const muted = Boolean(input.pacing) && rules.flares === 'never';
   const since = pacing.turnsSinceHeated;
-  if (!isHeatedIntent(intent) || since === null || since >= window - 1) return intent;
+  if (!muted && (since === null || since >= rules.window - 1)) return intent;
   const baseline = characterBaseline(input.characterKey);
   const emotion = HEATED_EMOTIONS.has(baseline.emotion) ? "tense" : baseline.emotion;
   const intensity = Math.min(intent.intensity, 1) as PerformanceIntensity;
-  // Flare-up inside the budget window: held-back delivery instead of the mapping's heat.
+  // Held-back delivery instead of the mapping's heat.
   return withGravity({ ...intent, emotion, intensity, delivery: "measured", pauses: intent.pauses ? "normal" : undefined,
-    actingNl: buildActingNl(emotion, intensity, "measured"), speedHint: 1, tempered: "calmed" }, input.characterKey);
+    actingNl: buildActingNl(emotion, intensity, "measured"), speedHint: 1, tempered: muted ? "muted" : "calmed" }, input.characterKey);
 }
 
-/** Intensity climbs one step per reply at most; the character ceiling holds except for an earned outburst. */
+/** The ramp climbs one step per reply at most; only a "full" flare-up may pass the character ceiling. */
 function withPacing(intent: PerformanceIntent, input: DerivePerformanceInput, pacing: PerformancePacing,
-  ceiling: PerformanceIntensity): PerformanceIntent {
+  rules: CharacterPacing): PerformanceIntent {
   const previous = pacing.previousIntensity ?? 0;
-  const rampMax = Math.min(2, previous + 1) as PerformanceIntensity;
-  const outburst = isHeatedIntent(intent) && !intent.tempered && intent.intensity === 2 && previous >= 1;
-  const limit = outburst ? rampMax : Math.min(rampMax, ceiling) as PerformanceIntensity;
+  const rampMax = (rules.ramp ? Math.min(2, previous + 1) : 2) as PerformanceIntensity;
+  const outburst = rules.flares === 'full' && isHeatedIntent(intent) && !intent.tempered && intent.intensity === 2
+    && (!rules.ramp || previous >= 1);
+  const ceiling = outburst ? 2 : rules.ceiling;
+  const limit = Math.min(rampMax, ceiling) as PerformanceIntensity;
   if (intent.intensity <= limit) return outburst ? { ...intent, outburst: true } : intent;
   const from = intent.intensity;
-  const reason = rampMax <= (outburst ? 2 : ceiling) ? 'ramp' : 'ceiling';
+  const reason = rampMax <= ceiling ? 'ramp' : 'ceiling';
   const speedHint = intent.source === 'speech_state'
     ? clamp(Number((1 + ((intent.speedHint ?? 1) - 1) * (limit + 1) / (from + 1)).toFixed(2)), 0.7, 1.2)
     : speedFor(intent.emotion, limit, intent.delivery);
@@ -442,9 +431,10 @@ export function derivePerformanceIntent(input: DerivePerformanceInput): Performa
   const settings = input.speechSettings ?? getSpeechPerformanceSettings();
   const resolved = { ...input, speechSettings: settings };
   const pacing = resolvePacing(input);
-  const tempered = withTemper(deriveUntemperedIntent(resolved), resolved, pacing, outburstWindow(settings));
+  const rules = resolveCharacterPacing(settings, input.characterKey);
+  const tempered = withTemper(deriveUntemperedIntent(resolved), resolved, pacing, rules);
   // Ramp and ceiling need the conversation history: auditions and workshops play the mapping as saved.
-  return input.pacing ? withPacing(tempered, resolved, pacing, intensityCeiling(settings, input.characterKey)) : tempered;
+  return input.pacing ? withPacing(tempered, resolved, pacing, rules) : tempered;
 }
 
 function deriveUntemperedIntent(input: DerivePerformanceInput): PerformanceIntent {

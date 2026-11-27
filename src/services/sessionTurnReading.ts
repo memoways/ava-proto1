@@ -63,6 +63,7 @@ export interface TtsReading {
 function pacingGuard(record: Record<string, unknown>): string | undefined {
   if (record.performance_outburst === true) return "éclat autorisé";
   if (record.performance_tempered === "calmed") return "retenu, budget d'éclats";
+  if (record.performance_tempered === "muted") return "retenu, aucun éclat pour ce personnage";
   const from = finite(record.performance_paced_from);
   if (from == null) return undefined;
   return record.performance_paced_reason === "ceiling" ? `plafonné, au lieu de ${from}` : `rampe, au lieu de ${from}`;
