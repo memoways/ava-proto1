@@ -1,6 +1,6 @@
 import { joinGuidanceParts, type GmGuidancePart } from '@/services/gmSpeechGuidance';
 import { rebuildCharacterStates, type StateLevels } from '@/services/characterState';
-import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, handoffFinalizationWritesSnapshot, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
+import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, completedCallExchanges, needsHandoffPreparation, handoffFinalizationMode, handoffFinalizationStep, HANDOFF_DEPENDENCY_TIMEOUT_MS } from '@/services/handoffCoordinator';
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
@@ -2107,14 +2107,31 @@ const IndexPRD4 = () => {
         // Finalize only the prepared request, using the ACTUAL complete receipt and the same GM evaluation.
         handoffFinalizationScheduled = true;
         // Lot T2: only a turn where a passage may be in play makes the next turn wait for the GM post-turn and its write.
-        const finalizeWaitsForNextTurn = handoffFinalizationWritesSnapshot(turnHandoffState, handoffUserText, result.maxResponse, turnCharacter)
-          || Boolean(preparedState);
-        const finalizeHandoff = result.postTurnPromise.then(async ev => {
-          if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return handoffSnapshotRef.current!;
+        // A name alone validates in the background (see handoffFinalizationMode).
+        const finalizationMode = preparedState ? 'blocking' : handoffFinalizationMode(turnHandoffState, handoffUserText,
+          result.maxResponse, turnCharacter, getGameplaySettings().VOICE_HANDOFF_WAIT_ON_NAME);
+        const holdNextTurn = () => {
+          handoffWriteRef.current = finalizeHandoff;
+          void finalizeHandoff.finally(() => { if (handoffWriteRef.current === finalizeHandoff) handoffWriteRef.current = null; }).catch(() => {});
+        };
+        const finalizeHandoff: Promise<HandoffSnapshot> = result.postTurnPromise.then(async ev => {
+          if (!turnHandoffState || !turnHandoffSnapshot || endedRef.current) return handoffSnapshotRef.current!;
+          const validatesOnReceipt = () => responseReceipt?.status === 'completed' && responseReceipt.delivered === responseReceipt.generated
+            && finalizeCharacterHandoff(turnHandoffState!, ev, handoffUserText, responseReceipt, true).validation.authorized;
+          const step = handoffFinalizationStep(finalizationMode, handoffLease?.current() === true, validatesOnReceipt);
+          if (step === 'late' || step === 'drop') {
+            // A passage validated after the next turn started is dropped, never written over it: record the loss.
+            if (step === 'late' && owningSessionId) {
+              void appendExperienceEvent({ sessionId: owningSessionId, eventKey: `handoff-late:${turnId}`,
+                eventType: 'handoff_blocked', turnId, turnIndex, character: turnCharacter,
+                payload: { stage: 'validation', blockedReason: 'late_after_next_turn', requestId: turnHandoffState.requestId } });
+            }
+            return handoffSnapshotRef.current!;
+          }
           if (turnHandoffState.state === 'available') return handoffSnapshotRef.current!;
-          // Lot T2: no passage in play (state 'none', no open request): nothing to validate or write. The next turn does not
-          // wait for this GM post-turn; the transcript is persisted by the receipt and by the next turn's own write.
-          if (!finalizeWaitsForNextTurn) {
+          // Nothing to write (state 'none' and no consent the GM validated on the heard reply): the next turn does not
+          // wait; the transcript is persisted by the receipt and by the next turn's own write.
+          if (step === 'idle') {
             if (owningSessionId && ev.action?.type === 'handoff') {
               const idle = finalizeCharacterHandoff(turnHandoffState, ev, handoffUserText, responseReceipt, false);
               void appendExperienceEvent({ sessionId: owningSessionId, eventKey: `handoff-final:${turnId}`,
@@ -2124,10 +2141,11 @@ const IndexPRD4 = () => {
             }
             return handoffSnapshotRef.current!;
           }
+          // A passage granted in the background before the next turn: that turn now waits for this write only.
+          if (step === 'hold') holdNextTurn();
           // A consent the GM validated on the heard receipt, spoken without an output
           // hold, gets the same readiness/director guards instead of being dropped.
-          if (!preparedState && responseReceipt?.status === 'completed' && responseReceipt.delivered === responseReceipt.generated
-            && finalizeCharacterHandoff(turnHandoffState, ev, handoffUserText, responseReceipt, true).validation.authorized) {
+          if (!preparedState && validatesOnReceipt()) {
             try {
               const prepared = await prepareCharacterHandoff({ state: turnHandoffState, evaluation: ev, text: responseReceipt.generated,
                 userText: handoffUserText, history: conversationRef.current.filter(message => message.delivery?.turnId !== turnId),
@@ -2181,10 +2199,7 @@ const IndexPRD4 = () => {
           }
           return handoffSnapshotRef.current!;
         });
-        if (finalizeWaitsForNextTurn) {
-          handoffWriteRef.current = finalizeHandoff;
-          void finalizeHandoff.finally(() => { if (handoffWriteRef.current === finalizeHandoff) handoffWriteRef.current = null; }).catch(() => {});
-        }
+        if (finalizationMode === 'blocking') holdNextTurn();
 
         const ttsStart = streamTtsStartedAt ?? performance.now();
         const responseReadyMs = Math.max(0, Math.round(performance.now() - inputReadyAt));

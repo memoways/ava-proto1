@@ -174,20 +174,47 @@ export async function prepareCharacterHandoff(input: PreparationInput) {
   return { state: prepared, portraitUrl: profile?.portraitUrl ?? null, target };
 }
 
+/** The player talks about reaching someone. A reason to wait for the GM, never a grant of consent. */
+function hasPlayerContactCue(text: string): boolean {
+  const s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/’/g, "'").toLowerCase();
+  return /\b(?:parler|discuter|echanger|appel(?:le|er|les|ez)?|joindre|contacter|causer|chercher|transfer\w*)\b/.test(s)
+    || /(?:\b(?:me|nous)\s+(?:(?:la|le)\s+)?|\bm')pass\w+/.test(s)
+    || /\bpass(?:e|es|er|ez)(?:[- ](?:moi|la|le))?\s+(?:max|emma)\b|\bpasse[- ](?:moi|la|le)\b/.test(s)
+    || /\b(?:au\s+telephone|au\s+bout\s+du\s+fil|en\s+ligne)\b/.test(s);
+}
+
 /**
- * Lot T2: can the post-turn finalisation write the handoff snapshot for this turn?
- * Yes while a request is open or an offer is prepared, and also when the other character is named by the player or in
- * the reply, or the reply reads as a transfer or consent: the GM may validate a passage on the current turn without a
- * request the regex caught (a consent needs the target named in a quote). Otherwise it writes nothing and the next turn
- * does not need to wait for the previous GM post-turn (2 to 4 s). An offer already `available` is never rewritten.
+ * How the post-turn handoff finalisation relates to the next turn.
+ * - `blocking`: a passage may be in play (open request or prepared offer, transfer offer or consent in the reply, the
+ *   player speaking of contact while the other character is named). The next turn waits for the GM post-turn and write.
+ * - `background`: the other character is only named. The GM may still validate a passage; it is written if its answer
+ *   comes before the next turn starts, otherwise it is dropped and recorded. The next turn does not wait.
+ * - `skip`: nothing to validate or write. An offer already `available` is never rewritten.
  */
-export function handoffFinalizationWritesSnapshot(state: HandoffState | null, userText: string, reply: string,
-  source: RuntimeCharacter): boolean {
-  if (!state || state.state === 'available') return false;
-  if (state.state !== 'none') return true;
+export type HandoffFinalizationMode = 'blocking' | 'background' | 'skip';
+
+export function handoffFinalizationMode(state: HandoffState | null, userText: string, reply: string,
+  source: RuntimeCharacter, waitOnNameAlone = false): HandoffFinalizationMode {
+  if (!state || state.state === 'available') return 'skip';
+  if (state.state !== 'none') return 'blocking';
   const target = otherCharacter(source);
-  const named = new RegExp(`\\b${target}\\b`, 'i');
-  return named.test(userText) || named.test(reply) || needsHandoffPreparation(reply) || hasCharacterHandoffConsent(reply, target);
+  if (needsHandoffPreparation(reply) || hasCharacterHandoffConsent(reply, target)) return 'blocking';
+  const name = new RegExp(`\\b${target}\\b`, 'i');
+  if (!name.test(userText) && !name.test(reply)) return 'skip';
+  return waitOnNameAlone || hasPlayerContactCue(userText) ? 'blocking' : 'background';
+}
+
+/**
+ * What the finalisation does when the GM post-turn answers. `current` is the turn's lease (false once the next turn has
+ * started); `validates` says whether the GM granted a passage on the fully delivered reply.
+ * `write`: the next turn is already waiting. `hold`: make it wait for this write only, then write.
+ * `late`: a granted passage is lost, record it. `idle` and `drop`: write nothing.
+ */
+export function handoffFinalizationStep(mode: HandoffFinalizationMode, current: boolean,
+  validates: () => boolean): 'write' | 'hold' | 'idle' | 'late' | 'drop' {
+  if (!current) return mode === 'background' && validates() ? 'late' : 'drop';
+  if (mode === 'blocking') return 'write';
+  return mode === 'background' && validates() ? 'hold' : 'idle';
 }
 
 export function finalizeCharacterHandoff(state: HandoffState, evaluation: PRD4PostTurnEvaluation,

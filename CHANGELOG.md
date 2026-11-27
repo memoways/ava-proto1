@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Attente de passage lot 1 : le simple nom ne retarde plus la réponse] — 2026-11-27
+
+- Diagnostic (lecture seule, 21–27 novembre) : 14 tours sur 574 attendaient plus de 0,5 s (médiane 1,45 s, maximum 3,10 s) l'écriture du tour précédent. Les 14 venaient du seul nom de l'autre personnage ; le Game Master n'a décidé aucun passage.
+- La réponse suivante n'attend plus quand l'autre personnage est seulement nommé. La validation continue : un passage accordé avant le tour suivant est écrit (ce tour n'attend alors que l'écriture) ; accordé après, il est abandonné et noté `late_after_next_turn` dans la session.
+- L'attente reste entière pour une demande ouverte, une offre préparée, une offre ou un accord dans la réplique, ou quand le joueur parle de contact en nommant l'autre.
+- Réglage réversible « Passage : attendre même sur un simple nom » (`VOICE_HANDOFF_WAIT_ON_NAME`, éteint par défaut). Aucune migration ; gain à mesurer sur une session réelle.
+
 ## [Latence : mesure iPhone et attente de passage] — 2026-11-27
 
 - Documentation seulement : lot 1 bis confirmé sur iPhone ; cause des tours lents consignée et prompt de reprise du lot « attente de passage ».

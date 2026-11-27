@@ -188,6 +188,14 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Réglage admin `endOfSpeechMs` à 600-700 ms en sandbox ; vérifier aussi l'attente `Finalize` de Deepgram (jusqu'à 1,5 s).
 - Mesure : délai de décision, tours re-décidés ou annulés (signature « annulation 1,1-1,5 s après la décision »), coupures ressenties. Adoption seulement si les coupures n'augmentent pas.
 
+### Attente de passage, lot 1 (27 novembre, code)
+
+Diagnostic sur `voice_turn_finished` (21–27 novembre) : 14 attentes `pre_turn_handoff_prior_write` de plus de 0,5 s sur 574 tours mesurés (médiane 1,45 s, max 3,10 s). Au tour précédent, l'autre personnage était nommé dans la réplique seule (11), par le joueur seul (2) ou les deux (1) ; aucune demande, offre ni accord ; `handoff_assessment` nul sur les 14 (GM 2,3 à 5,9 s).
+
+Règle (`handoffFinalizationMode`) : `blocking` comme avant pour une demande ouverte, une offre préparée, une offre ou un accord dans la réplique, ou une parole de contact du joueur avec l'autre nommé ; `background` pour un simple nom (écrit si le GM répond avant le tour suivant, sinon abandonné et noté `late_after_next_turn`) ; `skip` sinon. Rejouée sur le code : les 14 tours lents passent en `background`, les 10 décisions de passage relevées depuis le 15 novembre restent `blocking`. Réglage de retour : `VOICE_HANDOFF_WAIT_ON_NAME`.
+
+Limite : un passage accordé sur un simple nom, sans mot de contact ni offre, est perdu si le joueur reparle avant la réponse du GM. Aucun cas observé, échantillon petit.
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.
