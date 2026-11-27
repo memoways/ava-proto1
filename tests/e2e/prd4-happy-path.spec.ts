@@ -858,14 +858,17 @@ for (const character of ['Max', 'Emma'] as const) {
     await expect(page.getByRole('button', { name: /Passer/ })).toBeVisible();
     await startCharacterConversation(page, character, '/?env=sandbox-ulrich');
     await expect(page.getByRole('button', { name: "Démarrer l'enregistrement" })).toBeEnabled();
-    expect(fakes.getTtsText()).toBe(choices[1].normalize('NFKC').replace(/\s+([?!])/g, '$1'));
-    expect(fakes.getTtsCallCount()).toBe(1);
+    // Two syntheses: the rescue line prepared in advance, then the single greeting.
+    const greeting = choices[1].normalize('NFKC').replace(/\s+([?!])/g, '$1');
+    const rescue = character === 'Max' ? 'Reprenez, je vous écoute.' : 'Je vous écoute. On reprend doucement?';
+    expect(fakes.getTtsText()).toBe(`${rescue} ${greeting}`);
+    expect(fakes.getTtsCallCount()).toBe(2);
     expect(fakes.getMaxTurnCount()).toBe(0);
     expect(fakes.getGmPostTurnCount()).toBe(0);
     // Unrelated renders never select or read a second greeting.
     await page.setViewportSize({ width: 1100, height: 800 });
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
-    expect(fakes.getTtsCallCount()).toBe(1);
+    expect(fakes.getTtsCallCount()).toBe(2);
   });
 }
 
