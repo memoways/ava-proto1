@@ -141,6 +141,7 @@ export async function streamLLM(
   let firstToken = false;
   let firstTokenMs: number | null = null;
   let effectiveProvider: string | null = null;
+  let serviceObserved = false;
   observeVoice(options?.onVoiceObservation, "llm_request");
   try {
     const response = await withTimeout(`LLM stream ${model}`,
@@ -165,12 +166,17 @@ export async function streamLLM(
       const choices = value.choices as Array<{ finish_reason?: unknown }> | undefined;
       if (Array.isArray(choices) && typeof choices[0]?.finish_reason === 'string') finishReason = choices[0].finish_reason;
       if (typeof value.provider === 'string') effectiveProvider = value.provider;
-      if (typeof value.model === 'string') observeService(options?.onServiceObserved, {
+      // One observation per call: a streamed reply repeats the model on every chunk, and a turn
+      // keeps 16 services at most, so per-chunk entries pushed out the tts and video ones.
+      if (typeof value.model === 'string' && !serviceObserved) {
+        serviceObserved = true;
+        observeService(options?.onServiceObserved, {
         service: 'llm', requested_provider: 'openrouter', requested_model: model,
         resolved_provider: 'openrouter', resolved_model: model,
         effective_provider: typeof value.provider === 'string' ? value.provider : null,
         effective_model: value.model, transport: 'sse', fallback: value.model !== model,
-      });
+        });
+      }
       if (value._ava_observability) options?.onServerObserved?.(value._ava_observability as ServerObservation);
     }});
     if (controller.signal.aborted) throw new DOMException('LLM cancelled', 'AbortError');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leavesAvatarRoom, resolveCallVideo, type CallVideoInput } from "./callVideoRouting";
+import { describeNextCall, leavesAvatarRoom, resolveCallVideo, type CallVideoInput } from "./callVideoRouting";
 import { streamingAvatarDefaults } from "./streamingAvatar/settings";
 import type { CharacterVideoLink, StreamingAvatarSettings } from "./streamingAvatar/types";
 
@@ -41,8 +41,8 @@ describe("resolveCallVideo without a link", () => {
 });
 
 describe("resolveCallVideo with a link", () => {
-  it("opens Emma's Nuance persona on a tablet with the global switch on voice", () => {
-    const decision = resolveCallVideo(input({ character: "emma", configuredMode: "tts", avatar: linked({ emma: sonia }) }));
+  it("opens Emma's Nuance persona on a tablet with the global switch on video", () => {
+    const decision = resolveCallVideo(input({ character: "emma", avatar: linked({ emma: sonia }) }));
     expect(decision).toMatchObject({ mode: "streaming_avatar", reason: "character_link" });
     expect(decision.avatar.activeProvider).toBe("nuance");
     expect(decision.avatar.nuance).toMatchObject({ personaId: "sonia", expressiveness: 1.4, drive: "verbatim" });
@@ -76,6 +76,58 @@ describe("resolveCallVideo with a link", () => {
   it("applies the same rule to a later character (Léo)", () => {
     expect(resolveCallVideo(input({ character: "leo", avatar: linked({ leo: { provider: "tavus" } }) })))
       .toMatchObject({ mode: "streaming_avatar", reason: "character_link" });
+  });
+});
+
+describe("resolveCallVideo with the global switch on voice (27 November)", () => {
+  it("stays voice-only even with Max's Tavus link", () => {
+    const decision = resolveCallVideo(input({ configuredMode: "tts", avatar: linked({ max: { provider: "tavus" } }) }));
+    expect(decision).toMatchObject({ mode: "tts", reason: "settings" });
+    expect(decision.avatar.activeProvider).toBe(streamingAvatarDefaults.activeProvider);
+  });
+
+  it("stays voice-only for Emma's Nuance link", () => {
+    expect(resolveCallVideo(input({ character: "emma", configuredMode: "tts", avatar: linked({ emma: sonia }) })))
+      .toMatchObject({ mode: "tts", reason: "settings" });
+  });
+
+  it("keeps a device explicitly set to the live avatar on its own choice", () => {
+    const decision = resolveCallVideo(input({
+      configuredMode: "tts",
+      avatar: linked({ max: { provider: "tavus" } }),
+      deviceServices: { output: "avatar", avatarProvider: null },
+    }));
+    expect(decision).toMatchObject({ mode: "streaming_avatar", reason: "character_link" });
+  });
+});
+
+describe("resolveCallVideo with « Pas de vidéo »", () => {
+  it("gives Max a voice-only call while the global switch is on video", () => {
+    const decision = resolveCallVideo(input({ avatar: linked({ max: { provider: "none" } }) }));
+    expect(decision).toMatchObject({ mode: "tts", reason: "character_no_video" });
+  });
+
+  it("wins over a device set to the live avatar", () => {
+    expect(resolveCallVideo(input({
+      avatar: linked({ max: { provider: "none" } }),
+      deviceServices: { output: "avatar", avatarProvider: "tavus" },
+    }))).toMatchObject({ mode: "tts", reason: "character_no_video" });
+  });
+
+  it("leaves the other characters' links alone", () => {
+    const avatar = linked({ max: { provider: "none" }, emma: sonia });
+    expect(resolveCallVideo(input({ character: "emma", avatar }))).toMatchObject({ mode: "streaming_avatar", reason: "character_link" });
+  });
+});
+
+describe("describeNextCall", () => {
+  it.each([
+    [input({ avatar: linked({ max: { provider: "tavus" } }) }), "Vidéo Tavus"],
+    [input({ configuredMode: "tts", avatar: linked({ max: { provider: "tavus" } }) }), "Voix seule, car le réglage global est sur Voix"],
+    [input({ avatar: linked({ max: { provider: "none" } }) }), "Voix seule, choisie pour ce personnage"],
+    [input({ character: "emma" }), "Voix seule : sans service vidéo propre, seul Max suit le réglage global"],
+  ])("says what the next call gives (%#)", (value, label) => {
+    expect(describeNextCall(value)).toBe(label);
   });
 });
 

@@ -153,11 +153,18 @@ export interface TavusAvatarSettings {
 }
 
 /**
- * Video service of one character (`ava_streaming_avatar_settings.characterLinks`). A linked
- * character opens its call on that provider; an absent field follows the same provider's global
- * value. Tavus per-character fields stay in `tavus.characters`.
+ * Video service of one character (`ava_streaming_avatar_settings.characterLinks`). While video is
+ * on, a linked character opens its call on that provider; an absent field follows the same
+ * provider's global value. Tavus per-character fields stay in `tavus.characters`.
+ * `{ provider: "none" }` (« Pas de vidéo », 27 November) keeps the character voice-only.
  */
-export type CharacterVideoLink =
+export type CharacterVideoLink = CharacterProviderLink | CharacterNoVideoLink;
+
+export interface CharacterNoVideoLink {
+  provider: "none";
+}
+
+export type CharacterProviderLink =
   | { provider: "nuance"; personaId?: NuancePersonaId; expressiveness?: number; drive?: NuanceDriveMode }
   | { provider: "tavus" }
   | { provider: "heygen"; avatarId?: string; voiceId?: string }

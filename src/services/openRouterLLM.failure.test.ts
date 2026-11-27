@@ -77,3 +77,17 @@ describe('lot 3 — SSE terminal proof at the real streaming call', () => {
     expect(spoken.join(' ')).toBe(speech);
   });
 });
+
+describe('settings lot 1 — one LLM service observation per streamed call', () => {
+  it('records the LLM once, whatever the number of chunks, so tts and video keep their place', async () => {
+    const frames = Array.from({ length: 15 }, (_, index) => ({
+      id: 'gen-many', model: 'openai/gpt-5.6-luna', provider: 'Fast',
+      choices: [{ delta: { content: `mot${index} ` }, ...(index === 14 ? { finish_reason: 'stop' } : {}) }],
+    })).map(v => `data: ${JSON.stringify(v)}\n\n`).join('') + 'data: [DONE]\n\n';
+    vi.mocked(authenticatedFunctionFetch).mockResolvedValueOnce(new Response(frames));
+    const observed = vi.fn();
+    await streamLLM([{ role: 'user', content: 'Bonjour' }], () => {}, { model: 'openai/gpt-5.6-luna', onServiceObserved: observed });
+    expect(observed).toHaveBeenCalledTimes(1);
+    expect(observed).toHaveBeenCalledWith(expect.objectContaining({ service: 'llm', transport: 'sse', effective_provider: 'Fast', effective_model: 'openai/gpt-5.6-luna' }));
+  });
+});

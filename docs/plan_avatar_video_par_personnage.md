@@ -185,15 +185,27 @@ Verdict : **le plan tient sur le fond** (lien optionnel dans `ava_streaming_avat
 ### 9.3 Priorité au décrochage, version corrigée
 
 1. Appareil en « voix » (ou smartphone par défaut) → voix, lien ou pas.
-2. Le personnage de départ a un lien → vidéo, fournisseur du lien, champs du lien par-dessus la config globale du même fournisseur. Gagne sur le fournisseur fixé par l’appareil et sur l’interrupteur global.
+2. Le personnage de départ a un lien → vidéo, fournisseur du lien, champs du lien par-dessus la config globale du même fournisseur. Gagne sur le fournisseur fixé par l’appareil et sur l’interrupteur global. **Remplacé le 27 novembre (9.3 bis)** : le global sur « Voix » coupe la vidéo, lien ou pas.
 3. Pas de lien, personnage Max → règle actuelle (appareil « avatar » ou interrupteur global ; fournisseur de l’appareil sinon `activeProvider`).
 4. Pas de lien, Emma → voix, raison `character_voice_only`.
 
 Ajouter une raison distincte (par exemple `character_link`) pour que la session et le bloc « Joué » disent pourquoi la vidéo s’est ouverte.
 
+### 9.3 bis Règles du 27 novembre 2026 (priment sur 9.3)
+
+Décision d’Ulrich après une session Tavus ouverte malgré la sortie globale sur « Voix » (lien Tavus de Max posé le matin, invisible à l’écran) :
+
+1. Appareil en « voix » (ou smartphone par défaut) → voix, lien ou pas.
+2. Interrupteur global sur « Voix » → voix pour tous les personnages, lien ou pas (raison `settings`). Seul un appareil réglé explicitement sur « avatar » garde son choix, comme avant.
+3. Vidéo active, personnage en « Pas de vidéo (voix seule) » (`characterLinks.<clé> = { provider: "none" }`) → voix, raison `character_no_video`. Gagne aussi sur un appareil « avatar ».
+4. Vidéo active, lien vers un fournisseur → ce fournisseur, champs du lien par-dessus la config globale (raison `character_link`).
+5. Vidéo active, « Suivre le réglage global » (pas d’entrée) → Max suit l’appareil et le global ; les autres personnages restent en voix (`character_voice_only`).
+
+La forme `{ provider: "none" }` est additive : les anciennes valeurs se relisent à l’identique, et une version antérieure du code l’ignorait (« Suivre le réglage global »). Aucune migration. La fiche du personnage dit ce que donnera le prochain appel sur ordinateur (`describeNextCall`, par exemple « Vidéo Tavus » ou « Voix seule, car le réglage global est sur Voix »). Un passage vers un autre personnage repasse toujours en voix (inchangé).
+
 ### 9.4 Tests à ajouter à la liste du §4
 
-- Emma liée à Nuance, interrupteur global sur Voix, tablette : vidéo Nuance, persona d’Emma.
+- Emma liée à Nuance, interrupteur global sur Voix, tablette : vidéo Nuance, persona d’Emma. **Remplacé le 27 novembre** : voix (règle 9.3 bis) ; la vidéo Nuance d’Emma demande le global sur Vidéo.
 - Max lié à Nuance, appareil avec fournisseur HeyGen fixé : Nuance (le personnage gagne).
 - Appel ouvert par Emma en vidéo, passage vers Max : repli voix, aucune réplique de Max dans la salle d’Emma.
 - Appel ouvert par Max en vidéo, passage vers Emma : repli voix (comportement d’aujourd’hui conservé).

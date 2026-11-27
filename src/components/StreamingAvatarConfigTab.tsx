@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CheckCircle2, ChevronRight, Loader2, Video, XCircle } from "lucide-react";
+import { TestSettingsFold } from "@/components/admin/SettingsFold";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -511,8 +512,10 @@ function TavusFields({
             <SwitchField label="Sous-titres Tavus" hint="enable_closed_captions ; Ava affiche déjà ses sous-titres." checked={value.enableClosedCaptions} onChange={(enableClosedCaptions) => patch({ enableClosedCaptions })} />
             <SwitchField label="Fond vert" hint="apply_greenscreen ; sans effet sur un Face Phoenix-4.5." checked={value.applyGreenscreen} onChange={(applyGreenscreen) => patch({ applyGreenscreen })} />
             <SwitchField label="Politique UE" hint="policy « eu » : réglages automatiques résolus selon l'AI Act." checked={value.euPolicy} onChange={(euPolicy) => patch({ euPolicy })} />
-            <SwitchField label="Réponse parlée en cours de génération (prototype)" hint="Lot T7 : la première phrase part au TTS dès que le LLM l'a écrite. Voix d'Ava seulement ; désactivé par défaut. À mesurer sur sandbox-ulrich." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
           </div>
+          <TestSettingsFold testId="test-settings-tavus">
+            <SwitchField label="Parler dès la première phrase (prototype)" hint="La première phrase part à la voix dès qu'elle est écrite, sans attendre la réponse entière. Seulement avec la voix d'Ava ; désactivé par défaut." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
+          </TestSettingsFold>
           <div className="space-y-2 rounded-md border p-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -763,7 +766,9 @@ function AnamFields({
             <PromptField label="Attitude au repos (écoute)" value={notes.customIdlingStylePrompt} disabled={!notesRead} onChange={(customIdlingStylePrompt) => patchNotes({ customIdlingStylePrompt })} />
           </div>
         )}
-        <SwitchField label="Réponse parlée en cours de génération (mesure)" hint="Lot 4 latence : la première phrase part à Anam dès que le LLM l'a écrite, dans un seul flux de parole. Désactivé par défaut. À mesurer sur sandbox-ulrich." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
+        <TestSettingsFold testId="test-settings-anam">
+          <SwitchField label="Parler dès la première phrase (en mesure)" hint="La première phrase part à Anam dès qu'elle est écrite, dans un seul flux de parole, sans attendre la réponse entière. Désactivé par défaut." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
+        </TestSettingsFold>
         <Advanced>
           <div className="grid gap-4 md:grid-cols-2">
             <NumberField label="Durée maximale de session (s)" hint="60 à 3 600 ; défaut 900." bounds={b.anamMaxSessionSeconds} value={value.maxSessionLengthSeconds} onChange={(maxSessionLengthSeconds) => patch({ maxSessionLengthSeconds })} />

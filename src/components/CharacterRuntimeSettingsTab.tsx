@@ -17,7 +17,8 @@ import { EffectiveVoiceBlock, useVoiceProfiles } from '@/components/admin/Effect
 import { DEVICE_CLASSES } from '@/services/deviceClass';
 import { CharacterStateEditor } from "@/components/admin/CharacterStateEditor";
 import { CharacterReceivedPreview } from "@/components/admin/CharacterReceivedPreview";
-import { CharacterVideoLinkEditor } from "@/components/admin/CharacterVideoLinkEditor";
+import { CharacterVideoLinkEditor, characterVideoSummary } from "@/components/admin/CharacterVideoLinkEditor";
+import { SettingsFold } from "@/components/admin/SettingsFold";
 import {
   characterVideoChoice,
   getStreamingAvatarSettings,
@@ -95,6 +96,15 @@ function readiness(
         : "Vérifier que le personnage ne récupère pas les faits privés d'un autre corpus",
     },
   ];
+}
+
+/** One line for the folded « Audio » block: provider and voice in use. */
+function audioSummary(profile: CharacterRuntimeProfile, voiceId: string | null | undefined): string {
+  const provider = TTS_PROVIDER_LIST.find((entry) => entry.id === profile.tts_provider)?.label ?? profile.tts_provider;
+  if (!provider) return "Aucun fournisseur TTS";
+  const voice = voiceId ? `voix ${voiceId.length > 12 ? `${voiceId.slice(0, 8)}…` : voiceId}` : "sans Voice ID";
+  const roughness = profile.rugosite ? ` · rugosité ${profile.rugosite}` : "";
+  return `${provider} · ${voice}${roughness}`;
 }
 
 export default function CharacterRuntimeSettingsTab() {
@@ -263,6 +273,11 @@ export default function CharacterRuntimeSettingsTab() {
                   </label>
                 </div>
 
+                <SettingsFold
+                  title="Audio"
+                  summary={audioSummary(profile, characterVoice(voices, profile.character_key, profile.tts_provider as TTSProviderId | null) ?? profile.tts_voice_id)}
+                  testId={`audio-${profile.character_key}`}
+                >
                 <div className="grid grid-cols-2 gap-2">
                   <Select
                     value={profile.tts_provider ?? ""}
@@ -288,21 +303,6 @@ export default function CharacterRuntimeSettingsTab() {
                   if (catalogued && profile.tts_voice_id && catalogued !== profile.tts_voice_id) return <p className="text-xs text-amber-300/90">Le jeu utilise encore {profile.tts_voice_id} ; sauvegarder le profil applique l’ID de la configuration TTS.</p>;
                   return null;
                 })()}
-                <CharacterVideoLinkEditor
-                  characterKey={profile.character_key}
-                  characterName={profile.display_name}
-                  settings={avatarSettings}
-                  choice={videoChoice}
-                  onChange={(next) => setVideoDrafts((current) => ({ ...current, [profile.character_key]: next }))}
-                />
-                {profile.character_key === "max" || profile.character_key === "emma" ? (
-                  <EffectiveVoiceBlock
-                    devices={DEVICE_CLASSES}
-                    characters={[profile.character_key]}
-                    overrides={() => ({ avatar: withCharacterVideoChoice(avatarSettings, profile.character_key, videoChoice) })}
-                    profiles={{ max: null, emma: null, [profile.character_key]: { ttsProvider: profile.tts_provider, ttsVoiceId: profile.tts_voice_id } }}
-                  />
-                ) : null}
                  <p className="text-xs text-muted-foreground">
                   Le Voice ID est repris de <a className="underline" href={adminTabPath("voice")}>Technique → Configuration TTS</a> selon le provider choisi : aucune copie à la main. Les réglages fins Gradium se règlent aussi dans TTS Config.
                 </p>
@@ -327,6 +327,25 @@ export default function CharacterRuntimeSettingsTab() {
                     Module la fréquence des états bloqués, des ruptures et la tolérance au silence — jamais les faits. Épinglée à la session au premier tour.
                   </p>
                 </div>
+                </SettingsFold>
+
+                <SettingsFold title="Vidéo" summary={characterVideoSummary(videoChoice)} testId={`video-${profile.character_key}`}>
+                  <CharacterVideoLinkEditor
+                    characterKey={profile.character_key}
+                    characterName={profile.display_name}
+                    settings={avatarSettings}
+                    choice={videoChoice}
+                    onChange={(next) => setVideoDrafts((current) => ({ ...current, [profile.character_key]: next }))}
+                  />
+                </SettingsFold>
+                {profile.character_key === "max" || profile.character_key === "emma" ? (
+                  <EffectiveVoiceBlock
+                    devices={DEVICE_CLASSES}
+                    characters={[profile.character_key]}
+                    overrides={() => ({ avatar: withCharacterVideoChoice(avatarSettings, profile.character_key, videoChoice) })}
+                    profiles={{ max: null, emma: null, [profile.character_key]: { ttsProvider: profile.tts_provider, ttsVoiceId: profile.tts_voice_id } }}
+                  />
+                ) : null}
 
                 <CharacterStateEditor
                   characterName={profile.display_name}

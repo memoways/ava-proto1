@@ -325,6 +325,17 @@ describe("character video links", () => {
     });
   });
 
+  it("stores and reads back « Pas de vidéo » without changing the other links", () => {
+    const stored = {
+      characterLinks: { max: { provider: "none" }, emma: { provider: "nuance", personaId: "sonia" }, leo: { provider: "tavus" } },
+    };
+    expect(normalize(stored).characterLinks).toEqual({
+      max: { provider: "none" }, emma: { provider: "nuance", personaId: "sonia" }, leo: { provider: "tavus" },
+    });
+    const next = withCharacterVideoChoice(normalize(stored), "max", { link: { provider: "none" }, tavus: {} });
+    expect(normalize(JSON.parse(JSON.stringify(next))).characterLinks.max).toEqual({ provider: "none" });
+  });
+
   it("lays the character fields over the same provider's global block", () => {
     const base = normalize({
       heygen: { avatarId: "global-a", voiceId: "global-v" },

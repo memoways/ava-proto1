@@ -44,6 +44,7 @@ describe("describeEffectiveVoice", () => {
     const voice = describeEffectiveVoice(input({
       device: "tablet",
       character: "emma",
+      configuredOutput: "streaming_avatar",
       deviceServices: { ...followSwitch, avatarProvider: "heygen" },
       avatar: {
         ...streamingAvatarDefaults,
