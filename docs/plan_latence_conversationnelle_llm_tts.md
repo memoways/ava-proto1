@@ -196,6 +196,17 @@ Règle (`handoffFinalizationMode`) : `blocking` comme avant pour une demande ouv
 
 Limite : un passage accordé sur un simple nom, sans mot de contact ni offre, est perdu si le joueur reparle avant la réponse du GM. Aucun cas observé, échantillon petit.
 
+### Attente de passage, mesure après lot 1 (27 novembre, aucun code)
+
+Sessions `ab76a0c9` (18 tentatives) et `9e2ba88c` (13), `sandbox-ulrich`, voix seule, après la fusion de la PR #305 (17:32 UTC). Lecture seule : `voice_turn_events`, `experience_events`, `sessions`.
+
+- **Attente** : `pre_turn_handoff_prior_write` vaut 0 ms sur les 31 tentatives ; l'attente totale avant le tour est de 79 à 343 ms. La demande Max → Emma aboutit (`ab76a0c9` : `handoff_validated`, clic, `handoff_executed`).
+- **Cas probants** : 3, soit un tour précédent qui nomme l'autre sans le demander et un tour suivant parti pendant le Game Master (`9e2ba88c` tours 5 et 8, `ab76a0c9` tour 13). L'ancien code aurait attendu ; le nouveau n'attend pas, donc il était bien actif. Un quatrième est à la limite (`ab76a0c9` tour 7, GM fini 50 ms après).
+- **Défaut trouvé** : dans ces 3 cas, le post-tour du Game Master est **abandonné** (span `gm_persistence` ou `gm_generation` en échec environ 40 ms après le début du tour suivant) et le tour **manque dans `gm_post_turn_log`**. Cause lue dans le code : `postTurnSignal` est le signal du bail de passage (`IndexPRD4.tsx`), et le tour suivant le relie à un nouveau `requestId` (`advanceHandoffTurn`), ce qui annule l'ancien. Sont perdus pour ce tour : mémoire structurée, guidage et état de parole proposés, recommandation de cinématique, journal. Avant le lot 1, ces tours attendaient et le GM aboutissait.
+- **Compteur muet** : `late_after_next_turn` vaut 0, mais ce zéro ne prouve rien. L'évaluation annulée ne peut accorder aucun passage, donc la perte n'est presque jamais notée. La limite acceptée (« abandonné et noté ») n'est pas tenue.
+- **Antérieur au lot 1** : un tour qui ne nomme personne n'attendait déjà pas ; son GM est annulé de la même façon (`ab76a0c9` tour 15). Tous motifs confondus, 38 observations GM sur 288 sont en échec du 21 novembre à la fusion.
+- **Conclusion** : mécanisme confirmé ; gain en secondes **non mesurable** (le GM annulé ne dit pas combien l'ancien code aurait attendu) et passages perdus **non mesurables**. Refaire un appel avant correction n'apporterait rien. Retour possible sans code : activer « Passage : attendre même sur un simple nom » (le GM est conservé sur ces tours, l'attente revient). Suite : [lot 1 bis](prompt_reprise_attente_passage_lot_1_bis.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

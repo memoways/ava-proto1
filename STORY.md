@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Attente de passage)  
+> **Last Updated**: 2026-11-27 (Attente de passage, mesure)  
+
+---
+
+## Moins d'attente, mais des tours oubliés (27 novembre 2026)
+
+Deux appels de recette : Max ne fait plus attendre quand on prononce seulement le nom d'Emma. La mesure montre le prix caché : si le joueur reparle vite, le Game Master est coupé en plein travail et oublie ce tour, sans que personne le sache. À corriger avant de compter le gain.
 
 ---
 
