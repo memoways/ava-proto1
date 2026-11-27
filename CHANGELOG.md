@@ -10,6 +10,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Ailleurs : un échec du flux MP3 MediaSource avant tout son est mémorisé pour la page, et les lignes suivantes passent en PCM. Le chemin MSE des ordinateurs est inchangé, de même que l'interruption et les autres fournisseurs.
 - Télémétrie : `fallback_reason` dans `audio_latencies` (`mse: …`, `request: …`, `pcm: …`, `no_readable_body`). Aucune migration.
 
+## [Latence lot 2 : conclusion du banc] — 2026-11-27
+
+- Documentation seulement : qualité au juge (gpt-oss-120b − 0,52, écarté ; Gemini 2.5 Flash + 0,04), rappel long sur 40 tours, recommandation (garder gpt-5.6-luna avec `provider.sort: "latency"`, 1re phrase 1,25 → 0,82 s) dans le rapport, le plan, l'état courant et le prompt du lot 3.
+
 ## [Latence lot 2 : routage et raisonnement en évaluation] — 2026-11-26
 
 - `eval:judge --candidate-json` et `eval:llm-recall` savent jouer un candidat comme le banc l'a mesuré : `provider` (préférence OpenRouter), `reasoningEffort` et `disableReasoning` passent du tour d'évaluation à l'appel du personnage, puis à `proxy-llm`. Sans eux, gpt-oss rendait des réponses vides. `eval:llm-recall --models` accepte les noms du banc (`oss-cerebras`, `gemini-25-flash`, `luna-latency`…).
