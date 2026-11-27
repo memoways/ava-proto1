@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 4 : LLM streamé sur toutes les sorties] — 2026-11-27
+
+- Voix seule : nouvel interrupteur `VOICE_STREAMED_LLM` (Réglages › Game Master, défaut désactivé). La synthèse reçoit chaque phrase sûre du LLM dès qu'elle est écrite, avec le transport en flux des lots 1 et 1 bis (MP3 ou PCM). Gradium progressif reste prioritaire.
+- Anam : interrupteur `streamedLlm` (Réglages › Avatar vidéo › Anam, défaut désactivé). Un seul flux de parole alimenté phrase par phrase, fermé à la fin de la génération.
+- Le puits du flux T7 est partagé par toutes les sorties (`streamedOutputSink.ts`) ; gardes inchangées (passage retenu, phrase dite jamais remplacée, salvage T8, interruption).
+- Télémétrie : `output_stream` (sortie, mode, transport du LLM) dans `voice_turn_events`. Aucune migration.
+
 ## [Latence lot 3 : mesure réelle] — 2026-11-27
 
 - Documentation seulement : 24 tours sur `sandbox-ulrich` avec le routage `sort: latency`. Appel du personnage 1,97 → 1,23 s en médiane ; premier son voix seule 5,25 → 2,88 s. Constat sur les emportements de Max consigné, avec un prompt de reprise pour ce chantier.

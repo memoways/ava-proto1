@@ -148,6 +148,19 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - Gardes inchangées : salvage en flux (T8), retenue de passage (`heldOutput`) en lot, une phrase dite n'est jamais remplacée.
 - Mesure : au moins 10 tours activé puis au moins 10 désactivé, par sortie. Critère : gain médian > 0,5 s, 0 relance d'intent, 0 phrase retirée, interruption vérifiée. Si le critère est rempli, le défaut passe à vrai, sur accord d'Ulrich.
 
+**Résultat du lot 4 (27 nov., code livré, mesure en usage réel à faire)**
+
+- Sorties exclues du flux avant ce lot : voix seule hors Gradium progressif (ElevenLabs, Fish, Cartesia, Inworld, OpenAI), Anam, Tavus avec la voix du PAL, HeyGen, LemonSlice, Nuance. Seuls Gradium (`VOICE_INCREMENTAL_OUTPUT`) et Tavus avec l'audio d'Ava (`streamedLlm`) parlaient pendant la génération.
+- Deux nouveaux réglages, défaut faux, lus au début de chaque tour :
+  - **Voix seule** : `VOICE_STREAMED_LLM` (Réglages › Game Master, « Voix seule : réponse parlée en cours de génération »). `LocalTTSOutput.renderTextStream` découpe et met en file chaque phrase sûre dès qu'elle arrive, avec le même transport que le lot (flux MP3 MediaSource ou PCM Web Audio pour ElevenLabs, lots 1 et 1 bis). Gradium progressif reste prioritaire quand il est actif.
+  - **Anam** : `anam.streamedLlm` (Réglages › Avatar vidéo › Anam). Un seul flux `talk` alimenté phrase par phrase, chaque morceau part sans être retenu, le flux est fermé par `endMessage` à la fin de la génération.
+  - Tavus inchangé (`streamedLlm`, audio d'Ava). HeyGen, LemonSlice, Nuance et Tavus voix PAL restent en lot : ils ne savent pas encore recevoir une réplique en cours (hors périmètre).
+- Code commun : le puits du flux (T7) est sorti d'`IndexPRD4` dans `src/services/streamedOutputSink.ts` (`chooseOutputStreamMode`, `createStreamedOutputSink`) et sert à toutes les sorties. Gardes inchangées : demande de passage ouverte → lot (`held_batch`), segment demandant une préparation de passage → retenu (`heldOutput`), une phrase dite n'est jamais remplacée après un `reset`, en-tête privé raté → aucun segment en flux, la réponse récupérée (T8) part en lot. Un échec de génération n'est pas compté comme une panne de voix (pas de toast ni de repli TTS).
+- Télémétrie : `voice_turn_events.metadata_json.output_stream` = `{ output, mode, llm_transport }` (`output` : `tts` ou le fournisseur avatar ; `mode` : `feed`, `batch`, `held_batch`, `gradium_incremental` ; `llm_transport` : `sse` ou `http_batch`). Le délai à la première phrase dite est `durations.origin_to_output_estimated_ms`. Aucune migration (JSON). Projection MCP mise à jour.
+- Tests : `streamedOutputSink.test.ts` (8 : réglage absent = lot, `held_batch`, ordre des segments, phrase dite jamais remplacée, salvage T8 en lot, échec), `localTtsOutput.test.ts` (+4 : interrupteur, ordre, échec, interruption), `anam.test.ts` (+4 : interrupteur, un flux fermé par `endMessage`, échec après début, interruption pendant le flux), `voiceTurnTelemetryV2.test.ts` (+1).
+- **Mesure à faire par Ulrich** (`sandbox-ulrich`, aucune dépense automatique) : par sortie (voix seule ElevenLabs, Anam), au moins 10 tours interrupteur activé puis au moins 10 désactivé. Critère : gain médian du premier son > 0,5 s, 0 relance d'intent, 0 phrase retirée, une interruption vérifiée pendant le flux. Lecture : `voice_turn_events` filtré sur `output_stream.mode`. Anam : 3 ouvertures de salle par 10 minutes.
+- **Statut : code livré, mesure en attente.** Le défaut ne passe à vrai qu'après la mesure et l'accord d'Ulrich.
+
 ### Lot 5 — Fin de parole plus courte (essai)
 
 - Réglage admin `endOfSpeechMs` à 600-700 ms en sandbox ; vérifier aussi l'attente `Finalize` de Deepgram (jusqu'à 1,5 s).

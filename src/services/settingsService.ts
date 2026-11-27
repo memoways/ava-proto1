@@ -623,6 +623,11 @@ export interface GameplaySettings {
   VOICE_HANDS_FREE: HandsFreeVoiceSettings;
   /** P1 canary, disabled for existing environments. */
   VOICE_INCREMENTAL_OUTPUT: boolean;
+  /**
+   * Latency lot 4: voice-only output (ElevenLabs and the other batch TTS providers) speaks the first
+   * safe phrase while the LLM still answers. Off by default during the measurement.
+   */
+  VOICE_STREAMED_LLM: boolean;
   VOICE_ONLY_UI: boolean;
 }
 
@@ -660,6 +665,7 @@ const gameplayDefaults: GameplaySettings = {
   VIDEO_PLACEHOLDER_DURATION: defaultSettings.VIDEO_PLACEHOLDER_DURATION,
   VOICE_HANDS_FREE: { ...HANDS_FREE_DEFAULTS },
   VOICE_INCREMENTAL_OUTPUT: false,
+  VOICE_STREAMED_LLM: false,
   VOICE_ONLY_UI: false,
 };
 
@@ -674,6 +680,7 @@ export function getGameplaySettings(): GameplaySettings {
         MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(parsed.MAX_PROMPT_VARIANT, gameplayDefaults.MAX_PROMPT_VARIANT),
         VOICE_HANDS_FREE: normalizeHandsFreeSettings(parsed.VOICE_HANDS_FREE),
         VOICE_INCREMENTAL_OUTPUT: parsed.VOICE_INCREMENTAL_OUTPUT === true,
+        VOICE_STREAMED_LLM: parsed.VOICE_STREAMED_LLM === true,
         VOICE_ONLY_UI: parsed.VOICE_ONLY_UI === true,
         QUESTIONNAIRE_MODE: normalizeQuestionnaireMode(parsed.QUESTIONNAIRE_MODE),
       };
@@ -689,6 +696,7 @@ export async function loadGameplaySettingsFromDB(): Promise<GameplaySettings> {
     MAX_PROMPT_VARIANT: normalizeMaxPromptVariant(loaded.MAX_PROMPT_VARIANT, "legacy"),
     VOICE_HANDS_FREE: normalizeHandsFreeSettings(loaded.VOICE_HANDS_FREE),
     VOICE_INCREMENTAL_OUTPUT: loaded.VOICE_INCREMENTAL_OUTPUT === true,
+    VOICE_STREAMED_LLM: loaded.VOICE_STREAMED_LLM === true,
     VOICE_ONLY_UI: loaded.VOICE_ONLY_UI === true,
     QUESTIONNAIRE_MODE: normalizeQuestionnaireMode(loaded.QUESTIONNAIRE_MODE),
   };

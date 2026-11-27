@@ -160,3 +160,16 @@ it("retains video wait as an additive observation without changing the total or 
   expect(events[1].value.durations).toMatchObject({ video_wait_ms: 1200, origin_to_output_estimated_ms: 1800, playback_ms: 5000 });
   expect(events[0].value.durations.video_wait_ms).toBeUndefined();
 });
+
+describe("output stream observation (latency lot 4)", () => {
+  it("records the output, its mode and the LLM transport on the finished turn", () => {
+    const streamed = attempt();
+    streamed.turn.outputStream({ output: "anam", mode: "feed" });
+    streamed.turn.finish("completed");
+    expect(streamed.events.at(-1)?.value.output_stream).toEqual({ output: "anam", mode: "feed", llm_transport: "sse" });
+    const batch = attempt();
+    batch.turn.outputStream({ output: "tts", mode: "held_batch" });
+    batch.turn.finish("completed");
+    expect(batch.events.at(-1)?.value.output_stream).toEqual({ output: "tts", mode: "held_batch", llm_transport: "http_batch" });
+  });
+});

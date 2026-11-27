@@ -33,6 +33,8 @@ export const voiceTurnProjectionSchema = z.object({
   interruptions_capped: z.boolean().optional(),
   capture_dsp: z.object({ echoCancellation: z.boolean(), noiseSuppression: z.boolean().nullable(), autoGainControl: z.boolean().nullable(),
     trackSampleRate: z.number().finite().positive().nullable(), contextSampleRate: z.number().finite().positive() }).optional(),
+  output_stream: z.object({ output: z.string().max(32), mode: z.enum(["feed", "batch", "held_batch", "gradium_incremental"]),
+    llm_transport: z.enum(["sse", "http_batch"]) }).optional(),
 });
 export type VoiceTurnProjection = z.infer<typeof voiceTurnProjectionSchema>;
 export interface VoiceEventRow { id: string; created_at: string; event_name: string; metadata_json: unknown }

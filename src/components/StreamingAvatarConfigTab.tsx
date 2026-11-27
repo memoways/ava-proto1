@@ -763,6 +763,7 @@ function AnamFields({
             <PromptField label="Attitude au repos (écoute)" value={notes.customIdlingStylePrompt} disabled={!notesRead} onChange={(customIdlingStylePrompt) => patchNotes({ customIdlingStylePrompt })} />
           </div>
         )}
+        <SwitchField label="Réponse parlée en cours de génération (mesure)" hint="Lot 4 latence : la première phrase part à Anam dès que le LLM l'a écrite, dans un seul flux de parole. Désactivé par défaut. À mesurer sur sandbox-ulrich." checked={value.streamedLlm} onChange={(streamedLlm) => patch({ streamedLlm })} />
         <Advanced>
           <div className="grid gap-4 md:grid-cols-2">
             <NumberField label="Durée maximale de session (s)" hint="60 à 3 600 ; défaut 900." bounds={b.anamMaxSessionSeconds} value={value.maxSessionLengthSeconds} onChange={(maxSessionLengthSeconds) => patch({ maxSessionLengthSeconds })} />

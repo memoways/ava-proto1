@@ -4,7 +4,8 @@ import { HandoffCoordinator, prepareCharacterHandoff, finalizeCharacterHandoff, 
 import { createVoiceTurnV2, handleVoiceInputError, type AvatarCueObservation, type ServiceObservation, type VoiceObserver } from "@/services/voiceTurnTelemetryV2";
 import { renderWithVideoLatency, splitOutputLatency } from "@/services/streamingAvatar/latency";
 import type { AvatarVideoFit, VideoLatencyObservation } from "@/services/streamingAvatar/types";
-import { createAvatarLineFeed, type AvatarLineFeed } from "@/services/streamingAvatar/avatarAudioBridge";
+import type { AvatarLineFeed } from "@/services/streamingAvatar/avatarAudioBridge";
+import { chooseOutputStreamMode, createStreamedOutputSink, type StreamedOutputSink } from "@/services/streamedOutputSink";
 import { getRuntimeContext } from "@/services/environmentContext";
 /**
  * IndexPRD4 — Nouveau parcours (mai 2026).
@@ -793,7 +794,8 @@ const IndexPRD4 = () => {
       if (context.signal?.aborted || endedRef.current || callGenerationRef.current !== generation) { await output.dispose(); throw new DOMException('Call closed', 'AbortError'); }
       responseOutputRef.current = output;
     }
-    const streamedFeed = output.mode === "streaming_avatar" && output.renderTextStream ? context.feed : undefined;
+    // Latency lot 4: the voice-only output (LocalTTSOutput) takes the same feed as the avatars.
+    const streamedFeed = output.renderTextStream ? context.feed : undefined;
     if (output.mode === "streaming_avatar" && context.turnId && !streamedFeed) {
       expectedAvatarTextRef.current.set(context.turnId, text);
     }
@@ -844,6 +846,7 @@ const IndexPRD4 = () => {
       const result = output.mode === "streaming_avatar"
         ? await renderWithVideoLatency(output, text, turnContext, value => { videoLatency = value; },
           streamedFeed ? turn => output.renderTextStream!(streamedFeed, turn) : undefined)
+        : streamedFeed ? await output.renderTextStream!(streamedFeed, turnContext)
         : await output.renderText(text, turnContext);
       return videoLatency ? { ...result, videoLatency } : result;
     } catch (error) {
@@ -859,6 +862,12 @@ const IndexPRD4 = () => {
           failedSegments: 0,
           started: false,
         };
+      }
+      // Lot T7 / latency lot 4: a generation failure is not a voice failure; the turn answers it.
+      if (output.mode === "tts" && streamedFeed?.failure() != null) {
+        return { status: "failed", provider: output.provider, firstPlaybackStartMs: 0, playbackTotalMs: 0,
+          generatedSegments: 1, playedSegments: 0, failedSegments: 1, started: false,
+          error: error instanceof Error ? error : new Error(String(error)) };
       }
       if (output.mode === "tts") {
         const ttsError = error instanceof Error ? error : new Error(String(error));
@@ -1958,53 +1967,36 @@ const IndexPRD4 = () => {
           });
           streamedVoiceRef.current = streamedVoice;
         }
-        // Lot T7 (prototype): Tavus with Ava's audio speaks the first safe phrase while the LLM is still
-        // answering. Never with an open passage request (output stays held), never for another provider.
+        // Lot T7 (prototype), generalized by latency lot 4: an output whose switch is on (Tavus with Ava's
+        // audio, Anam, voice-only TTS) speaks the first safe phrase while the LLM is still answering.
+        // Never with an open passage request (output stays held), never when Gradium's progressive voice runs.
         let avatarPlaybackAt: number | null = null;
         let latePlaybackStart: (() => void) | null = null;
-        let avatarStream: {
-          delivery: Promise<string>; render: Promise<ResponseOutputResult> | null; onEvent: (event: PRD4StreamEvent) => void;
-        } | null = null;
+        let avatarStream: StreamedOutputSink | null = null;
         const streamingOutput = responseOutputRef.current;
-        if (!streamedVoice && !heldOutput && streamingOutput?.mode === 'streaming_avatar' && streamingOutput.canStreamText?.() === true) {
-          const feed = createAvatarLineFeed();
-          let responseIntent: { parole?: string | null } | null = null;
-          let dropping = false;
-          let resolveAvatarDelivery!: (text: string) => void, rejectAvatarDelivery!: (error: unknown) => void;
-          const avatarDelivery = new Promise<string>((resolve, reject) => { resolveAvatarDelivery = resolve; rejectAvatarDelivery = reject; });
-          avatarDelivery.catch(() => {});
-          const sink = { delivery: avatarDelivery, render: null as Promise<ResponseOutputResult> | null,
-            onEvent(event: PRD4StreamEvent) {
-              if (event.type === 'intent') responseIntent = event.intent;
-              else if (event.type === 'reset') { if (feed.pushed > 0) dropping = true; }
-              else if (event.type === 'segment') {
-                // A phrase already spoken cannot be replaced: a later replacement is dropped.
-                if (dropping) return;
-                if (!sink.render) {
-                  streamTtsStartedAt ??= performance.now();
-                  sink.render = renderResponseText(event.text, {
-                    feed, turnId, turnIndex, attemptId: telemetry.attemptId, onVoiceObservation: telemetry.observe,
-                    onServiceObserved: telemetry.service, onAvatarCue: telemetry.avatarCue, signal: turnController.signal,
-                    onPlaybackStart: () => {
-                      if (!isCurrentTurn()) return;
-                      avatarPlaybackAt ??= performance.now();
-                      earlyFirstPlaybackAt ??= avatarPlaybackAt;
-                      latePlaybackStart?.();
-                    },
-                    voiceId: activeVoiceIdRef.current ?? undefined, providerId: activeTTSProviderIdRef.current ?? undefined,
-                    characterKey: turnCharacter, userMessage: userText,
-                    speechPerformanceContext: { state: responseIntent?.parole ?? null,
-                      rugosite: speechRuntimeForVoice.rugosite, states: speechRuntimeForVoice.states },
-                  });
-                  sink.render.catch(() => {});
-                }
-                feed.push(event.text);
-              } else if (event.type === 'complete') {
-                expectedAvatarTextRef.current.set(turnId, event.response);
-                feed.end(); resolveAvatarDelivery(event.response);
-              } else { feed.fail(event.error); rejectAvatarDelivery(event.error); }
-            } };
-          avatarStream = sink;
+        const outputStreamMode = chooseOutputStreamMode({ gradiumIncremental: Boolean(streamedVoice), held: heldOutput,
+          streamable: Boolean(streamingOutput?.renderTextStream) && streamingOutput?.canStreamText?.() === true });
+        telemetry.outputStream({ output: streamingOutput?.mode === 'streaming_avatar' ? streamingOutput.provider : 'tts', mode: outputStreamMode });
+        if (outputStreamMode === 'feed') {
+          avatarStream = createStreamedOutputSink((firstText, feed, responseIntent) => {
+            streamTtsStartedAt ??= performance.now();
+            return renderResponseText(firstText, {
+              feed, turnId, turnIndex, attemptId: telemetry.attemptId, onVoiceObservation: telemetry.observe,
+              onServiceObserved: telemetry.service, onAvatarCue: telemetry.avatarCue, signal: turnController.signal,
+              onPlaybackStart: () => {
+                if (!isCurrentTurn()) return;
+                avatarPlaybackAt ??= performance.now();
+                earlyFirstPlaybackAt ??= avatarPlaybackAt;
+                latePlaybackStart?.();
+              },
+              voiceId: activeVoiceIdRef.current ?? undefined, providerId: activeTTSProviderIdRef.current ?? undefined,
+              characterKey: turnCharacter, userMessage: userText,
+              speechPerformanceContext: { state: responseIntent?.parole ?? null,
+                rugosite: speechRuntimeForVoice.rugosite, states: speechRuntimeForVoice.states },
+            });
+          }, response => {
+            if (streamingOutput?.mode === 'streaming_avatar') expectedAvatarTextRef.current.set(turnId, response);
+          });
         }
         const prepareHandoff = async (ev: import('@/types').PRD4PostTurnEvaluation, text: string, preparationSignal: AbortSignal, started: number): Promise<boolean> => {
           if (!turnHandoffState || !turnHandoffSnapshot || !handoffLease?.current() || endedRef.current) return false;
