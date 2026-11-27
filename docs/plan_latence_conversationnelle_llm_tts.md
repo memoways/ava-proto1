@@ -163,6 +163,20 @@ Diagnostic (`voice_turn_events`, 7 jours, 120 tours voix seule complétés, éca
 - **Premier essai d'Ulrich (27 nov., 9 h 59-10 h 04, `sandbox-ulrich`) : pas exploitable pour la voix seule.** Les 15 tours sont partis sur Tavus (`output_stream = tavus / feed`, 10 tours complétés, premier son médian 2,97 s) : le lien vidéo de Max vers Tavus passe avant l'interrupteur global « Voix ». Tavus parlait déjà en flux (T7) : ce n'est pas une comparaison du lot 4. Référence « désactivé » voix seule disponible : 16 tours du matin (8 h 39-8 h 45, ElevenLabs `http_stream`, LLM `http_batch`), premier son médian 2,88 s. Reste : 10 tours voix seule interrupteur activé, après avoir retiré le lien vidéo de Max (ou après le lot réglages). Suite des réglages : [reprise](prompt_reprise_reglages_tests_et_video_personnage_lot_1.md).
 - **Statut : code livré, mesure en attente.** Le défaut ne passe à vrai qu'après la mesure et l'accord d'Ulrich.
 
+**Mesure du lot 4, voix seule (27 nov., `sandbox-ulrich`, ElevenLabs ; remplace le statut ci-dessus pour la voix seule)**
+
+| `voice_turn_events` | Désactivé (7 h 39-7 h 45 UTC) | Activé (9 h 58 et 13 h 41-13 h 44 UTC) | Écart |
+|---|---:|---:|---:|
+| Tours ayant produit un son (`voice_turn_completed`), premier son médian / p90 | 16 : 2,88 / 3,64 s | 11 : 2,65 / 2,96 s | − 0,23 / − 0,68 s |
+| Tours menés au bout (`voice_turn_finished` ou GM, statut `completed`), médiane | 13 : 2,68 s | 9 : 2,58 s | − 0,09 s |
+| Réponse prête → voix (médiane) | 0,37 s | 0,21 s | − 0,15 s |
+
+- Critère du plan (gain médian > 0,5 s) : **non atteint**. Le défaut reste faux. Le − 0,6 s tiré des 4 premiers tours ne se confirme pas.
+- Aucun span de relance ou de rattrapage dans les tours activés. Écoute d'Ulrich : réactif, fluide.
+- Limites : petits échantillons, questions différentes ; les tours de l'après-midi suivent la fusion #302 (voix émotionnelle), synchronisation Lovable à cette heure non vérifiée.
+- Interruption pendant le flux, vérifiée : la voix s'arrête, mais **net** (retour d'Ulrich : « comme si on lui enlevait la prise », puis un silence). Lot séparé : [interruption douce](prompt_reprise_interruption_douce_lot_1.md).
+- Restent à mesurer : Anam (aucun tour activé), et le lot 1 sur iPhone et sur le poste de Romed. Le lot 5 attend la mesure Anam, ou la décision d'Ulrich de s'en passer.
+
 ### Lot 5 — Fin de parole plus courte (essai)
 
 - Réglage admin `endOfSpeechMs` à 600-700 ms en sandbox ; vérifier aussi l'attente `Finalize` de Deepgram (jusqu'à 1,5 s).
