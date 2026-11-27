@@ -1,7 +1,7 @@
 # Plan — Réduire la latence conversationnelle d'Ava (LLM, TTS, orchestration)
 
 Tâche Notion : [Réduire la latence conversationnelle AVA — LLM, TTS et orchestration](https://app.notion.com/p/18662322e59582878b6381b14558d632) (Gamilab, 🔥🔥🔥🔥).
-Statut (27 novembre 2026) : **lot 1 et lot 1 bis (iPhone) livrés (code), mesure iPhone après synchro Lovable à faire par Ulrich ; lot 2 terminé, recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` ([rapport](eval/banc_llm_latence_20261126.md)). Le lot 3 attend la décision d'Ulrich.** Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
+Statut (27 novembre 2026) : **lot 1 et lot 1 bis (iPhone) livrés (code), mesure iPhone après synchro Lovable à faire par Ulrich ; lot 2 terminé, recommandation : garder gpt-5.6-luna avec le routage `provider.sort: "latency"` ([rapport](eval/banc_llm_latence_20261126.md)). Décision d'Ulrich (27 nov.) : oui au routage ; lot 3 à lancer.** Reprise : [prompt du lot 3](prompt_reprise_latence_conversationnelle_lot_3.md).
 Règle : **un lot à la fois**. Chaque lot est livré selon le contrat d'Ava, puis s'arrête avec le prompt de reprise du lot suivant ; le lot suivant ne commence que sur nouvelle demande d'Ulrich.
 Historique utile : [analyse Tavus T1-T9](analyse_latence_tavus_20261119.md), [évaluation du LLM streamé](evaluation_llm_streame_vers_tts.md).
 
