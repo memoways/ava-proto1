@@ -1,11 +1,13 @@
 import { consumeLLMSse } from "./llmSse";
 import { observeVoice, observeService, type VoiceObserver, type ServiceObservation, type ServerObservation } from "./voiceTurnTelemetryV2";
 import { trackLLMCall } from "./llmUsageTracker";
+import { readCachedTokens, type OpenRouterUsageLike } from "./llmUsageMetrics";
 import { debugLogger } from "./debugLogger";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import { authenticatedFunctionFetch } from "./gameAuth";
 import { isReasoningEnabledForModel } from "./settingsService";
 import type { LLMCallDiagnosticTrace } from "@/types";
+import type { Json } from "@/integrations/supabase/types";
 import { getSupportedSamplingParameters } from "./llmModelCapabilities";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -46,13 +48,27 @@ interface LLMOptions {
 }
 
 type StreamCallback = (text: string, done: boolean) => void;
-type LLMUsagePayload = {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
-};
+type LLMUsagePayload = OpenRouterUsageLike;
 
 const DEFAULT_LLM_TIMEOUT_MS = 18000;
+
+/**
+ * Latency lot 3: what `llm_usage.latency_ms` means for this row, the whole duration,
+ * the upstream provider that served it and the routing preference sent.
+ */
+function usageMetadata(
+  latencyKind: "first_token" | "total",
+  durationMs: number,
+  effectiveProvider: string | null,
+  requestedProvider: Record<string, unknown> | undefined,
+): Record<string, Json> {
+  return {
+    latency_kind: latencyKind,
+    duration_ms: Math.round(durationMs),
+    ...(effectiveProvider ? { effective_provider: effectiveProvider } : {}),
+    ...(requestedProvider ? { provider_preference: requestedProvider as Json } : {}),
+  };
+}
 
 function normalizeTimeoutError(err: unknown, label: string, timeoutMs: number): Error {
   if (err instanceof TimeoutError) return err;
@@ -123,6 +139,8 @@ export async function streamLLM(
   let usage: LLMUsagePayload | null = null;
   let finishReason: string | null = null;
   let firstToken = false;
+  let firstTokenMs: number | null = null;
+  let effectiveProvider: string | null = null;
   observeVoice(options?.onVoiceObservation, "llm_request");
   try {
     const response = await withTimeout(`LLM stream ${model}`,
@@ -139,13 +157,14 @@ export async function streamLLM(
     if (!response.ok) throw new Error(`LLM error: ${response.status}`);
     if (!response.body) throw new Error('No response body');
     const fullText = await consumeLLMSse(response.body, content => {
-      if (!firstToken) { firstToken = true; observeVoice(options?.onVoiceObservation, "first_token"); }
+      if (!firstToken) { firstToken = true; firstTokenMs = Date.now() - startTime; observeVoice(options?.onVoiceObservation, "first_token"); }
       onChunk(content, false);
     }, { signal: controller.signal, timeoutMs, onMetadata: value => {
       if (typeof value.id === 'string') generationId = value.id;
       if (value.usage) usage = value.usage as LLMUsagePayload;
       const choices = value.choices as Array<{ finish_reason?: unknown }> | undefined;
       if (Array.isArray(choices) && typeof choices[0]?.finish_reason === 'string') finishReason = choices[0].finish_reason;
+      if (typeof value.provider === 'string') effectiveProvider = value.provider;
       if (typeof value.model === 'string') observeService(options?.onServiceObserved, {
         service: 'llm', requested_provider: 'openrouter', requested_model: model,
         resolved_provider: 'openrouter', resolved_model: model,
@@ -161,7 +180,9 @@ export async function streamLLM(
     const finalUsage = usage as LLMUsagePayload | null;
     trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
       prompt_tokens: finalUsage?.prompt_tokens, completion_tokens: finalUsage?.completion_tokens,
-      total_tokens: finalUsage?.total_tokens, generation_id: generationId, status: 'success' });
+      total_tokens: finalUsage?.total_tokens, generation_id: generationId, status: 'success',
+      latency_ms: firstTokenMs, cached_tokens: readCachedTokens(finalUsage),
+      metadata: usageMetadata('first_token', Date.now() - startTime, effectiveProvider, options?.provider) });
     debugLogger.logResponse(debugId, 'llm', `Stream ${model}`, response.status, startTime);
     return fullText;
   } catch (error) {
@@ -169,7 +190,8 @@ export async function streamLLM(
     trackLLMCall({ session_id: options?.session_id, feature_key: featureKey, model,
       generation_id: generationId, prompt_tokens: failedUsage?.prompt_tokens,
       completion_tokens: failedUsage?.completion_tokens, total_tokens: failedUsage?.total_tokens,
-      metadata: { finish_reason: finishReason },
+      latency_ms: firstTokenMs, cached_tokens: readCachedTokens(failedUsage),
+      metadata: { finish_reason: finishReason, ...usageMetadata('first_token', Date.now() - startTime, effectiveProvider, options?.provider) },
       status: 'error', error_message: error instanceof Error ? error.message.slice(0, 200) : 'Stream failed' });
     throw error;
   } finally {
@@ -291,6 +313,7 @@ export async function callLLMWithUsage(
     ? data._ava_trace as LLMCallDiagnosticTrace
     : null;
 
+  const latencyMs = Math.round(performance.now() - startedAt);
   trackLLMCall({
     session_id: options?.session_id,
     feature_key: featureKey,
@@ -300,6 +323,9 @@ export async function callLLMWithUsage(
     total_tokens: usage?.total_tokens,
     generation_id: generationId,
     status: "success",
+    latency_ms: latencyMs,
+    cached_tokens: readCachedTokens(usage),
+    metadata: usageMetadata("total", latencyMs, typeof data.provider === "string" ? data.provider : null, options?.provider),
   });
 
   return {
@@ -308,7 +334,7 @@ export async function callLLMWithUsage(
     usage,
     generationId,
     model: typeof data.model === "string" && data.model ? data.model : model,
-    latencyMs: Math.round(performance.now() - startedAt),
+    latencyMs,
     diagnosticTrace,
   };
 }

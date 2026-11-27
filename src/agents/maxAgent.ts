@@ -249,6 +249,8 @@ export interface SimulateMaxResult {
     topP: number;
     reasoning: boolean;
     timeoutMs: number | null;
+    /** OpenRouter provider preference actually sent (absent = default routing). */
+    provider?: MaxLlmOverrides["provider"];
   };
 }
 
@@ -346,6 +348,8 @@ export async function simulateMaxResponse(
   const temperature = opts?.llmOverrides?.temperature ?? llm.LLM_TEMPERATURE;
   const topP = opts?.llmOverrides?.topP ?? llm.LLM_TOP_P;
   const reasoning = isReasoningEnabledForModel(model, llm);
+  // Latency lot 3: the evaluation override wins; otherwise the admin setting (null = default routing).
+  const provider = opts?.llmOverrides?.provider ?? llm.LLM_CHARACTER_PROVIDER ?? undefined;
   const requestedSettings = {
     model,
     temperature,
@@ -353,6 +357,7 @@ export async function simulateMaxResponse(
     topP,
     reasoning,
     timeoutMs: opts?.timeoutMs ?? null,
+    ...(provider ? { provider } : {}),
   };
   let result: Awaited<ReturnType<typeof callLLMWithUsage>>;
   let streamSalvaged = false;
@@ -367,8 +372,8 @@ export async function simulateMaxResponse(
       top_p: topP,
       timeoutMs: opts?.timeoutMs,
       signal: opts?.signal,
-      // Latency lot 2: evaluation-only routing and reasoning levers; absent in play.
-      ...(opts?.llmOverrides?.provider ? { provider: opts.llmOverrides.provider } : {}),
+      // Latency lot 3: provider routing from the override or the admin setting; reasoning levers stay evaluation-only.
+      ...(provider ? { provider } : {}),
       ...(opts?.llmOverrides?.reasoningEffort ? { reasoningEffort: opts.llmOverrides.reasoningEffort } : {}),
       ...(opts?.llmOverrides?.disableReasoning ? { disableReasoning: true } : {}),
       feature_key: opts?.featureKey || "max_prompt_test",

@@ -78,12 +78,24 @@ describe("ConversationMemoryV1", () => {
     expect(selectOptimizedConversation(conversation, 2)).toHaveLength(6);
   });
 
-  it("omet un ancien échange surdimensionné sans jamais le couper", () => {
+  it("omet un ancien échange surdimensionné sans le couper quand le dernier tient", () => {
+    const conversation = [
+      { role: "user" as const, content: "u".repeat(700), timestamp: 1 },
+      { role: "max" as const, content: "m".repeat(700), timestamp: 2 },
+      { role: "user" as const, content: "court", timestamp: 3 },
+      { role: "max" as const, content: "réponse", timestamp: 4 },
+    ];
+    expect(selectOptimizedConversation(conversation, 0).map((message) => message.content)).toEqual(["court", "réponse"]);
+  });
+
+  it("garde le dernier échange tronqué plutôt qu'aucun historique (latence, lot 3)", () => {
     const conversation = [
       { role: "user" as const, content: "u".repeat(700), timestamp: 1 },
       { role: "max" as const, content: "m".repeat(700), timestamp: 2 },
     ];
-    expect(selectOptimizedConversation(conversation, 0)).toEqual([]);
+    const selected = selectOptimizedConversation(conversation, 0);
+    expect(selected.map((message) => message.role)).toEqual(["user", "max"]);
+    expect(selected.every((message) => message.content.length <= 600 && message.content.endsWith("…"))).toBe(true);
   });
 
   it("ne transmet pas à Emma une confidence privée faite à Max", () => {

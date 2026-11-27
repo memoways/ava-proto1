@@ -59,6 +59,28 @@ export interface LLMSettings {
   LLM_MAX_TOKENS_GM: number;
   /** Par modèle : reasoning activé ou non (défaut : désactivé pour tous). */
   LLM_REASONING: Record<string, boolean>;
+  /**
+   * Latency lot 3: OpenRouter provider preference for the character call only
+   * (`simulateMaxResponse` → proxy-llm `provider`). Null = OpenRouter default routing.
+   * Only what the lot 2 bench measured is offered (`sort: "latency"`).
+   */
+  LLM_CHARACTER_PROVIDER: CharacterProviderPreference | null;
+}
+
+export type CharacterProviderSort = "latency";
+export type CharacterProviderPreference = {
+  sort: CharacterProviderSort;
+};
+
+const CHARACTER_PROVIDER_SORTS = new Set<CharacterProviderSort>(["latency"]);
+
+/** Keeps a measured `sort` only; anything else (old value, typo, other keys) means default routing. */
+export function normalizeCharacterProviderPreference(value: unknown): CharacterProviderPreference | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const sort = (value as { sort?: unknown }).sort;
+  return typeof sort === "string" && CHARACTER_PROVIDER_SORTS.has(sort as CharacterProviderSort)
+    ? { sort: sort as CharacterProviderSort }
+    : null;
 }
 
 export function isReasoningEnabledForModel(modelId: string, settings?: LLMSettings): boolean {
@@ -243,6 +265,7 @@ const llmDefaults: LLMSettings = {
   // Plancher effectif (P3 : 950, relevé à 1600 le 10 novembre 2026) pour éviter les sorties tronquées.
   LLM_MAX_TOKENS_GM: GM_MIN_MAX_TOKENS,
   LLM_REASONING: {},
+  LLM_CHARACTER_PROVIDER: null,
 };
 
 const DEPRECATED_OPENROUTER_MODELS: Record<string, string> = {
@@ -329,6 +352,7 @@ function normalizeLLMSettings(settings: LLMSettings): LLMSettings {
     LLM_GM_TEMPERATURE: normalizeGmTemperature(settings.LLM_GM_TEMPERATURE),
     LLM_MAX_TOKENS_GM: Math.max(GM_MIN_MAX_TOKENS, Math.floor(Number(settings.LLM_MAX_TOKENS_GM) || llmDefaults.LLM_MAX_TOKENS_GM)),
     LLM_REASONING: settings.LLM_REASONING && typeof settings.LLM_REASONING === "object" ? settings.LLM_REASONING : {},
+    LLM_CHARACTER_PROVIDER: normalizeCharacterProviderPreference(settings.LLM_CHARACTER_PROVIDER),
   };
 }
 

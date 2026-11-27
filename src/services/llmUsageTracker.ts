@@ -13,6 +13,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { authenticatedFunctionFetch } from "./gameAuth";
+export { readCachedTokens, type OpenRouterUsageLike } from "./llmUsageMetrics";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const COST_ERROR_LOG_STORAGE_KEY = "ava_openrouter_cost_error_logs";
@@ -44,6 +45,21 @@ export interface UsageLogEntry {
   status?: string;
   metadata_json?: JsonObject;
   error_message?: string | null;
+  /** Latency lot 3: first token when streamed, whole call otherwise (see metadata_json.latency_kind). */
+  latency_ms?: number | null;
+  /** Latency lot 3: OpenRouter `usage.prompt_tokens_details.cached_tokens`. */
+  cached_tokens?: number | null;
+}
+
+function nonNegativeInteger(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+}
+
+/** PostgREST answers 42703 / PGRST204 while the additive columns are not migrated yet. */
+function isMissingLatencyColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return /latency_ms|cached_tokens/.test(error.message ?? "");
 }
 
 function saveCostErrorLocally(entry: CostErrorLogEntry) {
@@ -105,24 +121,31 @@ function getCostErrorType(status?: number, err?: unknown): CostErrorLogEntry["er
  */
 export async function logLLMUsage(entry: UsageLogEntry): Promise<string | null> {
   try {
-    const { data, error } = await supabase
-      .from("llm_usage")
-      .insert({
-        session_id: entry.session_id || null,
-        feature_key: entry.feature_key,
-        request_type: entry.request_type || "chat_completion",
-        model: entry.model,
-        prompt_tokens: entry.prompt_tokens || 0,
-        completion_tokens: entry.completion_tokens || 0,
-        total_tokens: entry.total_tokens || 0,
-        generation_id: entry.generation_id || null,
-        cost_usd: entry.cost_usd || 0,
-        status: entry.status || "pending",
-        metadata_json: entry.metadata_json || {},
-        error_message: entry.error_message || null,
-      })
-      .select("id")
-      .single();
+    const row = {
+      session_id: entry.session_id || null,
+      feature_key: entry.feature_key,
+      request_type: entry.request_type || "chat_completion",
+      model: entry.model,
+      prompt_tokens: entry.prompt_tokens || 0,
+      completion_tokens: entry.completion_tokens || 0,
+      total_tokens: entry.total_tokens || 0,
+      generation_id: entry.generation_id || null,
+      cost_usd: entry.cost_usd || 0,
+      status: entry.status || "pending",
+      metadata_json: entry.metadata_json || {},
+      error_message: entry.error_message || null,
+    };
+    const latencyMs = nonNegativeInteger(entry.latency_ms);
+    const cachedTokens = nonNegativeInteger(entry.cached_tokens);
+    const measured = {
+      ...(latencyMs !== null ? { latency_ms: latencyMs } : {}),
+      ...(cachedTokens !== null ? { cached_tokens: cachedTokens } : {}),
+    };
+    let { data, error } = await supabase.from("llm_usage").insert({ ...row, ...measured }).select("id").single();
+    // Until Lovable applies the additive migration, keep logging the call without the new columns.
+    if (error && Object.keys(measured).length && isMissingLatencyColumn(error)) {
+      ({ data, error } = await supabase.from("llm_usage").insert(row).select("id").single());
+    }
 
     if (error) {
       console.error("[LLM Tracker] Insert error:", error.message);
@@ -292,8 +315,12 @@ export async function trackLLMCall(params: {
   status?: string;
   error_message?: string | null;
   metadata?: JsonObject;
+  latency_ms?: number | null;
+  cached_tokens?: number | null;
 }): Promise<void> {
   const logId = await logLLMUsage({
+    latency_ms: params.latency_ms,
+    cached_tokens: params.cached_tokens,
     session_id: params.session_id,
     feature_key: params.feature_key,
     model: params.model,

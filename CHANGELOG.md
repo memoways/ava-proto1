@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Latence lot 3 : routage rapide du personnage, latence dans llm_usage, mémoire] — 2026-11-27
+
+- Réglage admin `LLM_CHARACTER_PROVIDER` (interrupteur dans Réglages › LLM) : envoie `provider.sort: "latency"` à `proxy-llm` pour l'appel du personnage. Défaut vide, payload inchangé. Une préférence d'évaluation reste prioritaire.
+- `llm_usage` : colonnes `latency_ms` et `cached_tokens` (migration additive `20261127090000`, à appliquer via Lovable) ; `metadata_json` avec `latency_kind`, `effective_provider` et `provider_preference`. Avant la migration, la ligne est écrite sans ces colonnes.
+- Mémoire `optimized_v3` : le dernier échange, s'il dépasse seul 1 200 car., est gardé tronqué au lieu de n'envoyer aucun historique.
+
 ## [Latence lot 1 bis : voix seule iPhone en flux PCM] — 2026-11-26
 
 - iPhone (ManagedMediaSource seul) : la voix seule ElevenLabs passe d'emblée par le flux PCM en Web Audio. Le flux MP3 y échouait avant tout son et la réponse attendait le MP3 complet (2,27 s mesurées sur 16 tours).

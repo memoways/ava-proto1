@@ -290,6 +290,23 @@ export default function LLMConfigTab() {
             <span>1 — Diversifié</span>
           </div>
         </div>
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <label htmlFor="llm-character-provider-latency" className="text-sm font-medium text-muted-foreground block">
+              Routage OpenRouter : fournisseur le plus rapide
+            </label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Envoie <code>provider.sort: "latency"</code> avec l'appel du personnage. Banc du 27 novembre, gpt-5.6-luna :
+              1re phrase 1,25 s → 0,82 s, même modèle et même coût. Désactivé : routage par défaut d'OpenRouter.
+            </p>
+          </div>
+          <Switch
+            id="llm-character-provider-latency"
+            checked={settings.LLM_CHARACTER_PROVIDER?.sort === "latency"}
+            onCheckedChange={(enabled) => updateLocal({ LLM_CHARACTER_PROVIDER: enabled ? { sort: "latency" } : null })}
+          />
+        </div>
       </section>
 
       {/* ===== GAME MASTER MODEL ===== */}

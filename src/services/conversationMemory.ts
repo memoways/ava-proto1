@@ -29,9 +29,28 @@ export function selectUnsummarizedConversation(
   return unsummarized.slice(-maxMessages);
 }
 
+/** Cuts a message to `budget` characters, ending with an ellipsis when it was shortened. */
+function truncateMessage(message: ConversationMessage, budget: number): ConversationMessage {
+  if (message.content.length <= budget) return message;
+  return { ...message, content: `${message.content.slice(0, Math.max(0, budget - 1)).trimEnd()}…` };
+}
+
+/**
+ * Latency lot 3: the last exchange alone can exceed the budget. Instead of sending no
+ * history at all, keep it, each message cut in proportion to its length.
+ */
+function truncateExchange(exchange: ConversationMessage[], targetChars: number): ConversationMessage[] {
+  const total = exchange.reduce((sum, message) => sum + message.content.length, 0);
+  if (total <= targetChars) return exchange;
+  return exchange.map((message) =>
+    truncateMessage(message, Math.max(1, Math.floor((targetChars * message.content.length) / total))),
+  );
+}
+
 /**
  * optimized_v3 : garde deux échanges complets et étend temporairement la
  * fenêtre aux tours que la mémoire structurée n'a pas encore absorbés.
+ * Si le dernier échange dépasse à lui seul le budget, il est gardé tronqué.
  */
 export function selectOptimizedConversation(
   conversation: ConversationMessage[],
@@ -51,6 +70,9 @@ export function selectOptimizedConversation(
     if (usedChars + exchangeChars > targetChars || selected.length + exchange.length > maxMessages) break;
     selected.unshift(...exchange);
     usedChars += exchangeChars;
+  }
+  if (selected.length === 0 && candidates.length > 0 && targetChars > 0) {
+    return truncateExchange(candidates.slice(-Math.min(2, maxMessages)), targetChars);
   }
   return selected;
 }
