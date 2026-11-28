@@ -3,6 +3,7 @@ import {
   buildTurnRelationshipDirective,
   compileCharacterRelationshipPolicy,
   createInitialRelationshipState,
+  normalizeRelationshipState,
   validateRelationshipTransition,
 } from "@/services/relationshipEngine";
 
@@ -144,5 +145,40 @@ describe("relationship engine", () => {
     expect(policy.characterKey).toBe("sam");
     expect(directive.characterKey).toBe("sam");
     expect(directive.mode).toBe("resist");
+  });
+
+  it("reconnaît un sujet dont l'identifiant coupé finissait sur un tiret", () => {
+    // 71 characters then a space: the 72-character cut lands on the separator.
+    const label = `${"abcdefg ".repeat(8)}abcdefg suite`;
+    const policy = compileCharacterRelationshipPolicy(
+      { ...source, sujets_sensibles: `${label} :: lien` },
+      "max",
+    );
+    const topicId = policy.sensitiveTopics[0].id;
+    expect(topicId).not.toMatch(/-$/);
+
+    const audit = validateRelationshipTransition({
+      previous: createInitialRelationshipState("max", policy.version),
+      policy,
+      characterKey: "max",
+      turnIndex: 1,
+      proposal: {
+        tier: "link",
+        topicOpenness: { [topicId]: "open" },
+        evidence: ["honesty"],
+        sourceTurn: 1,
+        characterKey: "max",
+        policyVersion: policy.version,
+      },
+    });
+    expect(audit.reasons).toEqual([]);
+    expect(audit.next.topicOpenness).toEqual({ [topicId]: "open" });
+
+    const directive = buildTurnRelationshipDirective({
+      policy,
+      state: normalizeRelationshipState(audit.next, "max", policy.version),
+      userMessage: "Parle-moi de abcdefg.",
+    });
+    expect(directive.mode).toBe("engage");
   });
 });
