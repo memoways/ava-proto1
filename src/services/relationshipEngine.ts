@@ -65,12 +65,48 @@ function cleanText(value: unknown, max = 800): string {
   return compact.length <= max ? compact : `${compact.slice(0, max - 1).trimEnd()}…`;
 }
 
-function cleanList(value: string | undefined, max = 8): string[] {
-  return (value ?? "")
-    .split(/\n+|\s*[;•]\s*/)
-    .map((item) => item.replace(/^[-*]\s*/, "").trim())
-    .filter(Boolean)
+interface SheetTopic {
+  text: string;
+  bulleted: boolean;
+}
+
+/**
+ * A bulleted sheet field holds one topic per bullet: its introduction is not a
+ * topic and wrapped lines belong to their bullet. Without any bullet, each line
+ * or semicolon-separated item is a topic.
+ */
+function splitSheetTopics(value: string, max: number): SheetTopic[] {
+  const bullets: string[] = [];
+  for (const line of value.split(/\n+/)) {
+    const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+    if (bullet) bullets.push(bullet[1].trim());
+    else if (bullets.length && line.trim()) bullets[bullets.length - 1] += ` ${line.trim()}`;
+  }
+  const items = bullets.length ? bullets : value.split(/\n+|\s*[;•]\s*/);
+  return items
+    .map((item) => ({ text: item.trim(), bulleted: bullets.length > 0 }))
+    .filter((item) => item.text)
     .slice(0, max);
+}
+
+// Function words and generic verbs that say nothing about the topic of a question.
+const TOPIC_STOPWORDS = new Set((
+  "les des une mes tes ses nos vos leurs mon ton son aux sur sous dans avec sans pour par que qui quoi dont "
+  + "est sont ete etre avoir pas plus moins toi moi lui elle elles ils nous vous cette ces cet "
+  + "devenir aller va vas vont fait faire apres avant tout tous toute toutes"
+).split(" "));
+
+/** Words from this length also match their close forms (« transformer », « transformation »). */
+const TOPIC_FAMILY_MIN_LENGTH = 8;
+
+function singular(word: string): string {
+  return word.length >= 4 ? word.replace(/s$/, "") : word;
+}
+
+function titleWords(label: string): string[] {
+  return normalized(label).split(" ")
+    .filter((word) => word.length >= 3 && !TOPIC_STOPWORDS.has(word))
+    .map(singular);
 }
 
 function parseTier(value: string | undefined, fallback: RelationshipTier): RelationshipTier {
@@ -81,22 +117,26 @@ function parseTier(value: string | undefined, fallback: RelationshipTier): Relat
   return fallback;
 }
 
-function parseTopicRules(value: string, fallbackTopics: string): RelationshipTopicRule[] {
-  const sourceLines = cleanList(value || fallbackTopics, 12);
-  return sourceLines.map((line, index) => {
-    const parts = line.split(/\s*(?:::|\|)\s*/).map((part) => part.trim()).filter(Boolean);
+function parseTopicRules(value: string): RelationshipTopicRule[] {
+  const topics = splitSheetTopics(value, 12).map(({ text, bulleted }, index) => {
+    const explicit = /::|\|/.test(text);
+    // « Le fusil : tu n'en parles pas » — the title names the topic, the rest describes it.
+    const titled = bulleted && !explicit ? text.match(/^([^:]+):\s*(.*)$/) : null;
+    const parts = titled
+      ? [titled[1].trim()]
+      : text.split(/\s*(?:::|\|)\s*/).map((part) => part.trim()).filter(Boolean);
     const label = cleanText(parts[0], 100) || `Sujet ${index + 1}`;
     const minimumTier = parseTier(parts[1], "link");
-    const condition = cleanText(parts.slice(2).join(" — "), 240)
+    const condition = cleanText(titled ? titled[2] : parts.slice(2).join(" — "), titled ? 160 : 240)
       || "Le sujet peut être reconnu, mais l'intimité et les motivations restent proportionnées à la relation.";
-    const keywords = normalized(label).split(" ").filter((token) => token.length >= 3).slice(0, 8);
-    return {
-      id: slug(label, `topic-${index + 1}`),
-      label,
-      keywords,
-      minimumTier,
-      condition,
-    };
+    return { id: slug(label, `topic-${index + 1}`), label, words: titleWords(label), minimumTier, condition };
+  });
+  return topics.map(({ words, ...topic }, index) => {
+    // A word that is another topic's whole title stays with that topic.
+    const owned = new Set(topics.filter((other, at) => at !== index && other.words.length === 1).map((other) => other.words[0]));
+    const keywords = words.length > 1 ? words.filter((word) => !owned.has(word)) : words;
+    // A title made of function words only (« L'après ») is recognised as a whole.
+    return { ...topic, keywords: keywords.length ? keywords.slice(0, 8) : [normalized(topic.label)] };
   });
 }
 
@@ -115,7 +155,7 @@ export function compileCharacterRelationshipPolicy(
     callDrive,
     openingSignals: ["écoute précise", "franchise", "respect d'une limite", "confrontation pertinente"],
     closingSignals: ["insistance après une limite", "contradiction intéressée", "hostilité explicite"],
-    sensitiveTopics: parseTopicRules("", source.sujets_sensibles ?? ""),
+    sensitiveTopics: parseTopicRules(source.sujets_sensibles ?? ""),
     resistanceStyle: "Répondre partiellement, déplacer le sujet ou demander ce que l'interlocuteur cherche, sans devenir un assistant complaisant.",
     initiativeStyle: "Poursuivre son propre besoin et reprendre un fil utile ; une question est possible lorsqu'elle engage réellement l'interlocuteur.",
     source: "legacy_compiled",
@@ -176,9 +216,29 @@ export function normalizeRelationshipState(
   };
 }
 
+/** Drops openness stored under an identifier the current sheet no longer defines. */
+export function withKnownTopics<T extends { topicOpenness?: Record<string, TopicOpenness> }>(
+  relationship: T,
+  policy: CharacterRelationshipPolicy,
+): T {
+  const known = new Set(policy.sensitiveTopics.map((topic) => topic.id));
+  return {
+    ...relationship,
+    topicOpenness: Object.fromEntries(
+      Object.entries(relationship.topicOpenness ?? {}).filter(([id]) => known.has(id)),
+    ),
+  };
+}
+
 function matchedTopics(policy: CharacterRelationshipPolicy, userMessage: string): RelationshipTopicRule[] {
-  const terms = new Set(normalized(userMessage).split(" ").filter((token) => token.length >= 3));
-  return policy.sensitiveTopics.filter((topic) => topic.keywords.some((keyword) => terms.has(keyword)));
+  const message = normalized(userMessage);
+  const terms = message.split(" ").map(singular);
+  const mentions = (keyword: string) => {
+    if (keyword.includes(" ")) return ` ${message} `.includes(` ${keyword} `);
+    const family = keyword.length >= TOPIC_FAMILY_MIN_LENGTH ? keyword.slice(0, -2) : null;
+    return terms.some((term) => term === keyword || (family !== null && term.startsWith(family)));
+  };
+  return policy.sensitiveTopics.filter((topic) => topic.keywords.some(mentions));
 }
 
 export function buildTurnRelationshipDirective(input: {

@@ -41,6 +41,7 @@ import {
   normalizeRelationshipState,
   relationshipStateToProposal,
   validateRelationshipTransition,
+  withKnownTopics,
 } from "@/services/relationshipEngine";
 
 /** Incrémenter à chaque changement de logique ou de prompt du GM (traçabilité A/B). */
@@ -296,7 +297,9 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
     openThreads: formatMemoryItems(memory.openThreads),
     commitments: formatMemoryItems(memory.commitments),
     topics: formatMemoryItems(memory.topics.slice(-8)),
-    relationship: memory.relationship,
+    relationship: memory.relationship && input.relationshipPolicy
+      ? withKnownTopics(memory.relationship, input.relationshipPolicy)
+      : memory.relationship,
     lastExchange: memory.lastExchange,
     lastTurn: memory.lastTurn,
   }) : "(aucune mémoire structurée)";
@@ -320,7 +323,10 @@ function buildUserPrompt(input: PRD4PostTurnInput, videos: VideoTriggerRow[]): s
       })
     : "(politique indisponible : ne propose aucun changement relationnel)";
   const relationshipState = input.relationshipPolicy
-    ? normalizeRelationshipState(memory?.relationship, input.currentCharacter, input.relationshipPolicy.version)
+    ? withKnownTopics(
+        normalizeRelationshipState(memory?.relationship, input.currentCharacter, input.relationshipPolicy.version),
+        input.relationshipPolicy,
+      )
     : null;
 
   return `## PERSONNAGE ACTIF — ATTRIBUTION IMMUABLE

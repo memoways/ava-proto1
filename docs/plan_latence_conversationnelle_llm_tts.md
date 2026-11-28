@@ -309,6 +309,33 @@ Le lot 1 ter est clos. Suite proposée, sur décision d'Ulrich : [mémoire gard�
 - Les mots-clés gardent tout mot de 3 lettres (« est », « pas », « les ») : d'après le code, la directive demande de se retenir dès qu'un sujet ainsi reconnu est fermé.
 - 4 refus pour identifiants de mémoire (`max-topic-…`, `emma-topic-…`) proposés comme sujets sensibles.
 
+### Mémoire et relation, lot 3 : liste des sujets sensibles (28 novembre, code, option A)
+
+**Mesure (lecture seule).** Fiches `prod`, 1506 questions de joueurs depuis le 1er octobre (141 sessions, surtout `sandbox-ulrich`), rejouées au palier « contact », sujets fermés : la part mesurée est donc un maximum, les ouvertures faites en cours d'appel la réduisent.
+
+| Consigne « retiens-toi » | Max (1135) | Emma (371) |
+| --- | --- | --- |
+| Aujourd'hui (12 morceaux) | 969 (85 %) | 283 (76 %) |
+| Un sujet par puce, prénoms déclencheurs (A) | 301 (27 %) | 146 (39 %) |
+| Un sujet par puce, prénoms seuls non déclencheurs (B) | 62 (5 %) | 28 (8 %) |
+
+Mots les plus déclencheurs aujourd'hui : « est », « que », « pas », « elle », « comment ». États stockés : 229 clés de sujet sur 61 sessions (211 « open », 16 « partial »), une seule session encore reprenable.
+
+**Reproduction rouge.** Deux tests dans `relationshipEngine.test.ts` : l'introduction et les bouts de phrases deviennent des sujets ; une question de mots courants en reconnaît cinq.
+
+**Règle approuvée par Ulrich (option A) et codée.** Il veut mieux cadrer les personnages ; B relâchait davantage.
+1. Fiche à puces : un sujet par puce, titre = texte avant « : » ; introduction ignorée. Sans puce, découpage actuel. Résultat : 9 sujets pour Max, 8 pour Emma.
+2. Mots déclencheurs : mots du titre, sans mots-outils, singulier et pluriel confondus, formes proches des mots longs (« transformer », « transformation ») ; un mot qui est à lui seul un autre titre reste à ce titre ; titre sans mot utile (« L'après ») reconnu en entier.
+3. Un prénom seul demande de se retenir comme les autres sujets.
+4. Palier minimum « lien » inchangé. Le Game Master reçoit comme condition les 160 premiers caractères du texte de la puce.
+5. États stockés : les anciens identifiants ne sont plus reconnus, le sujet repart fermé ; ils sont écartés de l'état montré au Game Master pour ne pas faire refuser la relation. Aucune écriture en base.
+
+**Limites.** Pas de synonymes : « arme » ne déclenche pas « Le fusil », « tué » pas « Les morts », « protéger » pas « Toi, le protecteur » (0 question reconnue, comme « L'après ») ; « homme » déclenche « Devenir un homme » dans tout contexte. Les identifiants de mémoire proposés par le Game Master restent hors lot. La consigne de retenue ne règle que la confidence, pas les demandes hors appel.
+
+**Livré.** `relationshipEngine.ts` (découpage, mots du titre, `withKnownTopics`) ; `gameMasterPRD4.ts` ne montre plus d'ouverture sous un ancien identifiant. Rejeu des 1506 questions avec le code livré : 301 (Max) et 146 (Emma), comme prévu. `test:quality` et `test:delivery` verts. Aucune migration, écriture en base, réglage ni prompt modifié ; aucun appel réel essayé, production non publiée. Recette : après synchro Lovable, un appel sur `sandbox-ulrich` ; « Admin › personnage › Relation compilée » doit annoncer 9 conditions pour Max, 8 pour Emma.
+
+Suite demandée par Ulrich : [cadre de l'appel, lot 1](prompt_reprise_cadre_appel_lot_1.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

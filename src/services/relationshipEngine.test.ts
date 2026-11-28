@@ -5,6 +5,7 @@ import {
   createInitialRelationshipState,
   normalizeRelationshipState,
   validateRelationshipTransition,
+  withKnownTopics,
 } from "@/services/relationshipEngine";
 
 const source = {
@@ -180,5 +181,61 @@ describe("relationship engine", () => {
       userMessage: "Parle-moi de abcdefg.",
     });
     expect(directive.mode).toBe("engage");
+  });
+
+  describe("fiche à puces", () => {
+    const sheet = [
+      "Aucun sujet n'est interdit. Tu commences par les faits.",
+      "",
+      "- Le fusil : tu n'en parles pas ; tu ne sais pas pourquoi.",
+      "",
+      "- Les morts : tu ne les comptes pas ; tu ne les nommes pas spontanément.",
+    ].join("\n");
+    const policy = () => compileCharacterRelationshipPolicy({ ...source, sujets_sensibles: sheet }, "max");
+
+    it("fait un sujet par puce, ni l'introduction ni les bouts de phrases", () => {
+      expect(policy().sensitiveTopics.map((topic) => topic.id)).toEqual(["le-fusil", "les-morts"]);
+    });
+
+    it("ne reconnaît aucun sujet sur des mots courants", () => {
+      const directive = buildTurnRelationshipDirective({
+        policy: policy(),
+        state: createInitialRelationshipState("max", policy().version),
+        userMessage: "Est-ce que les enfants ne sont pas là, tu sais ?",
+      });
+      expect(directive.matchedTopicIds).toEqual([]);
+      expect(directive.mode).toBe("engage");
+    });
+
+    it("déclenche un sujet sur les mots de son titre, pluriel et formes proches compris", () => {
+      const compiled = compileCharacterRelationshipPolicy({ ...source, sujets_sensibles: [
+        "- Emma : tu l'aimes.",
+        "- Emma va se transformer : tu attends.",
+        "- Les morts : tu ne les comptes pas.",
+        "  Tu décris seulement ce que tu as vu.",
+        "- L'après : tu imagines des suites.",
+      ].join("\n") }, "max");
+      const matched = (userMessage: string) => buildTurnRelationshipDirective({
+        policy: compiled,
+        state: createInitialRelationshipState("max", compiled.version),
+        userMessage,
+      }).matchedTopicIds;
+
+      expect(compiled.sensitiveTopics.map((topic) => topic.label)).toEqual(["Emma", "Emma va se transformer", "Les morts", "L'après"]);
+      expect(compiled.sensitiveTopics[2].condition).toBe("tu ne les comptes pas. Tu décris seulement ce que tu as vu.");
+      expect(matched("Comment va Emma ?")).toEqual(["emma"]);
+      expect(matched("Parle-moi de la transformation.")).toEqual(["emma-va-se-transformer"]);
+      expect(matched("Qui est mort ?")).toEqual(["les-morts"]);
+      expect(matched("Et l'après, tu le vois comment ?")).toEqual(["l-apres"]);
+      expect(matched("Qu'est-ce qui s'est passé après ?")).toEqual([]);
+    });
+
+    it("écarte les ouvertures stockées sous un ancien identifiant", () => {
+      const state = {
+        ...createInitialRelationshipState("max", policy().version),
+        topicOpenness: { "le-fusil": "open" as const, "le-fusil-tu-n-en-parles-pas": "open" as const },
+      };
+      expect(withKnownTopics(state, policy()).topicOpenness).toEqual({ "le-fusil": "open" });
+    });
   });
 });
