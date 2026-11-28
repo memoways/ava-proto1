@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-27 (Attente de passage lot 1 ter)  
+> **Last Updated**: 2026-11-28 (Attente de passage, mesure du lot 1 ter)  
+
+---
+
+## Coupé, donc jamais retenu (28 novembre 2026)
+
+L'appel de recette d'Ulrich le confirme : les trois répliques coupées n'ont laissé aucune trace dans la mémoire de Max. La mesure révèle un autre oubli : quand le Game Master propose une relation jugée irrecevable, tout ce qu'il avait noté du tour part avec elle, aveux compris.
 
 ---
 

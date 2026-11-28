@@ -263,6 +263,19 @@ Restes lus dans le code, non corrigés : la voix lue en bloc (et `held_batch`) r
 
 **Recette d'Ulrich** (`sandbox-ulrich`, voix seule, mains libres, après synchro Lovable) : environ 10 tours avec Max ; laisser finir au moins 4 répliques ; en couper au moins 3 au milieu d'une phrase qui contient une information ; reparler aussitôt après au moins 2 répliques finies ; terminer par une demande Max → Emma. Attendu à l'oreille : Max ne fait jamais référence à ce qu'il n'a pas eu le temps de dire comme à une chose dite. [Mesure](prompt_reprise_attente_passage_mesure_lot_1_ter.md).
 
+### Attente de passage, lot 1 ter : mesure (28 novembre, aucun code)
+
+Recette d'Ulrich : session `f89abea8` (`sandbox-ulrich`, voix seule, mains libres, 07:44–07:49 UTC, après la PR #311). 12 tours : 9 répliques `completed` (1, 2, 3, 7 à 12), 3 coupées (4, 5, 6 : reçus `cancelled`, `delivered` vide, après environ 4,2 s, 6,6 s et 13,2 s de lecture), puis Max → Emma. Voix `feed`, sauf le tour 10 (`held_batch`, tour du passage). Lecture seule : `sessions`, `session_summaries`, `voice_turn_events`, `experience_events`.
+
+- **Tour coupé jamais crédité : confirmé.** Tours 4, 5 et 6 absents de `gm_post_turn_log` ; aucune confidence ni sujet de `conversation_memory` ne vient d'eux (sources 1, 7, 8 pour les confidences, 7 et 8 pour les sujets) ; les résumés (Max jusqu'au tour 7, Emma jusqu'au tour 11) ne contiennent aucun élément propre à ces répliques. Aucun appel du Game Master pour eux.
+- **Tours entendus : 8 sur 9 au journal**, une fois chacun, dans l'ordre ; `memory_last_turn` = 11. Le tour 7, dont le Game Master a répondu après la prise de parole suivante, est bien enregistré (seul cas net de cet appel ; la recette en visait deux).
+- **Tour 12 absent : raccrochage.** Réplique entendue en entier, Game Master interrompu à 1,4 s (`gm_generation` `failed`), `call_closed` 0,1 s plus tard. Cause lue dans le code : la fin d'appel annule les post-tours en attente (`HandoffCoordinator.endCall`). Conforme à la conception, mais sa mémoire manque à une reprise de session.
+- **Passage** : `handoff_prepared`, `handoff_validated`, `handoff_proposed`, `handoff_accepted`, `handoff_executed` ; aucun `late_after_next_turn`, aucun événement ni message d'échec après les interruptions.
+- **Hors lot, mémoire perdue sur des tours entendus** : aux tours 2 et 3, la relation proposée est refusée (`relationship_invalid`) et tout `memory_delta` est jeté, confidences comprises (au tour 3, Max venait de dire avoir tué une protogyne). Comportement voulu et testé (`gameMasterPRD4.memory.test.ts`) ; 32 tours sur 196 depuis le 24 novembre (23 sessions, `relationship_invalid`, tous sans mémoire). Motifs : sujet inconnu, preuve montante absente, métadonnées recopiées du tour précédent.
+- **À savoir** : après les coupures, Max a redit presque la même chose aux tours 5 et 6. Cause probable, non vérifiée : la réplique coupée est écartée de l'historique, il ignore donc l'avoir commencée. La télémétrie voix a numéroté deux tentatives « 2 » après un premier essai abandonné (déjà connu).
+
+Le lot 1 ter est clos. Suite proposée, sur décision d'Ulrich : [mémoire gardée quand la relation est refusée](prompt_reprise_memoire_relation_refusee_lot_1.md).
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

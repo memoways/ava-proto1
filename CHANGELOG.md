@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Attente de passage : mesure après lot 1 ter] — 2026-11-28
+
+- Documentation seulement : sur un appel de recette, aucune des 3 répliques coupées n'est créditée (journal, mémoire, résumé) ; 8 répliques entendues sur 9 sont au journal, la neuvième interrompue par le raccrochage ; la demande Max → Emma aboutit.
+- Constat hors lot : une relation refusée fait perdre toute la mémoire du tour. Prompt de reprise préparé.
+
 ## [ElevenLabs annuel lot 1 : quota mensuel, vraies factures, crédits par modèle] — 2026-11-27
 
 - Abonnement annuel : le quota se compare au mois, ancré sur le jour de début ; la date de renouvellement reste annuelle. Mensuel inchangé.
