@@ -2,6 +2,8 @@
 
 À copier dans un nouveau chat Ava, quand Ulrich lance ce lot. Ce lot seulement.
 
+> **Suspendu le 28 novembre** : à lancer seulement après le chantier [compression de la fiche](plan_compression_fiche.md). Le bloc « Comment tu réponds » n'a pas été collé. Actualiser l'état avant usage.
+
 ## Objectif
 
 Préparer, depuis les vrais appels, la matière de la [Bible des réponses](plan_cadre_appel.md#bible-des-réponses). Il s'agit des réponses qui sonnent « IA », classées en cas, chiffrées et illustrées. Ulrich écrira ensuite le « pourquoi » et le « quoi faire à la place ». **Aucune règle de style n'est écrite ni envoyée au personnage dans ce lot.**
