@@ -1,6 +1,6 @@
 # Plan — Compression de la fiche personnage
 
-Statut au 28 novembre 2026 : **lot 1 livré, banc avec le modèle fait** ; « Fiche entière » est bloquée par la limite de taille de `proxy-llm` (décision d'Ulrich attendue), puis lot 2 qualité ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
+Statut au 28 novembre 2026 : **lot 1 livré, banc avec le modèle fait, limite de `proxy-llm` relevée à 120 000 caractères** (décision d'Ulrich) ; lot 2 qualité à faire ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
 
 ## Demande
 
@@ -136,7 +136,7 @@ Aucune correction de synchronisation n'est nécessaire.
 - **Le cache ne sert qu'au même prompt rejoué** (2e passage : presque tout en cache, coût divisé par 8). D'une question à l'autre, il ne s'active pas, même avec 33 500 caractères de tête commune (0 appel sur 19 au 1er passage, 1 sur 19 en « Actuel »). Les 420 répliques jouées ces 10 jours n'ont jamais eu de cache. En jeu, il faut donc compter le coût sans cache.
 - **« Fiche entière » est refusée par `proxy-llm`** : la fonction refuse tout message de plus de 60 000 caractères (`messages payload too large`, [proxy-llm](../supabase/functions/proxy-llm/index.ts)), et le prompt fait 63 000 à 67 000 caractères. 38 appels sur 38 refusés, non facturés. En jeu, ce niveau ferait répondre le personnage par la réplique de secours. Aucun niveau n'étant enregistré, aucun appel réel n'est touché.
 
-Décision à prendre par Ulrich : relever la limite de `proxy-llm` (par exemple à 120 000 caractères, changement d'Edge Function publié par Lovable) ou retirer « Fiche entière » du choix.
+**Décision d'Ulrich (28 novembre) : relever la limite.** `proxy-llm` accepte maintenant 120 000 caractères par requête (constante partagée [proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)), assez pour « Fiche entière » avec l'historique (≈ 70 000). Le compilateur ajoute l'alerte `proxy_limit_exceeded` (trace et aperçu) quand un tour dépasserait cette limite, au lieu d'un refus silencieux. La limite reste un garde-fou contre les requêtes trop coûteuses.
 
 ## Risques connus
 

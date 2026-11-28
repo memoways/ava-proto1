@@ -6,6 +6,7 @@ import {
   type OptimizedPromptInput,
 } from "./maxOptimizedPromptCompiler";
 import { buildCharacterRulesInvariant, previewCharacterIdentity } from "./characterRulesInvariant";
+import { PROXY_LLM_MAX_MESSAGE_CHARS } from "../../supabase/functions/_shared/proxyLlmLimits";
 import { measureSheetCoverage, SHEET_COMPRESSION_WHOLE_FIELDS, type SheetCompressionLevel } from "./sheetCompression";
 import { mergeConversationMemory } from "@/services/conversationMemoryV1";
 import { buildExperienceFrame } from "@/services/experienceFrame";
@@ -123,5 +124,16 @@ describe("optimized_v3 — compression de la fiche (lot 1)", () => {
     expect(share("current")).toBeLessThan(0.3);
     expect(share("guidelines")).toBeGreaterThan(0.45);
     expect(share("full")).toBe(1);
+  });
+
+  it("« Fiche entière » tient sous la limite de proxy-llm ; au-delà, l'alerte le dit", () => {
+    expect(PROXY_LLM_MAX_MESSAGE_CHARS).toBe(120_000);
+    for (const turn of turns) {
+      const trace = at(turn, "full");
+      expect(trace.finalSystemPrompt.length).toBeGreaterThan(60_000);
+      expect(trace.budget?.warnings?.map((warning) => warning.code) ?? []).not.toContain("proxy_limit_exceeded");
+    }
+    const oversized = at(turns[0], "full", { userMessage: `${turns[0].question} ${"et encore ".repeat(6_000)}` });
+    expect(oversized.budget?.warnings?.map((warning) => warning.code)).toContain("proxy_limit_exceeded");
   });
 });

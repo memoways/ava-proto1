@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { enforceGameRequest } from "../_shared/gameRequestGuard.ts";
 import { requireAdmin } from "../_shared/adminAuth.ts";
 import { buildOpenRouterPayload } from "./payload.ts";
+import { PROXY_LLM_MAX_MESSAGE_CHARS, PROXY_LLM_MAX_MESSAGES } from "../_shared/proxyLlmLimits.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -165,14 +166,14 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    if (body.messages.length > 60) {
+    if (body.messages.length > PROXY_LLM_MAX_MESSAGES) {
       return new Response(
         JSON.stringify({ error: 'messages array too large' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
     const totalChars = body.messages.reduce((s, m) => s + (typeof m?.content === 'string' ? m.content.length : 0), 0);
-    if (totalChars > 60000) {
+    if (totalChars > PROXY_LLM_MAX_MESSAGE_CHARS) {
       return new Response(
         JSON.stringify({ error: 'messages payload too large' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
