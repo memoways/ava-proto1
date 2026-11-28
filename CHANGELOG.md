@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Compression de la fiche lot 1 : trois niveaux] — 2026-11-28
+
+- Ajout : réglage « Fiche envoyée » par personnage (Réglages personnages), enregistré par environnement (`ava_character_sheet_compression`, sans migration), lu à la préparation de l'appel et noté dans la trace du tour.
+- `optimized_v3` : « Consignes entières » envoie Identité fondamentale, Qui tu es, Dynamique, Ce que tu ne fais jamais et Qui t'appelle en entier ; « Fiche entière » envoie tous les champs. Les champs entiers vont dans le noyau, en tête du prompt, avec leur propre place ; mémoire, cadre, directive, état, parole et souvenirs gardent la leur.
+- Correctif aux niveaux supérieurs : les sections du tour ne sont plus raccourcies comme doublons d'un noyau long.
+- « Voir ce que reçoit le personnage » : niveau, taille du prompt, part de la fiche envoyée champ par champ.
+- Mesure : `npm run eval:replay:compression` (605 questions, lecture seule). « Actuel » identique à `main` sur toutes les questions.
+- Vérifié : Notion et l'application ont le même texte. Aucune écriture en base ni dans Notion, aucun appel au modèle ; production non publiée.
+
 ## [Compression de la fiche : plan] — 2026-11-28
 
 - Documentation seulement : constat chiffré (≈ 15 % de la fiche envoyée par réplique, tri par mots communs), trois niveaux de compression retenus par Ulrich, réglables par personnage, et prompt de reprise du lot 1.

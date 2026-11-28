@@ -139,6 +139,8 @@ export interface MaxPromptAssemblyTrace {
     warnings?: Array<{ code: string; message: string }>;
     /** Cadre de l'appel lot 2 — « Comment tu réponds » found in the sheet; absent when the sheet has none. */
     replyBlock?: { field: string; chars: number; maxChars: number; sent: boolean; roomChars: number };
+    /** Compression de la fiche lot 1 — level read at the start of the call, fields sent whole and their own room. */
+    sheetCompression?: { level: "current" | "guidelines" | "full"; wholeFields: string[]; roomChars: number };
   };
 
   finalSystemPrompt: string;

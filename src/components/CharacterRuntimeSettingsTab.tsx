@@ -28,6 +28,14 @@ import {
   type CharacterVideoChoice,
 } from "@/services/streamingAvatar/settings";
 import { serializeStateProfile, normalizeStateProfile } from "@/services/characterState";
+import { SHEET_COMPRESSION_LABELS, SHEET_COMPRESSION_LEVELS, type SheetCompressionLevel } from "@/agents/sheetCompression";
+import {
+  getSheetCompressionSettings,
+  loadSheetCompressionSettings,
+  saveSheetCompressionLevel,
+  sheetCompressionFor,
+  type SheetCompressionSettings,
+} from "@/services/characterSheetCompression";
 import {
   fetchCharacterAutoReadiness,
   listCharacterRuntimeProfiles,
@@ -127,6 +135,9 @@ export default function CharacterRuntimeSettingsTab() {
   const [avatarSettings, setAvatarSettings] = useState(getStreamingAvatarSettings);
   /** Unsaved video choices; a character without one is not rewritten on save. */
   const [videoDrafts, setVideoDrafts] = useState<Record<string, CharacterVideoChoice>>({});
+  /** Compression de la fiche lot 1: saved levels and unsaved choices, per character. */
+  const [compression, setCompression] = useState<SheetCompressionSettings>(getSheetCompressionSettings);
+  const [compressionDrafts, setCompressionDrafts] = useState<Record<string, SheetCompressionLevel>>({});
 
   const readProfiles = async () => (await listCharacterRuntimeProfiles()).slice().sort(
     (a, b) => KEY_ORDER.indexOf(a.character_key) - KEY_ORDER.indexOf(b.character_key),
@@ -135,6 +146,8 @@ export default function CharacterRuntimeSettingsTab() {
   const load = async () => {
     setLoading(true);
     setLoadError(null);
+    // Read alongside the profiles, never before them: the local copy shows until it lands.
+    void loadSheetCompressionSettings().then(setCompression, () => undefined);
     try {
       const nextProfiles = await readProfiles();
       setProfiles(nextProfiles);
@@ -143,6 +156,7 @@ export default function CharacterRuntimeSettingsTab() {
       setVoices(seedFromProfiles(await loadCharacterVoicesFromDB(), nextProfiles));
       setAvatarSettings(await loadStreamingAvatarSettingsFromDB());
       setVideoDrafts({});
+      setCompressionDrafts({});
       try {
         setAutoReadiness(await fetchCharacterAutoReadiness(nextProfiles.map((profile) => profile.display_name)));
       } catch {
@@ -180,6 +194,7 @@ export default function CharacterRuntimeSettingsTab() {
     try {
       fresh = (await readProfiles()).find((candidate) => candidate.id === saved.id) ?? saved;
       setAvatarSettings(await loadStreamingAvatarSettingsFromDB());
+      void loadSheetCompressionSettings().then(setCompression, () => undefined);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : String(error));
     }
@@ -187,6 +202,11 @@ export default function CharacterRuntimeSettingsTab() {
     setProfiles(replace);
     setSavedProfiles(replace);
     setVideoDrafts((current) => {
+      const next = { ...current };
+      delete next[saved.character_key];
+      return next;
+    });
+    setCompressionDrafts((current) => {
       const next = { ...current };
       delete next[saved.character_key];
       return next;
@@ -213,6 +233,10 @@ export default function CharacterRuntimeSettingsTab() {
       });
       const videoDraft = videoDrafts[profile.character_key];
       if (videoDraft) await saveCharacterVideoChoiceToDB(profile.character_key, videoDraft);
+      const compressionDraft = compressionDrafts[profile.character_key];
+      if (compressionDraft && compressionDraft !== sheetCompressionFor(compression, profile.character_key)) {
+        await saveSheetCompressionLevel(profile.character_key, compressionDraft);
+      }
       toast.success(`Profil de ${profile.display_name} enregistré`);
       await refreshSaved(profile);
     } catch (error) {
@@ -255,7 +279,9 @@ export default function CharacterRuntimeSettingsTab() {
           const saved = savedProfiles.find((candidate) => candidate.id === profile.id);
           const videoChanged = Boolean(videoDrafts[profile.character_key])
             && JSON.stringify(videoDrafts[profile.character_key]) !== JSON.stringify(characterVideoChoice(avatarSettings, profile.character_key));
-          const dirty = videoChanged || JSON.stringify(profile) !== JSON.stringify(saved);
+          const savedLevel = sheetCompressionFor(compression, profile.character_key);
+          const level = compressionDrafts[profile.character_key] ?? savedLevel;
+          const dirty = videoChanged || level !== savedLevel || JSON.stringify(profile) !== JSON.stringify(saved);
           return (
             <div key={profile.id} className={`rounded border p-3 ${dirty ? "border-amber-500" : ""}`}>
               <UnsavedSection dirty={dirty} label={`Profil de ${profile.display_name}`} saving={saving} save={() => saveProfile(profile)} />
@@ -387,10 +413,31 @@ export default function CharacterRuntimeSettingsTab() {
                   onChange={(next) => patchProfile(profile.id, { state_profile: next })}
                 />
 
+                <SettingsFold title="Fiche envoyée" summary={SHEET_COMPRESSION_LABELS[level].label} testId={`sheet-compression-${profile.character_key}`}>
+                  <div className="space-y-2">
+                    <Select
+                      value={level}
+                      onValueChange={(value) => setCompressionDrafts((current) => ({ ...current, [profile.character_key]: value as SheetCompressionLevel }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs" aria-label={`Fiche envoyée à ${profile.display_name}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SHEET_COMPRESSION_LEVELS.map((option) => (
+                          <SelectItem key={option} value={option} className="text-xs">{SHEET_COMPRESSION_LABELS[option].label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">{SHEET_COMPRESSION_LABELS[level].description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Enregistré pour cet environnement seulement, sans nouvelle version d'orchestration ni du Game Master. Effet au prochain appel ; « Voir ce que reçoit le personnage » montre ce niveau.
+                    </p>
+                  </div>
+                </SettingsFold>
+
                 <CharacterReceivedPreview
                   characterId={autoReadiness[profile.display_name]?.characterId}
                   characterName={profile.display_name}
                   stateProfile={profile.state_profile}
+                  sheetCompression={level}
                 />
 
                 <div className="space-y-2 rounded bg-muted/40 p-3">

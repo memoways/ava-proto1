@@ -30,6 +30,7 @@ import { advanceHandoffTurn, parseHandoffState, restoreHandoffOffer, revokeHando
 import { readHandoffSnapshot, writeHandoffSnapshot, revalidateHandoffCall, HandoffConflictError, type HandoffSnapshot } from '@/services/sessionHandoff';
 import type { ResponseDeliveryReceipt } from "@/services/responseDelivery";
 import { processPRD4Turn, streamPRD4Turn, type PRD4StreamEvent } from "@/services/prd4Orchestrator";
+import { EMPTY_SHEET_COMPRESSION, getSheetCompressionSettings, sheetCompressionFor, type SheetCompressionSettings } from "@/services/characterSheetCompression";
 import {
   createPRD4Session,
   endPRD4Session,
@@ -381,6 +382,8 @@ const IndexPRD4 = () => {
     new URLSearchParams(window.location.search).get("diagnostic") === "full",
   );
   const diagnosticTraceEnabledRef = useRef(false);
+  /** Compression de la fiche lot 1 — levels pinned while the call is prepared. */
+  const sheetCompressionRef = useRef<SheetCompressionSettings>(EMPTY_SHEET_COMPRESSION);
   const conversationRef = useRef<ConversationMessage[]>([]);
   const isProcessingRef = useRef(false);
   const processingWatchdogRef = useRef<number | null>(null);
@@ -942,6 +945,8 @@ const IndexPRD4 = () => {
     // Bounded wait for the database settings; past it the call goes on with the local copy
     // or the code defaults, and the fallback is reported (never silent).
     const settingsState = await ensureExperienceSettings({ sessionContext: "prepare_call" });
+    // Read once per call: a level changed in the back-office applies from the next call.
+    sheetCompressionRef.current = getSheetCompressionSettings();
     // Character profiles for the session record: requested now, never awaited before the call.
     const recordProfiles = Promise.all([
       getCharacterRuntimeProfile("max").catch(() => null),
@@ -2065,6 +2070,7 @@ const IndexPRD4 = () => {
           gmTopicsCovered: gmTopicsCoveredRef.current,
           gmSpeechState,
           characterStateLogged: characterStateRef.current[activeCharacterRef.current] ?? null,
+          sheetCompression: sheetCompressionFor(sheetCompressionRef.current, turnCharacterContext.characterKey),
           playedSpeechStateRef,
           onLatencySegment: handleLatencySegment,
           signal: turnController.signal,

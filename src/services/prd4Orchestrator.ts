@@ -1,4 +1,6 @@
 import { ResponseIntentParser, type ResponseIntent, type ResponseStreamContractVariant } from "./responseIntentStream";
+import type { SheetCompressionLevel } from "@/agents/sheetCompression";
+import { getSheetCompressionSettings, sheetCompressionFor } from "@/services/characterSheetCompression";
 import { isCharacterTimeCuesEnabled } from "@/services/characterTimeCues";
 import { projectDeliveredConversation, type ResponseDeliveryReceipt } from "./responseDelivery";
 import type { OpenHandoffRequest } from './characterHandoffState';
@@ -126,6 +128,11 @@ export interface PRD4TurnInput {
    * previous post-turn (absent: the profile's initial state is used).
    */
   characterStateLogged?: StateLevels | null;
+  /**
+   * Compression de la fiche lot 1 — level pinned by the page at the start of the call.
+   * Absent (replays, tests): the level saved for this character in the environment.
+   */
+  sheetCompression?: SheetCompressionLevel;
   /** Reçoit l'état « parole » déclaré par le personnage (flux streamé). */
   playedSpeechStateRef?: { current: string | null };
   onLatencySegment?: (event: PRD4LatencySegmentEvent) => void;
@@ -464,6 +471,7 @@ export async function processPRD4Turn(input: PRD4TurnInput): Promise<PRD4TurnRes
     characterState: characterStateForGm ? compileCharacterStateBlock(characterStateForGm.levels, characterStateForGm.profile, evaluationOverrides?.radarTexts) : undefined,
     rugosite,
     speechStateHistory: recentSpeechStates,
+    sheetCompression: input.sheetCompression ?? sheetCompressionFor(getSheetCompressionSettings(), activeCharacter),
   };
   observeVoice(input.onVoiceObservation, "context_ready");
   span("character_context_reads", maxStart);

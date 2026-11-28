@@ -50,6 +50,7 @@ export const EXPERIENCE_SETTING_KEYS = [
   "ava_stt_settings",
   "ava_stt_provider_settings",
   "ava_stt_dictionary",
+  "ava_character_sheet_compression",
 ] as const;
 
 export type ExperienceSettingKey = (typeof EXPERIENCE_SETTING_KEYS)[number];

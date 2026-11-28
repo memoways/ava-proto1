@@ -13,6 +13,7 @@ import { buildCharacterIdentityInvariant, toCharacterExecutionContext } from "@/
 import { buildLongTurnSimulation } from "@/services/characterReceivedSimulation";
 import { getActiveEnvironment } from "@/services/environmentContext";
 import { describeReplyBlock } from "@/services/replyBlockStatus";
+import { measureSheetCoverage, SHEET_COMPRESSION_LABELS, type SheetCompressionLevel, type SheetCoverage } from "@/agents/sheetCompression";
 import type { RuntimeCharacter } from "@/types";
 
 const DEFAULT_QUESTION = "Comment ce fusil est-il arrivé au chalet ?";
@@ -26,10 +27,12 @@ const DEFAULT_QUESTION = "Comment ce fusil est-il arrivé au chalet ?";
  * transfer, the typed question and the souvenirs `query-rag` really returns for
  * it. Nothing is sent to any model, nothing is written.
  */
-export function CharacterReceivedPreview({ characterId, characterName, stateProfile }: {
+export function CharacterReceivedPreview({ characterId, characterName, stateProfile, sheetCompression = "current" }: {
   characterId: string | null | undefined;
   characterName: string;
   stateProfile: unknown;
+  /** Compression de la fiche lot 1: level shown (the one chosen on screen, saved or not). */
+  sheetCompression?: SheetCompressionLevel;
 }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<CharacterLayerRow[] | null>(null);
@@ -41,6 +44,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
   const [summary, setSummary] = useState("");
   const [replyBlock, setReplyBlock] = useState<ReturnType<typeof describeReplyBlock> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [coverage, setCoverage] = useState<{ level: SheetCompressionLevel; value: SheetCoverage } | null>(null);
 
   const compile = async (simulate: boolean) => {
     if (!characterId) { setError("Aucune fiche synchronisée pour ce personnage."); return; }
@@ -96,6 +100,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
         userMessage: "(message du joueur)",
         historyChars: 0,
         characterState: profile ? compileCharacterStateBlock(profile.initial, profile) : undefined,
+        sheetCompression,
         ...turn,
       });
       const budget = trace.budget;
@@ -103,6 +108,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
       setPrompt(trace.finalSystemPrompt);
       setWarnings(budget?.warnings ?? []);
       setReplyBlock(describeReplyBlock(budget?.replyBlock));
+      setCoverage({ level: sheetCompression, value: measureSheetCoverage(sheet, trace.finalSystemPrompt) });
       setSummary(`${budget?.totalSystemChars ?? trace.finalSystemPrompt.length} car. sur ${budget?.limitChars ?? "?"} (historique ${budget?.historyChars ?? 0})${simulate ? ` · ${found}, ${budget?.sentRagIds?.length ?? 0} envoyé(s)` : ""}`);
       setError("");
     } catch (cause) {
@@ -153,6 +159,27 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
               : " Ici l'état initial du radar et aucun historique : « absent (section_vide) » veut dire « non simulé », cochez « Simuler un tour long » pour voir la place qui reste en jeu."}
           </p>
           {summary && <p className="text-[11px]" data-testid="character-received-summary">Prompt système : {summary}</p>}
+          {coverage && (
+            <div className="space-y-1 text-[11px]" data-testid="character-received-sheet-coverage">
+              <p>
+                Niveau en jeu : <strong>{SHEET_COMPRESSION_LABELS[coverage.level].label}</strong>
+                {coverage.level !== sheetCompression ? " (recalculer pour voir le niveau choisi)" : ""}
+                {" · "}part de la fiche envoyée : {Math.round(coverage.value.share * 100)} % ({coverage.value.sentChars} car. sur {coverage.value.chars})
+              </p>
+              <table className="w-full">
+                <thead><tr className="text-left text-muted-foreground"><th>Champ de la fiche</th><th className="text-right">Envoyé</th><th className="text-right">Part</th></tr></thead>
+                <tbody>
+                  {coverage.value.fields.map((field) => (
+                    <tr key={field.key} className={field.sentChars ? "" : "text-muted-foreground"}>
+                      <td>{field.label}</td>
+                      <td className="text-right">{field.sentChars} / {field.chars}</td>
+                      <td className="text-right">{Math.round((field.sentChars / field.chars) * 100)} %</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {replyBlock && (
             <p className={`text-[11px] ${replyBlock.tooLong ? "text-destructive" : ""}`} data-testid="character-received-reply-block">{replyBlock.text}</p>
           )}

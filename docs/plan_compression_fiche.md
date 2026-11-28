@@ -1,6 +1,6 @@
 # Plan — Compression de la fiche personnage
 
-Statut au 28 novembre 2026 : **plan approuvé par Ulrich ; lot 1 à faire** ([reprise](prompt_reprise_compression_fiche_lot_1.md)). Aucun code dans ce plan.
+Statut au 28 novembre 2026 : **lot 1 livré (code, mesure sans modèle)** ; banc avec le modèle et lot 2 à faire ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
 
 ## Demande
 
@@ -75,9 +75,53 @@ Principes :
    - Décision du niveau par défaut.
 3. **Ensuite :** reprise de la [Bible des réponses](plan_cadre_appel.md#bible-des-réponses) sur le niveau retenu.
 
+## Lot 1 — livré le 28 novembre (mesure sans modèle)
+
+### Notion et l'application ont le même texte
+
+Pages Max et Emma lues dans Notion Gamilab (lecture seule), comparées champ par champ à `character_prompts` de sandbox-ulrich, sandbox-romed et sandbox-benoit :
+
+- les 9 champs synchronisés sont **identiques mot pour mot** dans les trois sandboxes ;
+- les retours à la ligne sont gardés ; seul le gras de Notion est perdu (les sous-titres deviennent des lignes simples), sans effet pour le personnage ;
+- « Ce que tu sais aujourd'hui » est vide dans Notion comme dans l'application ;
+- le corps de page (≈ 114 000 caractères par personnage) n'entre pas dans la fiche : il alimente les souvenirs (`query-rag`).
+
+Aucune correction de synchronisation n'est nécessaire.
+
+### Ce qui est codé
+
+- Réglage **« Fiche envoyée »** par personnage dans Admin › Réglages personnages, enregistré par environnement dans `admin_settings` (clé `ava_character_sheet_compression`, sans migration), lu une fois à la préparation de l'appel ; noté dans la trace du tour (`budget.sheetCompression` : niveau, champs entiers, place).
+- Dans `optimized_v3` ([maxOptimizedPromptCompiler.ts](../src/agents/maxOptimizedPromptCompiler.ts), niveaux dans [sheetCompression.ts](../src/agents/sheetCompression.ts)) :
+  - les champs du niveau partent **en entier dans le noyau**, en tête du prompt, dans l'ordre de la fiche, sans ce que portent déjà les sections protégées ;
+  - noyau et limite de contexte grandissent exactement de leur taille ;
+  - au-dessus d'« Actuel », la Manière de parler ne cède plus de paragraphes aux faits établis ;
+  - les sections du tour (mémoire, cadre, directive, état, parole) ne sont plus dédoublonnées contre les champs entiers ni contre le noyau entier (un texte aussi long contient presque tous les mots et faisait tomber des phrases au hasard) ; les souvenirs restent dédoublonnés contre toute la fiche envoyée, mais seulement sur un passage recopié (cinq mots de suite).
+- « Voir ce que reçoit le personnage » montre le niveau choisi, la taille du prompt et la part de la fiche envoyée, champ par champ.
+- Rejeu généralisé : `npm run eval:replay:compression` (reconstitution des tours dans `scripts/eval-judge/turnReplay.ts`, partagée avec `eval:replay:reply-block`).
+
+### Mesure (605 questions réelles depuis le 19 novembre, sans modèle, sans souvenirs)
+
+| | Actuel | Consignes entières | Fiche entière |
+|---|---|---|---|
+| Prompt médian Max (p90) | 16 498 (17 192) | 37 436 (38 092) | 63 522 (64 225) |
+| Prompt médian Emma (p90) | 15 306 (16 438) | 38 171 (39 184) | 60 445 (61 485) |
+| Part de la fiche, Max / Emma | 14 % / 14 % | 52 % / 57 % | 100 % / 100 % |
+| Sections évincées | 0 | 0 | 0 |
+| Alertes | Emma 14 (`canon_squeezed`) | 0 | 0 |
+
+- **Niveau Actuel identique à `main`** : même empreinte du prompt sur 605 questions sur 605 (rejeu avec le compilateur de `main`).
+- Mémoire : plus complète aux niveaux supérieurs (151 tours de Max, 77 d'Emma gardent une phrase qu'« Actuel » retirait à tort comme doublon). Aucune phrase perdue ; un seul cas chez Emma (« Mona est dans un camp ») est un vrai doublon, déjà envoyé dans le canon.
+- Le défaut de doublon à tort reste en « Actuel » (prompt inchangé par décision) ; il ne grossit pas avec le noyau.
+- Part de la fiche en « Actuel », champ par champ (médiane, Max) : présent 100 %, Manière de parler 90 %, Identité 36 %, Dynamique 25 %, Sujets sensibles 8 %, Ce que tu ne fais jamais 4 %, Timeline 2 %, Qui tu es et Références 0 %.
+
+### Pas fait dans ce lot
+
+- Banc avec le modèle (délai de la première phrase, part en cache, coût) : il attend l'accord d'Ulrich sur le coût, au début du lot 2.
+- Aucun réglage enregistré, aucun appel réel, écran non regardé dans l'aperçu Lovable.
+
 ## Risques connus
 
-- **Délai** : le prompt passerait d'environ 16 500 à environ 35 000 caractères (Consignes entières) ou environ 62 000 (Fiche entière). Le cache peut en absorber une partie : à mesurer.
+- **Délai** : le prompt passe d'environ 16 500 à environ 37 500 caractères (Consignes entières) ou environ 63 500 (Fiche entière), mesuré au lot 1. Le cache peut en absorber une partie : la tête du prompt (règles et noyau) ne dépend plus de la question au-dessus d'« Actuel ». À mesurer avec le modèle.
 - **Coût** par tour : jusqu'à 3 à 4 fois plus sans cache.
 - **Personnage noyé** dans un prompt long : c'est l'objet du lot 2.
-- **Dédoublonnage de la mémoire** contre les mots du noyau entier : avec un noyau plus long, plus de phrases de mémoire peuvent tomber à tort (constaté au lot 2 du cadre de l'appel). À mesurer au lot 1, et à corriger si cela arrive.
+- **Dédoublonnage de la mémoire** contre les mots du noyau entier : constaté au lot 1 sur un essai, corrigé avant mesure (voir ci-dessus).
