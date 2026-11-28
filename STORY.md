@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Toute la fiche, si on veut)  
+> **Last Updated**: 2026-11-28 (Le prix d'une fiche)  
+
+---
+
+## Le prix d'une fiche (28 novembre 2026)
+
+Neuf centimes de banc ont donné la réponse : envoyer toutes les consignes double le prix d'une réplique, sans la ralentir de façon sensible. Le cache espéré ne joue pas d'une question à l'autre. Et la fiche entière ne passe pas du tout : la porte vers le modèle refuse les messages de plus de 60 000 caractères. Ulrich doit choisir d'élargir la porte ou de renoncer à ce niveau.
 
 ---
 

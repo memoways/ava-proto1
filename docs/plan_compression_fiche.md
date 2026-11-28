@@ -1,6 +1,6 @@
 # Plan — Compression de la fiche personnage
 
-Statut au 28 novembre 2026 : **lot 1 livré (code, mesure sans modèle)** ; banc avec le modèle et lot 2 à faire ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
+Statut au 28 novembre 2026 : **lot 1 livré, banc avec le modèle fait** ; « Fiche entière » est bloquée par la limite de taille de `proxy-llm` (décision d'Ulrich attendue), puis lot 2 qualité ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
 
 ## Demande
 
@@ -118,6 +118,25 @@ Aucune correction de synchronisation n'est nécessaire.
 
 - Banc avec le modèle (délai de la première phrase, part en cache, coût) : il attend l'accord d'Ulrich sur le coût, au début du lot 2.
 - Aucun réglage enregistré, aucun appel réel, écran non regardé dans l'aperçu Lovable.
+
+## Banc avec le modèle (28 novembre, accord d'Ulrich, 0,09 $ dépensés)
+
+`npm run eval:llm-latency -- --sheet-compression <niveau>` compile les prompts réels du corpus du juge au niveau choisi (en mémoire, sans réglage enregistré), puis les joue en flux par `proxy-llm`, comme en jeu (`gpt-5.6-luna`, routage par latence, Amazon Bedrock). 19 questions (10 Max, 9 Emma) × 3 niveaux, deux passages, sandbox-ulrich, 115 appels.
+
+| | Actuel | Consignes entières | Fiche entière |
+|---|---|---|---|
+| Jetons envoyés (médiane) | ≈ 5 000 | ≈ 10 000 (Max) / 10 500 (Emma) | — |
+| Première phrase, 1er passage (médiane) | 735 ms | 782 ms | refusé |
+| Premier jeton, 1er passage (médiane) | 506 ms | 588 ms | refusé |
+| Coût par réplique, sans cache | 0,0013 $ | 0,0027 $ | refusé |
+| Coût par réplique, prompt identique rejoué | 0,0002 $ | 0,0003 $ | refusé |
+
+- **« Consignes entières » ne ralentit presque pas** : + 47 ms sur la première phrase, + 82 ms sur le premier jeton, dans le bruit d'un appel à l'autre.
+- **Coût doublé** sans cache : ≈ 0,08 $ par appel de 30 répliques au lieu de ≈ 0,04 $.
+- **Le cache ne sert qu'au même prompt rejoué** (2e passage : presque tout en cache, coût divisé par 8). D'une question à l'autre, il ne s'active pas, même avec 33 500 caractères de tête commune (0 appel sur 19 au 1er passage, 1 sur 19 en « Actuel »). Les 420 répliques jouées ces 10 jours n'ont jamais eu de cache. En jeu, il faut donc compter le coût sans cache.
+- **« Fiche entière » est refusée par `proxy-llm`** : la fonction refuse tout message de plus de 60 000 caractères (`messages payload too large`, [proxy-llm](../supabase/functions/proxy-llm/index.ts)), et le prompt fait 63 000 à 67 000 caractères. 38 appels sur 38 refusés, non facturés. En jeu, ce niveau ferait répondre le personnage par la réplique de secours. Aucun niveau n'étant enregistré, aucun appel réel n'est touché.
+
+Décision à prendre par Ulrich : relever la limite de `proxy-llm` (par exemple à 120 000 caractères, changement d'Edge Function publié par Lovable) ou retirer « Fiche entière » du choix.
 
 ## Risques connus
 
