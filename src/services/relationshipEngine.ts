@@ -54,7 +54,8 @@ function normalized(value: string): string {
 }
 
 function slug(value: string, fallback: string): string {
-  const result = normalized(value).replace(/\s+/g, "-").slice(0, 72);
+  // The cut may land on a separator; a second pass would drop it, so drop it now.
+  const result = normalized(value).replace(/\s+/g, "-").slice(0, 72).replace(/-$/, "");
   return result || fallback;
 }
 

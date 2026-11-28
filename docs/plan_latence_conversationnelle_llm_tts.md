@@ -294,6 +294,21 @@ Le lot 1 ter est clos. Suite proposée, sur décision d'Ulrich : [mémoire gard�
 
 **Livré.** `gameMasterPRD4.ts` retire la seule relation refusée (delta entier jeté si elle nomme l'autre personnage) ; `mergeConversationMemory` laisse la relation stockée intacte sans proposition. Reproduction rouge (12 tests) puis verte ; `test:quality` et `test:delivery` verts. Aucune migration, aucun réglage ni prompt modifié, aucun appel réel essayé, rien en production. Recette : après synchro Lovable, un appel sur `sandbox-ulrich` ; sur un tour `relationship_invalid`, `conversation_memory` doit contenir les faits et confidences du tour, relation inchangée.
 
+### Mémoire et relation, lot 2 : sujets sensibles reconnus (28 novembre, code)
+
+**Reproduction.** Test rouge : sujet dont la coupe à 72 caractères tombe sur un séparateur. La politique donnait un identifiant finissant par un tiret, que le second passage de `slug` (validation, normalisation) retirait : `unknown_topic`.
+
+**Fiches actuelles (lecture seule, `prod`).** Max : 4 sujets sur 12 touchés (introduction, Ava, « tu ne sais pas comment lui en parler », Léo). Emma : 2 sur 12 (introduction, Ava). 15 refus sur 32 depuis le 24 novembre n'avaient que cette cause, 11 au palier « contact », 4 au palier « lien ».
+
+**Effet en jeu, approuvé par Ulrich avant le code.** Ces relations pourront passer et ces sujets s'ouvrir. Les autres règles restent (pas de saut de palier, preuve montante exigée, pas d'ouverture avant « lien ») : un tour auparavant refusé peut encore l'être ; les propositions refusées n'étant pas conservées, aucun rejeu possible.
+
+**Livré.** `slug` retire le tiret laissé par la coupe. Les identifiants sont stables d'un passage à l'autre. États stockés vérifiés en lecture seule : 229 clés de sujet sur 61 sessions, aucune ne finit par un tiret ; rien à reprendre. `test:quality` et `test:delivery` verts. Aucune migration, écriture, réglage ni prompt modifié ; aucun appel réel essayé.
+
+**Constaté, non corrigé** ([reprise lot 3](prompt_reprise_memoire_relation_refusee_lot_3.md)) :
+- `cleanList` coupe la fiche à chaque ligne et chaque point-virgule, 12 morceaux au plus : l'introduction et des bouts de phrases deviennent des sujets, « Les morts » et « L'après » manquent pour Max, « L'après » pour Emma.
+- Les mots-clés gardent tout mot de 3 lettres (« est », « pas », « les ») : d'après le code, la directive demande de se retenir dès qu'un sujet ainsi reconnu est fermé.
+- 4 refus pour identifiants de mémoire (`max-topic-…`, `emma-topic-…`) proposés comme sujets sensibles.
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

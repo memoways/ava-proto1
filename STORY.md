@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Mémoire gardée quand la relation est refusée)  
+> **Last Updated**: 2026-11-28 (Sujets sensibles reconnus)  
+
+---
+
+## Un tiret fermait des portes (28 novembre 2026)
+
+Un seul caractère en trop empêchait Max et Emma de reconnaître certains sujets, Ava en tête, et faisait refuser près d'un tour de relation refusé sur deux. Ulrich accepte l'effet en jeu : la proximité pourra avancer plus souvent. La liste des sujets elle-même reste mal découpée ; c'est la question suivante.
 
 ---
 

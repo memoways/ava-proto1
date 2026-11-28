@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sujets sensibles reconnus, mémoire et relation lot 2] — 2026-11-28
+
+- Correctif : l'identifiant d'un sujet sensible coupé à 72 caractères ne finit plus par un tiret ; la validation le reconnaît, la relation proposée n'est plus refusée pour cette seule cause et le sujet peut s'ouvrir.
+- Effet en jeu approuvé par Ulrich : paliers et sujets pourront avancer plus souvent ; les autres règles de validation sont inchangées.
+- Aucune migration, aucune écriture en base, aucun réglage ni prompt modifié ; aucun appel réel essayé, production non publiée.
+
 ## [Mémoire gardée quand la relation est refusée, lot 1] — 2026-11-28
 
 - Correctif : un refus de la relation proposée par le Game Master garde le reste de la mémoire du tour ; aucun champ de la relation refusée n'est appliqué. Delta entier jeté si elle nomme l'autre personnage.
