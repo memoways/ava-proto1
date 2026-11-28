@@ -19,6 +19,8 @@ Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compres
 - « Fiche entière » était refusée par `proxy-llm` (limite de 60 000 caractères, prompts de 63 000 à 67 000). **Décision d'Ulrich : limite relevée à 120 000** ([proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)) ; alerte `proxy_limit_exceeded` si un tour la dépasse. Fonction publiée et vérifiée le 28 novembre ; « Fiche entière » mesurée : première phrase 1 097 ms, 0,0042 $ par réplique (Actuel 735 ms, 0,0013 $ ; Consignes entières 782 ms, 0,0027 $).
 - Outils : `npm run eval:replay:compression` (sans modèle), `npm run eval:llm-latency` (banc LLM, [llmLatency.ts](../scripts/eval-judge/llmLatency.ts)), `npm run eval:judge` (juge), `llm_usage` (latence, cache, fournisseur par appel).
 
+- **Première recette d'Ulrich (28 novembre, un appel par niveau avec Max)** : « Consignes entières » mieux qu'« Actuel », de façon subtile ; pas de différence nette entre « Consignes entières » et « Fiche entière ». Premier son médian 2,58 s (Actuel) → 2,91 s (Consignes) et 2,82 s (Fiche), dans l'écart entre deux appels. Détail dans le plan. Le juge doit surtout départager « Consignes entières » et « Fiche entière », avec « Actuel » comme référence.
+
 ## Périmètre
 
 1. **Juge de qualité** sur un même jeu de questions à chaque niveau jouable : respect des limites de la fiche, réponse aux questions hors sujet, tests du joueur, approbation trop facile, exactitude des faits. Coût annoncé (≈ 0,02 $ par évaluation avec Claude Sonnet) et accepté avant.

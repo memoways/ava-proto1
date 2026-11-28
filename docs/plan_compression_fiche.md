@@ -141,6 +141,29 @@ Aucune correction de synchronisation n'est nécessaire.
 
 **Décision d'Ulrich (28 novembre) : relever la limite.** `proxy-llm` accepte maintenant 120 000 caractères par requête (constante partagée [proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)), assez pour « Fiche entière » avec l'historique (≈ 70 000). Le compilateur ajoute l'alerte `proxy_limit_exceeded` (trace et aperçu) quand un tour dépasserait cette limite, au lieu d'un refus silencieux. La limite reste un garde-fou contre les requêtes trop coûteuses. Publiée par Lovable le 28 novembre (fonction `proxy-llm` seule, à la demande d'Ulrich ; partagée par tous les environnements) et vérifiée par un vrai prompt « Fiche entière » de 68 600 caractères.
 
+## Première recette d'Ulrich (28 novembre, deux appels avec Max)
+
+Un appel par niveau sur sandbox-ulrich (`ffe45068` en « Consignes entières », 15 tours ; `9d8b42a5` en « Fiche entière », 13 tours), comparés aux 6 appels « Actuel » des 27 et 28 novembre (52 tours, mêmes réglages de voix).
+
+Ressenti d'Ulrich :
+- « Consignes entières » est **mieux qu'« Actuel »**, de façon subtile.
+- **Pas de différence nette** entre « Consignes entières » et « Fiche entière » (conversations différentes, même tenue d'ensemble).
+- Un peu plus lent, sans gêne marquée.
+
+Mesuré dans `voice_turn_events` et `llm_usage` (lecture seule) :
+
+| | Actuel (52 tours) | Consignes entières (15) | Fiche entière (13) |
+|---|---|---|---|
+| Premier son, médiane (p90) | 2,58 s (3,41) | 2,91 s (3,49) | 2,82 s (3,17) |
+| Réponse prête, médiane | 2,36 s | 2,57 s | 2,71 s |
+| Appel au modèle, médiane | ≈ 0,72 s | 0,87 s | 0,81 s |
+| Jetons envoyés par tour | ≈ 6 100 | ≈ 11 700 | ≈ 18 600 |
+| Coût par réplique | 0,0016 $ | 0,0029 $ | 0,0047 $ |
+
+- Environ **+ 0,3 s** sur le premier son aux deux niveaux. C'est de l'ordre de l'écart entre deux appels « Actuel » (médianes de 2,39 à 2,94 s), donc à confirmer sur plus de tours.
+- Dans ces deux appels, « Fiche entière » n'est pas plus lente que « Consignes entières ». Au banc, l'écart était de + 315 ms sur la première phrase.
+- Un appel par niveau, des conversations différentes : indicatif, pas une preuve. Le lot 2 doit trancher.
+
 ## Risques connus
 
 - **Délai** : le prompt passe d'environ 16 500 à environ 37 500 caractères (Consignes entières) ou environ 63 500 (Fiche entière), mesuré au lot 1. Le cache peut en absorber une partie : la tête du prompt (règles et noyau) ne dépend plus de la question au-dessus d'« Actuel ». À mesurer avec le modèle.
