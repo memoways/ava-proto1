@@ -1082,6 +1082,36 @@
                                   "contextSampleRate"
                                 ],
                                 "additionalProperties": false
+                              },
+                              "output_stream": {
+                                "type": "object",
+                                "properties": {
+                                  "output": {
+                                    "type": "string"
+                                  },
+                                  "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                      "feed",
+                                      "batch",
+                                      "held_batch",
+                                      "gradium_incremental"
+                                    ]
+                                  },
+                                  "llm_transport": {
+                                    "type": "string",
+                                    "enum": [
+                                      "sse",
+                                      "http_batch"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "output",
+                                  "mode",
+                                  "llm_transport"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
