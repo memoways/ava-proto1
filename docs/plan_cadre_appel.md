@@ -1,6 +1,6 @@
 # Plan — Cadre de l'appel (personnages trop permissifs)
 
-Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait ; suite réorganisée avec Ulrich : lot 2 réduit à la tuyauterie, puis Bible des réponses**. Aucun code, aucun réglage, aucune fiche ni écriture en base.
+Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait ; lot 2 (bloc « Comment tu réponds ») livré ; prochain chantier : la Bible des réponses, en commençant par la préparation de sa matière** ([reprise](prompt_reprise_bible_reponses_lot_1.md)). Aucune fiche ni écriture en base, aucun réglage modifié.
 
 ## Demande
 
@@ -110,7 +110,7 @@ Orientation d'Ulrich : ne pas résoudre par des rustines ce qu'un chantier de fo
 
 | Étape | Décision |
 |---|---|
-| Lot 2 — emplacement garanti | À faire. Tuyauterie seulement |
+| Lot 2 — emplacement garanti | **Fait (28 novembre)**, tuyauterie seulement : voir le relevé ci-dessous |
 | Bible des réponses | Gros chantier des semaines suivantes |
 | Anciennes consignes du code (ex-lot 3) | Fondues dans la Bible : elles décident de la manière de répondre |
 | Raccrocher (ex-lot 4) | À part, plus tard, sur décision d'Ulrich |
@@ -119,6 +119,22 @@ Orientation d'Ulrich : ne pas résoudre par des rustines ce qu'un chantier de fo
 ### Lot 2 — Un bloc « Comment tu réponds » qui arrive toujours
 
 Un bloc court dans la fiche, reconnu par son intitulé, envoyé en entier comme la Manière de parler, avec sa place (environ 900 caractères de plus, à mesurer). Contrôlé dans « Voir ce que reçoit le personnage ». Contenu du lot : quelques limites **déjà écrites** dans les fiches, pour vérifier qu'elles passent. Aucune nouvelle règle de style. Réussite : le bloc est présent sur les 450 questions rejouées ; faits établis, mémoire, souvenirs et canon partent toujours.
+
+**Livré le 28 novembre (code, rien en production)** :
+
+- **Reconnaissance.** Un paragraphe qui commence par la ligne « Comment tu réponds », dans « Ce que tu ne fais jamais », la Dynamique, « Ce que tu sais sur l'utilisateur », « Qui tu es » ou l'Identité. Il va jusqu'à la première ligne vide. Aucune migration.
+- **Envoi.** Le texte sous le titre part en entier dans le noyau, juste après la Manière de parler, sous `## COMMENT TU RÉPONDS`. Il n'est envoyé qu'une fois et sort de son champ.
+- **Place.** Le noyau et la limite de contexte grandissent exactement de la taille du bloc. Toutes les autres sections gardent la place qu'elles avaient.
+- **Au-delà de 900 caractères.** Le bloc n'est pas envoyé à part et reste lu comme le reste de son champ. L'alerte `reply_block_too_long` tombe.
+- **Aperçu.** « Voir ce que reçoit le personnage » dit si le bloc est absent, envoyé en entier, ou trop long (en rouge).
+- **Mesure sur 605 questions réelles** (468 à Max, 137 à Emma, depuis le 19 novembre, trois sandboxes) :
+  - bloc envoyé à chaque tour ;
+  - prompt + 882 caractères pour Max, + 909 pour Emma (+ 5 à 6 %) ;
+  - faits établis, cadre, directive, état, mémoire et canon identiques à chaque tour ;
+  - sans bloc, prompt identique à `main` sur les 605 questions.
+- [Relevé](eval/cadre_appel_lot2_mesures_20261128.md).
+- **Texte proposé pour Max et Emma**, fait seulement de limites déjà écrites, sans `[END_CALL]` ni « allusion sentimentale » : [proposition](proposition_bloc_comment_tu_reponds.md). Ulrich le colle dans Notion ; ensuite, synchronisation et contrôle dans l'aperçu.
+- **Constaté, non corrigé.** La mémoire est dédoublonnée contre les mots du noyau entier. Un mot banal ajouté à la fiche peut retirer une phrase de mémoire. Avec « l'utilisateur » dans le bloc, c'était le cas dans 17 tours de Max ; le texte proposé l'évite. À reprendre si cela gêne la Bible.
 
 ### Bible des réponses
 

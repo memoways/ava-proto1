@@ -26,6 +26,7 @@
     "eval:judge:merge-factuality": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/mergeFactuality.ts --",
     "eval:judge:sheets": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/sheets.ts --",
     "eval:replay:souvenirs": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/replaySouvenirs.ts --",
+    "eval:replay:reply-block": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/replyBlockReplay.ts --",
     "eval:llm-latency": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/llmLatency.ts --",
     "eval:llm-recall": "vite-node --config scripts/eval-judge/vite.config.ts scripts/eval-judge/llmRecall.ts --",
     "test:e2e": "playwright test",

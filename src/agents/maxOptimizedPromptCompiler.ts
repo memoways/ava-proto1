@@ -9,10 +9,14 @@ import { trimRagContextToWholeSouvenirs } from "@/services/ragService";
 import { WORLD_BOUNDARY_RULE } from "@/agents/worldBoundary";
 import { RESPONSE_HOOK_RULE } from "@/agents/responseHook";
 import {
+  REPLY_BLOCK_MAX_CHARS,
+  REPLY_BLOCK_TITLE,
   characterEmbodiment,
   characterLivedImpact,
+  characterReplyBlock,
   withoutCharacterEmbodiment,
   withoutCharacterLivedImpact,
+  withoutCharacterReplyBlock,
 } from '@/services/characterEmbodiment';
 import {
   ESTABLISHED_FACTS_DEFAULT,
@@ -413,8 +417,19 @@ function timelineTitleUnits(timeline: string): Array<{ text: string; group?: str
 
 /** A budget decision the player-side trace must show: nothing the sheet holds leaves the prompt unannounced. */
 export interface PromptBudgetWarning {
-  code: "established_facts_dropped" | "canon_squeezed" | "souvenirs_evinces" | "memoire_evincee" | "canon_evince";
+  code: "established_facts_dropped" | "canon_squeezed" | "souvenirs_evinces" | "memoire_evincee" | "canon_evince" | "reply_block_too_long";
   message: string;
+}
+
+/**
+ * Cadre de l'appel lot 2: the « Comment tu réponds » block brings its own room.
+ * The core and the whole context grow by exactly its rendered size, so every
+ * other section keeps the room it had without the block; no block, no change.
+ */
+function sentReplyBlock(character: CharacterPrompt): { content: string; room: number } | null {
+  const block = characterReplyBlock(character);
+  if (!block || block.tooLong) return null;
+  return { content: block.content, room: `\n\n## ${REPLY_BLOCK_TITLE}\n${block.content}`.length };
 }
 
 function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? ""): {
@@ -424,17 +439,19 @@ function protectedCharacterSections(character: CharacterPrompt, establishedFacts
 } {
   const present = character.situation_summary.trim();
   const lived = characterLivedImpact(character);
+  const reply = sentReplyBlock(character);
   const base = (facts: string | null, manner?: string): ProtectedSection[] => [
     ...(present ? [{ key: 'situation_summary', title: PRESENT_TITLE, content: present }] : []),
     ...(facts ? [{ key: 'faits_etablis', title: ESTABLISHED_FACTS_TITLE, content: facts }] : []),
     ...(lived ? [{ key: 'vecu', title: LIVED_IMPACT_TITLE, content: lived.content }] : []),
     ...characterEmbodiment(character).map(section => section.key === 'maniere_de_parler' && manner !== undefined
       ? { ...section, content: manner } : section),
+    ...(reply ? [{ key: 'comment_tu_reponds', title: REPLY_BLOCK_TITLE, content: reply.content }] : []),
   ];
   const extracted = establishedFacts ? characterEstablishedFacts(character)?.content ?? null : null;
   const facts = extracted ? `${ESTABLISHED_FACTS_USAGE_LINE}\n${extracted}` : null;
   if (!facts) return { sections: base(null), yielded: [], warnings: [] };
-  const limit = OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars;
+  const limit = OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars + (reply?.room ?? 0);
   const fitsWith = (room: number) => (manner: string) => protectedSize(base(facts, manner), canonicalName) + room <= limit;
   const manner = character.maniere_de_parler?.trim() ?? "";
   // Priority: facts, then the relevant canon, then the speaking manner (which yields first).
@@ -463,8 +480,9 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
   const candidates: CandidateUnit[] = [];
   const protectedCore = protectedCharacterSections(character, establishedFacts, canonicalName);
   const hasFacts = protectedCore.sections.some(section => section.key === 'faits_etablis');
-  const withoutProtected = withoutCharacterLivedImpact(withoutCharacterEmbodiment(character));
-  const staticLimit = OPTIMIZED_V3_LIMITS.staticChars + (hasFacts ? OPTIMIZED_V3_LIMITS.establishedFactsExtraChars : 0);
+  const withoutProtected = withoutCharacterReplyBlock(withoutCharacterLivedImpact(withoutCharacterEmbodiment(character)));
+  const staticLimit = OPTIMIZED_V3_LIMITS.staticChars + (hasFacts ? OPTIMIZED_V3_LIMITS.establishedFactsExtraChars : 0)
+    + (sentReplyBlock(character)?.room ?? 0);
   const selectable = hasFacts ? withoutEstablishedFacts(withoutProtected) : withoutProtected;
   FIELD_SPECS.forEach((spec, fieldIndex) => {
     // The current scene is one atomic editorial unit, never a relevance candidate.
@@ -627,6 +645,11 @@ function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", ch
       ? `INVARIANTS DE ${characterName.toLocaleUpperCase("fr")}`
       : spec.title;
     if (parts.length) blocks.push(`## ${title}\n${parts.join("\n")}`);
+    if (spec.key === 'maniere_de_parler') {
+      // Cadre de l'appel lot 2: how the character answers sits right after how it speaks.
+      const reply = units.find(unit => unit.sourceKey === 'comment_tu_reponds');
+      if (reply) blocks.push(`## ${reply.title}\n${reply.text}`);
+    }
     if (spec.key === 'situation_summary') {
       // Established facts sit right after the present, before identity and voice.
       const facts = units.find(unit => unit.sourceKey === 'faits_etablis');
@@ -651,6 +674,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
   const staticSelection = selectStaticUnits(character, query, contract, canonicalName, establishedFacts);
+  const replyBlock = characterReplyBlock(character);
+  const replyRoom = sentReplyBlock(character)?.room ?? 0;
+  const contextLimitChars = OPTIMIZED_V3_LIMITS.generatedContextChars + replyRoom;
   const core = renderGroupedStatic(staticSelection.selected, "core", canonicalName);
   if (!core) throw new Error("Fiche personnage incohérente : noyau éditorial vide");
   const canon = renderGroupedStatic(staticSelection.selected, "canon", canonicalName);
@@ -810,7 +836,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       return "";
     }
     const prefix = `\n\n# ${title}\n`;
-    const systemLimit = Math.max(2_000, OPTIMIZED_V3_LIMITS.generatedContextChars - input.historyChars);
+    const systemLimit = Math.max(2_000, contextLimitChars - input.historyChars);
     const remaining = systemLimit - prompt.length - prefix.length - owed;
     // All protected editorial units are in the core. Never normalize, shorten
     // or silently omit it, even when a long conversation consumes its room.
@@ -881,6 +907,12 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   if (canon.trim() && !canonSent) {
     turnWarnings.push({ code: "canon_evince", message: "Canon pertinent retiré faute de place : les passages de la fiche liés à la question ne sont pas envoyés." });
   }
+  if (replyBlock?.tooLong) {
+    turnWarnings.push({
+      code: "reply_block_too_long",
+      message: `Bloc « Comment tu réponds » non envoyé : ${replyBlock.content.length} car., au-delà de ${REPLY_BLOCK_MAX_CHARS}. Il reste lu comme le reste de son champ ; à resserrer dans Notion.`,
+    });
+  }
   const warnings = [...staticSelection.warnings, ...turnWarnings];
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
@@ -892,7 +924,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const totalMessageChars = prompt.length + input.historyChars + input.userMessage.length;
   const deduplicatedChars = unitDecisions
     .reduce((sum, unit) => sum + (unit.removedChars ?? 0), 0);
-  const systemLimit = Math.max(2_000, OPTIMIZED_V3_LIMITS.generatedContextChars - input.historyChars);
+  const systemLimit = Math.max(2_000, contextLimitChars - input.historyChars);
 
   return {
     baseSystemPrompt: staticRendered,
@@ -920,9 +952,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       currentUserChars: input.userMessage.length,
       totalMessageChars,
       systemToConversationRatio: input.historyChars + input.userMessage.length ? prompt.length / (input.historyChars + input.userMessage.length) : null,
-      withinBudget: prompt.length + input.historyChars <= OPTIMIZED_V3_LIMITS.generatedContextChars,
-      contextLimitChars: OPTIMIZED_V3_LIMITS.generatedContextChars,
-      oversizedCurrentUser: totalMessageChars > OPTIMIZED_V3_LIMITS.normalTotalMessageChars && prompt.length + input.historyChars <= OPTIMIZED_V3_LIMITS.generatedContextChars,
+      withinBudget: prompt.length + input.historyChars <= contextLimitChars,
+      contextLimitChars,
+      oversizedCurrentUser: totalMessageChars > OPTIMIZED_V3_LIMITS.normalTotalMessageChars && prompt.length + input.historyChars <= contextLimitChars,
       deduplicatedChars,
       sections: budgetSections,
       units: unitDecisions.map((unit) => ({
@@ -948,6 +980,13 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
       memoryLastTurn: memory.lastTurn,
       sentRagIds,
       reservedSections: OPTIMIZED_V3_SECTION_RESERVATIONS.enabled ? { ...OPTIMIZED_V3_SECTION_RESERVATIONS.sections } : {},
+      ...(replyBlock ? { replyBlock: {
+        field: replyBlock.field,
+        chars: replyBlock.content.length,
+        maxChars: REPLY_BLOCK_MAX_CHARS,
+        sent: !replyBlock.tooLong,
+        roomChars: replyRoom,
+      } } : {}),
       ...(warnings.length ? { warnings } : {}),
     },
     finalSystemPrompt: prompt,

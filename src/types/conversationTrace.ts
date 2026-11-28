@@ -137,6 +137,8 @@ export interface MaxPromptAssemblyTrace {
     reservedSections?: Record<string, number>;
     /** Budget decisions that removed or squeezed sheet content (e.g. the established facts block). */
     warnings?: Array<{ code: string; message: string }>;
+    /** Cadre de l'appel lot 2 — « Comment tu réponds » found in the sheet; absent when the sheet has none. */
+    replyBlock?: { field: string; chars: number; maxChars: number; sent: boolean; roomChars: number };
   };
 
   finalSystemPrompt: string;
