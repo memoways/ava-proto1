@@ -374,7 +374,8 @@ export function mergeConversationMemory(
       turnIndex,
       LIMITS.topics,
     ),
-    relationship: {
+    // No relationship in the delta (absent or refused): the stored one stays untouched.
+    relationship: !delta.relationship ? previousRelationship : {
       depth: persistentDepth(
         previous.characterStates?.[activeCharacter]?.relationship.depth
           ?? (activeCharacter === "max" ? previous.relationship.depth : "surface"),

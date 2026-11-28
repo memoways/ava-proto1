@@ -198,7 +198,7 @@ describe("Game Master PRD4 — memory_delta", () => {
     );
   });
 
-  it("ne persiste aucun delta lorsqu'une proposition relationnelle est rejetée", async () => {
+  const refusedTurn = async (relationship: Record<string, unknown>) => {
     vi.mocked(callLLMWithUsage).mockResolvedValueOnce({
       content: JSON.stringify({
         labels: { themes: [], topics: [], intentions: [] },
@@ -216,19 +216,48 @@ describe("Game Master PRD4 — memory_delta", () => {
         action: { type: "none" },
         player_switch_request: null,
         memory_delta: {
-          userFacts: ["fait qui ne doit pas passer"],
-          relationship: { tier: "trust", topicOpenness: {}, justification: "hors tour", evidence: ["honesty"], sourceTurn: 99, characterKey: "max", policyVersion: "policy-v1" },
+          userFacts: ["Alice a une sœur"],
+          maxDisclosures: ["Max dit avoir tué une protogyne"],
+          openThreads: ["Ce que Max dira à Emma"],
+          lastExchange: "Max avoue à Alice.",
+          relationship,
         },
       }),
       model: "openai/gpt-4.1-mini", latencyMs: 10, usage: null, generationId: null, diagnosticTrace: null,
     } as never);
     vi.mocked(persistPostTurnMemory).mockResolvedValueOnce(createEmptyConversationMemory());
-    const result = await evaluatePostTurnPRD4({
+    return evaluatePostTurnPRD4({
       sessionId: "session-invalid-relationship", conversationHistory: [], userMessage: "Bonjour", maxResponse: "Je t'écoute.",
       currentCharacter: "max", userRole: null, turnIndex: 4, timeElapsedSeconds: 20,
       sessionDurationSeconds: 900, minimumClosureSeconds: 600, relationshipPolicy,
     });
+  };
+  const proposal = { tier: "link", trust: "ouverte", depth: "verite", emotionalState: "à vif", topicOpenness: {},
+    justification: "franchise", evidence: ["honesty"], sourceTurn: 4, characterKey: "max", policyVersion: "policy-v1" };
+
+  it.each([
+    ["sujet inconnu", { ...proposal, topicOpenness: { inconnu: "open" } }],
+    ["preuve montante absente", { ...proposal, evidence: [] }],
+    ["saut de palier", { ...proposal, tier: "trust" }],
+    ["métadonnées d'un autre tour", { ...proposal, sourceTurn: 99, policyVersion: "ancienne" }],
+    ["métadonnées absentes", { trust: "ouverte", emotionalState: "à vif" }],
+  ])("garde la mémoire sans la relation refusée (%s)", async (_label, relationship) => {
+    const result = await refusedTurn(relationship);
     expect(result.execution_status).toBe("executed");
+    expect(result.execution_reason).toBe("relationship_invalid");
+    expect(result.relationship_transition?.accepted).toBe(false);
+    expect(result.memory_delta).toMatchObject({
+      userFacts: ["Alice a une sœur"],
+      maxDisclosures: ["Max dit avoir tué une protogyne"],
+      openThreads: ["Ce que Max dira à Emma"],
+      lastExchange: "Max avoue à Alice.",
+    });
+    expect(result.memory_delta).not.toHaveProperty("relationship");
+    expect(persistPostTurnMemory).toHaveBeenCalledWith("session-invalid-relationship", expect.anything(), result.memory_delta, 4, "max");
+  });
+
+  it.each(["emma", " Emma "])("jette tout le delta si la relation nomme l'autre personnage (%j)", async characterKey => {
+    const result = await refusedTurn({ ...proposal, characterKey });
     expect(result.execution_reason).toBe("relationship_invalid");
     expect(result.memory_delta).toBeNull();
     expect(persistPostTurnMemory).toHaveBeenCalledWith("session-invalid-relationship", expect.anything(), null, 4, "max");

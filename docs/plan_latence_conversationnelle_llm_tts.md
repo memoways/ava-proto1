@@ -276,6 +276,24 @@ Recette d'Ulrich : session `f89abea8` (`sandbox-ulrich`, voix seule, mains libre
 
 Le lot 1 ter est clos. Suite proposée, sur décision d'Ulrich : [mémoire gardée quand la relation est refusée](prompt_reprise_memoire_relation_refusee_lot_1.md).
 
+### Mémoire gardée quand la relation est refusée, lot 1 : diagnostic, règle et correctif (28 novembre, code)
+
+**Cause (historique Git).** Au 11 septembre (`cb7e7fd9`), un refus gardait le delta et remettait la relation précédente. Le 14 octobre (#41, `75ef4d9a`), un refus est devenu une évaluation `invalid`, et rien d'une évaluation non exécutée n'était mémorisé : d'où `memory_delta: null`. F1 (#88, 26 octobre) a rétabli `executed` (« Reject this mutation only ») en laissant ce `null` en place.
+
+**Mesure (lecture seule, depuis le 24 novembre).** 32 refus sur 196 tours : 19 pour sujet inconnu seul, 6 avec un écart de métadonnées.
+
+**Fiabilité du reste.** Sujet, preuve montante et sauts de palier ne concernent que la relation. Les trois écarts de métadonnées arrivent le plus souvent ensemble : probablement des champs absents plutôt que recopiés d'un autre tour (non vérifiable, aucune trace conservée). La réponse du Game Master est celle de cet appel, et le tour comme le personnage sont attribués par l'application.
+
+**Règle approuvée par Ulrich (28 novembre) et codée.**
+1. Relation refusée : aucun de ses champs n'est appliqué ; le reste de la mémoire du tour entendu est gardé.
+2. Exception : si la relation nomme explicitement l'autre personnage, tout le delta reste jeté (jamais observé).
+3. Sans relation dans le delta (absente ou refusée), la relation précédente reste identique. Avant ce lot, la fusion pouvait remettre `trust` à « neutre » et avançait `sourceTurn`.
+4. Motifs journalisés, `relationship_invalid` et passage inchangés.
+
+**Défaut distinct trouvé.** L'identifiant d'un sujet coupé à 72 caractères se termine par un tiret ; la validation le retire et ne le reconnaît plus. Présent dans 17 refus, seule cause pour 15. Quatre autres refus viennent d'identifiants de mémoire (`max-topic-…`) donnés comme sujets sensibles. Hors de ce lot : [reprise lot 2](prompt_reprise_memoire_relation_refusee_lot_2.md).
+
+**Livré.** `gameMasterPRD4.ts` retire la seule relation refusée (delta entier jeté si elle nomme l'autre personnage) ; `mergeConversationMemory` laisse la relation stockée intacte sans proposition. Reproduction rouge (12 tests) puis verte ; `test:quality` et `test:delivery` verts. Aucune migration, aucun réglage ni prompt modifié, aucun appel réel essayé, rien en production. Recette : après synchro Lovable, un appel sur `sandbox-ulrich` ; sur un tour `relationship_invalid`, `conversation_memory` doit contenir les faits et confidences du tour, relation inchangée.
+
 ### Bilan final
 
 Tableau avant/après par segment et par sortie, compromis qualité, coût et limites. Mise à jour de la tâche Notion et de `docs/etat_courant.md`.

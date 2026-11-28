@@ -203,7 +203,8 @@ describe("live handoff prompt contract over historical schemas", () => {
       expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
     } else {
       expect(result.execution_reason).toBe("relationship_invalid");
-      expect(result.memory_delta).toBeNull();
+      expect(result.memory_delta?.userFacts).toEqual(["Le joueur travaille la nuit."]);
+      expect(result.memory_delta).not.toHaveProperty("relationship");
       expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
       expect(result.relationship_transition?.accepted).toBe(false);
     }
@@ -451,7 +452,7 @@ it('F1 T21: preserves independently valid handoff when relationship is invalid',
   vi.mocked(callLLMWithUsage).mockResolvedValueOnce({ ...llmMetadata, content: JSON.stringify({ ...historicalJson,
     handoff_assessment: validAssessment(), memory_delta: { relationship: {} } }) });
   const result = await evaluatePostTurnPRD4({ ...input, relationshipPolicy: policy });
-  expect(result.memory_delta).toBeNull();
+  expect(result.memory_delta).not.toHaveProperty("relationship");
   expect(result.relationship_transition?.accepted).toBe(false);
   expect(validateCharacterHandoff({ ...validInput(), evaluation: result }).authorized).toBe(true);
 });

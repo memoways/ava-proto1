@@ -25,6 +25,24 @@ describe("ConversationMemoryV1", () => {
     expect(duplicate).toEqual(first);
   });
 
+  it.each([
+    ["max", "link", "ouverte"],
+    ["max", "link", "fragile"],
+    ["max", "trust", "neutre"],
+    ["emma", "link", "ouverte"],
+  ] as const)("sans relation dans le delta, garde celle de %s à l'identique (%s, %s)", (character, tier, trust) => {
+    const before = mergeConversationMemory(createEmptyConversationMemory(), {
+      relationship: { tier, trust, depth: "fissure", emotionalState: "tendue", topicOpenness: { mona: "partial" },
+        justification: "franchise", evidence: ["honesty"], sourceTurn: 1, characterKey: character, policyVersion: "v1" },
+    }, 1, character);
+    const after = mergeConversationMemory(before, { userFacts: ["Elle a une sœur"] }, 2, character);
+
+    expect(after.characterStates?.[character]?.relationship).toEqual(before.characterStates?.[character]?.relationship);
+    expect(after.relationship).toEqual(before.relationship);
+    expect(after.characterStates?.[character]?.userFacts).toHaveLength(1);
+    expect(after.lastTurn).toBe(2);
+  });
+
   it("ignore un delta retardé et ne fait jamais régresser la profondeur", () => {
     const deep = mergeConversationMemory(createEmptyConversationMemory(), {
       relationship: { depth: "verite", trust: "ouverte" },
