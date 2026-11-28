@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Compression de la fiche : plan] — 2026-11-28
+
+- Documentation seulement : constat chiffré (≈ 15 % de la fiche envoyée par réplique, tri par mots communs), trois niveaux de compression retenus par Ulrich, réglables par personnage, et prompt de reprise du lot 1.
+- Le bloc « Comment tu réponds » n'est pas à coller ; la Bible des réponses est suspendue jusqu'à la fin de ce chantier.
+- Aucun code, aucun réglage ni prompt modifié ; production non publiée.
+
 ## [Cadre de l'appel lot 2 : bloc « Comment tu réponds »] — 2026-11-28
 
 - Ajout : un paragraphe qui commence par « Comment tu réponds » dans un champ existant de la fiche est envoyé en entier dans le noyau `optimized_v3`, après la Manière de parler, avec sa propre place. Le noyau et le contexte grandissent de sa taille exacte. Au-delà de 900 caractères, il n'est pas envoyé et l'alerte `reply_block_too_long` le dit.

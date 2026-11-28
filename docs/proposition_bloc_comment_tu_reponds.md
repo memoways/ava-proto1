@@ -1,6 +1,6 @@
 # Proposition — bloc « Comment tu réponds » pour Max et Emma
 
-Cadre de l'appel, lot 2 (28 novembre 2026). Texte à coller par Ulrich dans Notion ; l'agent n'écrit rien dans la base Caractères.
+Cadre de l'appel, lot 2 (28 novembre 2026). **Suspendu le même jour : ne pas coller.** Ulrich préfère que la fiche entière passe ([plan compression de la fiche](plan_compression_fiche.md)). Le texte est gardé pour mémoire.
 
 ## Où et comment le coller
 

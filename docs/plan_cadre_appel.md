@@ -1,6 +1,6 @@
 # Plan — Cadre de l'appel (personnages trop permissifs)
 
-Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait ; lot 2 (bloc « Comment tu réponds ») livré ; prochain chantier : la Bible des réponses, en commençant par la préparation de sa matière** ([reprise](prompt_reprise_bible_reponses_lot_1.md)). Aucune fiche ni écriture en base, aucun réglage modifié.
+Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait ; lot 2 (bloc « Comment tu réponds ») livré ; prochain chantier : la Bible des réponses, en commençant par la préparation de sa matière** ([reprise](prompt_reprise_bible_reponses_lot_1.md)). **Mise à jour du 28 novembre** : Ulrich suspend la Bible et le collage du bloc. D'abord, faire passer la fiche elle-même : [plan compression de la fiche](plan_compression_fiche.md). Aucune fiche ni écriture en base, aucun réglage modifié.
 
 ## Demande
 

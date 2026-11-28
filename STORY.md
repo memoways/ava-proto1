@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Une place qui arrive toujours)  
+> **Last Updated**: 2026-11-28 (Quinze pour cent)  
+
+---
+
+## Quinze pour cent (28 novembre 2026)
+
+Ulrich apprend que ses personnages ne lisent qu'environ un septième de leur fiche à chaque réplique, choisi par mots communs avec la question. Tout ce qui est écrit dans Notion doit servir : avant d'ajouter du texte, on fera passer celui qui existe, par paliers, en mesurant délai, coût et qualité.
 
 ---
 
