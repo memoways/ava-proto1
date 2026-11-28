@@ -1,6 +1,6 @@
 # Plan — Compression de la fiche personnage
 
-Statut au 28 novembre 2026 : **lot 1 livré, banc avec le modèle fait, limite de `proxy-llm` relevée à 120 000 caractères** (décision d'Ulrich) ; lot 2 qualité à faire ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
+Statut au 28 novembre 2026 : **lot 1 livré, banc avec le modèle fait aux trois niveaux, limite de `proxy-llm` relevée à 120 000 caractères et publiée** (décision d'Ulrich) ; lot 2 qualité à faire ([reprise lot 2](prompt_reprise_compression_fiche_lot_2.md)).
 
 ## Demande
 
@@ -125,18 +125,21 @@ Aucune correction de synchronisation n'est nécessaire.
 
 | | Actuel | Consignes entières | Fiche entière |
 |---|---|---|---|
-| Jetons envoyés (médiane) | ≈ 5 000 | ≈ 10 000 (Max) / 10 500 (Emma) | — |
-| Première phrase, 1er passage (médiane) | 735 ms | 782 ms | refusé |
-| Premier jeton, 1er passage (médiane) | 506 ms | 588 ms | refusé |
-| Coût par réplique, sans cache | 0,0013 $ | 0,0027 $ | refusé |
-| Coût par réplique, prompt identique rejoué | 0,0002 $ | 0,0003 $ | refusé |
+| Jetons envoyés (médiane) | ≈ 5 000 | ≈ 10 000 (Max) / 10 500 (Emma) | ≈ 17 100 |
+| Première phrase, 1er passage (médiane) | 735 ms | 782 ms | 1 097 ms |
+| Premier jeton, 1er passage (médiane) | 506 ms | 588 ms | 917 ms |
+| Coût par réplique, sans cache | 0,0013 $ | 0,0027 $ | 0,0042 $ |
+| Coût par réplique, prompt identique rejoué | 0,0002 $ | 0,0003 $ | 0,0005 $ |
+| Appel de 30 répliques, sans cache | ≈ 0,04 $ | ≈ 0,08 $ | ≈ 0,13 $ |
 
 - **« Consignes entières » ne ralentit presque pas** : + 47 ms sur la première phrase, + 82 ms sur le premier jeton, dans le bruit d'un appel à l'autre.
 - **Coût doublé** sans cache : ≈ 0,08 $ par appel de 30 répliques au lieu de ≈ 0,04 $.
 - **Le cache ne sert qu'au même prompt rejoué** (2e passage : presque tout en cache, coût divisé par 8). D'une question à l'autre, il ne s'active pas, même avec 33 500 caractères de tête commune (0 appel sur 19 au 1er passage, 1 sur 19 en « Actuel »). Les 420 répliques jouées ces 10 jours n'ont jamais eu de cache. En jeu, il faut donc compter le coût sans cache.
 - **« Fiche entière » est refusée par `proxy-llm`** : la fonction refuse tout message de plus de 60 000 caractères (`messages payload too large`, [proxy-llm](../supabase/functions/proxy-llm/index.ts)), et le prompt fait 63 000 à 67 000 caractères. 38 appels sur 38 refusés, non facturés. En jeu, ce niveau ferait répondre le personnage par la réplique de secours. Aucun niveau n'étant enregistré, aucun appel réel n'est touché.
 
-**Décision d'Ulrich (28 novembre) : relever la limite.** `proxy-llm` accepte maintenant 120 000 caractères par requête (constante partagée [proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)), assez pour « Fiche entière » avec l'historique (≈ 70 000). Le compilateur ajoute l'alerte `proxy_limit_exceeded` (trace et aperçu) quand un tour dépasserait cette limite, au lieu d'un refus silencieux. La limite reste un garde-fou contre les requêtes trop coûteuses.
+« Fiche entière » mesurée après la publication de la limite relevée (39 appels, 0,09 $, aucun refus) : **+ 360 ms** sur la première phrase par rapport à « Actuel » et coût **multiplié par 3,2**. Total du banc : ≈ 0,18 $.
+
+**Décision d'Ulrich (28 novembre) : relever la limite.** `proxy-llm` accepte maintenant 120 000 caractères par requête (constante partagée [proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)), assez pour « Fiche entière » avec l'historique (≈ 70 000). Le compilateur ajoute l'alerte `proxy_limit_exceeded` (trace et aperçu) quand un tour dépasserait cette limite, au lieu d'un refus silencieux. La limite reste un garde-fou contre les requêtes trop coûteuses. Publiée par Lovable le 28 novembre (fonction `proxy-llm` seule, à la demande d'Ulrich ; partagée par tous les environnements) et vérifiée par un vrai prompt « Fiche entière » de 68 600 caractères.
 
 ## Risques connus
 
