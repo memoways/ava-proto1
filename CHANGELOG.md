@@ -4,6 +4,10 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Compression de la fiche : première recette] — 2026-11-28
+
+- Documentation seulement : ressenti d'Ulrich sur deux appels avec Max et latence mesurée (premier son médian 2,58 s en « Actuel », 2,91 s en « Consignes entières », 2,82 s en « Fiche entière ») ; le lot 2 doit départager les deux niveaux longs.
+
 ## [Compression de la fiche : banc de « Fiche entière »] — 2026-11-28
 
 - Documentation seulement : `proxy-llm` publiée par Lovable avec la limite de 120 000 caractères, vérifiée ; « Fiche entière » mesurée (39 appels, 0,09 $) : première phrase 1 097 ms (735 ms en « Actuel »), 0,0042 $ par réplique.
