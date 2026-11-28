@@ -20,7 +20,13 @@ vi.mock('@/services/tts/characterVoices', async original => ({
  ...await original<typeof import('@/services/tts/characterVoices')>(),
  loadCharacterVoicesFromDB: vi.fn(async () => ({ emma: { gradium: 'emma-new' } })),
 }));
+vi.mock('@/services/characterSheetCompression', async original => ({
+ ...await original<typeof import('@/services/characterSheetCompression')>(),
+ loadSheetCompressionSettings: vi.fn(async () => ({ byCharacter: { emma: 'guidelines' } })),
+ saveSheetCompressionLevel: vi.fn(async () => ({ byCharacter: {} })),
+}));
 import { updateCharacterRuntimeProfile } from '@/services/experienceOrchestration';
+import { saveSheetCompressionLevel } from '@/services/characterSheetCompression';
 import CharacterRuntimeSettingsTab from './CharacterRuntimeSettingsTab';
 
 describe('AP4-bis — character settings read voice IDs from TTS configuration', () => {
@@ -51,5 +57,14 @@ describe('AP4-bis — character settings read voice IDs from TTS configuration',
   expect(screen.getByTestId('audio-max-summary')).toHaveTextContent('Gradium TTS · voix max-gradium');
   expect(screen.getByTestId('video-max-summary')).toHaveTextContent('Suit le réglage global');
   expect(screen.getByLabelText('Accueil de Max')).toBeInTheDocument();
+ });
+ it('shows the saved sheet level per character and saves only a changed one', async () => {
+  render(<CharacterRuntimeSettingsTab />);
+  await screen.findByLabelText('Voice ID Max');
+  expect(screen.getByTestId('sheet-compression-max-summary')).toHaveTextContent('Actuel');
+  await waitFor(() => expect(screen.getByTestId('sheet-compression-emma-summary')).toHaveTextContent('Consignes entières'));
+  fireEvent.click(screen.getAllByRole('button', { name: /Enregistrer/ })[0]);
+  await waitFor(() => expect(updateCharacterRuntimeProfile).toHaveBeenCalledWith('p-max', expect.anything()));
+  expect(saveSheetCompressionLevel).not.toHaveBeenCalled();
  });
 });

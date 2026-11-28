@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Quinze pour cent)  
+> **Last Updated**: 2026-11-28 (Toute la fiche, si on veut)  
+
+---
+
+## Toute la fiche, si on veut (28 novembre 2026)
+
+Ulrich voulait savoir si ce qu'il écrit dans Notion arrive bien. Le texte est identique, mot pour mot ; c'est le tri qui en laissait tomber les six septièmes. Chaque personnage a maintenant un réglage : la fiche triée comme avant, les consignes en entier, ou la fiche entière. Sur 605 questions rejouées, le prompt passe de 16 500 à 37 500 ou 63 500 caractères, sans rien évincer. Reste à savoir ce que cela coûte en délai et en argent, puis si les personnages répondent mieux.
 
 ---
 

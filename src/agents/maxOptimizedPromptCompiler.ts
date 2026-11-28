@@ -31,6 +31,11 @@ import {
   WATCHED_VIDEOS_SECTION_MAX_CHARS,
   WATCHED_VIDEOS_SECTION_TITLE,
 } from "@/services/watchedVideoMemory";
+import {
+  DEFAULT_SHEET_COMPRESSION,
+  SHEET_COMPRESSION_WHOLE_FIELDS,
+  type SheetCompressionLevel,
+} from "@/agents/sheetCompression";
 
 /**
  * Souvenirs lot 1 (24 November): the turn sections that used to take « what was left »
@@ -130,6 +135,8 @@ interface CandidateUnit {
   /** Timeline titles (lot K1): period heading rendered once above its titles, in sheet order. */
   group?: string;
   order?: number;
+  /** Compression de la fiche lot 1: a field sent whole, rendered in the core whatever its group. */
+  whole?: boolean;
 }
 
 interface SelectedUnit extends CandidateUnit {
@@ -173,6 +180,12 @@ export interface OptimizedPromptInput {
   establishedFacts?: boolean;
   /** Lot H: written hierarchy of instructions at the head of the prompt; `false` only for the evaluation reference side. */
   instructionHierarchy?: boolean;
+  /**
+   * Compression de la fiche lot 1: per-character level read at the start of the call.
+   * `current` (default) is the assembly as it was; the other levels send fields whole
+   * in the core, which (and the context limit) grows by exactly their rendered size.
+   */
+  sheetCompression?: SheetCompressionLevel;
 }
 
 /** The generated present is a dense list of facts: it anchors coherence but
@@ -263,10 +276,14 @@ function duplicateOf(text: string, selected: CandidateUnit[]): CandidateUnit | n
     // Apply the same evidence threshold on both sides of the comparison.
     if (other.length < 20) continue;
     if (other.includes(normalized) || normalized.includes(other)) return candidate;
-    let sharedTerms = 0;
-    lexicalTerms.forEach((value) => { if (otherTerms.has(value)) sharedTerms += 1; });
-    const lexicalContainment = sharedTerms / Math.max(1, Math.min(lexicalTerms.size, otherTerms.size));
-    if (Math.min(lexicalTerms.size, otherTerms.size) >= 8 && lexicalContainment >= 0.82) return candidate;
+    // A field sent whole holds most of the sheet's vocabulary: shared words prove nothing
+    // there, only a copied passage (five-word overlap below) does.
+    if (!candidate.whole) {
+      let sharedTerms = 0;
+      lexicalTerms.forEach((value) => { if (otherTerms.has(value)) sharedTerms += 1; });
+      const lexicalContainment = sharedTerms / Math.max(1, Math.min(lexicalTerms.size, otherTerms.size));
+      if (Math.min(lexicalTerms.size, otherTerms.size) >= 8 && lexicalContainment >= 0.82) return candidate;
+    }
     if (!shingles.size) continue;
     let common = 0;
     shingles.forEach((value) => { if (otherShingles.has(value)) common += 1; });
@@ -369,9 +386,15 @@ function scoreText(text: string, queryTerms: Set<string>, baseScore: number, sou
   return baseScore + overlap * 90 + recentTimelineBoost;
 }
 
-interface ProtectedSection { key: string; title: string; content: string }
+interface ProtectedSection { key: string; title: string; content: string; whole?: boolean }
 
-function staticSize(units: Array<Pick<CandidateUnit, "sourceKey" | "title" | "text">>, canonicalName: string): number {
+/** A field sent whole is no longer a selection: its title drops « pertinent(e)(s) ». */
+const WHOLE_FIELD_TITLES: Record<string, string> = {
+  timeline: "TIMELINE CANONIQUE",
+  sujets_sensibles: "SUJETS SENSIBLES",
+};
+
+function staticSize(units: Array<Pick<CandidateUnit, "sourceKey" | "title" | "text" | "whole">>, canonicalName: string): number {
   const core = renderGroupedStatic(units as CandidateUnit[], 'core', canonicalName);
   const canon = renderGroupedStatic(units as CandidateUnit[], 'canon', canonicalName);
   return (core ? `\n\n# NOYAU DE ${canonicalName.toLocaleUpperCase('fr')}\n${core}`.length : 0)
@@ -379,7 +402,7 @@ function staticSize(units: Array<Pick<CandidateUnit, "sourceKey" | "title" | "te
 }
 
 const protectedSize = (sections: ProtectedSection[], canonicalName: string) =>
-  staticSize(sections.map(section => ({ sourceKey: section.key, title: section.title, text: section.content })), canonicalName);
+  staticSize(sections.map(section => ({ sourceKey: section.key, title: section.title, text: section.content, whole: section.whole })), canonicalName);
 
 /**
  * The speaking manner gives up trailing paragraphs, last first, only as far as
@@ -432,7 +455,7 @@ function sentReplyBlock(character: CharacterPrompt): { content: string; room: nu
   return { content: block.content, room: `\n\n## ${REPLY_BLOCK_TITLE}\n${block.content}`.length };
 }
 
-function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? ""): {
+function protectedCharacterSections(character: CharacterPrompt, establishedFacts = false, canonicalName = character.name ?? "", wholeManner = false): {
   sections: ProtectedSection[];
   yielded: string[];
   warnings: PromptBudgetWarning[];
@@ -454,6 +477,9 @@ function protectedCharacterSections(character: CharacterPrompt, establishedFacts
   const limit = OPTIMIZED_V3_LIMITS.staticChars + OPTIMIZED_V3_LIMITS.establishedFactsExtraChars + (reply?.room ?? 0);
   const fitsWith = (room: number) => (manner: string) => protectedSize(base(facts, manner), canonicalName) + room <= limit;
   const manner = character.maniere_de_parler?.trim() ?? "";
+  // Compression de la fiche lot 1: above « Actuel » the sheet brings its own room,
+  // so the speaking manner no longer yields to the facts.
+  if (wholeManner) return { sections: base(facts), yielded: [], warnings: [] };
   // Priority: facts, then the relevant canon, then the speaking manner (which yields first).
   let bounded = boundSpeakingManner(manner, fitsWith(OPTIMIZED_V3_LIMITS.minCanonChars));
   const warnings: PromptBudgetWarning[] = [];
@@ -475,18 +501,34 @@ function protectedCharacterSections(character: CharacterPrompt, establishedFacts
   return { sections: base(facts, bounded.content), yielded: bounded.dropped, warnings };
 }
 
-function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string, establishedFacts: boolean): { selected: SelectedUnit[]; all: SelectedUnit[]; warnings: PromptBudgetWarning[]; limit: number } {
+function selectStaticUnits(character: CharacterPrompt, query: string, contract: string, canonicalName: string, establishedFacts: boolean, level: SheetCompressionLevel = DEFAULT_SHEET_COMPRESSION): { selected: SelectedUnit[]; all: SelectedUnit[]; warnings: PromptBudgetWarning[]; limit: number; whole: ProtectedSection[]; wholeRoom: number } {
   const queryTerms = keywords(query);
   const candidates: CandidateUnit[] = [];
-  const protectedCore = protectedCharacterSections(character, establishedFacts, canonicalName);
+  const wholeManner = SHEET_COMPRESSION_WHOLE_FIELDS[level].length > 0;
+  const protectedCore = protectedCharacterSections(character, establishedFacts, canonicalName, wholeManner);
   const hasFacts = protectedCore.sections.some(section => section.key === 'faits_etablis');
   const withoutProtected = withoutCharacterReplyBlock(withoutCharacterLivedImpact(withoutCharacterEmbodiment(character)));
   const staticLimit = OPTIMIZED_V3_LIMITS.staticChars + (hasFacts ? OPTIMIZED_V3_LIMITS.establishedFactsExtraChars : 0)
     + (sentReplyBlock(character)?.room ?? 0);
   const selectable = hasFacts ? withoutEstablishedFacts(withoutProtected) : withoutProtected;
+  // Compression de la fiche lot 1: the fields of the level go whole, in sheet order,
+  // without what the protected sections already carry (facts, lived, motive, reply block).
+  const wholeKeys = new Set<string>(SHEET_COMPRESSION_WHOLE_FIELDS[level]);
+  const whole: ProtectedSection[] = FIELD_SPECS
+    .filter(spec => wholeKeys.has(spec.key))
+    .map(spec => ({ key: spec.key, title: WHOLE_FIELD_TITLES[spec.key] ?? spec.title, content: (selectable[spec.key] ?? "").trim(), whole: true }))
+    .filter(section => section.content);
+  // Their own room: exactly what they (and the speaking manner given back whole) add to
+  // the rendered core of « Actuel », nothing taken from the rest.
+  const wholeRoom = wholeManner
+    ? protectedSize([...protectedCore.sections, ...whole], canonicalName)
+      - protectedSize(protectedCharacterSections(character, establishedFacts, canonicalName).sections, canonicalName)
+    : 0;
+  const staticLimitWithWhole = staticLimit + wholeRoom;
   FIELD_SPECS.forEach((spec, fieldIndex) => {
     // The current scene is one atomic editorial unit, never a relevance candidate.
     if (spec.key === 'situation_summary') return;
+    if (wholeKeys.has(spec.key)) return;
     if (hasFacts && spec.key === 'timeline') {
       const titleUnits = timelineTitleUnits(selectable.timeline || "");
       // Match the question against the title itself, not the place and time of day shared by many titles.
@@ -536,10 +578,11 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       });
     });
   });
-  const protectedUnits: SelectedUnit[] = protectedCore.sections.map(section => ({
-    id: `static:${section.key}:protected`, source: 'static', sourceKey: section.key,
+  const protectedUnits: SelectedUnit[] = [...protectedCore.sections, ...whole].map(section => ({
+    id: `static:${section.key}:${section.whole ? 'whole' : 'protected'}`, source: 'static', sourceKey: section.key,
     title: section.title, text: section.content, score: 10_000, status: 'selected',
     originalChars: section.content.length, removedChars: 0, reason: 'included',
+    ...(section.whole ? { whole: true } : {}),
   }));
   const selected: CandidateUnit[] = [...protectedUnits];
   const decisions = new Map<string, SelectedUnit>();
@@ -557,7 +600,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     text: contract,
     score: 10_000,
   };
-  if (staticSize(selected, canonicalName) > staticLimit) {
+  if (staticSize(selected, canonicalName) > staticLimitWithWhole) {
     throw new Error('Présent canonique et parole éditoriale trop longs pour le noyau optimized_v3 : génération interdite');
   }
   const trySelect = (candidate: CandidateUnit) => {
@@ -580,7 +623,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
       decisions.set(candidate.id, { ...effective, status: "duplicate_static", keptBy: duplicate.id, originalChars: candidate.text.length, removedChars: candidate.text.length, reason: "duplicate" });
       return;
     }
-    if (staticSize([...selected, effective], canonicalName) > staticLimit) {
+    if (staticSize([...selected, effective], canonicalName) > staticLimitWithWhole) {
       decisions.set(candidate.id, { ...effective, status: "budget", originalChars: candidate.text.length, removedChars: novelty.removedChars, reason: "budget" });
       return;
     }
@@ -620,7 +663,7 @@ function selectStaticUnits(character: CharacterPrompt, query: string, contract: 
     removedChars: 0,
     reason: "lower_rank" as const,
   })];
-  return { selected: selectedWithStatus, all, warnings: protectedCore.warnings, limit: staticLimit };
+  return { selected: selectedWithStatus, all, warnings: protectedCore.warnings, limit: staticLimitWithWhole, whole, wholeRoom };
 }
 
 function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", characterName: string): string {
@@ -631,8 +674,9 @@ function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", ch
     const lived = units.find(unit => unit.sourceKey === 'vecu');
     if (lived) blocks.push(`## ${lived.title}\n${lived.text}`);
   }
-  for (const spec of FIELD_SPECS.filter((item) => item.group === group)) {
-    const own = units.filter((unit) => unit.sourceKey === spec.key);
+  for (const spec of FIELD_SPECS) {
+    // A field sent whole sits in the core, in sheet order, whatever its usual group.
+    const own = units.filter((unit) => unit.sourceKey === spec.key && (unit.whole ? group === "core" : spec.group === group));
     const grouped = own.some((unit) => unit.order !== undefined);
     const parts: string[] = [];
     let heading: string | undefined;
@@ -641,10 +685,12 @@ function renderGroupedStatic(units: CandidateUnit[], group: "core" | "canon", ch
       heading = unit.group;
       parts.push(unit.text);
     }
-    const title = spec.title === "INVARIANTS DU PERSONNAGE"
+    const baseTitle = own.find((unit) => unit.whole)?.title ?? spec.title;
+    const title = baseTitle === "INVARIANTS DU PERSONNAGE"
       ? `INVARIANTS DE ${characterName.toLocaleUpperCase("fr")}`
-      : spec.title;
+      : baseTitle;
     if (parts.length) blocks.push(`## ${title}\n${parts.join("\n")}`);
+    if (spec.group !== group) continue;
     if (spec.key === 'maniere_de_parler') {
       // Cadre de l'appel lot 2: how the character answers sits right after how it speaks.
       const reply = units.find(unit => unit.sourceKey === 'comment_tu_reponds');
@@ -673,10 +719,11 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const contract = conversationContract(canonicalName, input.identityInvariant, input.instructionHierarchy !== false);
   const memory = normalizeConversationMemory(input.conversationMemory);
   const query = [input.userMessage, ...memorySearchTerms(memory)].join(" ");
-  const staticSelection = selectStaticUnits(character, query, contract, canonicalName, establishedFacts);
+  const sheetCompression = input.sheetCompression ?? DEFAULT_SHEET_COMPRESSION;
+  const staticSelection = selectStaticUnits(character, query, contract, canonicalName, establishedFacts, sheetCompression);
   const replyBlock = characterReplyBlock(character);
   const replyRoom = sentReplyBlock(character)?.room ?? 0;
-  const contextLimitChars = OPTIMIZED_V3_LIMITS.generatedContextChars + replyRoom;
+  const contextLimitChars = OPTIMIZED_V3_LIMITS.generatedContextChars + replyRoom + staticSelection.wholeRoom;
   const core = renderGroupedStatic(staticSelection.selected, "core", canonicalName);
   if (!core) throw new Error("Fiche personnage incohérente : noyau éditorial vide");
   const canon = renderGroupedStatic(staticSelection.selected, "canon", canonicalName);
@@ -692,7 +739,10 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     removedChars: 0,
     reason: "included",
   };
-  const selectedForDedup: CandidateUnit[] = [contractUnit, ...staticSelection.selected.map((unit) => ({ ...unit }))];
+  // Compression de la fiche lot 1: the turn sections (memory, state, directive…) are not
+  // trimmed against the fields sent whole, so they keep their place at every level; the
+  // souvenirs, which are sheet text, are still deduplicated against everything sent.
+  const selectedForDedup: CandidateUnit[] = [contractUnit, ...staticSelection.selected.filter((unit) => !unit.whole).map((unit) => ({ ...unit }))];
   const unitDecisions: SelectedUnit[] = [contractUnit, ...staticSelection.all];
   const injectedSections: MaxPromptAssemblyTrace["injectedSections"] = [];
   const budgetSections: NonNullable<MaxPromptAssemblyTrace["budget"]>["sections"] = [];
@@ -857,7 +907,9 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     injectedSections.push({ key, title, content: bounded });
     budgetSections.push({ key, title, chars: prefix.length + bounded.length, originalChars: original.length, included: true, truncated: bounded.length < original.length });
     const candidate: CandidateUnit = { id, source, sourceKey: key, title, text: bounded, score: 0 };
-    selectedForDedup.push(candidate);
+    // A core holding whole fields shares nearly every word with any sentence: as a
+    // reference it would trim memory and turn sections at random. Its parts already are.
+    if (!(key === "character_core" && staticSelection.whole.length)) selectedForDedup.push(candidate);
     unitDecisions.push({
       ...candidate,
       status: "selected",
@@ -916,7 +968,7 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
   const warnings = [...staticSelection.warnings, ...turnWarnings];
 
   const deliveredCore = injectedSections.find(section => section.key === 'character_core')?.content ?? '';
-  if (protectedCharacterSections(character, establishedFacts, canonicalName).sections.some(section => !deliveredCore.includes(section.content))) {
+  if ([...protectedCharacterSections(character, establishedFacts, canonicalName, staticSelection.whole.length > 0).sections, ...staticSelection.whole].some(section => !deliveredCore.includes(section.content))) {
     throw new Error('Présent canonique ou parole éditoriale incomplets : génération interdite');
   }
   const staticRendered = [core, canon].filter(Boolean).join("\n\n");
@@ -987,6 +1039,11 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
         sent: !replyBlock.tooLong,
         roomChars: replyRoom,
       } } : {}),
+      sheetCompression: {
+        level: sheetCompression,
+        wholeFields: staticSelection.whole.map((section) => section.key),
+        roomChars: staticSelection.wholeRoom,
+      },
       ...(warnings.length ? { warnings } : {}),
     },
     finalSystemPrompt: prompt,

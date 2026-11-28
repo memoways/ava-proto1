@@ -124,6 +124,8 @@ export interface MaxAgentInput {
   speechStateHistory?: Array<string | null>;
   /** Lot D — bloc « ÉTAT DU PERSONNAGE À CE TOUR » déjà compilé (absent = pas de profil d'état). */
   characterState?: string;
+  /** Compression de la fiche lot 1 — niveau du personnage lu au début de l'appel (optimized_v3). */
+  sheetCompression?: import("@/agents/sheetCompression").SheetCompressionLevel;
 }
 
 export interface MaxTemporalContext {
@@ -824,6 +826,7 @@ export async function buildMaxSystemPrompt(
       ragCandidates: input.ragCandidates,
       establishedFacts: evaluation?.establishedFacts,
       instructionHierarchy: evaluation?.instructionHierarchy,
+      sheetCompression: input.sheetCompression,
     });
   }
 
