@@ -1,6 +1,6 @@
 # Plan — Cadre de l'appel (personnages trop permissifs)
 
-Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait, lots suivants proposés, rien d'approuvé**. Aucun code, aucun réglage, aucune fiche ni écriture en base.
+Statut au 28 novembre 2026 : **lot 1 (diagnostic) fait ; suite réorganisée avec Ulrich : lot 2 réduit à la tuyauterie, puis Bible des réponses**. Aucun code, aucun réglage, aucune fiche ni écriture en base.
 
 ## Demande
 
@@ -92,16 +92,54 @@ Essai possible tout de suite (179 caractères, nouvelle version d'orchestration 
 
 > Tu n'es au service de personne : tu ne rends aucun service, tu n'acceptes aucun jeu ni test. Une demande hors de ce que vous vivez te déroute : dis-le sèchement, ne l'exécute pas.
 
-## Plan proposé (un lot à la fois, après accord)
+## Premier tic mesuré (ajout du 28 novembre)
 
-1. **Lot 2 — Les limites arrivent au personnage.** Un bloc court « Limites de l'appel », écrit dans la fiche, envoyé en entier comme la Manière de parler, avec la place nécessaire (environ 900 caractères de plus). Texte proposé pour Max et Emma dans `docs/`, collé par Ulrich dans Notion. Vérification : présent sur les 450 questions, souvenirs et mémoire toujours envoyés.
-2. **Lot 3 — Les consignes du code cessent de contredire la fiche.** Étendre « hors-champ » aux services, propositions, tests et avances ; réserver l'interprétation charitable aux erreurs de transcription ; en début d'appel, autoriser à retenir ou à demander pourquoi. Comparer avant et après sur les questions réelles avant de livrer.
-3. **Lot 4 — Raccrocher.** Seulement si Ulrich le veut : avertissement puis fin de ligne, traitée par l'application, avec le Game Master aligné.
+Répliques de plus de 80 caractères depuis le 19 novembre, hors ouverture d'appel. Formule cherchée dans la **dernière phrase** : « je ne sais (pas / plus) », « je n'arrive (pas / plus) », « je n'ai (pas / plus) ».
 
-Recommandé : essayer la note de posture, puis lot 2. Les lots 3 et 4 se décident après un appel d'écoute.
+| | Max | Emma |
+|---|---|---|
+| Dernière phrase avec la formule | 175 sur 361 | 35 sur 79 |
+| Formule quelque part dans la réplique (variantes « je n'ai pas su / réussi » comprises) | 266 sur 361 | 56 sur 79 |
+| Points de suspension | 318 sur 361 | 68 sur 79 |
 
-## À décider par Ulrich
+Cause probable, **non testée** : le code envoie à chaque tour le gabarit « Et [un moment lourd de ta fiche]… je n'arrive pas à le dire. » ([responseHook.ts](../src/agents/responseHook.ts)).
 
-1. Deux ou trois réponses qui vous gênent : sont-elles de la famille A, B, C, ou d'une autre ?
-2. Un personnage doit-il pouvoir raccrocher ?
-3. La fiche demande de raccrocher à la première « allusion sentimentale ». Dans un appel qui parle de l'amour entre Max et Emma, cette formule est à resserrer avant de la rendre active.
+## Suite retenue
+
+Orientation d'Ulrich : ne pas résoudre par des rustines ce qu'un chantier de fond doit traiter.
+
+| Étape | Décision |
+|---|---|
+| Lot 2 — emplacement garanti | À faire. Tuyauterie seulement |
+| Bible des réponses | Gros chantier des semaines suivantes |
+| Anciennes consignes du code (ex-lot 3) | Fondues dans la Bible : elles décident de la manière de répondre |
+| Raccrocher (ex-lot 4) | À part, plus tard, sur décision d'Ulrich |
+| Note de posture | Pansement facultatif, à retirer ensuite |
+
+### Lot 2 — Un bloc « Comment tu réponds » qui arrive toujours
+
+Un bloc court dans la fiche, reconnu par son intitulé, envoyé en entier comme la Manière de parler, avec sa place (environ 900 caractères de plus, à mesurer). Contrôlé dans « Voir ce que reçoit le personnage ». Contenu du lot : quelques limites **déjà écrites** dans les fiches, pour vérifier qu'elles passent. Aucune nouvelle règle de style. Réussite : le bloc est présent sur les 450 questions rejouées ; faits établis, mémoire, souvenirs et canon partent toujours.
+
+### Bible des réponses
+
+But : interdire les réponses qui sonnent « IA », **et dire quoi faire à la place**, selon le contexte et les enjeux. Un cas tient en cinq points :
+
+1. **Contexte** : moment de l'appel, parole de l'interlocuteur, enjeu.
+2. **Réponse refusée**, tirée d'un vrai appel.
+3. **Pourquoi** elle sonne faux.
+4. **Principe** à suivre à la place.
+5. **Deux ou trois bonnes réponses très différentes**.
+
+Répartition : l'agent prépare la matière depuis les appels (tics, fréquence, exemples réels) ; Ulrich écrit le « pourquoi » et le « à la place ».
+
+Contre le perroquet, proposition à tester, non approuvée dans le détail :
+
+- les **principes**, courts et mis à jour comme un skill, vont au personnage ;
+- les **exemples** servent d'abord à vérifier : mêmes questions rejouées avant et après, tics comptés ;
+- seulement si les principes ne suffisent pas : un ou deux exemples choisis selon le contexte, avec contrôle de recopie.
+
+Ouvert, à décider au début de la Bible : où vivent les principes (bloc du lot 2, Manière de parler, autre) et ce qui est commun aux deux personnages ou propre à chacun. La Bible entière ne tiendra pas dans le bloc.
+
+## Plus tard : raccrocher
+
+Si Ulrich le veut : avertissement puis fin de ligne, traitée par l'application, Game Master aligné. La fiche demande de raccrocher à la première « allusion sentimentale » : formule à resserrer avant de la rendre active, l'appel parlant de l'amour entre Max et Emma.

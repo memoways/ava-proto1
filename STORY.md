@@ -7,6 +7,12 @@
 
 ---
 
+## Apprendre à répondre, sans faire le perroquet (28 novembre 2026)
+
+Pour Ulrich, interdire ne suffit pas : Max répond souvent comme une IA, et une personne qui souffre ainsi n'est pas crédible. Une Bible des réponses dira ce qui sonne faux, pourquoi, et quoi faire à la place, avec des principes que le personnage applique sans recopier les exemples. Avant elle, un seul chantier : garantir que ce texte lui parvienne.
+
+---
+
 ## Des limites écrites, jamais reçues (28 novembre 2026)
 
 Ulrich trouve Max et Emma trop serviables. Leurs fiches disent pourtant quand se fermer et quand raccrocher. Le diagnostic montre que ce texte n'atteint presque jamais le personnage, faute de place, et que raccrocher n'a jamais été branché. La correction est proposée en lots et attend son accord.
