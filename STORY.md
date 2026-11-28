@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Attente de passage, mesure du lot 1 ter)  
+> **Last Updated**: 2026-11-28 (Mémoire gardée quand la relation est refusée)  
+
+---
+
+## L'aveu reste, la relation attend (28 novembre 2026)
+
+Une erreur du Game Master sur la relation n'efface plus ce qui s'est dit : Ulrich choisit de garder les souvenirs du tour sans rien accorder de la proximité refusée, sauf si le Game Master semble s'être trompé de personnage. En cherchant, un second défaut apparaît : certains sujets sensibles ne peuvent jamais s'ouvrir.
 
 ---
 

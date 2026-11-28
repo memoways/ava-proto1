@@ -1,5 +1,7 @@
 # Prompt de reprise — Mémoire gardée quand la relation est refusée, lot 1
 
+> **Exécuté le 28 novembre 2026.** Suite : [lot 2](prompt_reprise_memoire_relation_refusee_lot_2.md).
+
 À copier dans un nouveau chat Ava, **seulement si Ulrich veut ce chantier**. Origine : [plan latence](plan_latence_conversationnelle_llm_tts.md), « Attente de passage, lot 1 ter : mesure ». Ce lot seulement.
 
 ## Objectif

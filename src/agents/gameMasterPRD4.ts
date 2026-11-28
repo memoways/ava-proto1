@@ -784,16 +784,17 @@ export async function evaluatePostTurnPRD4(
       // Reject this mutation only; JSON and separately validated handoff retain their status.
       executionReason = "relationship_invalid";
     }
+    const { relationship, ...memoryWithoutRelationship } = result.memory_delta;
+    // A proposal naming the other character may come from a confused evaluation: trust nothing in it.
+    const namedCharacter = asRuntimeCharacter(relationship.characterKey?.toLowerCase());
+    const namesOtherCharacter = namedCharacter !== null && namedCharacter !== input.currentCharacter;
     result = {
       ...result,
       relationship_transition: transition,
       memory_delta: transition.accepted ? {
-          ...result.memory_delta,
-          relationship: {
-            ...result.memory_delta.relationship,
-            ...relationshipStateToProposal(transition.next),
-          },
-        } : null,
+          ...memoryWithoutRelationship,
+          relationship: { ...relationship, ...relationshipStateToProposal(transition.next) },
+        } : namesOtherCharacter ? null : memoryWithoutRelationship,
     };
   }
 

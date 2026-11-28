@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Mémoire gardée quand la relation est refusée, lot 1] — 2026-11-28
+
+- Correctif : un refus de la relation proposée par le Game Master garde le reste de la mémoire du tour ; aucun champ de la relation refusée n'est appliqué. Delta entier jeté si elle nomme l'autre personnage.
+- Correctif : un delta sans relation laisse la relation stockée identique (la confiance pouvait revenir à « neutre »).
+- Aucune migration, aucun réglage modifié, production non publiée ; recette sur appel réel à faire.
+
 ## [Attente de passage : mesure après lot 1 ter] — 2026-11-28
 
 - Documentation seulement : sur un appel de recette, aucune des 3 répliques coupées n'est créditée (journal, mémoire, résumé) ; 8 répliques entendues sur 9 sont au journal, la neuvième interrompue par le raccrochage ; la demande Max → Emma aboutit.
