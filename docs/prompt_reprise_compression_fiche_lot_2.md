@@ -1,10 +1,10 @@
-# Prompt de reprise — Compression de la fiche, lot 2 : coût avec le modèle, puis qualité
+# Prompt de reprise — Compression de la fiche, lot 2 : limite du proxy, puis qualité
 
 À copier dans un nouveau chat Ava, quand Ulrich lance ce lot. Ce lot seulement.
 
 ## Objectif
 
-Le lot 1 a livré trois niveaux de fiche envoyée (Actuel, Consignes entières, Fiche entière), réglables par personnage. Ce lot mesure ce qu'ils coûtent avec le vrai modèle, puis s'ils rendent Max et Emma meilleurs, pour qu'Ulrich choisisse le niveau par défaut.
+Le lot 1 a livré trois niveaux de fiche envoyée (Actuel, Consignes entières, Fiche entière), réglables par personnage, et le banc avec le modèle a mesuré leur délai et leur coût. Ce lot règle d'abord le sort de « Fiche entière » (refusée par `proxy-llm`), puis mesure si les niveaux rendent Max et Emma meilleurs, pour qu'Ulrich choisisse le niveau par défaut.
 
 Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compression_fiche.md).
 
@@ -15,15 +15,19 @@ Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compres
 - Réglage : Admin › Réglages personnages › « Fiche envoyée », clé `ava_character_sheet_compression` par environnement, lue à la préparation de l'appel ([characterSheetCompression.ts](../src/services/characterSheetCompression.ts)) ; niveaux dans [sheetCompression.ts](../src/agents/sheetCompression.ts) ; assemblage dans [maxOptimizedPromptCompiler.ts](../src/agents/maxOptimizedPromptCompiler.ts). Trace du tour : `budget.sheetCompression`.
 - **Aucun niveau n'est encore enregistré** : tous les personnages jouent « Actuel ».
 - Mesure sans modèle (605 questions) : prompt médian de Max 16 498 / 37 436 / 63 522 car., part de la fiche 14 / 52 / 100 % ; Emma 15 306 / 38 171 / 60 445 car., 14 / 57 / 100 %. Rien n'est évincé. « Actuel » est identique à l'ancien prompt.
+- Banc avec le modèle fait (115 appels, 0,09 $, `npm run eval:llm-latency -- --sheet-compression …`) : « Consignes entières » 0,0027 $ par réplique contre 0,0013 $ pour « Actuel », première phrase 782 ms contre 735 ms ; aucun cache d'une question à l'autre (seulement sur un prompt identique rejoué).
+- **« Fiche entière » est refusée par `proxy-llm`** : `totalChars > 60000` → `messages payload too large` ([proxy-llm](../supabase/functions/proxy-llm/index.ts)) ; ses prompts font 63 000 à 67 000 caractères. Rien n'est corrigé : décision d'Ulrich attendue (relever la limite, par exemple à 120 000, ou retirer le niveau).
 - Outils : `npm run eval:replay:compression` (sans modèle), `npm run eval:llm-latency` (banc LLM, [llmLatency.ts](../scripts/eval-judge/llmLatency.ts)), `npm run eval:judge` (juge), `llm_usage` (latence, cache, fournisseur par appel).
 
 ## Périmètre
 
-1. **Coût annoncé avant tout appel.** Estimer le coût du banc à partir de `llm_usage` (prix par jeton entrant et sortant, part en cache des appels récents de `optimized_v3`) : environ 4 700, 10 700 et 18 000 jetons entrants par tour selon le niveau. Proposer un banc court (par exemple 10 questions réelles × 3 niveaux × Max et Emma, deux passages pour voir le cache) et donner son coût. **Attendre l'accord d'Ulrich.**
-2. **Banc avec le modèle** sur sandbox-ulrich, après accord, avec le niveau passé en mémoire (sans enregistrer le réglage) : délai de la première phrase, durée de l'appel, part en cache, coût par tour, par niveau. Généraliser `llmLatency.ts` si besoin.
-3. **Juge de qualité** sur un même jeu de questions à chaque niveau : respect des limites de la fiche, réponse aux questions hors sujet, tests du joueur, approbation trop facile, exactitude des faits. Le coût du juge est annoncé et accepté avant.
-4. **Présenter à Ulrich**, chiffres à l'appui, coût, délai et qualité par niveau, avec une recommandation de niveau par défaut. La décision est la sienne.
-5. **Recette d'Ulrich** : appels sur sandbox-ulrich, niveau par niveau. Le niveau est enregistré dans l'écran seulement s'il le demande.
+1. **« Fiche entière » et la limite de `proxy-llm`**, selon la décision d'Ulrich :
+   - soit relever la limite de taille dans `proxy-llm` (Edge Function ; garde-fou contre l'abus, à garder raisonnable) et faire publier la fonction par Lovable, puis rejouer le banc de ce seul niveau (coût annoncé, ≈ 0,10 $) ;
+   - soit retirer « Fiche entière » du choix, ou l'afficher comme indisponible tant que la limite tient.
+   Dans tous les cas, faire dire par l'aperçu et la trace quand un prompt dépasse la limite du proxy, au lieu d'un refus silencieux en jeu.
+2. **Juge de qualité** sur un même jeu de questions à chaque niveau jouable : respect des limites de la fiche, réponse aux questions hors sujet, tests du joueur, approbation trop facile, exactitude des faits. Coût annoncé (≈ 0,02 $ par évaluation avec Claude Sonnet) et accepté avant.
+3. **Présenter à Ulrich**, chiffres à l'appui, coût, délai et qualité par niveau, avec une recommandation de niveau par défaut. La décision est la sienne.
+4. **Recette d'Ulrich** : appels sur sandbox-ulrich, niveau par niveau. Le niveau est enregistré dans l'écran seulement s'il le demande.
 
 ## Hors de ce lot
 
@@ -49,4 +53,4 @@ Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compres
 
 ## Première action
 
-Lire `AGENTS.md`, `docs/etat_courant.md`, `git status` et le plan, puis estimer le coût du banc depuis `llm_usage` (lecture seule) et le présenter à Ulrich.
+Lire `AGENTS.md`, `docs/etat_courant.md`, `git status` et le plan, puis demander à Ulrich sa décision sur la limite de `proxy-llm` si elle n'est pas déjà donnée dans la demande.

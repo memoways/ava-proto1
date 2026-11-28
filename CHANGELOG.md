@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Compression de la fiche : banc avec le modèle] — 2026-11-28
+
+- Ajout : `npm run eval:llm-latency -- --sheet-compression current|guidelines|full` compile les prompts au niveau choisi, en mémoire.
+- Mesure (accord d'Ulrich, 115 appels, 0,09 $) : « Consignes entières » coûte 0,0027 $ par réplique contre 0,0013 $, première phrase 782 ms contre 735 ms ; pas de cache d'une question à l'autre.
+- Constaté : `proxy-llm` refuse les messages de plus de 60 000 caractères, donc tout prompt « Fiche entière ». Rien n'est corrigé en attendant la décision d'Ulrich.
+- Aucun réglage enregistré, aucune écriture en base ; production non publiée.
+
 ## [Compression de la fiche lot 1 : trois niveaux] — 2026-11-28
 
 - Ajout : réglage « Fiche envoyée » par personnage (Réglages personnages), enregistré par environnement (`ava_character_sheet_compression`, sans migration), lu à la préparation de l'appel et noté dans la trace du tour.

@@ -27,6 +27,8 @@ const USAGE = `npm run eval:llm-latency -- [options]
   --character all|max|emma personnages du corpus (défaut all)
   --questions N            questions par personnage à compiler (défaut 5)
   --compile-only           compile et enregistre les prompts (RAG seulement), sans banc
+  --sheet-compression L    niveau de fiche current|guidelines|full, en mémoire (compression de la fiche) ;
+                           l'identifiant de chaque prompt reçoit #L
   --prompts @FICHIER       prompts déjà compilés (sinon compilés au début)
   --candidates a,b         candidats (défaut : tous ceux du proxy) ; --list pour les voir
   --repeats N              répétitions par prompt et par candidat (défaut 3)
@@ -54,6 +56,10 @@ async function main(): Promise<void> {
   if (![questions, repeats, warmup, capUsd].every((n) => Number.isFinite(n) && n >= 0) || questions < 1 || repeats < 1) fail(`Options numériques invalides.\n\n${USAGE}`);
   const { candidates, unknown } = bench.selectBenchCandidates(args.get("candidates")?.split(",").map((s) => s.trim()).filter(Boolean) ?? null);
   if (unknown.length) fail(`Candidats inconnus : ${unknown.join(", ")} (--list)`);
+  const sheetCompressionArg = args.get("sheet-compression");
+  const { normalizeSheetCompressionLevel } = await import("@/agents/sheetCompression");
+  const sheetCompression = sheetCompressionArg ? normalizeSheetCompressionLevel(sheetCompressionArg) : undefined;
+  if (sheetCompressionArg && sheetCompression !== sheetCompressionArg) fail(`--sheet-compression inconnu : ${sheetCompressionArg}`);
   const outDir = path.resolve(process.cwd(), args.get("out") ?? "output/eval-judge");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 
@@ -126,6 +132,7 @@ async function main(): Promise<void> {
           await processPRD4Turn({
             sessionId: null, conversationHistory: [], userMessage: item.question, userRole: null, timeElapsedSeconds: 0,
             characterContext, signal: controller.signal, turnIndex: 1,
+            ...(sheetCompression ? { sheetCompression } : {}),
             evaluationOverrides: pipeline.buildEvalTurnOverrides(config, characterKey),
           }).catch(() => null);
         } finally {
@@ -134,7 +141,7 @@ async function main(): Promise<void> {
         const body = captured as { messages: import("@/services/llmLatencyBench").BenchMessage[]; temperature?: number; top_p?: number; max_tokens: number } | null;
         if (!body) { log(`  ✖ ${item.id} : prompt non capturé (tour en repli avant l'appel ?)`); continue; }
         prompts.push({
-          id: item.id, character: pipeline.evalCharacterKey(item.character_name) ?? "?", question: item.question,
+          id: sheetCompression ? `${item.id}#${sheetCompression}` : item.id, character: pipeline.evalCharacterKey(item.character_name) ?? "?", question: item.question,
           messages: body.messages, sampling: { temperature: body.temperature, top_p: body.top_p, max_tokens: body.max_tokens },
         });
         log(`  ✓ ${item.id} · ${item.character_name} · ${body.messages[0].content.length} car. système`);
@@ -142,7 +149,7 @@ async function main(): Promise<void> {
       mkdirSync(outDir, { recursive: true });
       const file = path.join(outDir, `llm-latency-prompts-${stamp}.json`);
       promptsFile = file;
-      writeFileSync(file, `${JSON.stringify({ environment: session.environment, model: config.model, promptVariant: config.promptVariant, prompts }, null, 2)}\n`, "utf8");
+      writeFileSync(file, `${JSON.stringify({ environment: session.environment, model: config.model, promptVariant: config.promptVariant, sheetCompression: sheetCompression ?? null, prompts }, null, 2)}\n`, "utf8");
       log(`✓ Prompts enregistrés : --prompts @${path.relative(process.cwd(), file)}`);
     }
   }
