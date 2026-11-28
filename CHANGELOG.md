@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Compression de la fiche : banc de « Fiche entière »] — 2026-11-28
+
+- Documentation seulement : `proxy-llm` publiée par Lovable avec la limite de 120 000 caractères, vérifiée ; « Fiche entière » mesurée (39 appels, 0,09 $) : première phrase 1 097 ms (735 ms en « Actuel »), 0,0042 $ par réplique.
+- Aucun code modifié, aucun réglage enregistré.
+
 ## [proxy-llm : limite de taille relevée] — 2026-11-28
 
 - `proxy-llm` accepte 120 000 caractères par requête au lieu de 60 000 (décision d'Ulrich), pour le niveau « Fiche entière ». Constante partagée avec l'application (`supabase/functions/_shared/proxyLlmLimits.ts`).

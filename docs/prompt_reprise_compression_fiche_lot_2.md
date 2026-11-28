@@ -16,15 +16,14 @@ Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compres
 - **Aucun niveau n'est encore enregistré** : tous les personnages jouent « Actuel ».
 - Mesure sans modèle (605 questions) : prompt médian de Max 16 498 / 37 436 / 63 522 car., part de la fiche 14 / 52 / 100 % ; Emma 15 306 / 38 171 / 60 445 car., 14 / 57 / 100 %. Rien n'est évincé. « Actuel » est identique à l'ancien prompt.
 - Banc avec le modèle fait (115 appels, 0,09 $, `npm run eval:llm-latency -- --sheet-compression …`) : « Consignes entières » 0,0027 $ par réplique contre 0,0013 $ pour « Actuel », première phrase 782 ms contre 735 ms ; aucun cache d'une question à l'autre (seulement sur un prompt identique rejoué).
-- « Fiche entière » était refusée par `proxy-llm` (limite de 60 000 caractères, prompts de 63 000 à 67 000). **Décision d'Ulrich : limite relevée à 120 000** ([proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)) ; alerte `proxy_limit_exceeded` si un tour la dépasse. Vérifier sur origin/main et dans les journaux que la fonction publiée accepte ces prompts (banc du seul niveau « Fiche entière » mesuré ou non : voir le plan).
+- « Fiche entière » était refusée par `proxy-llm` (limite de 60 000 caractères, prompts de 63 000 à 67 000). **Décision d'Ulrich : limite relevée à 120 000** ([proxyLlmLimits.ts](../supabase/functions/_shared/proxyLlmLimits.ts)) ; alerte `proxy_limit_exceeded` si un tour la dépasse. Fonction publiée et vérifiée le 28 novembre ; « Fiche entière » mesurée : première phrase 1 097 ms, 0,0042 $ par réplique (Actuel 735 ms, 0,0013 $ ; Consignes entières 782 ms, 0,0027 $).
 - Outils : `npm run eval:replay:compression` (sans modèle), `npm run eval:llm-latency` (banc LLM, [llmLatency.ts](../scripts/eval-judge/llmLatency.ts)), `npm run eval:judge` (juge), `llm_usage` (latence, cache, fournisseur par appel).
 
 ## Périmètre
 
-1. **« Fiche entière »** : si son banc n'est pas encore dans le plan, vérifier que `proxy-llm` publiée accepte ces prompts, puis rejouer ce seul niveau (≈ 0,10 $, coût annoncé et accepté avant).
-2. **Juge de qualité** sur un même jeu de questions à chaque niveau jouable : respect des limites de la fiche, réponse aux questions hors sujet, tests du joueur, approbation trop facile, exactitude des faits. Coût annoncé (≈ 0,02 $ par évaluation avec Claude Sonnet) et accepté avant.
-3. **Présenter à Ulrich**, chiffres à l'appui, coût, délai et qualité par niveau, avec une recommandation de niveau par défaut. La décision est la sienne.
-4. **Recette d'Ulrich** : appels sur sandbox-ulrich, niveau par niveau. Le niveau est enregistré dans l'écran seulement s'il le demande.
+1. **Juge de qualité** sur un même jeu de questions à chaque niveau jouable : respect des limites de la fiche, réponse aux questions hors sujet, tests du joueur, approbation trop facile, exactitude des faits. Coût annoncé (≈ 0,02 $ par évaluation avec Claude Sonnet) et accepté avant.
+2. **Présenter à Ulrich**, chiffres à l'appui, coût, délai et qualité par niveau, avec une recommandation de niveau par défaut. La décision est la sienne.
+3. **Recette d'Ulrich** : appels sur sandbox-ulrich, niveau par niveau. Le niveau est enregistré dans l'écran seulement s'il le demande.
 
 ## Hors de ce lot
 
@@ -50,4 +49,4 @@ Plan, décisions et chiffres du lot 1 : [plan_compression_fiche.md](plan_compres
 
 ## Première action
 
-Lire `AGENTS.md`, `docs/etat_courant.md`, `git status` et le plan, puis vérifier l'état de « Fiche entière » dans le plan et annoncer le coût du juge de qualité.
+Lire `AGENTS.md`, `docs/etat_courant.md`, `git status` et le plan, puis annoncer à Ulrich le coût du juge de qualité et attendre son accord.
