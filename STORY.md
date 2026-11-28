@@ -7,6 +7,12 @@
 
 ---
 
+## Des limites écrites, jamais reçues (28 novembre 2026)
+
+Ulrich trouve Max et Emma trop serviables. Leurs fiches disent pourtant quand se fermer et quand raccrocher. Le diagnostic montre que ce texte n'atteint presque jamais le personnage, faute de place, et que raccrocher n'a jamais été branché. La correction est proposée en lots et attend son accord.
+
+---
+
 ## Les vrais sujets de la fiche (28 novembre 2026)
 
 La consigne de retenue partait presque à chaque question, sur des mots comme « est » ou « pas ». Elle suit maintenant les sujets de la fiche. Entre deux réglages, Ulrich garde le plus strict : les personnages lui semblent trop permissifs, trop proches d'un assistant serviable. Cadrer ce qui est possible dans un appel devient le chantier suivant.

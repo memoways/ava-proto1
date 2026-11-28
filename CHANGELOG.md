@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cadre de l'appel : diagnostic lot 1] — 2026-11-28
+
+- Documentation seulement : réponses trop permissives relevées en lecture seule, causes établies par reconstitution des prompts (limites des fiches coupées faute de place, `[END_CALL]` sans code, consignes poussant à répondre), leviers sans code et plan en lots proposé.
+- Aucun code, aucune écriture en base, aucun réglage ni prompt modifié ; production non publiée.
+
 ## [Sujets sensibles de la fiche, mémoire et relation lot 3] — 2026-11-28
 
 - Correctif : une fiche à puces donne un sujet par puce (l'introduction et les bouts de phrases n'en sont plus) ; un sujet se reconnaît sur les mots de son titre, sans mots-outils, pluriel et formes proches compris.
