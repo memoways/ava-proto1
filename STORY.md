@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Les vrais sujets de la fiche)  
+> **Last Updated**: 2026-11-28 (Une place qui arrive toujours)  
+
+---
+
+## Une place qui arrive toujours (28 novembre 2026)
+
+Les limites de Max et Emma restaient en bas de fiche, coupées à chaque tour. La fiche a maintenant un emplacement court, « Comment tu réponds », qui arrive en entier à chaque réplique sans rien pousser dehors. Ulrich y colle d'abord des limites qu'il avait déjà écrites. La Bible des réponses le remplira ensuite.
 
 ---
 

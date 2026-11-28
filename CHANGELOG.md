@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cadre de l'appel lot 2 : bloc « Comment tu réponds »] — 2026-11-28
+
+- Ajout : un paragraphe qui commence par « Comment tu réponds » dans un champ existant de la fiche est envoyé en entier dans le noyau `optimized_v3`, après la Manière de parler, avec sa propre place. Le noyau et le contexte grandissent de sa taille exacte. Au-delà de 900 caractères, il n'est pas envoyé et l'alerte `reply_block_too_long` le dit.
+- « Voir ce que reçoit le personnage » dit si le bloc est absent, envoyé ou trop long.
+- Mesure (`npm run eval:replay:reply-block`, 605 questions réelles en lecture seule) : le bloc est toujours envoyé ; les autres sections sont identiques ; sans bloc, le prompt est identique à avant.
+- Texte proposé pour Max et Emma dans `docs/proposition_bloc_comment_tu_reponds.md`, à coller dans Notion par Ulrich.
+- Aucune migration, aucune écriture en base ni dans Notion, aucun réglage modifié ; production non publiée.
+
 ## [Cadre de l'appel : suite et Bible des réponses] — 2026-11-28
 
 - Documentation seulement : lot 2 réduit à un emplacement toujours envoyé, Bible des réponses décrite, consignes du code fondues dans ce chantier, raccrochage repoussé ; premier tic de réplique mesuré en lecture seule.

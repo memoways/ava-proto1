@@ -12,6 +12,7 @@ import { compileCharacterStateBlock, normalizeStateProfile } from "@/services/ch
 import { buildCharacterIdentityInvariant, toCharacterExecutionContext } from "@/services/characterIdentityGuard";
 import { buildLongTurnSimulation } from "@/services/characterReceivedSimulation";
 import { getActiveEnvironment } from "@/services/environmentContext";
+import { describeReplyBlock } from "@/services/replyBlockStatus";
 import type { RuntimeCharacter } from "@/types";
 
 const DEFAULT_QUESTION = "Comment ce fusil est-il arrivé au chalet ?";
@@ -38,6 +39,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
   const [longTurn, setLongTurn] = useState(false);
   const [question, setQuestion] = useState(DEFAULT_QUESTION);
   const [summary, setSummary] = useState("");
+  const [replyBlock, setReplyBlock] = useState<ReturnType<typeof describeReplyBlock> | null>(null);
   const [busy, setBusy] = useState(false);
 
   const compile = async (simulate: boolean) => {
@@ -100,6 +102,7 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
       setRows(describeCharacterPromptLayers(trace));
       setPrompt(trace.finalSystemPrompt);
       setWarnings(budget?.warnings ?? []);
+      setReplyBlock(describeReplyBlock(budget?.replyBlock));
       setSummary(`${budget?.totalSystemChars ?? trace.finalSystemPrompt.length} car. sur ${budget?.limitChars ?? "?"} (historique ${budget?.historyChars ?? 0})${simulate ? ` · ${found}, ${budget?.sentRagIds?.length ?? 0} envoyé(s)` : ""}`);
       setError("");
     } catch (cause) {
@@ -150,6 +153,9 @@ export function CharacterReceivedPreview({ characterId, characterName, stateProf
               : " Ici l'état initial du radar et aucun historique : « absent (section_vide) » veut dire « non simulé », cochez « Simuler un tour long » pour voir la place qui reste en jeu."}
           </p>
           {summary && <p className="text-[11px]" data-testid="character-received-summary">Prompt système : {summary}</p>}
+          {replyBlock && (
+            <p className={`text-[11px] ${replyBlock.tooLong ? "text-destructive" : ""}`} data-testid="character-received-reply-block">{replyBlock.text}</p>
+          )}
           <table className="w-full text-[11px]">
             <thead><tr className="text-left text-muted-foreground"><th>Niveau</th><th>Couche</th><th>Provenance</th><th className="text-right">Car.</th></tr></thead>
             <tbody>
