@@ -4,6 +4,12 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [proxy-llm : limite de taille relevée] — 2026-11-28
+
+- `proxy-llm` accepte 120 000 caractères par requête au lieu de 60 000 (décision d'Ulrich), pour le niveau « Fiche entière ». Constante partagée avec l'application (`supabase/functions/_shared/proxyLlmLimits.ts`).
+- Ajout : alerte `proxy_limit_exceeded` dans la trace et l'aperçu quand un tour `optimized_v3` dépasserait la limite.
+- Aucun réglage enregistré ; production non publiée côté application.
+
 ## [Compression de la fiche : banc avec le modèle] — 2026-11-28
 
 - Ajout : `npm run eval:llm-latency -- --sheet-compression current|guidelines|full` compile les prompts au niveau choisi, en mémoire.

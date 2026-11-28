@@ -36,6 +36,10 @@ import {
   SHEET_COMPRESSION_WHOLE_FIELDS,
   type SheetCompressionLevel,
 } from "@/agents/sheetCompression";
+import { PROXY_LLM_MAX_MESSAGE_CHARS } from "../../supabase/functions/_shared/proxyLlmLimits";
+
+/** Room kept for what the agent appends after the compiler (stream contract, private continuity). */
+export const PROXY_LIMIT_APPENDED_MARGIN_CHARS = 4_000;
 
 /**
  * Souvenirs lot 1 (24 November): the turn sections that used to take « what was left »
@@ -440,7 +444,7 @@ function timelineTitleUnits(timeline: string): Array<{ text: string; group?: str
 
 /** A budget decision the player-side trace must show: nothing the sheet holds leaves the prompt unannounced. */
 export interface PromptBudgetWarning {
-  code: "established_facts_dropped" | "canon_squeezed" | "souvenirs_evinces" | "memoire_evincee" | "canon_evince" | "reply_block_too_long";
+  code: "established_facts_dropped" | "canon_squeezed" | "souvenirs_evinces" | "memoire_evincee" | "canon_evince" | "reply_block_too_long" | "proxy_limit_exceeded";
   message: string;
 }
 
@@ -963,6 +967,14 @@ export function buildOptimizedPromptAssembly(input: OptimizedPromptInput): MaxPr
     turnWarnings.push({
       code: "reply_block_too_long",
       message: `Bloc « Comment tu réponds » non envoyé : ${replyBlock.content.length} car., au-delà de ${REPLY_BLOCK_MAX_CHARS}. Il reste lu comme le reste de son champ ; à resserrer dans Notion.`,
+    });
+  }
+  // The proxy refuses an oversized request: the turn would fall back, so it must be said here.
+  const requestChars = prompt.length + PROXY_LIMIT_APPENDED_MARGIN_CHARS + input.historyChars + input.userMessage.length;
+  if (requestChars > PROXY_LLM_MAX_MESSAGE_CHARS) {
+    turnWarnings.push({
+      code: "proxy_limit_exceeded",
+      message: `Prompt trop long pour proxy-llm : ≈ ${requestChars} car. avec l'historique, au-delà de ${PROXY_LLM_MAX_MESSAGE_CHARS}. Le personnage répondrait par la réplique de secours ; choisir un niveau de fiche plus court.`,
     });
   }
   const warnings = [...staticSelection.warnings, ...turnWarnings];
