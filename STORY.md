@@ -3,7 +3,13 @@
 > **Status**: 🟡 In Progress  
 > **Creator**: Ulrich Fischer / Memoways  
 > **Started**: 2026-03-07  
-> **Last Updated**: 2026-11-28 (Sujets sensibles reconnus)  
+> **Last Updated**: 2026-11-28 (Les vrais sujets de la fiche)  
+
+---
+
+## Les vrais sujets de la fiche (28 novembre 2026)
+
+La consigne de retenue partait presque à chaque question, sur des mots comme « est » ou « pas ». Elle suit maintenant les sujets de la fiche. Entre deux réglages, Ulrich garde le plus strict : les personnages lui semblent trop permissifs, trop proches d'un assistant serviable. Cadrer ce qui est possible dans un appel devient le chantier suivant.
 
 ---
 

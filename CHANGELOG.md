@@ -4,6 +4,13 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Sujets sensibles de la fiche, mémoire et relation lot 3] — 2026-11-28
+
+- Correctif : une fiche à puces donne un sujet par puce (l'introduction et les bouts de phrases n'en sont plus) ; un sujet se reconnaît sur les mots de son titre, sans mots-outils, pluriel et formes proches compris.
+- Effet en jeu approuvé par Ulrich (prénom seul déclencheur) : consigne de retenue sur au plus 27 % des questions à Max (85 % avant) et 39 % à Emma (76 % avant). Pas de synonymes.
+- Les ouvertures stockées sous les anciens identifiants ne sont plus lues ni montrées au Game Master.
+- Aucune migration, aucune écriture en base, aucun réglage ni prompt modifié ; aucun appel réel essayé, production non publiée.
+
 ## [Sujets sensibles reconnus, mémoire et relation lot 2] — 2026-11-28
 
 - Correctif : l'identifiant d'un sujet sensible coupé à 72 caractères ne finit plus par un tiret ; la validation le reconnaît, la relation proposée n'est plus refusée pour cette seule cause et le sujet peut s'ouvrir.
