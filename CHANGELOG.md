@@ -4,6 +4,11 @@ Toutes les modifications notables de ce projet sont documentées ici.
 
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [Cadre de l'appel : suite et Bible des réponses] — 2026-11-28
+
+- Documentation seulement : lot 2 réduit à un emplacement toujours envoyé, Bible des réponses décrite, consignes du code fondues dans ce chantier, raccrochage repoussé ; premier tic de réplique mesuré en lecture seule.
+- Aucun code, aucun réglage ni prompt modifié ; production non publiée.
+
 ## [Cadre de l'appel : diagnostic lot 1] — 2026-11-28
 
 - Documentation seulement : réponses trop permissives relevées en lecture seule, causes établies par reconstitution des prompts (limites des fiches coupées faute de place, `[END_CALL]` sans code, consignes poussant à répondre), leviers sans code et plan en lots proposé.
